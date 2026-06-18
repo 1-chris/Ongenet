@@ -49,18 +49,26 @@ build_linux() {
     rm -rf "$b"
 
     # PipeWire support: PortAudio has no native PipeWire backend — it reaches PipeWire via ALSA (the
-    # pipewire-alsa plugin, always on) and, for tighter integration / lower latency, via JACK (PipeWire's
-    # JACK server). Enable the JACK backend when its dev headers are present.
-    local jack_flag=""
-    if pkg-config --exists jack 2>/dev/null; then
-        jack_flag="-DPA_USE_JACK=ON"
-        echo "  PipeWire/JACK backend: ENABLED (links libjack — provided by pipewire-jack)."
-    else
-        echo "  JACK headers not found — building ALSA-only (audio still routes through PipeWire's ALSA plugin)."
-        echo "  For first-class PipeWire (JACK) support: sudo dnf install pipewire-jack-audio-connection-kit-devel, then re-run."
+    # pipewire-alsa plugin) and, for tighter integration / lower latency, via JACK (PipeWire's JACK
+    # server). JACK is REQUIRED for our Linux builds, so bail loudly if its dev files are missing.
+    if ! pkg-config --exists jack 2>/dev/null; then
+        echo "  ! JACK dev files not found — pkg-config can't see 'jack'. JACK is required for Linux builds."
+        echo "    Install it:  Fedora/Nobara: sudo dnf install pipewire-jack-audio-connection-kit-devel"
+        echo "                 Debian/Ubuntu: sudo apt-get install libjack-jackd2-dev"
+        return 1
     fi
+    # On a PipeWire-JACK system libjack.so lives in a non-standard dir (e.g. /usr/lib64/pipewire-0.3/jack)
+    # that the linker doesn't search by default — PortAudio emits a bare `-ljack`, so without pkg-config's
+    # -L path the link fails ("cannot find -ljack"). Feed those dirs to the shared-lib linker flags.
+    local jack_flag="-DPA_USE_JACK=ON"
+    local jack_ldflags; jack_ldflags="$(pkg-config --libs-only-L jack 2>/dev/null)"
+    echo "  PipeWire/JACK backend: ENABLED ($(pkg-config --libs jack 2>/dev/null))."
 
+    # CMAKE_POLICY_VERSION_MINIMUM=3.5: PortAudio v19.7.0's cmake_minimum_required is < 3.5, which
+    # CMake 4.x refuses outright. This flag lets it configure anyway (harmless on CMake 3.x).
     cmake -S "$SRC" -B "$b" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_SHARED_LINKER_FLAGS="$jack_ldflags" \
         -DPA_BUILD_TESTS=OFF -DPA_BUILD_EXAMPLES=OFF -DPA_USE_ALSA=ON $jack_flag >/dev/null \
         || { echo "  ! cmake configure failed"; return 0; }
     cmake --build "$b" -j"$(nproc)" >/dev/null || { echo "  ! build failed"; return 0; }
@@ -98,6 +106,7 @@ build_windows() {
     # Point CMake at the full MinGW toolchain (C, C++, RC) and statically fold the MinGW gcc/winpthread
     # runtime into the DLL so users need no extra MinGW DLLs.
     cmake -S "$SRC" -B "$b" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DPA_BUILD_TESTS=OFF -DPA_BUILD_EXAMPLES=OFF \
         -DCMAKE_SYSTEM_NAME=Windows \
         -DCMAKE_C_COMPILER="$cc" \

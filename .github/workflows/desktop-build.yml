@@ -64,7 +64,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake make zip \
-            libasound2-dev \
+            libasound2-dev libjack-jackd2-dev \
             gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64
 
       - name: Build native PortAudio + publish (Linux/Windows)
@@ -89,6 +89,7 @@ jobs:
             -DBUILD_SHARED_LIBS=ON \
             -DPA_BUILD_TESTS=OFF \
             -DPA_BUILD_EXAMPLES=OFF \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.osx_arch }}
           cmake --build pa-build -j"$(sysctl -n hw.ncpu)"
 
