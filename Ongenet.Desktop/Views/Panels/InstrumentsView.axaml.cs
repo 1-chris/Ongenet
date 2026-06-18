@@ -17,6 +17,7 @@ namespace Ongenet.Desktop.Views.Panels
 
         private Point _pressPoint;
         private InstrumentInfo? _pressed;
+        private PointerPressedEventArgs? _pressArgs;
 
         public InstrumentsView()
         {
@@ -28,6 +29,7 @@ namespace Ongenet.Desktop.Views.Panels
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
             _pressed = (e.Source as Control)?.DataContext as InstrumentInfo;
+            _pressArgs = _pressed is not null ? e : null;
             if (_pressed is not null) _pressPoint = e.GetPosition(this);
         }
 
@@ -42,14 +44,17 @@ namespace Ongenet.Desktop.Views.Panels
 
             var delta = e.GetPosition(this) - _pressPoint;
             if (System.Math.Abs(delta.X) < DragThreshold && System.Math.Abs(delta.Y) < DragThreshold) return;
+            if (_pressArgs is null) { _pressed = null; return; }
 
-            var data = new DataObject();
-            data.Set(DragFormats.Instrument, _pressed.Id);
+            var data = new DataTransfer();
+            data.Add(DataTransferItem.Create(DragFormats.Instrument, _pressed.Id));
+            var pressArgs = _pressArgs;
             _pressed = null;
+            _pressArgs = null;
 
             try
             {
-                await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+                await DragDrop.DoDragDropAsync(pressArgs, data, DragDropEffects.Copy);
             }
             catch (Exception)
             {

@@ -12,7 +12,6 @@
         Background="Transparent"
         SystemDecorations="None"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
         Title="{Binding Title}">
 
     <Panel>

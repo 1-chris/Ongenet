@@ -192,9 +192,9 @@ namespace Ongenet.Desktop.Views.Panels
         {
             if (DataContext is not TimelineViewModel vm) return;
             // Audio can arrive from the in-app file browser (DragFormats.AudioFile) or from the OS
-            // file manager as DataFormats.Files.
-            var isAudio = e.Data.Contains(DragFormats.AudioFile) || ExternalAudioPaths(e, vm).Count > 0;
-            var isInstrument = e.Data.Contains(DragFormats.Instrument);
+            // file manager as files.
+            var isAudio = e.DataTransfer.Contains(DragFormats.AudioFile) || ExternalAudioPaths(e, vm).Count > 0;
+            var isInstrument = e.DataTransfer.Contains(DragFormats.Instrument);
             if (!isAudio && !isInstrument)
             {
                 e.DragEffects = DragDropEffects.None;
@@ -226,11 +226,11 @@ namespace Ongenet.Desktop.Views.Panels
             vm.ClearDropHighlight();
 
             var (rowIndex, beat) = LocatePoint(e.GetPosition(LanesList), vm);
-            if (e.Data.Get(DragFormats.Instrument) is string instrumentId)
+            if (e.DataTransfer.TryGetValue(DragFormats.Instrument) is { } instrumentId)
             {
                 vm.CreateInstrumentTrack(instrumentId, vm.TrackInsertIndexForRow(rowIndex));
             }
-            else if (e.Data.Get(DragFormats.AudioFile) is string path)
+            else if (e.DataTransfer.TryGetValue(DragFormats.AudioFile) is { } path)
             {
                 var target = rowIndex >= vm.RowCount ? null : vm.TrackLaneAtRow(rowIndex);
                 vm.AddAudioClip(path, target, beat);
@@ -264,9 +264,7 @@ namespace Ongenet.Desktop.Views.Panels
         private static List<string> ExternalAudioPaths(DragEventArgs e, TimelineViewModel vm)
         {
             var paths = new List<string>();
-            if (!e.Data.Contains(DataFormats.Files)) return paths;
-
-            var items = e.Data.GetFiles();
+            var items = e.DataTransfer.TryGetFiles();
             if (items is null) return paths;
 
             foreach (var item in items)

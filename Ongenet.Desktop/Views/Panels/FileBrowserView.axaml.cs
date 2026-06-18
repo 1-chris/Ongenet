@@ -18,6 +18,7 @@ namespace Ongenet.Desktop.Views.Panels
 
         private Point _pressPoint;
         private FileNodeViewModel? _pressedNode;
+        private PointerPressedEventArgs? _pressArgs;
 
         public FileBrowserView()
         {
@@ -31,10 +32,12 @@ namespace Ongenet.Desktop.Views.Panels
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
             _pressedNode = null;
+            _pressArgs = null;
             if ((e.Source as Control)?.DataContext is FileNodeViewModel { IsDirectory: false } node)
             {
                 _pressPoint = e.GetPosition(this);
                 _pressedNode = node;
+                _pressArgs = e; // DoDragDropAsync requires the originating pressed event
             }
         }
 
@@ -51,20 +54,21 @@ namespace Ongenet.Desktop.Views.Panels
             if (Math.Abs(delta.X) < DragThreshold && Math.Abs(delta.Y) < DragThreshold) return;
 
             // Only audio files are draggable onto the timeline.
-            if (DataContext is not FileBrowserViewModel vm || !vm.IsAudioFile(_pressedNode.FullPath))
+            if (DataContext is not FileBrowserViewModel vm || _pressArgs is null || !vm.IsAudioFile(_pressedNode.FullPath))
             {
                 _pressedNode = null;
                 return;
             }
 
-            var data = new DataObject();
-            data.Set(DragFormats.AudioFile, _pressedNode.FullPath);
-            var node = _pressedNode;
+            var data = new DataTransfer();
+            data.Add(DataTransferItem.Create(DragFormats.AudioFile, _pressedNode.FullPath));
+            var pressArgs = _pressArgs;
             _pressedNode = null;
+            _pressArgs = null;
 
             try
             {
-                await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+                await DragDrop.DoDragDropAsync(pressArgs, data, DragDropEffects.Copy);
             }
             catch (Exception)
             {

@@ -11,8 +11,7 @@
         TransparencyLevelHint="Blur, AcrylicBlur, Transparent"
         Background="Transparent"
         SystemDecorations="None"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome">
+        ExtendClientAreaToDecorationsHint="True">
     <Window.Styles>
         <Style Selector="ListBox">
             <Setter Property="Background" Value="{StaticResource CatppuccinBase}"/>

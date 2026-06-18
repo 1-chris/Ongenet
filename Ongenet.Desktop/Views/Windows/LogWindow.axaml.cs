@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Ongenet.Desktop.ViewModels;
 using Ongenet.Core.Models.Logging;
