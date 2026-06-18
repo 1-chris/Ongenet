@@ -43,8 +43,11 @@ jobs:
         include:
           - { rid: linux-x64, os: ubuntu-latest }
           - { rid: win-x64,   os: ubuntu-latest }            # cross-compiled via MinGW
-          - { rid: osx-arm64, os: macos-14, osx_arch: arm64 }   # Apple Silicon runner
-          - { rid: osx-x64,   os: macos-13, osx_arch: x86_64 }  # Intel runner
+          # Both macOS targets build on the Apple Silicon runner. Intel (macos-13) runners are being
+          # retired, so osx-x64 is cross-compiled: clang targets x86_64 via CMAKE_OSX_ARCHITECTURES and
+          # `dotnet publish -r osx-x64` cross-publishes fine from an arm64 host.
+          - { rid: osx-arm64, os: macos-14, osx_arch: arm64 }
+          - { rid: osx-x64,   os: macos-14, osx_arch: x86_64 }
 
     steps:
       - name: Checkout
