@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Ongenet.Desktop.Views.Windows.MainWindow"
         x:DataType="vm:MainViewModel"
-        Width="1300" Height="700"
+        Width="1670" Height="700"
         TransparencyLevelHint="Blur, AcrylicBlur, Transparent"
         Background="Transparent"
         SystemDecorations="None"
@@ -73,8 +73,16 @@
                         <TabControl Grid.Row="2" MinHeight="90" DataContext="{Binding BottomPanel}"
                                     SelectedIndex="{Binding SelectedTabIndex}"
                                     Background="{StaticResource CatppuccinMantle}">
-                            <TabItem Header="Instrument">
-                                <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
+                            <!-- Contextual first tab: Instrument inspector, or Sample inspector for an audio clip -->
+                            <TabItem Header="{Binding FirstTabHeader}">
+                                <Panel>
+                                    <ContentControl IsVisible="{Binding IsInstrumentMode}">
+                                        <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
+                                    </ContentControl>
+                                    <ContentControl IsVisible="{Binding IsSampleSelected}">
+                                        <views:SampleInspectorView DataContext="{Binding Sample}"/>
+                                    </ContentControl>
+                                </Panel>
                             </TabItem>
                             <TabItem Header="Piano Roll">
                                 <views:PianoRollView DataContext="{Binding PianoRoll}"/>

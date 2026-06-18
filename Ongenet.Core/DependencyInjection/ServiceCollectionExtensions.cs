@@ -39,8 +39,10 @@ public static class ServiceCollectionExtensions
         // (Ongenet.Desktop references the PortAudio backend); the engine depends only on the seam.
         services.AddSingleton<IAudioEngine, AudioEngine>();
 
-        // Audio file decoding. Register one IAudioFileDecoder per format (WAV today).
+        // Audio file decoding. One IAudioFileDecoder per strategy: native WAV first, then ffmpeg for
+        // everything else (transcoded to WAV on the fly). AudioFileService picks the first that matches.
         services.AddSingleton<IAudioFileDecoder, WavFileDecoder>();
+        services.AddSingleton<IAudioFileDecoder, FfmpegAudioDecoder>();
         services.AddSingleton<IAudioFileService, AudioFileService>();
 
         // Offline render (export to WAV).

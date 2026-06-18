@@ -50,8 +50,11 @@ namespace Ongenet.Desktop
             // Core services.
             services.AddOngenetCore();
 
-            // Audio device backend (PortAudio). The engine in Core depends only on IAudioOutput.
+            // Audio device backend (PortAudio). The engine in Core depends only on the IAudioOutput /
+            // IAudioInput / IAudioDeviceService seams; the concrete devices live in Ongenet.Audio.
+            services.AddSingleton<IAudioDeviceService, PortAudioDeviceService>();
             services.AddSingleton<IAudioOutput, PortAudioOutput>();
+            services.AddSingleton<IAudioInput, PortAudioInput>();
 
             // Parameter automation: creates lanes from the "Create automation track" right-click.
             services.AddSingleton<Services.IAutomationService, Services.AutomationService>();
@@ -70,11 +73,13 @@ namespace Ongenet.Desktop
 
             // ViewModels. Panel view models are singletons: they share the one transport,
             // selection, and project for the lifetime of the single main window.
+            services.AddSingleton<AudioDevicesViewModel>();
             services.AddSingleton<TransportViewModel>();
             services.AddSingleton<TimelineViewModel>();
             services.AddSingleton<TrackInspectorViewModel>();
             services.AddSingleton<ClipInspectorViewModel>();
             services.AddSingleton<InstrumentInspectorViewModel>();
+            services.AddSingleton<SampleInspectorViewModel>();
             services.AddSingleton<PianoRollViewModel>();
             services.AddSingleton<EffectsViewModel>();
             services.AddSingleton<BottomPanelViewModel>();

@@ -23,7 +23,7 @@ namespace Ongenet.Desktop.ViewModels
 
         public TransportViewModel(ITransportService transport, IAudioEngine engine,
             IProjectService project, IEventAggregator events, IEditModeService editMode,
-            OfflineRenderer renderer, IRecordingService recording)
+            OfflineRenderer renderer, IRecordingService recording, AudioDevicesViewModel devices)
         {
             _transport = transport;
             _engine = engine;
@@ -32,6 +32,7 @@ namespace Ongenet.Desktop.ViewModels
             _editMode = editMode;
             _renderer = renderer;
             _recording = recording;
+            Devices = devices;
 
             _transport.StateChanged += _ => OnStateChanged();
             _transport.TempoChanged += _ => OnTempoChanged();
@@ -44,6 +45,9 @@ namespace Ongenet.Desktop.ViewModels
             StopCommand = new RelayCommand(OnStop);
             RecordCommand = new RelayCommand(_recording.StartRecording);
         }
+
+        /// <summary>Audio input/output device pickers shown in the top bar.</summary>
+        public AudioDevicesViewModel Devices { get; }
 
         // Stop ends a recording session (committing its clips) or just stops the transport.
         private void OnStop()

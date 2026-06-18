@@ -61,6 +61,8 @@ namespace Ongenet.Desktop.ViewModels
             events.Subscribe<ArrangementLengthChangedEvent>(_ => ResizeArrangement());
             _transport.StateChanged += _ => OnPropertyChanged(nameof(IsPlaying));
             _transport.StartBeatChanged += () => OnPropertyChanged(nameof(StartBeat));
+            // Re-fit tempo-synced audio clips to the grid whenever the project tempo changes.
+            _transport.TempoChanged += _ => OnProjectTempoChanged();
             _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSelectMode));
 
             Rebuild();
@@ -109,6 +111,9 @@ namespace Ongenet.Desktop.ViewModels
 
         /// <summary>Beats per bar from the project's time signature.</summary>
         public int BeatsPerBar => Math.Max(1, _project.Current.TimeSignature.Numerator);
+
+        /// <summary>Whether a file path is an audio file the timeline can ingest (drag-and-drop gate).</summary>
+        public bool CanIngest(string path) => _audioFiles.IsAudioFile(path);
 
         /// <summary>Selects a clip (used by the timeline pointer gestures).</summary>
         public void SelectClip(ClipViewModel clip) => _selection.SelectClip(clip.Model, clip.Owner);
@@ -371,17 +376,39 @@ namespace Ongenet.Desktop.ViewModels
             var project = _project.Current;
             // Use the live transport tempo (what the user sets), so an N-bar sample lands on N bars.
             var bpm = _transport.Tempo.BeatsPerMinute;
+            var duration = loaded?.Waveform.DurationSeconds ?? 0;
 
-            // Length from decoded duration; fall back to a sensible default if undecodable.
-            var lengthBeats = loaded is { Waveform.DurationSeconds: > 0 }
-                ? loaded.Waveform.DurationSeconds * bpm / 60.0
-                : 4.0;
+            // Default: place the clip at its native duration (no stretch).
+            var lengthBeats = duration > 0 ? duration * bpm / 60.0 : 4.0;
+            var stretchToTempo = false;
+            double? sourceTempo = null;
+
+            // If we know the sample's natural tempo, fit it to the grid and time-stretch to match.
+            // Tagged (name-based) tempos always sync; estimated tempos only for loop-length material
+            // (≥ ~2 beats) so we don't warp one-shots on a shaky estimate.
+            if (duration > 0 && loaded?.Tempo is { } naturalBpm && naturalBpm > 0)
+            {
+                var naturalBeats = duration * naturalBpm / 60.0;
+                if (loaded.TempoFromName || naturalBeats >= 2.0)
+                {
+                    var musical = Core.Audio.TempoSync.MusicalBeats(duration, naturalBpm, bpm);
+                    if (musical > 0)
+                    {
+                        lengthBeats = musical;
+                        stretchToTempo = true;
+                        sourceTempo = naturalBpm;
+                    }
+                }
+            }
 
             var clip = new Clip
             {
                 Name = Path.GetFileNameWithoutExtension(path),
                 StartBeat = startBeat,
                 LengthBeats = lengthBeats,
+                IsAudio = true,
+                StretchToTempo = stretchToTempo,
+                SourceTempo = sourceTempo,
                 AudioFilePath = path,
                 Waveform = loaded?.Waveform,
                 Samples = loaded?.Samples
@@ -472,6 +499,33 @@ namespace Ongenet.Desktop.ViewModels
             var lane = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, track));
             lane?.RefreshAutomationState();
             RebuildRows();
+        }
+
+        // Project tempo changed: re-fit each tempo-synced audio clip to the grid. Its musical length in
+        // beats is recomputed (re-snapping the half/double octave) so the loop stays aligned; the engine
+        // then resamples the audio to span that beat-length at the new tempo on the next playback.
+        private void OnProjectTempoChanged()
+        {
+            var projBpm = _transport.Tempo.BeatsPerMinute;
+            if (projBpm <= 0) return;
+
+            foreach (var lane in _trackLanes)
+            {
+                foreach (var clipVm in lane.Clips)
+                {
+                    var m = clipVm.Model;
+                    if (!m.StretchToTempo || m.Samples is null || m.SourceTempo is not { } source) continue;
+
+                    var duration = m.Samples.FrameCount / (double)m.Samples.SampleRate;
+                    var beats = Core.Audio.TempoSync.MusicalBeats(duration, source, projBpm);
+                    if (beats <= 0 || Math.Abs(beats - m.LengthBeats) < 1e-6) continue;
+
+                    m.LengthBeats = beats;
+                    clipVm.RefreshFromModel();
+                    _events.Publish(new ClipChangedEvent(m));
+                    ExtendTimeline(m.EndBeat);
+                }
+            }
         }
 
         // Sizes the ruler/arrange area to max(project bar count, content) bars.
@@ -601,6 +655,9 @@ namespace Ongenet.Desktop.ViewModels
                 Name = src.Name,
                 StartBeat = src.StartBeat,
                 LengthBeats = src.LengthBeats,
+                IsAudio = src.IsAudio,
+                StretchToTempo = src.StretchToTempo,
+                SourceTempo = src.SourceTempo,
                 AudioFilePath = src.AudioFilePath,
                 Waveform = src.Waveform,
                 Samples = src.Samples

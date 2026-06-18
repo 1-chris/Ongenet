@@ -249,6 +249,7 @@
                                                 </Border.ContextMenu>
                                                 <Grid>
                                                     <controls:WaveformControl Waveform="{Binding Waveform}"
+                                                                              Revision="{Binding WaveformRevision}"
                                                                               IsVisible="{Binding IsAudio}"
                                                                               IsHitTestVisible="False"
                                                                               Fill="{StaticResource CatppuccinCrust}"

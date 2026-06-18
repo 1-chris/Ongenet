@@ -38,7 +38,8 @@ namespace Ongenet.Desktop.ViewModels
                 if (string.Equals(root.FullPath, path, StringComparison.Ordinal)) return;
             }
 
-            Roots.Add(new FileNodeViewModel(path, isDirectory: true));
+            // Only show folders and audio files we can ingest (WAV natively, others via ffmpeg).
+            Roots.Add(new FileNodeViewModel(path, isDirectory: true, _audioFiles.IsAudioFile));
         }
     }
 }

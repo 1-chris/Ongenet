@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Ongenet.Desktop.ViewModels;
@@ -189,7 +191,9 @@ namespace Ongenet.Desktop.Views.Panels
         private void OnDragOver(object? sender, DragEventArgs e)
         {
             if (DataContext is not TimelineViewModel vm) return;
-            var isAudio = e.Data.Contains(DragFormats.AudioFile);
+            // Audio can arrive from the in-app file browser (DragFormats.AudioFile) or from the OS
+            // file manager as DataFormats.Files.
+            var isAudio = e.Data.Contains(DragFormats.AudioFile) || ExternalAudioPaths(e, vm).Count > 0;
             var isInstrument = e.Data.Contains(DragFormats.Instrument);
             if (!isAudio && !isInstrument)
             {
@@ -231,6 +235,21 @@ namespace Ongenet.Desktop.Views.Panels
                 var target = rowIndex >= vm.RowCount ? null : vm.TrackLaneAtRow(rowIndex);
                 vm.AddAudioClip(path, target, beat);
             }
+            else
+            {
+                // External OS file drop: one file lands on the hovered lane; multiple files each get
+                // their own new audio track so they don't pile up on top of each other.
+                var paths = ExternalAudioPaths(e, vm);
+                if (paths.Count == 1)
+                {
+                    var target = rowIndex >= vm.RowCount ? null : vm.TrackLaneAtRow(rowIndex);
+                    vm.AddAudioClip(paths[0], target, beat);
+                }
+                else
+                {
+                    foreach (var p in paths) vm.AddAudioClip(p, null, beat);
+                }
+            }
 
             e.Handled = true;
         }
@@ -239,6 +258,24 @@ namespace Ongenet.Desktop.Views.Panels
         {
             NewTrackGhost.IsVisible = false;
             (DataContext as TimelineViewModel)?.ClearDropHighlight();
+        }
+
+        // Extracts the local paths of any dragged OS files the timeline can ingest as audio.
+        private static List<string> ExternalAudioPaths(DragEventArgs e, TimelineViewModel vm)
+        {
+            var paths = new List<string>();
+            if (!e.Data.Contains(DataFormats.Files)) return paths;
+
+            var items = e.Data.GetFiles();
+            if (items is null) return paths;
+
+            foreach (var item in items)
+            {
+                var local = item.TryGetLocalPath();
+                if (!string.IsNullOrEmpty(local) && vm.CanIngest(local)) paths.Add(local);
+            }
+
+            return paths;
         }
 
         // Maps a drag position to a target track lane (null = new track) + beat.

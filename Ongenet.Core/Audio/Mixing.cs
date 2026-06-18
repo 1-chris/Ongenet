@@ -25,12 +25,15 @@ public static class Mixing
     /// <summary>
     /// Renders an audio clip's samples (no strip) additively into a scratch buffer, resampling
     /// from the file rate to the device/render rate and positioning by the playhead beat.
+    /// <paramref name="stretch"/> is an extra playback-rate multiplier (1.0 = native): the engine sets
+    /// it so a tempo-synced clip's whole sample spans its beat-length at the project tempo.
     /// </summary>
     public static void RenderAudioClip(Span<float> temp, AudioSampleBuffer samples,
         double clipStartBeat, double clipLengthBeats, double blockStartBeat,
-        double samplesPerBeat, int deviceSampleRate, int channels)
+        double samplesPerBeat, int deviceSampleRate, int channels, double stretch = 1.0)
     {
-        var ratio = (double)samples.SampleRate / deviceSampleRate;
+        if (stretch <= 0) stretch = 1.0;
+        var ratio = (double)samples.SampleRate / deviceSampleRate * stretch;
         var frameCount = samples.FrameCount;
         var frames = temp.Length / channels;
 

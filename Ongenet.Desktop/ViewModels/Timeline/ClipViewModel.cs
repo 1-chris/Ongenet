@@ -69,6 +69,15 @@ namespace Ongenet.Desktop.ViewModels.Timeline
         /// <summary>Signals that the clip's notes changed (repaints the miniature view).</summary>
         public void NotifyNotesChanged() => NotesRevision++;
 
+        private int _waveformRevision;
+
+        /// <summary>Bumped whenever the clip's waveform grows in place (live recording), to repaint it.</summary>
+        public int WaveformRevision
+        {
+            get => _waveformRevision;
+            private set => SetField(ref _waveformRevision, value);
+        }
+
         /// <summary>Whether this clip is the current selection.</summary>
         public bool IsSelected
         {
@@ -86,8 +95,9 @@ namespace Ongenet.Desktop.ViewModels.Timeline
             OnPropertyChanged(nameof(IsAudio));
             OnPropertyChanged(nameof(IsMidi));
             OnPropertyChanged(nameof(ClipLengthBeats));
-            // Repaint the miniature note view too (a resize changes the note→pixel mapping).
+            // Repaint the miniature note view and waveform too (a resize/grow changes their mapping).
             NotifyNotesChanged();
+            WaveformRevision++;
         }
 
         private void OnMetricsChanged(object? sender, PropertyChangedEventArgs e)

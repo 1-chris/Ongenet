@@ -21,6 +21,60 @@ internal static class PortAudioNative
     public const int PaContinue = 0;
     public const int PaComplete = 1;
 
+    // Sentinel device index meaning "no device" (paNoDevice).
+    public const int PaNoDevice = -1;
+
+    // paNoFlag / paClipOff etc. We use no special stream flags.
+    public const uint PaNoFlag = 0;
+
+    /// <summary>
+    /// Mirror of PortAudio's <c>PaDeviceInfo</c>. No <c>unsigned long</c> fields, so the default
+    /// sequential layout is correct on every 64-bit platform (pointers are 8 bytes throughout).
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PaDeviceInfo
+    {
+        public int structVersion;
+        public IntPtr name; // const char*
+        public int hostApi;
+        public int maxInputChannels;
+        public int maxOutputChannels;
+        public double defaultLowInputLatency;
+        public double defaultLowOutputLatency;
+        public double defaultHighInputLatency;
+        public double defaultHighOutputLatency;
+        public double defaultSampleRate;
+    }
+
+    /// <summary>Mirror of PortAudio's <c>PaHostApiInfo</c> (used only for the host-API display name).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PaHostApiInfo
+    {
+        public int structVersion;
+        public int type;
+        public IntPtr name; // const char*
+        public int deviceCount;
+        public int defaultInputDevice;
+        public int defaultOutputDevice;
+    }
+
+    /// <summary>
+    /// Mirror of PortAudio's <c>PaStreamParameters</c>. <c>sampleFormat</c> is C's <c>unsigned long</c>
+    /// (4 bytes on Windows LLP64, 8 on Unix LP64); we declare it as a 8-byte <see cref="ulong"/>, which
+    /// gives byte-for-byte identical field offsets on both because the following <c>double</c> forces
+    /// 8-byte alignment anyway, and on little-endian x64/arm64 the low 4 bytes carry the value Windows
+    /// reads. Always zero-initialise before use so the high bytes are clean.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PaStreamParameters
+    {
+        public int device;
+        public int channelCount;
+        public ulong sampleFormat;
+        public double suggestedLatency;
+        public IntPtr hostApiSpecificStreamInfo;
+    }
+
     /// <summary>
     /// PortAudio stream callback. Note: C's <c>unsigned long</c> is mapped to <see cref="uint"/>;
     /// frame counts and status flags are small, and on the x64 calling conventions each argument
@@ -52,6 +106,37 @@ internal static class PortAudioNative
         PaStreamCallback streamCallback,
         IntPtr userData);
 
+    // Opens a stream on explicit devices. inputParameters / outputParameters are pointers to a
+    // PaStreamParameters (or IntPtr.Zero for "none"); this is what lets us pick a device, unlike
+    // Pa_OpenDefaultStream. streamFlags is C's unsigned long but is passed by register, so uint is fine.
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int Pa_OpenStream(
+        out IntPtr stream,
+        IntPtr inputParameters,
+        IntPtr outputParameters,
+        double sampleRate,
+        uint framesPerBuffer,
+        uint streamFlags,
+        PaStreamCallback streamCallback,
+        IntPtr userData);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int Pa_GetDeviceCount();
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int Pa_GetDefaultInputDevice();
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int Pa_GetDefaultOutputDevice();
+
+    // Returns a const PaDeviceInfo* owned by PortAudio (do not free); IntPtr.Zero if the index is bad.
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr Pa_GetDeviceInfo(int device);
+
+    // Returns a const PaHostApiInfo* owned by PortAudio (do not free); IntPtr.Zero if the index is bad.
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr Pa_GetHostApiInfo(int hostApi);
+
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     public static extern int Pa_StartStream(IntPtr stream);
 
@@ -72,6 +157,41 @@ internal static class PortAudioNative
     {
         var ptr = Pa_GetErrorText(code);
         return ptr == IntPtr.Zero ? $"PortAudio error {code}" : Marshal.PtrToStringAnsi(ptr) ?? $"PortAudio error {code}";
+    }
+
+    // --- Refcounted lifetime -------------------------------------------------------------
+    // Several components (output stream, input stream, device enumeration) need PortAudio
+    // initialised. Refcount Pa_Initialize/Pa_Terminate so they can come and go independently
+    // and the library is only torn down once nothing is using it.
+
+    private static int _initCount;
+    private static readonly object InitLock = new();
+
+    /// <summary>Ensures PortAudio is initialised, registering the library resolver first. Refcounted.</summary>
+    public static void PaRef()
+    {
+        lock (InitLock)
+        {
+            if (_initCount == 0)
+            {
+                EnsureResolver();
+                var code = Pa_Initialize();
+                if (code < 0) throw new InvalidOperationException($"Pa_Initialize failed: {ErrorText(code)}");
+            }
+
+            _initCount++;
+        }
+    }
+
+    /// <summary>Releases one PortAudio reference, terminating the library when the last one goes.</summary>
+    public static void PaUnref()
+    {
+        lock (InitLock)
+        {
+            if (_initCount == 0) return;
+            _initCount--;
+            if (_initCount == 0) Pa_Terminate();
+        }
     }
 
     // --- Native library resolution -------------------------------------------------------

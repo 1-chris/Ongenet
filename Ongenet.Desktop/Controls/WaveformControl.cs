@@ -22,9 +22,22 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<IBrush?> FillProperty =
             AvaloniaProperty.Register<WaveformControl, IBrush?>(nameof(Fill));
 
+        /// <summary>
+        /// Bumped to force a repaint when the bound <see cref="AudioWaveform"/> grows in place (e.g.
+        /// while recording) — the property reference doesn't change, so we need an explicit trigger.
+        /// </summary>
+        public static readonly StyledProperty<int> RevisionProperty =
+            AvaloniaProperty.Register<WaveformControl, int>(nameof(Revision));
+
         static WaveformControl()
         {
-            AffectsRender<WaveformControl>(WaveformProperty, FillProperty);
+            AffectsRender<WaveformControl>(WaveformProperty, FillProperty, RevisionProperty);
+        }
+
+        public int Revision
+        {
+            get => GetValue(RevisionProperty);
+            set => SetValue(RevisionProperty, value);
         }
 
         public AudioWaveform? Waveform

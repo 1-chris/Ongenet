@@ -141,7 +141,12 @@ public sealed class AudioEngine : IAudioEngine
                 {
                     if (clip.Samples is { } samples && clip.EndBeat > startBeat)
                     {
-                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples));
+                        // Tempo-synced clips resample so the whole sample spans their beat-length at the
+                        // current tempo (keeps loops on the grid); others play at native speed.
+                        var stretch = clip.StretchToTempo
+                            ? TempoSync.Stretch(samples.FrameCount / (double)samples.SampleRate, bpm, clip.LengthBeats)
+                            : 1.0;
+                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples, stretch));
                     }
                 }
             }
@@ -229,7 +234,7 @@ public sealed class AudioEngine : IAudioEngine
                     if (ReferenceEquals(acp.Track, track))
                     {
                         Mixing.RenderAudioClip(temp, acp.Samples, acp.StartBeat, acp.LengthBeats,
-                            prevBeat, _samplesPerBeat, _output.Format.SampleRate, channels);
+                            prevBeat, _samplesPerBeat, _output.Format.SampleRate, channels, acp.Stretch);
                         hasContent = true;
                     }
                 }
@@ -411,5 +416,5 @@ public sealed class AudioEngine : IAudioEngine
 
     private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument Instrument, int Note, float Velocity);
 
-    private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples);
+    private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch);
 }

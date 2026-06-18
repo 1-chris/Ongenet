@@ -15,6 +15,10 @@ namespace Ongenet.Desktop.ViewModels.FileSystem
         // expander arrow before we've actually enumerated its contents.
         private static readonly FileNodeViewModel Placeholder = new();
 
+        // When set, only files matching this predicate are listed (directories are always shown).
+        // Propagated to child nodes so the whole tree filters consistently.
+        private readonly Func<string, bool>? _fileFilter;
+
         private bool _isExpanded;
         private bool _childrenLoaded;
 
@@ -26,10 +30,11 @@ namespace Ongenet.Desktop.ViewModels.FileSystem
             IsDirectory = false;
         }
 
-        public FileNodeViewModel(string fullPath, bool isDirectory)
+        public FileNodeViewModel(string fullPath, bool isDirectory, Func<string, bool>? fileFilter = null)
         {
             FullPath = fullPath;
             IsDirectory = isDirectory;
+            _fileFilter = fileFilter;
             Name = Path.GetFileName(fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             if (string.IsNullOrEmpty(Name)) Name = fullPath; // drive/root
 
@@ -69,14 +74,15 @@ namespace Ongenet.Desktop.ViewModels.FileSystem
                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase);
                 foreach (var dir in dirs)
                 {
-                    Children.Add(new FileNodeViewModel(dir, isDirectory: true));
+                    Children.Add(new FileNodeViewModel(dir, isDirectory: true, _fileFilter));
                 }
 
                 var files = Directory.EnumerateFiles(FullPath)
+                    .Where(f => _fileFilter is null || _fileFilter(f)) // hide unsupported file types
                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase);
                 foreach (var file in files)
                 {
-                    Children.Add(new FileNodeViewModel(file, isDirectory: false));
+                    Children.Add(new FileNodeViewModel(file, isDirectory: false, _fileFilter));
                 }
             }
             catch (Exception)

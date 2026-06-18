@@ -11,11 +11,13 @@ namespace Ongenet.Core.Audio.Files;
 /// </summary>
 public sealed class AudioFileService : IAudioFileService
 {
-    // Extensions we treat as audio for drag-and-drop. Only those with a registered decoder can
-    // actually be decoded today (WAV); the rest are recognised so the UX is ready for them.
+    // Extensions we treat as audio for drag-and-drop and the file browser. WAV decodes natively; the
+    // rest are transcoded via ffmpeg. This is the set the browser shows and the timeline accepts.
     private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".wav", ".wave", ".mp3", ".flac", ".ogg", ".aif", ".aiff", ".m4a"
+        ".wav", ".wave",
+        ".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".mp4", ".aac",
+        ".aif", ".aiff", ".aifc", ".wma", ".alac", ".caf", ".ape", ".wv"
     };
 
     private readonly IReadOnlyList<IAudioFileDecoder> _decoders;
@@ -36,6 +38,10 @@ public sealed class AudioFileService : IAudioFileService
 
         var samples = decoder.Decode(path);
         var waveform = AudioWaveform.Build(samples);
-        return new LoadedAudio(samples, waveform);
+
+        // Natural tempo: prefer an explicit "<n>bpm" tag in the file/folder name, else estimate it.
+        var named = TempoDetector.FromPath(path);
+        var tempo = named ?? TempoDetector.Estimate(samples);
+        return new LoadedAudio(samples, waveform, tempo, named.HasValue);
     }
 }

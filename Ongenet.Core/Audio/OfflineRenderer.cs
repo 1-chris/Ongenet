@@ -57,7 +57,11 @@ public sealed class OfflineRenderer
             {
                 foreach (var clip in track.Clips)
                 {
-                    if (clip.Samples is { } samples) rt.AudioClips.Add((clip.StartBeat, clip.LengthBeats, samples));
+                    if (clip.Samples is not { } samples) continue;
+                    var stretch = clip.StretchToTempo
+                        ? TempoSync.Stretch(samples.FrameCount / (double)samples.SampleRate, bpm, clip.LengthBeats)
+                        : 1.0;
+                    rt.AudioClips.Add((clip.StartBeat, clip.LengthBeats, samples, stretch));
                 }
             }
 
@@ -119,9 +123,9 @@ public sealed class OfflineRenderer
                 }
                 else
                 {
-                    foreach (var (start, length, samples) in rt.AudioClips)
+                    foreach (var (start, length, samples, stretch) in rt.AudioClips)
                     {
-                        Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat, sampleRate, channels);
+                        Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat, sampleRate, channels, stretch);
                         hasContent = true;
                     }
                 }
@@ -156,7 +160,7 @@ public sealed class OfflineRenderer
         public Track Source { get; }
         public IInstrument? Instrument { get; set; }
         public IAudioEffect[] Effects { get; set; } = Array.Empty<IAudioEffect>();
-        public List<(double Start, double Length, AudioSampleBuffer Samples)> AudioClips { get; } = new();
+        public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch)> AudioClips { get; } = new();
     }
 
     private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument Instrument, int Note, float Velocity);
