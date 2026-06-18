@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             xmlns:inst="using:Ongenet.Desktop.ViewModels.Instruments"
+             xmlns:panels="using:Ongenet.Desktop.Views.Panels"
+             xmlns:controls="using:Ongenet.Desktop.Controls"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="240"
+             x:Class="Ongenet.Desktop.Views.Panels.InstrumentInspectorView"
+             x:DataType="vm:InstrumentInspectorViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.key">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Margin" Value="1,0"/>
+            <Setter Property="CornerRadius" Value="0,0,4,4"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSubtext1}"/>
+        </Style>
+        <Style Selector="Border.key.black">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="Border.key:pointerover">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+        <Style Selector="Border.key.active">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+        <Grid>
+            <TextBlock Text="Select an instrument track." IsVisible="{Binding !HasInstrument}"
+                       Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
+
+            <!-- Rows: header / parameters (fills + scrolls) / grain monitor / keyboard -->
+            <Grid IsVisible="{Binding HasInstrument}" RowDefinitions="Auto,*,Auto,Auto">
+
+                <!-- Header: name, sampler loader, plugin-UI button -->
+                <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="{Binding InstrumentName}" FontWeight="Bold" FontSize="12"
+                               VerticalAlignment="Center" Margin="0,0,16,0"
+                               Foreground="{StaticResource CatppuccinMauve}"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
+                                VerticalAlignment="Center" IsVisible="{Binding IsSampler}">
+                        <Button Content="Load sample…" Click="OnLoadSample"
+                                Background="{StaticResource CatppuccinSurface0}"/>
+                        <TextBlock Text="{Binding SampleName}" VerticalAlignment="Center"
+                                   MaxWidth="220" FontSize="11" TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    </StackPanel>
+
+                    <Button Content="{Binding EditorButtonText}" Click="OnTogglePluginUi"
+                            IsVisible="{Binding HasEditor}" VerticalAlignment="Center"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            ToolTip.Tip="Open the plugin's own interface"/>
+                </WrapPanel>
+
+                <!-- Parameters: grouped fieldsets that wrap across the width, scroll vertically on overflow -->
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+                    <panels:GroupedParametersView DataContext="{Binding ParameterGroups}"/>
+                </ScrollViewer>
+
+                <!-- Grain monitor (granular synth only) -->
+                <Border Grid.Row="2" Height="96" Margin="0,8,0,0" CornerRadius="4"
+                        ClipToBounds="True" IsVisible="{Binding IsGranular}"
+                        BorderBrush="{StaticResource CatppuccinSurface0}" BorderThickness="1">
+                    <Grid>
+                        <controls:GrainMonitorControl Monitor="{Binding GrainMonitor}"/>
+                        <TextBlock Text="GRAINS" FontSize="9" Margin="6,4"
+                                   VerticalAlignment="Top" HorizontalAlignment="Left"
+                                   IsHitTestVisible="False"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    </Grid>
+                </Border>
+
+                <!-- Mini keyboard -->
+                <StackPanel Grid.Row="3" Spacing="4" Margin="0,8,0,0">
+                    <TextBlock Text="Click keys to play" FontSize="11"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Keys}" Name="Keyboard">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="inst:KeyViewModel">
+                                    <Border Classes="key" Classes.black="{Binding IsBlack}"
+                                            Classes.active="{Binding IsActive}" Height="72"
+                                            PointerPressed="OnKeyPressed"
+                                            PointerReleased="OnKeyReleased"
+                                            PointerExited="OnKeyExited">
+                                        <TextBlock Text="{Binding Label}" FontSize="9"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                                   Margin="0,0,0,4"
+                                                   Foreground="{StaticResource CatppuccinCrust}"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

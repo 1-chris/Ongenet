@@ -1,0 +1,90 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Ongenet.Core.Audio.Automation;
+using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Instruments;
+
+namespace Ongenet.Core.Models.Audio;
+
+/// <summary>
+/// A single track in a <see cref="Project"/>: a named, coloured lane that holds clips
+/// and carries mix settings. POCO by design — the Desktop layer wraps it in a view model
+/// and raises change notifications.
+/// </summary>
+public sealed class Track
+{
+    /// <summary>Stable identity for selection and lookups.</summary>
+    public Guid Id { get; init; } = Guid.NewGuid();
+
+    /// <summary>Display name.</summary>
+    public string Name { get; set; } = "Track";
+
+    /// <summary>The kind of material this track carries.</summary>
+    public TrackKind Kind { get; set; } = TrackKind.Audio;
+
+    /// <summary>Whether the track is muted.</summary>
+    public bool IsMuted { get; set; }
+
+    /// <summary>Whether the track is soloed.</summary>
+    public bool IsSoloed { get; set; }
+
+    /// <summary>
+    /// Whether the track is armed for recording. Live MIDI input is captured into armed
+    /// instrument tracks while the transport is recording. Not persisted.
+    /// </summary>
+    public bool IsArmed { get; set; }
+
+    /// <summary>Linear output gain, 0..1.</summary>
+    public double Volume { get; set; } = 0.8;
+
+    /// <summary>Stereo pan, -1 (hard left) .. +1 (hard right).</summary>
+    public double Pan { get; set; }
+
+    /// <summary>
+    /// The track's colour, stored as a palette key (e.g. "CatppuccinMauve") or a "#rrggbb"
+    /// hex string. Kept as a string so Core stays free of any UI/Avalonia dependency; the
+    /// Desktop layer resolves it to a brush.
+    /// </summary>
+    public string ColorKey { get; set; } = "CatppuccinMauve";
+
+    /// <summary>The clips placed on this track, ordered loosely by <see cref="Clip.StartBeat"/>.</summary>
+    public List<Clip> Clips { get; } = new();
+
+    /// <summary>
+    /// The live instrument for an <see cref="TrackKind.Instrument"/> track, or null. The audio
+    /// engine mixes this; the instrument inspector edits it.
+    /// </summary>
+    public IInstrument? Instrument { get; set; }
+
+    /// <summary>
+    /// Transient peak output level (0..1, with release) written by the audio engine each block and
+    /// polled by the UI level meter. Not persisted.
+    /// </summary>
+    public float MeterLevel;
+
+    /// <summary>The track's insert effect chain (UI-facing list). Edit, then call <see cref="CommitEffects"/>.</summary>
+    public List<IAudioEffect> Effects { get; } = new();
+
+    private volatile IAudioEffect[] _activeEffects = Array.Empty<IAudioEffect>();
+
+    /// <summary>Lock-free snapshot of the effect chain read by the audio engine.</summary>
+    public IAudioEffect[] ActiveEffects => _activeEffects;
+
+    /// <summary>Publishes the current <see cref="Effects"/> list to the audio thread.</summary>
+    public void CommitEffects() => _activeEffects = Effects.ToArray();
+
+    /// <summary>Automation lanes on this track (UI-facing). Edit, then call <see cref="CommitAutoLanes"/>.</summary>
+    public List<AutomationLane> AutoLanes { get; } = new();
+
+    private volatile AutomationLane[] _activeAutoLanes = Array.Empty<AutomationLane>();
+
+    /// <summary>Lock-free snapshot of the automation lanes read by the audio engine.</summary>
+    public AutomationLane[] ActiveAutoLanes => _activeAutoLanes;
+
+    /// <summary>Publishes the current <see cref="AutoLanes"/> list to the audio thread.</summary>
+    public void CommitAutoLanes() => _activeAutoLanes = AutoLanes.ToArray();
+
+    /// <summary>Transient UI state: whether this track's automation lanes are collapsed in the timeline.</summary>
+    public bool AutomationCollapsed { get; set; }
+}

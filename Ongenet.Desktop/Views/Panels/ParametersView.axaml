@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             xmlns:controls="using:Ongenet.Desktop.Controls"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="120"
+             x:Class="Ongenet.Desktop.Views.Panels.ParametersView">
+    <!-- DataContext is an IEnumerable&lt;ParameterViewModel&gt;. Float params render as compact
+         rotary knobs; choice params as a labelled combo. Laid out in a wrap to save space. -->
+    <ItemsControl ItemsSource="{Binding}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.DataTemplates>
+            <DataTemplate DataType="vm:FloatParameterViewModel">
+                <StackPanel Width="58" Margin="2,4" HorizontalAlignment="Center">
+                    <controls:Knob Width="40" Height="40" HorizontalAlignment="Center"
+                                   Minimum="{Binding Min}" Maximum="{Binding Max}" Skew="{Binding Skew}"
+                                   Value="{Binding Value, Mode=TwoWay}"/>
+                    <TextBlock Text="{Binding Name}" FontSize="10" HorizontalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock Text="{Binding ValueText}" FontSize="9" HorizontalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext1}"/>
+                </StackPanel>
+            </DataTemplate>
+            <DataTemplate DataType="vm:ChoiceParameterViewModel">
+                <StackPanel Width="120" Margin="2,4">
+                    <TextBlock Text="{Binding Name}" FontSize="10"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <ComboBox ItemsSource="{Binding Options}" SelectedIndex="{Binding SelectedIndex}"
+                              HorizontalAlignment="Stretch"/>
+                </StackPanel>
+            </DataTemplate>
+            <DataTemplate DataType="vm:BoolParameterViewModel">
+                <StackPanel Width="90" Margin="2,4" VerticalAlignment="Center">
+                    <CheckBox IsChecked="{Binding Value, Mode=TwoWay}" Content="{Binding Name}" FontSize="11"/>
+                </StackPanel>
+            </DataTemplate>
+        </ItemsControl.DataTemplates>
+    </ItemsControl>
+</UserControl>

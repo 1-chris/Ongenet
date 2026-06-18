@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             xmlns:inst="using:Ongenet.Core.Audio.Instruments"
+             mc:Ignorable="d" d:DesignWidth="260" d:DesignHeight="600"
+             x:Class="Ongenet.Desktop.Views.Panels.InstrumentsView"
+             x:DataType="vm:InstrumentsViewModel">
+
+    <Border Background="{StaticResource CatppuccinMantle}">
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="Drag an instrument onto the timeline"
+                       FontSize="11" Margin="12,12,12,8" TextWrapping="Wrap"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+
+            <ItemsControl Name="InstrumentList" ItemsSource="{Binding Instruments}" Margin="6,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="inst:InstrumentInfo">
+                        <Border Margin="2" Padding="10,8" CornerRadius="4"
+                                Background="{StaticResource CatppuccinSurface0}"
+                                BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="🎹" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"
+                                           FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DockPanel>
+    </Border>
+</UserControl>

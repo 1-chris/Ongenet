@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             xmlns:fs="using:Ongenet.Desktop.ViewModels.FileSystem"
+             mc:Ignorable="d" d:DesignWidth="260" d:DesignHeight="600"
+             x:Class="Ongenet.Desktop.Views.Panels.FileBrowserView"
+             x:DataType="vm:FileBrowserViewModel">
+
+    <Border Background="{StaticResource CatppuccinMantle}">
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="FILES" FontWeight="Bold" FontSize="11"
+                       Margin="12,12,12,6"
+                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+            <TreeView Name="FileTree" ItemsSource="{Binding Roots}" Background="Transparent" Margin="4,0,4,4">
+                <TreeView.Styles>
+                    <!-- Bind each item's expansion back to the VM so children load lazily. -->
+                    <Style Selector="TreeViewItem" x:DataType="fs:FileNodeViewModel">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                    </Style>
+                </TreeView.Styles>
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="fs:FileNodeViewModel">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="📁" IsVisible="{Binding IsDirectory}"/>
+                            <TextBlock Text="🎵" IsVisible="{Binding !IsDirectory}"/>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </DockPanel>
+    </Border>
+</UserControl>

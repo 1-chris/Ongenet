@@ -1,0 +1,118 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Ongenet.Desktop.ViewModels"
+        xmlns:views="using:Ongenet.Desktop.Views.Panels"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="Ongenet.Desktop.Views.Windows.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Width="1100" Height="700"
+        TransparencyLevelHint="Blur, AcrylicBlur, Transparent"
+        Background="Transparent"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        Title="{Binding Title}">
+
+    <Panel>
+    <Border BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+    <Panel>
+        <ExperimentalAcrylicBorder IsHitTestVisible="False">
+            <ExperimentalAcrylicBorder.Material>
+                <ExperimentalAcrylicMaterial
+                    BackgroundSource="Digger"
+                    TintColor="{StaticResource CatppuccinBaseColor}"
+                    TintOpacity="0.90"
+                    MaterialOpacity="0.75" />
+            </ExperimentalAcrylicBorder.Material>
+        </ExperimentalAcrylicBorder>
+
+        <Grid RowDefinitions="Auto, *">
+            <!-- Custom Title Bar (exact port of the original MainWindow chrome) -->
+            <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto" PointerPressed="TitleBar_PointerPressed">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" Spacing="12">
+                    <TextBlock Text="Ongenet" FontSize="12" Foreground="{StaticResource CatppuccinMauve}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
+                               VerticalAlignment="Center" Margin="-6,1,0,0"/>
+                    <Button Content="Logs" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Name="MinimizeButton" Classes="TitleBarButton" Click="MinimizeButton_Click">
+                        <Path Margin="0,5,0,0" VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,0" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                    </Button>
+                    <Button Name="MaximizeButton" Classes="TitleBarButton" Click="MaximizeButton_Click">
+                        <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,0 L10,10 L0,10 Z" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1" Fill="Transparent"/>
+                    </Button>
+                    <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
+                        <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- DAW workspace: transport bar over [track inspector | timeline+clip inspector | file browser] -->
+            <Grid Grid.Row="1" RowDefinitions="Auto,*">
+
+                <views:TransportView Grid.Row="0" DataContext="{Binding Transport}"/>
+
+                <Grid Grid.Row="1" ColumnDefinitions="240,4,*,4,260">
+                    <!-- Left: track settings -->
+                    <views:TrackInspectorView Grid.Column="0" MinWidth="180"
+                                              DataContext="{Binding TrackInspector}"/>
+                    <GridSplitter Grid.Column="1" ResizeDirection="Columns"
+                                  Background="{StaticResource CatppuccinCrust}"/>
+
+                    <!-- Centre: timeline over the contextual bottom panel -->
+                    <Grid Grid.Column="2" RowDefinitions="*,4,240">
+                        <views:TimelineView Grid.Row="0" DataContext="{Binding Timeline}"/>
+                        <GridSplitter Grid.Row="1" ResizeDirection="Rows"
+                                      HorizontalAlignment="Stretch"
+                                      Background="{StaticResource CatppuccinCrust}"/>
+                        <!-- Bottom panel: tabbed Instrument / Piano Roll / Effects (contextual to selection) -->
+                        <TabControl Grid.Row="2" MinHeight="90" DataContext="{Binding BottomPanel}"
+                                    SelectedIndex="{Binding SelectedTabIndex}"
+                                    Background="{StaticResource CatppuccinMantle}">
+                            <TabItem Header="Instrument">
+                                <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
+                            </TabItem>
+                            <TabItem Header="Piano Roll">
+                                <views:PianoRollView DataContext="{Binding PianoRoll}"/>
+                            </TabItem>
+                            <TabItem Header="Effects">
+                                <views:EffectsView DataContext="{Binding Effects}"/>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+
+                    <GridSplitter Grid.Column="3" ResizeDirection="Columns"
+                                  Background="{StaticResource CatppuccinCrust}"/>
+
+                    <!-- Right: tabbed Files / Instruments -->
+                    <TabControl Grid.Column="4" MinWidth="180" Background="{StaticResource CatppuccinMantle}">
+                        <TabItem Header="Files">
+                            <views:FileBrowserView DataContext="{Binding FileBrowser}"/>
+                        </TabItem>
+                        <TabItem Header="Instruments">
+                            <views:InstrumentsView DataContext="{Binding Instruments}"/>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Panel>
+    </Border>
+
+    <!-- Resize Handles -->
+    <Grid IsHitTestVisible="True">
+        <Border Width="4" HorizontalAlignment="Left" Cursor="LeftSide" PointerPressed="OnResizeHandlePressed" Tag="Left" Background="Transparent"/>
+        <Border Width="4" HorizontalAlignment="Right" Cursor="RightSide" PointerPressed="OnResizeHandlePressed" Tag="Right" Background="Transparent"/>
+        <Border Height="4" VerticalAlignment="Top" Cursor="TopSide" PointerPressed="OnResizeHandlePressed" Tag="Top" Background="Transparent"/>
+        <Border Height="4" VerticalAlignment="Bottom" Cursor="BottomSide" PointerPressed="OnResizeHandlePressed" Tag="Bottom" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="TopLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="TopLeft" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="TopRightCorner" PointerPressed="OnResizeHandlePressed" Tag="TopRight" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="BottomLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomLeft" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="BottomRightCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomRight" Background="Transparent"/>
+    </Grid>
+    </Panel>
+</Window>

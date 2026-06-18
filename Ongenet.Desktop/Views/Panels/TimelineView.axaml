@@ -1,0 +1,325 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             xmlns:tl="using:Ongenet.Desktop.ViewModels.Timeline"
+             xmlns:controls="using:Ongenet.Desktop.Controls"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="400"
+             x:Class="Ongenet.Desktop.Views.Panels.TimelineView"
+             x:DataType="vm:TimelineViewModel">
+
+    <UserControl.Resources>
+        <x:Double x:Key="HeaderWidth">140</x:Double>
+        <x:Double x:Key="RulerHeight">26</x:Double>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Border.clip">
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinCrust}"/>
+        </Style>
+        <Style Selector="Border.clip.selected">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinText}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="{StaticResource CatppuccinCrust}">
+        <Grid RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
+
+            <!-- [0,0] corner above the headers -->
+            <Border Grid.Row="0" Grid.Column="0"
+                    Width="{StaticResource HeaderWidth}" Height="{StaticResource RulerHeight}"
+                    Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,1,1">
+                <TextBlock Text="Tracks" Margin="8,0" VerticalAlignment="Center" FontSize="11"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+            </Border>
+
+            <!-- [0,1] ruler — scroll driven horizontally by the lanes -->
+            <ScrollViewer Grid.Row="0" Grid.Column="1" Name="RulerScroll"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Disabled"
+                          Background="{StaticResource CatppuccinMantle}">
+                <!-- ItemsControl is sized explicitly so its Canvas panel has room (otherwise ticks clip to 0x0).
+                     Left-aligned so it doesn't centre (and drift from the lanes) when the viewport is wider. -->
+                <ItemsControl ItemsSource="{Binding Bars}" HorizontalAlignment="Left"
+                              Width="{Binding Metrics.TotalWidth}" Height="{StaticResource RulerHeight}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.Styles>
+                        <Style Selector="ContentPresenter" x:DataType="tl:BarTickViewModel">
+                            <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                            <Setter Property="Canvas.Top" Value="0"/>
+                        </Style>
+                    </ItemsControl.Styles>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="tl:BarTickViewModel">
+                            <StackPanel Orientation="Horizontal" Spacing="4" Height="26">
+                                <Rectangle Width="1" Fill="{StaticResource CatppuccinSurface2}"/>
+                                <TextBlock Text="{Binding BarNumber}" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,0,1"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- [1,0] track headers — scroll driven vertically by the lanes -->
+            <ScrollViewer Grid.Row="1" Grid.Column="0" Name="HeaderScroll"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Hidden"
+                          Background="{StaticResource CatppuccinMantle}">
+                <ItemsControl ItemsSource="{Binding Lanes}" Width="{StaticResource HeaderWidth}">
+                    <ItemsControl.Styles>
+                        <Style Selector="Border.selected">
+                            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+                        </Style>
+                        <Style Selector="ToggleButton.ms">
+                            <Setter Property="Width" Value="22"/>
+                            <Setter Property="Height" Value="18"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="FontSize" Value="10"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                        </Style>
+                        <Style Selector="ToggleButton.ms:checked /template/ ContentPresenter#PART_ContentPresenter">
+                            <Setter Property="Background" Value="{StaticResource CatppuccinSurface2}"/>
+                        </Style>
+                        <Style Selector="ToggleButton.rec:checked /template/ ContentPresenter#PART_ContentPresenter">
+                            <Setter Property="Background" Value="{StaticResource CatppuccinRed}"/>
+                        </Style>
+                        <Style Selector="ToggleButton.rec:checked">
+                            <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+                        </Style>
+                        <Style Selector="Button.chev">
+                            <Setter Property="Width" Value="16"/>
+                            <Setter Property="Height" Value="16"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="FontSize" Value="10"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+                        </Style>
+                        <Style Selector="Button.xbtn">
+                            <Setter Property="Width" Value="16"/>
+                            <Setter Property="Height" Value="16"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="FontSize" Value="10"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            <Setter Property="Foreground" Value="{StaticResource CatppuccinOverlay1}"/>
+                        </Style>
+                    </ItemsControl.Styles>
+                    <ItemsControl.DataTemplates>
+                        <!-- Track header -->
+                        <DataTemplate DataType="tl:TrackLaneViewModel">
+                            <Border Height="{Binding Height}" BorderBrush="{StaticResource CatppuccinCrust}"
+                                    BorderThickness="0,0,1,1"
+                                    Classes.selected="{Binding IsSelected}">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
+                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
+                                        <Separator/>
+                                        <MenuItem Header="Add Instrument Track" Command="{Binding AddInstrumentTrackCommand}"/>
+                                        <MenuItem Header="Add Audio Track" Command="{Binding AddAudioTrackCommand}"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <Grid ColumnDefinitions="4,*,Auto">
+                                    <!-- colour strip -->
+                                    <Border Grid.Column="0"
+                                            Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                    <StackPanel Grid.Column="1" Margin="8,6" Spacing="6" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="3">
+                                            <Button Classes="chev" Content="{Binding CollapseGlyph}"
+                                                    ToolTip.Tip="Collapse/expand automation"
+                                                    IsVisible="{Binding HasAutomation}"
+                                                    Command="{Binding ToggleAutomationCommand}"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <ToggleButton Classes="ms" Content="M" ToolTip.Tip="Mute"
+                                                          IsChecked="{Binding IsMuted, Mode=TwoWay}"
+                                                          Foreground="{StaticResource CatppuccinRed}"/>
+                                            <ToggleButton Classes="ms" Content="S" ToolTip.Tip="Solo"
+                                                          IsChecked="{Binding IsSoloed, Mode=TwoWay}"
+                                                          Foreground="{StaticResource CatppuccinYellow}"/>
+                                            <ToggleButton Classes="ms rec" Content="●" ToolTip.Tip="Arm for recording"
+                                                          IsChecked="{Binding IsArmed, Mode=TwoWay}"
+                                                          Foreground="{StaticResource CatppuccinRed}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <!-- live output level -->
+                                    <controls:LevelMeterControl Grid.Column="2" Width="6" Margin="0,8,6,8"
+                                                                Level="{Binding MeterLevel}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                        <!-- Automation header (indented under its track) -->
+                        <DataTemplate DataType="tl:AutomationLaneViewModel">
+                            <Border Height="{Binding Height}" BorderBrush="{StaticResource CatppuccinCrust}"
+                                    BorderThickness="0,0,1,1" Background="{StaticResource CatppuccinMantle}">
+                                <Grid ColumnDefinitions="4,16,*,Auto">
+                                    <Border Grid.Column="0" Opacity="0.5"
+                                            Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                    <!-- indent rail -->
+                                    <Border Grid.Column="1" Background="{StaticResource CatppuccinCrust}"/>
+                                    <StackPanel Grid.Column="2" Margin="6,4" Spacing="3" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontSize="11"
+                                                   Foreground="{StaticResource CatppuccinSubtext0}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <ToggleButton Classes="ms rec" Content="●" ToolTip.Tip="Arm to record control moves"
+                                                      IsChecked="{Binding IsArmed, Mode=TwoWay}"
+                                                      Foreground="{StaticResource CatppuccinRed}"
+                                                      HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="3" Classes="xbtn" Content="✕" ToolTip.Tip="Remove automation"
+                                            VerticalAlignment="Top" Margin="0,4,4,0"
+                                            Command="{Binding RemoveCommand}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.DataTemplates>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- [1,1] lanes — the master scroll region (selection + virtualization) -->
+            <ListBox Grid.Row="1" Grid.Column="1" Name="LanesList"
+                     ItemsSource="{Binding Lanes}"
+                     SelectedItem="{Binding SelectedLane, Mode=TwoWay}"
+                     Background="Transparent"
+                     DragDrop.AllowDrop="True"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="MinHeight" Value="0"/>
+                        <!-- Keep lane content pinned to the left so bar 0 sits at x=0 (a fixed-width
+                             child with the default Stretch alignment would otherwise be centred when
+                             the viewport is wider than the content). -->
+                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                    </Style>
+                </ListBox.Styles>
+                <ListBox.DataTemplates>
+                    <!-- Track lane -->
+                    <DataTemplate DataType="tl:TrackLaneViewModel">
+                        <Border Width="{Binding LaneWidth}" Height="{Binding Height}" HorizontalAlignment="Left"
+                                BorderBrush="{StaticResource CatppuccinMantle}" BorderThickness="0,0,0,1">
+                            <Grid>
+                            <controls:TimelineGridControl IsHitTestVisible="False"
+                                                          PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
+                                                          TotalBeats="{Binding Metrics.TotalBeats}"
+                                                          BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
+                            <ItemsControl ItemsSource="{Binding Clips}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <!-- ItemContainerTheme styles ONLY the clip containers (not, e.g.,
+                                     the context menu's content presenters, which a broad
+                                     "ContentPresenter" style would have mis-sized). -->
+                                <ItemsControl.ItemContainerTheme>
+                                    <ControlTheme TargetType="ContentPresenter" x:DataType="tl:ClipViewModel">
+                                        <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                        <Setter Property="Canvas.Top" Value="6"/>
+                                        <Setter Property="Width" Value="{Binding Width}"/>
+                                        <Setter Property="Height" Value="52"/>
+                                    </ControlTheme>
+                                </ItemsControl.ItemContainerTheme>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="tl:ClipViewModel">
+                                            <Border Classes="clip" CornerRadius="4" ClipToBounds="True"
+                                                    Background="{Binding Owner.ColorKey, Converter={StaticResource ColorKeyToBrush}}"
+                                                    Classes.selected="{Binding IsSelected}">
+                                                <Border.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
+                                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
+                                                    </ContextMenu>
+                                                </Border.ContextMenu>
+                                                <Grid>
+                                                    <controls:WaveformControl Waveform="{Binding Waveform}"
+                                                                              IsVisible="{Binding IsAudio}"
+                                                                              IsHitTestVisible="False"
+                                                                              Fill="{StaticResource CatppuccinCrust}"
+                                                                              Opacity="0.55" Margin="0,3"/>
+                                                    <controls:MidiNoteMiniControl Notes="{Binding Notes}"
+                                                                                  ClipLengthBeats="{Binding ClipLengthBeats}"
+                                                                                  Revision="{Binding NotesRevision}"
+                                                                                  IsVisible="{Binding IsMidi}"
+                                                                                  IsHitTestVisible="False"
+                                                                                  Fill="{StaticResource CatppuccinCrust}"
+                                                                                  Opacity="0.6" Margin="2,16,2,4"/>
+                                                    <TextBlock Text="{Binding Name}" Margin="6,3" FontSize="11"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               IsHitTestVisible="False"
+                                                               VerticalAlignment="Top"
+                                                               Foreground="{StaticResource CatppuccinCrust}"/>
+                                                </Grid>
+                                            </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- Drop highlight while dragging an audio file over this lane -->
+                            <Border IsVisible="{Binding IsDropTarget}" IsHitTestVisible="False"
+                                    Background="#33cba6f7"
+                                    BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="2"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                    <!-- Automation lane (the editable curve) -->
+                    <DataTemplate DataType="tl:AutomationLaneViewModel">
+                        <Border Width="{Binding LaneWidth}" Height="{Binding Height}" HorizontalAlignment="Left"
+                                Background="{StaticResource CatppuccinMantle}"
+                                BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <controls:TimelineGridControl IsHitTestVisible="False" Opacity="0.5"
+                                                              PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
+                                                              TotalBeats="{Binding Metrics.TotalBeats}"
+                                                              BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
+                                <controls:AutomationLaneControl Revision="{Binding Revision}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.DataTemplates>
+            </ListBox>
+
+            <!-- Drop overlay: "New audio track" ghost shown when dragging below the last lane -->
+            <Canvas Grid.Row="1" Grid.Column="1" Name="DropOverlay" IsHitTestVisible="False">
+                <Border Name="NewTrackGhost" Height="64" IsVisible="False" CornerRadius="2"
+                        Background="#332ECC71"
+                        BorderBrush="{StaticResource CatppuccinGreen}" BorderThickness="2">
+                    <TextBlock Name="NewTrackGhostLabel" Text="New audio track" Margin="10,0"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold" Foreground="{StaticResource CatppuccinGreen}"/>
+                </Border>
+            </Canvas>
+
+            <!-- Playhead + start marker lines (and the select-mode rubber band) over the lanes -->
+            <Canvas Grid.Row="1" Grid.Column="1" Name="PlayheadOverlay" IsHitTestVisible="False" ClipToBounds="True">
+                <Rectangle Name="StartMarkerLine" Width="1" IsVisible="False"
+                           Fill="{StaticResource CatppuccinOverlay1}"/>
+                <Rectangle Name="PlayheadLine" Width="2" IsVisible="False"
+                           Fill="{StaticResource CatppuccinGreen}"/>
+                <Border Name="Band" IsVisible="False"
+                        Background="#33cba6f7" BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="1"/>
+            </Canvas>
+
+            <!-- Start-marker play icon in the ruler -->
+            <Canvas Grid.Row="0" Grid.Column="1" Name="RulerOverlay" IsHitTestVisible="False" ClipToBounds="True">
+                <Path Name="StartMarkerIcon" IsVisible="False" Data="M0,0 L9,5 L0,10 Z"
+                      Fill="{StaticResource CatppuccinGreen}"/>
+            </Canvas>
+        </Grid>
+    </Border>
+</UserControl>

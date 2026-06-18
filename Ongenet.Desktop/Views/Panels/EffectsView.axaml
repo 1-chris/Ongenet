@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             xmlns:fx="using:Ongenet.Desktop.ViewModels.Effects"
+             xmlns:efx="using:Ongenet.Core.Audio.Effects"
+             xmlns:controls="using:Ongenet.Desktop.Controls"
+             xmlns:panels="using:Ongenet.Desktop.Views.Panels"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="200"
+             x:Class="Ongenet.Desktop.Views.Panels.EffectsView"
+             x:DataType="vm:EffectsViewModel">
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+        <Grid>
+            <TextBlock Text="Select a track to add effects." IsVisible="{Binding !HasTrack}"
+                       Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
+
+            <DockPanel IsVisible="{Binding HasTrack}">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                    <Button Content="+ Add effect" Background="{StaticResource CatppuccinSurface0}">
+                        <Button.Flyout>
+                            <Flyout>
+                                <ScrollViewer MaxHeight="420">
+                                    <ItemsControl ItemsSource="{Binding AddableCategories}" Width="170">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="fx:EffectCategoryViewModel">
+                                                <StackPanel Margin="0,0,0,6">
+                                                    <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="Bold"
+                                                               Margin="2,4,2,2"
+                                                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                    <ItemsControl ItemsSource="{Binding Effects}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="fx:AvailableEffectViewModel">
+                                                                <Button Content="{Binding Name}" Command="{Binding AddCommand}"
+                                                                        HorizontalAlignment="Stretch" Margin="0,1"
+                                                                        HorizontalContentAlignment="Left"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <TextBlock Text="{Binding TrackName}" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock Text="signal chain: top = first → bottom = last" VerticalAlignment="Center"
+                               FontSize="11" FontStyle="Italic" IsVisible="{Binding HasEffects}"
+                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                </StackPanel>
+
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Effects}">
+                        <ItemsControl.DataTemplates>
+                            <!-- EQ: interactive parametric-EQ graph. -->
+                            <DataTemplate DataType="fx:EqEffectViewModel">
+                                <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                                        Background="{StaticResource CatppuccinSurface0}"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <StackPanel Spacing="6">
+                                        <panels:EffectHeaderView/>
+                                        <Border CornerRadius="4" ClipToBounds="True"
+                                                BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                            <controls:EqGraphControl Height="180"
+                                                                     Eq="{Binding Eq}"
+                                                                     Source="{Binding Source}"/>
+                                        </Border>
+                                        <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
+                                                   Text="Double-click to add a band · drag to move · wheel for Q · right-click for type / delete"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
+                            <!-- Filter: card with the analyser graph above the knobs. -->
+                            <DataTemplate DataType="fx:FilterEffectViewModel">
+                                <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                                        Background="{StaticResource CatppuccinSurface0}"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <StackPanel Spacing="6">
+                                        <panels:EffectHeaderView/>
+                                        <Border CornerRadius="4" ClipToBounds="True"
+                                                BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                            <controls:FilterResponseControl Height="120"
+                                                                            SampleRate="{Binding SampleRate}"
+                                                                            Source="{Binding Source}"
+                                                                            Frequency="{Binding FrequencyParam.Value, Mode=TwoWay}"
+                                                                            Resonance="{Binding ResonanceParam.Value, Mode=TwoWay}"
+                                                                            Mode="{Binding ModeParam.SelectedIndex}"/>
+                                        </Border>
+                                        <panels:ParametersView DataContext="{Binding Parameters}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
+                            <!-- Default effect card (built-in effects + CLAP audio-effect plugins). -->
+                            <DataTemplate DataType="fx:EffectViewModel">
+                                <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                                        Background="{StaticResource CatppuccinSurface0}"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <StackPanel Spacing="6">
+                                        <panels:EffectHeaderView/>
+                                        <panels:ParametersView DataContext="{Binding Parameters}"/>
+                                        <Button Content="{Binding EditorButtonText}" IsVisible="{Binding HasEditor}"
+                                                Click="OnToggleEffectPluginUi" HorizontalAlignment="Left"
+                                                Background="{StaticResource CatppuccinSurface1}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.DataTemplates>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </Border>
+</UserControl>

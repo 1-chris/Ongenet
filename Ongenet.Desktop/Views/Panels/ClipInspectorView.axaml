@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="180"
+             x:Class="Ongenet.Desktop.Views.Panels.ClipInspectorView"
+             x:DataType="vm:ClipInspectorViewModel">
+
+    <Border Background="{StaticResource CatppuccinMantle}"
+            BorderBrush="{StaticResource CatppuccinCrust}"
+            BorderThickness="0,1,0,0"
+            Padding="12">
+        <Grid>
+            <!-- Empty state -->
+            <TextBlock Text="Select a clip to edit its settings."
+                       IsVisible="{Binding !HasClip}"
+                       VerticalAlignment="Center" HorizontalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+
+            <!-- Clip settings -->
+            <StackPanel IsVisible="{Binding HasClip}" Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="CLIP" FontWeight="Bold" FontSize="11"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    <TextBlock Text="{Binding TrackName}" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <StackPanel Spacing="4" Width="220">
+                        <TextBlock Text="Name" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <TextBox Text="{Binding Name}"/>
+                    </StackPanel>
+                    <StackPanel Spacing="4" Width="120">
+                        <TextBlock Text="Start (beats)" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <NumericUpDown Value="{Binding StartBeat}" Minimum="0" Increment="1" FormatString="0.##"/>
+                    </StackPanel>
+                    <StackPanel Spacing="4" Width="120">
+                        <TextBlock Text="Length (beats)" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <NumericUpDown Value="{Binding LengthBeats}" Minimum="0.25" Increment="1" FormatString="0.##"/>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

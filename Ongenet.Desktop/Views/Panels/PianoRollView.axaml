@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             xmlns:pr="using:Ongenet.Desktop.ViewModels.PianoRoll"
+             xmlns:controls="using:Ongenet.Desktop.Controls"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="220"
+             x:Class="Ongenet.Desktop.Views.Panels.PianoRollView"
+             x:DataType="vm:PianoRollViewModel">
+
+    <UserControl.Resources>
+        <x:Double x:Key="KeyGutterWidth">56</x:Double>
+        <x:Double x:Key="PrRulerHeight">22</x:Double>
+    </UserControl.Resources>
+
+    <Border Background="{StaticResource CatppuccinCrust}"
+            BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,1,0,0">
+        <Grid RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
+
+            <!-- corner -->
+            <Border Grid.Row="0" Grid.Column="0"
+                    Width="{StaticResource KeyGutterWidth}" Height="{StaticResource PrRulerHeight}"
+                    Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,1,1">
+                <TextBlock Text="{Binding ClipName}" Margin="6,0" VerticalAlignment="Center"
+                           FontSize="10" TextTrimming="CharacterEllipsis"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+            </Border>
+
+            <!-- ruler (slaved horizontally) -->
+            <ScrollViewer Grid.Row="0" Grid.Column="1" Name="PrRulerScroll"
+                          HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                          Background="{StaticResource CatppuccinMantle}">
+                <controls:PianoRollRulerControl Width="{Binding Metrics.TotalWidth}" Height="{StaticResource PrRulerHeight}"
+                                                PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
+                                                TotalBeats="{Binding Metrics.TotalBeats}"
+                                                BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
+            </ScrollViewer>
+
+            <!-- key gutter (slaved vertically) -->
+            <ScrollViewer Grid.Row="1" Grid.Column="0" Name="PrKeysScroll"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden"
+                          Background="{StaticResource CatppuccinMantle}">
+                <ItemsControl ItemsSource="{Binding Keys}"
+                              Width="{StaticResource KeyGutterWidth}" Height="{Binding Metrics.TotalHeight}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.Styles>
+                        <Style Selector="ContentPresenter" x:DataType="pr:PianoKeyViewModel">
+                            <Setter Property="Canvas.Left" Value="0"/>
+                            <Setter Property="Canvas.Top" Value="{Binding Top}"/>
+                        </Style>
+                    </ItemsControl.Styles>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="pr:PianoKeyViewModel">
+                            <Border Width="{StaticResource KeyGutterWidth}" Height="{Binding Height}"
+                                    BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"
+                                    PointerPressed="OnKeyPressed" PointerReleased="OnKeyReleased"
+                                    PointerExited="OnKeyExited">
+                                <Border.Background>
+                                    <SolidColorBrush Color="{StaticResource CatppuccinSurface1Color}"/>
+                                </Border.Background>
+                                <Panel>
+                                    <Border IsVisible="{Binding IsBlack}" Background="{StaticResource CatppuccinCrust}"/>
+                                    <Border IsVisible="{Binding IsActive}" Background="{StaticResource CatppuccinMauve}"/>
+                                    <TextBlock Text="{Binding Name}" IsVisible="{Binding IsC}"
+                                               FontSize="9" Margin="5,0" VerticalAlignment="Center"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                </Panel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- note grid (master scroll) -->
+            <ScrollViewer Grid.Row="1" Grid.Column="1" Name="PrGridScroll"
+                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Panel Name="PianoGrid" Background="Transparent"
+                       Width="{Binding Metrics.TotalWidth}" Height="{Binding Metrics.TotalHeight}">
+                    <controls:PianoRollBackgroundControl IsHitTestVisible="False"
+                                                         PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
+                                                         TotalBeats="{Binding Metrics.TotalBeats}"
+                                                         BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
+                    <Border Name="Band" IsVisible="False" IsHitTestVisible="False"
+                            HorizontalAlignment="Left" VerticalAlignment="Top"
+                            Background="#33cba6f7" BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="1"/>
+                    <ItemsControl ItemsSource="{Binding Notes}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.Styles>
+                            <Style Selector="ContentPresenter" x:DataType="pr:NoteViewModel">
+                                <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                <Setter Property="Canvas.Top" Value="{Binding Top}"/>
+                                <Setter Property="Width" Value="{Binding Width}"/>
+                                <Setter Property="Height" Value="{Binding Height}"/>
+                            </Style>
+                        </ItemsControl.Styles>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="pr:NoteViewModel">
+                                <Border CornerRadius="2" Background="{StaticResource CatppuccinMauve}"
+                                        BorderBrush="{StaticResource CatppuccinText}"
+                                        Classes.selected="{Binding IsSelected}">
+                                    <Border.Styles>
+                                        <Style Selector="Border"><Setter Property="BorderThickness" Value="0"/></Style>
+                                        <Style Selector="Border.selected"><Setter Property="BorderThickness" Value="1"/></Style>
+                                    </Border.Styles>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Panel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>
