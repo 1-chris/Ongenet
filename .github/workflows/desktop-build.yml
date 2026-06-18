@@ -102,6 +102,12 @@ jobs:
           cp -L "$real" "native/${{ matrix.rid }}/libportaudio.2.dylib"
           # We dlopen by absolute path, but set a sane install id anyway for cleanliness.
           install_name_tool -id @loader_path/libportaudio.2.dylib "native/${{ matrix.rid }}/libportaudio.2.dylib"
+          # Ad-hoc re-sign: install_name_tool invalidated the linker's signature, and arm64 macOS
+          # refuses to load a mach-O with a broken/absent signature ("killed: 9"). `-s -` signs with
+          # no certificate — enough to RUN locally (this is what Homebrew does for arm64), but NOT
+          # notarization: a downloaded app still hits Gatekeeper until we add a Developer ID + notarize.
+          codesign --force --sign - "native/${{ matrix.rid }}/libportaudio.2.dylib"
+          codesign --verify --verbose "native/${{ matrix.rid }}/libportaudio.2.dylib"
           echo "Bundled dylib dependencies (should be system frameworks only):"
           otool -L "native/${{ matrix.rid }}/libportaudio.2.dylib"
           lipo -info "native/${{ matrix.rid }}/libportaudio.2.dylib"
