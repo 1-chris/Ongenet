@@ -428,7 +428,7 @@ namespace Ongenet.Desktop.ViewModels
 
             for (var bar = Bars.Count; bar < neededBars; bar++)
             {
-                Bars.Add(new BarTickViewModel(bar + 1, bar * beatsPerBar, Metrics));
+                Bars.Add(new BarTickViewModel(bar + 1, Metrics));
             }
 
             Metrics.TotalBeats = neededBars * beatsPerBar;
@@ -498,7 +498,7 @@ namespace Ongenet.Desktop.ViewModels
             {
                 for (var bar = Bars.Count; bar < bars; bar++)
                 {
-                    Bars.Add(new BarTickViewModel(bar + 1, bar * beatsPerBar, Metrics));
+                    Bars.Add(new BarTickViewModel(bar + 1, Metrics));
                 }
             }
         }

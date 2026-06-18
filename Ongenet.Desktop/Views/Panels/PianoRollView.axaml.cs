@@ -36,18 +36,77 @@ namespace Ongenet.Desktop.Views.Panels
 
         private PianoRollViewModel? _vm;
 
+        // Middle C (C4) — the row the editor scrolls to by default.
+        private const int MiddleC = 60;
+
+        // Re-entrancy guard for the grid<->gutter/ruler scroll sync so they can't fight each other.
+        private bool _syncingScroll;
+        private bool _centeredOnMiddleC;
+        private bool _centerScheduled;
+
         public PianoRollView()
         {
             InitializeComponent();
             Focusable = true;
 
+            // The grid is the master scroller; the ruler (X) and key gutter (Y) are pinned to it.
+            // Sync is bidirectional so that wheel-scrolling over the gutter/ruler drives the grid too,
+            // keeping the keys glued to their rows instead of drifting independently.
             PrGridScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnGridScrollChanged);
+            PrKeysScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnKeysScrollChanged);
+            PrRulerScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnRulerScrollChanged);
             PianoGrid.PointerPressed += OnGridPressed;
             PianoGrid.PointerMoved += OnGridMoved;
             PianoGrid.PointerReleased += OnGridReleased;
             KeyDown += OnKeyDown;
 
+            // Center on Middle C once, as soon as the grid has a real viewport/extent.
+            LayoutUpdated += OnLayoutUpdated;
+
             DataContextChanged += OnDataContextChanged;
+        }
+
+        private void OnLayoutUpdated(object? sender, EventArgs e)
+        {
+            if (_centeredOnMiddleC || _centerScheduled) return;
+            if (DataContext is not PianoRollViewModel vm) return;
+
+            var viewport = PrGridScroll.Viewport.Height;
+            if (viewport <= 0) return;
+
+            // Wait until the grid content has actually been laid out to its full height. Early layout
+            // passes report Extent ≈ Viewport (the TotalHeight binding hasn't applied yet); centering
+            // then would clamp to 0 and "center" on the top.
+            if (PrGridScroll.Extent.Height + 1.0 < vm.Metrics.TotalHeight) return;
+
+            // Defer to after this layout pass so the offset actually sticks.
+            _centerScheduled = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (CenterOnMiddleC(vm))
+                {
+                    _centeredOnMiddleC = true;
+                    LayoutUpdated -= OnLayoutUpdated;
+                }
+                else
+                {
+                    _centerScheduled = false; // transient; retry on a later layout pass
+                }
+            }, DispatcherPriority.Background);
+        }
+
+        // Scrolls so Middle C sits roughly in the vertical center of the grid. Returns false if the
+        // viewport/extent aren't ready, so the caller can retry.
+        private bool CenterOnMiddleC(PianoRollViewModel vm)
+        {
+            var viewport = PrGridScroll.Viewport.Height;
+            var extent = PrGridScroll.Extent.Height;
+            if (viewport <= 0 || extent <= 0) return false;
+
+            var targetY = vm.Metrics.NoteToY(MiddleC) + PianoRollMetrics.KeyHeight / 2 - viewport / 2;
+            targetY = Math.Clamp(targetY, 0, Math.Max(0, extent - viewport));
+            PrGridScroll.Offset = new Vector(PrGridScroll.Offset.X, targetY);
+            return true;
         }
 
         private void OnDataContextChanged(object? sender, EventArgs e)
@@ -62,9 +121,35 @@ namespace Ongenet.Desktop.Views.Panels
 
         private void OnGridScrollChanged(object? sender, ScrollChangedEventArgs e)
         {
+            if (_syncingScroll) return;
+            _syncingScroll = true;
             var offset = PrGridScroll.Offset;
             PrRulerScroll.Offset = new Vector(offset.X, 0);
             PrKeysScroll.Offset = new Vector(0, offset.Y);
+            _syncingScroll = false;
+        }
+
+        // The key gutter was scrolled directly (e.g. mouse wheel over the keys): drive the master grid
+        // so the rows, grid lines and notes follow — the keys stay pinned rather than drifting.
+        private void OnKeysScrollChanged(object? sender, ScrollChangedEventArgs e)
+        {
+            if (_syncingScroll) return;
+            var y = PrKeysScroll.Offset.Y;
+            if (Math.Abs(y - PrGridScroll.Offset.Y) < 0.5) return;
+            _syncingScroll = true;
+            PrGridScroll.Offset = new Vector(PrGridScroll.Offset.X, y);
+            _syncingScroll = false;
+        }
+
+        // Likewise, scrolling the ruler horizontally drives the master grid.
+        private void OnRulerScrollChanged(object? sender, ScrollChangedEventArgs e)
+        {
+            if (_syncingScroll) return;
+            var x = PrRulerScroll.Offset.X;
+            if (Math.Abs(x - PrGridScroll.Offset.X) < 0.5) return;
+            _syncingScroll = true;
+            PrGridScroll.Offset = new Vector(x, PrGridScroll.Offset.Y);
+            _syncingScroll = false;
         }
 
         // --- Clickable keys (preview only, no note added) ---

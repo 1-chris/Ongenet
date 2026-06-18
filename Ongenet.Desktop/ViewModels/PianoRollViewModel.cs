@@ -19,6 +19,7 @@ namespace Ongenet.Desktop.ViewModels
     {
         private const double DefaultNoteLengthBeats = 1.0;
 
+        private readonly IProjectService _project;
         private readonly ISelectionService _selection;
         private readonly IEventAggregator _events;
         private readonly IEditModeService _editMode;
@@ -27,9 +28,10 @@ namespace Ongenet.Desktop.ViewModels
         private Clip? _clip;
         private Track? _track;
 
-        public PianoRollViewModel(ISelectionService selection, IEventAggregator events,
-            IEditModeService editMode, IPreviewService preview)
+        public PianoRollViewModel(IProjectService project, ISelectionService selection,
+            IEventAggregator events, IEditModeService editMode, IPreviewService preview)
         {
+            _project = project;
             _selection = selection;
             _events = events;
             _editMode = editMode;
@@ -39,11 +41,20 @@ namespace Ongenet.Desktop.ViewModels
 
             _selection.SelectionChanged += OnSelectionChanged;
             _events.Subscribe<ClipChangedEvent>(e => OnClipGeometryChanged(e.Clip));
+            // Keep the grid's bar lines in step with the project time signature (changed via the
+            // transport bar), exactly as the arrange view does.
+            _events.Subscribe<ArrangementLengthChangedEvent>(_ => SyncTimeSignature());
+            _project.ProjectChanged += SyncTimeSignature;
             _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSelectMode));
             _preview.ActiveNotesChanged += UpdateKeyHighlights;
 
+            SyncTimeSignature();
             Bind(_selection.SelectedClip, _selection.SelectedTrack);
         }
+
+        /// <summary>Pulls beats-per-bar from the project time signature into the editor metrics.</summary>
+        private void SyncTimeSignature()
+            => Metrics.BeatsPerBar = Math.Max(1, _project.Current.TimeSignature.Numerator);
 
         private void UpdateKeyHighlights()
         {

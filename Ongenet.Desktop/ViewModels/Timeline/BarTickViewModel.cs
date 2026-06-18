@@ -9,12 +9,10 @@ namespace Ongenet.Desktop.ViewModels.Timeline
     public class BarTickViewModel : ViewModelBase
     {
         private readonly TimelineMetrics _metrics;
-        private readonly double _beat;
 
-        public BarTickViewModel(int barNumber, double beat, TimelineMetrics metrics)
+        public BarTickViewModel(int barNumber, TimelineMetrics metrics)
         {
             BarNumber = barNumber;
-            _beat = beat;
             _metrics = metrics;
             _metrics.PropertyChanged += OnMetricsChanged;
         }
@@ -22,12 +20,17 @@ namespace Ongenet.Desktop.ViewModels.Timeline
         /// <summary>1-based bar number shown as the label.</summary>
         public int BarNumber { get; }
 
+        /// <summary>Beat position of this bar, derived live from the current bar length so it tracks
+        /// time-signature changes.</summary>
+        private double Beat => (BarNumber - 1) * _metrics.BeatsPerBar;
+
         /// <summary>Left edge of the tick on the ruler canvas, in pixels.</summary>
-        public double Left => _metrics.BeatsToPixels(_beat);
+        public double Left => _metrics.BeatsToPixels(Beat);
 
         private void OnMetricsChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName is nameof(TimelineMetrics.PixelsPerBeat))
+            // Reposition on both zoom (PixelsPerBeat) and time-signature (BeatsPerBar) changes.
+            if (e.PropertyName is nameof(TimelineMetrics.PixelsPerBeat) or nameof(TimelineMetrics.BeatsPerBar))
             {
                 OnPropertyChanged(nameof(Left));
             }
