@@ -1,0 +1,161 @@
+name: Desktop Build
+
+# Builds self-contained Ongenet desktop packages for every platform, bundling the native PortAudio
+# library into each one, and (on a v* tag) publishes them to a GitHub Release.
+#
+# Strategy — reuse the repo's own scripts so CI and local builds stay identical:
+#   * linux-x64 / win-x64 : built on Ubuntu. build-portaudio.sh already cross-compiles the Windows
+#                           PortAudio DLL via MinGW, so one Linux runner covers both.
+#   * osx-arm64 / osx-x64 : built on macOS runners. PortAudio can't be cross-built from Linux (needs
+#                           Apple's SDK), so each macOS job compiles libportaudio.2.dylib from source
+#                           for its arch, drops it in native/<rid>/, then publishes with --no-native.
+#
+# Each job ends with dist/Ongenet-<rid>.zip (produced by publish-desktop.sh) uploaded as an artifact.
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:        # allow manual runs from the Actions tab
+
+# Don't pile up redundant runs for the same ref; cancel the in-progress one when a new push lands.
+# (Tag runs get their own group so a release build is never cancelled by a later branch push.)
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write           # needed by the release job to create/upload a GitHub Release
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  PORTAUDIO_TAG: "v19.7.0"  # keep in sync with build-portaudio.sh
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false      # one platform failing shouldn't abandon the others
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-latest }
+          - { rid: win-x64,   os: ubuntu-latest }            # cross-compiled via MinGW
+          - { rid: osx-arm64, os: macos-14, osx_arch: arm64 }   # Apple Silicon runner
+          - { rid: osx-x64,   os: macos-13, osx_arch: x86_64 }  # Intel runner
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # --- Linux + Windows (ubuntu-latest) ----------------------------------------------------------
+      # Toolchain for build-portaudio.sh: cmake + ALSA headers (linux native), and the full MinGW-w64
+      # cross toolchain incl. C++ (PortAudio's CMake enables C++) for the Windows DLL. zip for packaging.
+      - name: Install Linux/Windows build toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake make zip \
+            libasound2-dev \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+
+      - name: Build native PortAudio + publish (Linux/Windows)
+        if: runner.os == 'Linux'
+        env:
+          # Only build the native lib for THIS job's RID (publish-desktop.sh invokes build-portaudio.sh,
+          # which honours RIDS). The win-x64 job builds only the DLL; linux-x64 only the .so.
+          RIDS: ${{ matrix.rid }}
+        run: |
+          chmod +x publish-desktop.sh build-portaudio.sh
+          ./publish-desktop.sh "${{ matrix.rid }}"
+
+      # --- macOS (build PortAudio from source for the runner's arch) --------------------------------
+      - name: Build native PortAudio dylib (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          rm -rf pa-src pa-build
+          git clone --depth 1 --branch "${PORTAUDIO_TAG}" https://github.com/PortAudio/portaudio pa-src
+          cmake -S pa-src -B pa-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DPA_BUILD_TESTS=OFF \
+            -DPA_BUILD_EXAMPLES=OFF \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.osx_arch }}
+          cmake --build pa-build -j"$(sysctl -n hw.ncpu)"
+
+          mkdir -p "native/${{ matrix.rid }}"
+          # CMake emits libportaudio.dylib -> libportaudio.<v>.dylib; copy the real versioned file.
+          real="$(ls pa-build/libportaudio.2.dylib 2>/dev/null || ls pa-build/libportaudio*.dylib | head -n1)"
+          cp -L "$real" "native/${{ matrix.rid }}/libportaudio.2.dylib"
+          # We dlopen by absolute path, but set a sane install id anyway for cleanliness.
+          install_name_tool -id @loader_path/libportaudio.2.dylib "native/${{ matrix.rid }}/libportaudio.2.dylib"
+          echo "Bundled dylib dependencies (should be system frameworks only):"
+          otool -L "native/${{ matrix.rid }}/libportaudio.2.dylib"
+          lipo -info "native/${{ matrix.rid }}/libportaudio.2.dylib"
+
+      - name: Publish (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          chmod +x publish-desktop.sh
+          ./publish-desktop.sh --no-native "${{ matrix.rid }}"
+
+      # --- Guard against silently shipping an audio-less package ------------------------------------
+      # build-portaudio.sh is deliberately non-fatal (it skips on a missing toolchain), so a failed
+      # native build would otherwise produce a zip with no PortAudio and a green check. Fail loudly if
+      # the platform's native lib didn't make it into the package.
+      - name: Verify PortAudio is bundled
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.rid }}" in
+            linux-x64) nf="libportaudio.so.2" ;;
+            win-x64)   nf="portaudio.dll" ;;
+            osx-*)     nf="libportaudio.2.dylib" ;;
+          esac
+          zip="dist/Ongenet-${{ matrix.rid }}.zip"
+          echo "Checking $zip for $nf ..."
+          if ! unzip -l "$zip" | grep -q -- "$nf"; then
+            echo "::error::$nf is missing from $zip — the native PortAudio build did not succeed."
+            unzip -l "$zip"
+            exit 1
+          fi
+          echo "OK: $nf is bundled."
+
+      # --- Package artifact -------------------------------------------------------------------------
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ongenet-${{ matrix.rid }}
+          path: |
+            dist/Ongenet-${{ matrix.rid }}.zip
+            dist/Ongenet-${{ matrix.rid }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # Attach every platform's package to a GitHub Release, but only when a v* tag is pushed.
+  release:
+    name: Publish Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts          # each artifact lands in artifacts/<name>/...
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2   # third-party action; pinned to a major tag
+        with:
+          files: artifacts/**/Ongenet-*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
