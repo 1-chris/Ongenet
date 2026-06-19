@@ -16,13 +16,13 @@ class Program
             .WithInterFont()
             .With(new FontManagerOptions
             {
-                // The default family must be a font that actually exists, or the very first text-render
-                // (the compositor's diagnostic renderer) throws "Could not create glyphTypeface" before
-                // the app's styles apply. "Noto Sans" ships on our Linux dev/CI boxes but NOT on macOS,
-                // which crashed the Mac build at startup. Use the embedded Inter font (bundled by
-                // WithInterFont, so always present) as the default on macOS only — Linux/Windows keep
-                // their existing "Noto Sans" default and render exactly as before.
-                DefaultFamilyName = OperatingSystem.IsMacOS()
+                // The default family must be a font that actually exists, or text rendered directly with
+                // Typeface.Default (custom-drawn controls like the piano-roll ruler / spectrum graph) and
+                // the compositor's diagnostic renderer throw "Could not create glyphTypeface". "Noto Sans"
+                // ships on our Linux dev/CI boxes but NOT on macOS or stock Windows, which crashed those
+                // builds. Use the embedded Inter font (bundled by WithInterFont, so always present) as the
+                // default on macOS and Windows — Linux keeps its "Noto Sans" default and renders as before.
+                DefaultFamilyName = OperatingSystem.IsMacOS() || OperatingSystem.IsWindows()
                     ? "avares://Avalonia.Fonts.Inter/Assets#Inter"
                     : "Noto Sans",
                 FontFallbacks = new[]
