@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Linq;
+using Avalonia.Threading;
 using Ongenet.Desktop.Services;
 
 namespace Ongenet.Desktop.ViewModels
@@ -31,7 +32,12 @@ namespace Ongenet.Desktop.ViewModels
             {
                 if (!SetField(ref _selectedItem, value)) return;
                 if (_suppress || value is null) return;
-                _history.JumpTo(value.Index); // jump to the chosen point in time
+                // Defer the jump: JumpTo fires Changed → Rebuild, which clears/rebuilds Items.
+                // Doing that synchronously here would mutate the ListBox's ItemsSource mid
+                // pointer-press selection update and crash Avalonia's SelectionModel with a
+                // stale (out-of-range) index. Let the click's selection batch settle first.
+                var index = value.Index;
+                Dispatcher.UIThread.Post(() => _history.JumpTo(index));
             }
         }
 
