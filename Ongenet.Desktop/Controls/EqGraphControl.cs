@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -22,12 +23,23 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<EqEffect?> EqProperty =
             AvaloniaProperty.Register<EqGraphControl, EqEffect?>(nameof(Eq));
 
-        private static readonly IPen ZeroPen = new Pen(new SolidColorBrush(Color.FromRgb(0x58, 0x5b, 0x70)), 1); // overlay0
-        private static readonly IPen CurvePen = new Pen(new SolidColorBrush(Color.FromRgb(0xcb, 0xa6, 0xf7)), 2) { LineJoin = PenLineJoin.Round }; // mauve
-        private static readonly IBrush FillBrush = new SolidColorBrush(Color.FromArgb(0x33, 0xcb, 0xa6, 0xf7));
-        private static readonly IBrush NodeBrush = new SolidColorBrush(Color.FromRgb(0x89, 0xb4, 0xfa));      // blue
-        private static readonly IBrush NodeSelBrush = new SolidColorBrush(Color.FromRgb(0xcb, 0xa6, 0xf7));   // mauve
-        private static readonly IPen NodeRing = new Pen(new SolidColorBrush(Color.FromRgb(0xcd, 0xd6, 0xf4)), 2); // text
+        private IPen _zeroPen = new Pen(Brushes.Gray, 1);
+        private IPen _curvePen = new Pen(Brushes.Gray, 2);
+        private IBrush _fillBrush = Brushes.Gray;
+        private IBrush _nodeBrush = Brushes.Gray;
+        private IBrush _nodeSelBrush = Brushes.Gray;
+        private IPen _nodeRing = new Pen(Brushes.Gray, 2);
+
+        protected override void BuildThemeResources()
+        {
+            base.BuildThemeResources();
+            _zeroPen = new Pen(new SolidColorBrush(ThemePalette.Overlay0), 1);
+            _curvePen = new Pen(new SolidColorBrush(ThemePalette.Mauve), 2) { LineJoin = PenLineJoin.Round };
+            _fillBrush = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Mauve, 0x33));
+            _nodeBrush = new SolidColorBrush(ThemePalette.Blue);
+            _nodeSelBrush = new SolidColorBrush(ThemePalette.Mauve);
+            _nodeRing = new Pen(new SolidColorBrush(ThemePalette.Text), 2);
+        }
 
         private EqBand? _dragBand;
         private EqBand? _selected;
@@ -148,7 +160,7 @@ namespace Ongenet.Desktop.Controls
         protected override void RenderOverlay(DrawingContext context, double w, double plotH)
         {
             var zeroY = DbToY(0, plotH);
-            context.DrawLine(ZeroPen, new Point(0, zeroY), new Point(w, zeroY));
+            context.DrawLine(_zeroPen, new Point(0, zeroY), new Point(w, zeroY));
 
             if (Eq is not { } eq) return;
             var bands = eq.Bands;
@@ -182,15 +194,15 @@ namespace Ongenet.Desktop.Controls
                 fctx.EndFigure(true);
             }
 
-            context.DrawGeometry(FillBrush, null, fill);
-            context.DrawGeometry(null, CurvePen, stroke);
+            context.DrawGeometry(_fillBrush, null, fill);
+            context.DrawGeometry(null, _curvePen, stroke);
 
             // Band nodes.
             foreach (var band in bands)
             {
                 var c = NodePoint(band, w, plotH);
                 var sel = ReferenceEquals(band, _selected);
-                context.DrawEllipse(sel ? NodeSelBrush : NodeBrush, NodeRing, c, sel ? 7 : 5, sel ? 7 : 5);
+                context.DrawEllipse(sel ? _nodeSelBrush : _nodeBrush, _nodeRing, c, sel ? 7 : 5, sel ? 7 : 5);
             }
         }
 

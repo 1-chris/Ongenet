@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Parameters;
+using Ongenet.Desktop.Services;
 
 namespace Ongenet.Desktop.ViewModels
 {
@@ -7,6 +9,9 @@ namespace Ongenet.Desktop.ViewModels
     public abstract class ParameterViewModel : ViewModelBase
     {
         protected ParameterViewModel(string name) => Name = name;
+
+        /// <summary>Undo history, resolved on demand (these VMs are created by a factory, not DI).</summary>
+        private protected static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
 
         public string Name { get; }
 
@@ -84,6 +89,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (_parameter.Value == value) return;
+                History?.Capture("Toggle parameter");
                 _parameter.Value = value;
                 OnPropertyChanged();
             }
@@ -107,6 +113,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (_parameter.SelectedIndex == value) return;
+                History?.Capture("Change parameter");
                 _parameter.SelectedIndex = value;
                 OnPropertyChanged();
             }

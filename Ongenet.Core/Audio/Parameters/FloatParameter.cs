@@ -16,6 +16,7 @@ public sealed class FloatParameter : Parameter
         Max = max;
         _get = get;
         _set = set;
+        DefaultValue = get(); // the owner's initial value (its code default) — used by "Reset to default"
         Format = format;
         Unit = unit;
         Skew = skew <= 0 ? 1.0 : skew;
@@ -23,6 +24,9 @@ public sealed class FloatParameter : Parameter
 
     public double Min { get; }
     public double Max { get; }
+
+    /// <summary>The value captured at construction (the owner's code default), restored by "Reset to default".</summary>
+    public double DefaultValue { get; }
 
     /// <summary>.NET format string for displaying the value.</summary>
     public string Format { get; }

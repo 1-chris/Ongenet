@@ -1,8 +1,10 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.Desktop.Services;
 
 namespace Ongenet.Desktop.ViewModels
 {
@@ -133,6 +135,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (value <= 0 || _transport.Tempo.BeatsPerMinute == value) return;
+                App.ServiceProvider?.GetService<IHistoryService>()?.Capture("Change tempo");
                 _transport.Tempo = new Tempo(value);
                 _project.Current.Tempo = new Tempo(value); // keep the project model in sync
                 OnPropertyChanged();

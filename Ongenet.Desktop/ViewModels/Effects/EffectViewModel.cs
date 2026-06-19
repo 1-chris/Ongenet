@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Desktop.Services;
 
 namespace Ongenet.Desktop.ViewModels.Effects
 {
@@ -71,6 +73,7 @@ namespace Ongenet.Desktop.ViewModels.Effects
             set
             {
                 if (Effect.Enabled == value) return;
+                App.ServiceProvider?.GetService<IHistoryService>()?.Capture(value ? "Enable effect" : "Bypass effect");
                 Effect.Enabled = value;
                 OnPropertyChanged();
             }

@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Input;
 using Avalonia.Media;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -33,11 +34,21 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<double> SampleRateProperty =
             AvaloniaProperty.Register<FilterResponseControl, double>(nameof(SampleRate), 44100.0);
 
-        private static readonly IPen ZeroPen = new Pen(new SolidColorBrush(Color.FromRgb(0x58, 0x5b, 0x70)), 1); // overlay0
-        private static readonly IPen CurvePen = new Pen(new SolidColorBrush(Color.FromRgb(0xcb, 0xa6, 0xf7)), 2) { LineJoin = PenLineJoin.Round }; // mauve
-        private static readonly IBrush FillBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xcb, 0xa6, 0xf7));
-        private static readonly IBrush MarkerBrush = new SolidColorBrush(Color.FromRgb(0xcb, 0xa6, 0xf7));
-        private static readonly IPen MarkerRing = new Pen(new SolidColorBrush(Color.FromRgb(0xcd, 0xd6, 0xf4)), 2); // text
+        private IPen _zeroPen = new Pen(Brushes.Gray, 1);
+        private IPen _curvePen = new Pen(Brushes.Gray, 2);
+        private IBrush _fillBrush = Brushes.Gray;
+        private IBrush _markerBrush = Brushes.Gray;
+        private IPen _markerRing = new Pen(Brushes.Gray, 2);
+
+        protected override void BuildThemeResources()
+        {
+            base.BuildThemeResources();
+            _zeroPen = new Pen(new SolidColorBrush(ThemePalette.Overlay0), 1);
+            _curvePen = new Pen(new SolidColorBrush(ThemePalette.Mauve), 2) { LineJoin = PenLineJoin.Round };
+            _fillBrush = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Mauve, 0x40));
+            _markerBrush = new SolidColorBrush(ThemePalette.Mauve);
+            _markerRing = new Pen(new SolidColorBrush(ThemePalette.Text), 2);
+        }
 
         private bool _dragging;
 
@@ -93,7 +104,7 @@ namespace Ongenet.Desktop.Controls
         protected override void RenderOverlay(DrawingContext context, double w, double plotH)
         {
             var zeroY = DbToY(0, plotH);
-            context.DrawLine(ZeroPen, new Point(0, zeroY), new Point(w, zeroY));
+            context.DrawLine(_zeroPen, new Point(0, zeroY), new Point(w, zeroY));
 
             var sr = SampleRate > 0 ? SampleRate : 44100.0;
             var coeffs = BiquadCoefficients.Compute((FilterMode)Mode, Frequency, Resonance, sr);
@@ -119,14 +130,14 @@ namespace Ongenet.Desktop.Controls
                 fctx.EndFigure(true);
             }
 
-            context.DrawGeometry(FillBrush, null, fill);
-            context.DrawGeometry(null, CurvePen, stroke);
+            context.DrawGeometry(_fillBrush, null, fill);
+            context.DrawGeometry(null, _curvePen, stroke);
 
             if ((FilterMode)Mode != FilterMode.Bypass)
             {
                 var mx = FreqToX(Frequency, w);
                 var my = DbToY(coeffs.MagnitudeDb(Frequency, sr), plotH);
-                context.DrawEllipse(MarkerBrush, MarkerRing,
+                context.DrawEllipse(_markerBrush, _markerRing,
                     new Point(Math.Clamp(mx, 0, w), Math.Clamp(my, 0, plotH)), 5, 5);
             }
         }

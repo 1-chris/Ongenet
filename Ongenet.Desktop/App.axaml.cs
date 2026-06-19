@@ -59,6 +59,9 @@ namespace Ongenet.Desktop
             // Parameter automation: creates lanes from the "Create automation track" right-click.
             services.AddSingleton<Services.IAutomationService, Services.AutomationService>();
 
+            // Undo/redo history (project-snapshot based).
+            services.AddSingleton<Services.IHistoryService, Services.HistoryService>();
+
             // ~30fps UI heartbeat so automated controls visibly move during playback.
             services.AddSingleton<Services.IPlaybackClock, Services.PlaybackClock>();
 
@@ -87,10 +90,17 @@ namespace Ongenet.Desktop
             services.AddSingleton<InstrumentsViewModel>();
             services.AddSingleton<MainViewModel>();
 
+            // Live theming (Catppuccin variants + custom themes).
+            services.AddSingleton<Theming.IThemeService, Theming.ThemeService>();
+            services.AddSingleton<ThemeEditorViewModel>();
+
             ServiceProvider = services.BuildServiceProvider();
 
             // Establish the font-size resources used across the app.
             ApplyFontScale(1.0);
+
+            // Capture the palette brushes and apply the default theme.
+            ServiceProvider.GetRequiredService<Theming.IThemeService>().Initialize();
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {

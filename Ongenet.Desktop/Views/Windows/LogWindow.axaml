@@ -64,18 +64,8 @@
     </Window.Styles>
 
     <Panel>
-    <Border BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+    <Border Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
     <Panel>
-        <ExperimentalAcrylicBorder IsHitTestVisible="False">
-            <ExperimentalAcrylicBorder.Material>
-                <ExperimentalAcrylicMaterial
-                    BackgroundSource="Digger"
-                    TintColor="{StaticResource CatppuccinBaseColor}"
-                    TintOpacity="0.90"
-                    MaterialOpacity="0.75" />
-            </ExperimentalAcrylicBorder.Material>
-        </ExperimentalAcrylicBorder>
-
         <Grid RowDefinitions="Auto, *">
             <!-- Custom Title Bar -->
             <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto" PointerPressed="TitleBar_PointerPressed">
@@ -94,7 +84,7 @@
             <Viewbox Width="20" Height="20">
                 <Path Data="M3,5H21V7H3M3,11H21V13H3M3,17H21V19H3" Fill="{StaticResource CatppuccinMauve}"/>
             </Viewbox>
-            <TextBlock Text="DEBUG LOGS" FontSize="{DynamicResource FontSize14}" FontWeight="Bold" VerticalAlignment="Center" Foreground="White"/>
+            <TextBlock Text="DEBUG LOGS" FontSize="{DynamicResource FontSize14}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinText}"/>
         </StackPanel>
 
         <TabControl Grid.Row="1" Name="LogTabs" SelectionChanged="LogTabs_SelectionChanged">

@@ -1,6 +1,6 @@
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -8,12 +8,14 @@ namespace Ongenet.Desktop.Controls
     /// A thin vertical level meter (for track headers). <see cref="Level"/> is a linear peak
     /// (0..1+); it's drawn on a dB scale with a green→red gradient fixed to the control height.
     /// </summary>
-    public sealed class LevelMeterControl : Control
+    public sealed class LevelMeterControl : ThemedControl
     {
         public static readonly StyledProperty<double> LevelProperty =
             AvaloniaProperty.Register<LevelMeterControl, double>(nameof(Level));
 
-        private static readonly IBrush Background = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x25));
+        private IBrush _background = Brushes.Black;
+
+        protected override void BuildThemeResources() => _background = new SolidColorBrush(ThemePalette.Mantle);
 
         static LevelMeterControl()
         {
@@ -32,7 +34,7 @@ namespace Ongenet.Desktop.Controls
             var h = Bounds.Height;
             if (w < 1 || h < 1) return;
 
-            context.FillRectangle(Background, new Rect(0, 0, w, h));
+            context.FillRectangle(_background, new Rect(0, 0, w, h));
 
             var fill = MeterScale.Normalize(Level);
             if (fill <= 0) return;
@@ -46,11 +48,11 @@ namespace Ongenet.Desktop.Controls
                 EndPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
                 GradientStops =
                 {
-                    new GradientStop(Color.FromRgb(0xa6, 0xe3, 0xa1), 0.0),  // green
-                    new GradientStop(Color.FromRgb(0xa6, 0xe3, 0xa1), 0.6),
-                    new GradientStop(Color.FromRgb(0xf9, 0xe2, 0xaf), 0.8),  // yellow
-                    new GradientStop(Color.FromRgb(0xfa, 0xb3, 0x87), 0.9),  // orange
-                    new GradientStop(Color.FromRgb(0xf3, 0x38, 0x40), 1.0)   // bright red
+                    new GradientStop(ThemePalette.Green, 0.0),
+                    new GradientStop(ThemePalette.Green, 0.6),
+                    new GradientStop(ThemePalette.Yellow, 0.8),
+                    new GradientStop(ThemePalette.Peach, 0.9),
+                    new GradientStop(ThemePalette.Red, 1.0)
                 }
             };
 

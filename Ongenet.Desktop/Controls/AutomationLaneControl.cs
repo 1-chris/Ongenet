@@ -1,9 +1,11 @@
 using System;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Automation;
+using Ongenet.Desktop.Services;
+using Ongenet.Desktop.Theming;
 using Ongenet.Desktop.ViewModels.Timeline;
 
 namespace Ongenet.Desktop.Controls
@@ -16,7 +18,7 @@ namespace Ongenet.Desktop.Controls
     /// (tension), and right-click deletes a handle. Curve evaluation is shared with
     /// <see cref="AutomationLane.Evaluate"/> so the drawn line matches playback exactly.
     /// </summary>
-    public sealed class AutomationLaneControl : Control
+    public sealed class AutomationLaneControl : ThemedControl
     {
         /// <summary>Bump to force a repaint when the lane's points mutate in place (e.g. while recording).</summary>
         public static readonly StyledProperty<int> RevisionProperty =
@@ -28,11 +30,20 @@ namespace Ongenet.Desktop.Controls
         private const double OnLineSlack = 6.0; // double-clicking within this of the curve drops the point onto it
         private const double BendThreshold = 3.0; // px of vertical travel before a segment actually bends
 
-        private static readonly IPen LinePen = new Pen(new SolidColorBrush(Color.Parse("#cba6f7")), 1.6);
-        private static readonly IBrush HandleFill = new SolidColorBrush(Color.Parse("#cdd6f4"));
-        private static readonly IPen HandleStroke = new Pen(new SolidColorBrush(Color.Parse("#1e1e2e")), 1);
+        private IPen _linePen = new Pen(Brushes.Gray, 1.6);       // accent (mauve)
+        private IBrush _handleFill = Brushes.Gray;                // text
+        private IPen _handleStroke = new Pen(Brushes.Black, 1);   // base
+
+        protected override void BuildThemeResources()
+        {
+            _linePen = new Pen(new SolidColorBrush(ThemePalette.Mauve), 1.6);
+            _handleFill = new SolidColorBrush(ThemePalette.Text);
+            _handleStroke = new Pen(new SolidColorBrush(ThemePalette.Base), 1);
+        }
 
         private enum Drag { None, Move, Bend }
+
+        private static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
 
         private Drag _drag = Drag.None;
         private AutomationPoint? _dragPoint;
@@ -106,12 +117,12 @@ namespace Ongenet.Desktop.Controls
                 gc.LineTo(new Point(w, lastY));
             }
 
-            context.DrawGeometry(null, LinePen, geo);
+            context.DrawGeometry(null, _linePen, geo);
 
             foreach (var p in pts)
             {
                 var c = new Point(BeatToX(p.Beat, m), ValueToY(p.Value, lane, h));
-                context.DrawEllipse(HandleFill, HandleStroke, c, HandleRadius, HandleRadius);
+                context.DrawEllipse(_handleFill, _handleStroke, c, HandleRadius, HandleRadius);
             }
         }
 
@@ -131,6 +142,7 @@ namespace Ongenet.Desktop.Controls
                 var victim = HitPoint(pos, lane, m, h);
                 if (victim is not null && lane.Points.Count > 1)
                 {
+                    History?.Capture("Delete automation point");
                     lane.RemovePoint(victim);
                     vm.CommitEdits();
                     InvalidateVisual();
@@ -158,6 +170,7 @@ namespace Ongenet.Desktop.Controls
             var hit = HitPoint(pos, lane, m, h);
             if (hit is not null)
             {
+                History?.Capture("Move automation point");
                 _drag = Drag.Move;
                 _dragPoint = hit;
                 return;
@@ -172,6 +185,7 @@ namespace Ongenet.Desktop.Controls
                 var lineY = ValueToY(lane.Evaluate(XToBeat(pos.X, m)), lane, h);
                 if (Math.Abs(lineY - pos.Y) <= OnLineSlack) value = lane.Evaluate(beat);
 
+                History?.Capture("Add automation point");
                 var point = new AutomationPoint(beat, value);
                 lane.AddPoint(point);
                 vm.CommitEdits();
@@ -186,6 +200,7 @@ namespace Ongenet.Desktop.Controls
             var idx = SegmentIndexAt(XToBeat(pos.X, m), lane);
             if (idx >= 0)
             {
+                History?.Capture("Bend automation");
                 _drag = Drag.Bend;
                 _bendIndex = idx;
                 _bendStartCurve = lane.Points[idx].Curve;

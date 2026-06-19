@@ -12,7 +12,11 @@ public sealed class BoolParameter : Parameter
     {
         _get = get;
         _set = set;
+        DefaultValue = get(); // the owner's initial state (its code default) — used by "Reset to default"
     }
+
+    /// <summary>The state captured at construction (the owner's code default), restored by "Reset to default".</summary>
+    public bool DefaultValue { get; }
 
     public bool Value
     {

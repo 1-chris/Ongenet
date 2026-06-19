@@ -9,6 +9,8 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Desktop.Services;
 using Ongenet.Desktop.ViewModels;
 using Ongenet.Desktop.ViewModels.Timeline;
 
@@ -24,6 +26,7 @@ namespace Ongenet.Desktop.Views.Panels
         private const double EdgeZone = 8.0;          // px at each clip end that resizes
         private const double MinClipBeats = 0.25;     // minimum clip length
         private const double ZoomSensitivity = 0.005; // middle-drag zoom factor
+        private const double BoundaryBand = 7.0;      // px around a track line that inserts a new track
 
         private enum Gesture { None, Move, ResizeLeft, ResizeRight, Zoom, Band }
 
@@ -38,6 +41,7 @@ namespace Ongenet.Desktop.Views.Panels
         // Active-gesture state.
         private Gesture _gesture = Gesture.None;
         private ClipViewModel? _dragClip;
+        private bool _clipDragCaptured; // history snapshot taken once per move/resize drag (on first actual move)
         private double _pressBeat;
         private double _origStart;
         private double _origLength;
@@ -313,6 +317,23 @@ namespace Ongenet.Desktop.Views.Panels
             }
 
             e.DragEffects = DragDropEffects.Copy;
+
+            // An audio file dragged near the line between two tracks inserts a NEW track there, shown
+            // with the same insertion line used for track reordering.
+            if (isAudio && !isInstrument)
+            {
+                var (insertIndex, indicatorY) = LocateBoundary(e, vm);
+                if (insertIndex >= 0)
+                {
+                    vm.SetDropHighlight(null);
+                    NewTrackGhost.IsVisible = false;
+                    ShowInsertLine(indicatorY);
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            DragInsertLine.IsVisible = false;
             var (target, _, isNewTrack) = Locate(e, vm);
 
             // An instrument drop always creates a new track; an audio drop targets a hovered lane.
@@ -333,28 +354,30 @@ namespace Ongenet.Desktop.Views.Panels
         private void OnDrop(object? sender, DragEventArgs e)
         {
             NewTrackGhost.IsVisible = false;
+            DragInsertLine.IsVisible = false;
             if (DataContext is not TimelineViewModel vm) return;
             vm.ClearDropHighlight();
 
             var (rowIndex, beat) = LocatePoint(e.GetPosition(LanesList), vm);
+            var (insertIndex, _) = LocateBoundary(e, vm);
             if (e.DataTransfer.TryGetValue(DragFormats.Instrument) is { } instrumentId)
             {
                 vm.CreateInstrumentTrack(instrumentId, vm.TrackInsertIndexForRow(rowIndex));
             }
             else if (e.DataTransfer.TryGetValue(DragFormats.AudioFile) is { } path)
             {
-                var target = rowIndex >= vm.RowCount ? null : vm.TrackLaneAtRow(rowIndex);
-                vm.AddAudioClip(path, target, beat);
+                if (insertIndex >= 0) vm.AddAudioClip(path, null, beat, insertIndex);
+                else vm.AddAudioClip(path, rowIndex >= vm.RowCount ? null : vm.TrackLaneAtRow(rowIndex), beat);
             }
             else
             {
-                // External OS file drop: one file lands on the hovered lane; multiple files each get
-                // their own new audio track so they don't pile up on top of each other.
+                // External OS file drop: one file lands on the hovered lane (or a new track at a boundary);
+                // multiple files each get their own new audio track so they don't pile up on top of each other.
                 var paths = ExternalAudioPaths(e, vm);
                 if (paths.Count == 1)
                 {
-                    var target = rowIndex >= vm.RowCount ? null : vm.TrackLaneAtRow(rowIndex);
-                    vm.AddAudioClip(paths[0], target, beat);
+                    if (insertIndex >= 0) vm.AddAudioClip(paths[0], null, beat, insertIndex);
+                    else vm.AddAudioClip(paths[0], rowIndex >= vm.RowCount ? null : vm.TrackLaneAtRow(rowIndex), beat);
                 }
                 else
                 {
@@ -368,7 +391,27 @@ namespace Ongenet.Desktop.Views.Panels
         private void OnDragLeave(object? sender, DragEventArgs e)
         {
             NewTrackGhost.IsVisible = false;
+            DragInsertLine.IsVisible = false;
             (DataContext as TimelineViewModel)?.ClearDropHighlight();
+        }
+
+        // Content-Y of the drag mapped to an inter-track boundary (insert index + indicator Y), or (-1, 0).
+        private (int InsertIndex, double IndicatorY) LocateBoundary(DragEventArgs e, TimelineViewModel vm)
+        {
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            var scrollY = _lanesScroll?.Offset.Y ?? 0;
+            return vm.HitTrackBoundary(e.GetPosition(LanesList).Y + scrollY, BoundaryBand);
+        }
+
+        // Shows the horizontal insertion line (reused from track reordering) at a content-Y boundary.
+        private void ShowInsertLine(double contentY)
+        {
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            var scrollY = _lanesScroll?.Offset.Y ?? 0;
+            Canvas.SetTop(DragInsertLine, contentY - scrollY - 1.5);
+            Canvas.SetLeft(DragInsertLine, 0);
+            DragInsertLine.Width = DragOverlay.Bounds.Width;
+            DragInsertLine.IsVisible = true;
         }
 
         // Extracts the local paths of any dragged OS files the timeline can ingest as audio.
@@ -503,6 +546,7 @@ namespace Ongenet.Desktop.Views.Panels
                 : Gesture.Move;
 
             _dragClip = clip;
+            _clipDragCaptured = false; // snapshot on the first real move, not on a plain click-select
             _pressBeat = beat;
             _origStart = clip.Model.StartBeat;
             _origLength = clip.Model.LengthBeats;
@@ -510,6 +554,9 @@ namespace Ongenet.Desktop.Views.Panels
             e.Pointer.Capture(LanesList);
             e.Handled = true;
         }
+
+        // History service resolved on demand (controls aren't constructed through DI).
+        private static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
 
         private void OnPointerMoved(object? sender, PointerEventArgs e)
         {
@@ -542,6 +589,12 @@ namespace Ongenet.Desktop.Views.Panels
             }
 
             if (_dragClip is null) return;
+            if (!_clipDragCaptured)
+            {
+                History?.Capture(_gesture == Gesture.Move ? "Move clip" : "Resize clip");
+                _clipDragCaptured = true;
+            }
+
             var (_, beat) = LocatePoint(pos, vm);
             var delta = beat - _pressBeat;
 

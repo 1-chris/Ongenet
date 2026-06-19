@@ -16,13 +16,15 @@ namespace Ongenet.Desktop.ViewModels
         private readonly ISelectionService _selection;
         private readonly IEventAggregator _events;
         private readonly ITransportService _transport;
+        private readonly IHistoryService _history;
 
         public TrackInspectorViewModel(ISelectionService selection, IEventAggregator events,
-            ITransportService transport, IPlaybackClock clock)
+            ITransportService transport, IPlaybackClock clock, IHistoryService history)
         {
             _selection = selection;
             _events = events;
             _transport = transport;
+            _history = history;
             _selection.SelectionChanged += OnSelectionChanged;
             // Stay in sync when the track is edited elsewhere (e.g. header mute/solo toggles).
             _events.Subscribe<TrackChangedEvent>(e =>
@@ -60,6 +62,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (Track is null || Track.Name == value) return;
+                _history.Capture("Rename track");
                 Track.Name = value;
                 OnPropertyChanged();
                 Notify();
@@ -72,6 +75,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (Track is null || Track.IsMuted == value) return;
+                _history.Capture(value ? "Mute track" : "Unmute track");
                 Track.IsMuted = value;
                 OnPropertyChanged();
                 Notify();
@@ -84,6 +88,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (Track is null || Track.IsSoloed == value) return;
+                _history.Capture(value ? "Solo track" : "Unsolo track");
                 Track.IsSoloed = value;
                 OnPropertyChanged();
                 Notify();
@@ -118,6 +123,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (Track is null || value is null || Track.ColorKey == value) return;
+                _history.Capture("Change track colour");
                 Track.ColorKey = value;
                 OnPropertyChanged();
                 Notify();

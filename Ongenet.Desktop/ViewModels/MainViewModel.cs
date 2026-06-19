@@ -14,6 +14,7 @@ namespace Ongenet.Desktop.ViewModels
     {
         private readonly ObservableCollection<LogEntry> _logEntries;
         private readonly IProjectFileService _projectFile;
+        private readonly Services.IHistoryService _history;
 
         public MainViewModel(
             TransportViewModel transport,
@@ -23,6 +24,7 @@ namespace Ongenet.Desktop.ViewModels
             FileBrowserViewModel fileBrowser,
             InstrumentsViewModel instruments,
             IProjectFileService projectFile,
+            Services.IHistoryService history,
             ObservableCollectionLoggerProvider? logProvider = null)
         {
             Transport = transport;
@@ -32,6 +34,13 @@ namespace Ongenet.Desktop.ViewModels
             FileBrowser = fileBrowser;
             Instruments = instruments;
             _projectFile = projectFile;
+            _history = history;
+            _history.Changed += () =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    OnPropertyChanged(nameof(CanUndo));
+                    OnPropertyChanged(nameof(CanRedo));
+                });
             _projectFile.Changed += () =>
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
@@ -54,6 +63,10 @@ namespace Ongenet.Desktop.ViewModels
 
         /// <summary>Version label shown next to the name in the title bar, e.g. "v0.1.0".</summary>
         public string Version => $"v{AppInfo.Version}";
+
+        /// <summary>Whether undo/redo are available (drives the title-bar buttons' enabled state).</summary>
+        public bool CanUndo => _history.CanUndo;
+        public bool CanRedo => _history.CanRedo;
 
         /// <summary>Top-bar transport (play/stop, tempo).</summary>
         public TransportViewModel Transport { get; }

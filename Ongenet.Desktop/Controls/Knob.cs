@@ -1,9 +1,11 @@
 using System;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Desktop.Services;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -12,7 +14,7 @@ namespace Ongenet.Desktop.Controls
     /// value; a 270° arc shows the value and a pointer line indicates the position. More
     /// space-efficient than a slider for synth/effect controls.
     /// </summary>
-    public sealed class Knob : Control
+    public sealed class Knob : ThemedControl
     {
         // Sweep: 225° (down-left) clockwise-by-screen to -45° (down-right), 270° total, gap at bottom.
         private const double StartDeg = 225.0;
@@ -32,14 +34,25 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<double> SkewProperty =
             AvaloniaProperty.Register<Knob, double>(nameof(Skew), 1.0);
 
-        private static readonly IBrush BodyBrush = new SolidColorBrush(Color.FromRgb(0x31, 0x32, 0x44));   // surface0
-        private static readonly IPen TrackPen = new Pen(new SolidColorBrush(Color.FromRgb(0x45, 0x47, 0x5a)), 3) { LineCap = PenLineCap.Round };
-        private static readonly IPen ValuePen = new Pen(new SolidColorBrush(Color.FromRgb(0xcb, 0xa6, 0xf7)), 3) { LineCap = PenLineCap.Round }; // mauve
-        private static readonly IPen IndicatorPen = new Pen(new SolidColorBrush(Color.FromRgb(0xcd, 0xd6, 0xf4)), 2) { LineCap = PenLineCap.Round }; // text
+        private IBrush _bodyBrush = Brushes.Transparent;       // surface0
+        private IPen _trackPen = new Pen(Brushes.Gray, 3);     // surface1
+        private IPen _valuePen = new Pen(Brushes.Gray, 3);     // mauve (accent)
+        private IPen _indicatorPen = new Pen(Brushes.Gray, 2); // text
+
+        protected override void BuildThemeResources()
+        {
+            _bodyBrush = new SolidColorBrush(ThemePalette.Surface0);
+            _trackPen = new Pen(new SolidColorBrush(ThemePalette.Surface1), 3) { LineCap = PenLineCap.Round };
+            _valuePen = new Pen(new SolidColorBrush(ThemePalette.Mauve), 3) { LineCap = PenLineCap.Round };
+            _indicatorPen = new Pen(new SolidColorBrush(ThemePalette.Text), 2) { LineCap = PenLineCap.Round };
+        }
 
         private bool _dragging;
+        private bool _dragCaptured; // one history snapshot per drag (taken on first move)
         private double _dragStartY;
         private double _dragStartT;
+
+        private static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
 
         static Knob()
         {
@@ -78,17 +91,19 @@ namespace Ongenet.Desktop.Controls
         {
             base.OnPointerPressed(e);
 
-            // Right-click: offer "Create automation track" for the bound float parameter.
+            // Right-click: offer "Reset to default" + "Create automation track" for the bound float parameter.
             if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed
                 && DataContext is ViewModels.FloatParameterViewModel fp)
             {
-                AutomationGesture.Offer(this, AutomationGesture.ForFloat(fp.Parameter));
+                AutomationGesture.Offer(this, AutomationGesture.ForFloat(fp.Parameter),
+                    () => fp.Value = fp.Parameter.DefaultValue);
                 e.Handled = true;
                 return;
             }
 
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
             _dragging = true;
+            _dragCaptured = false;
             _dragStartY = e.GetPosition(this).Y;
             _dragStartT = Normalized;
             e.Pointer.Capture(this);
@@ -99,6 +114,7 @@ namespace Ongenet.Desktop.Controls
         {
             base.OnPointerMoved(e);
             if (!_dragging) return;
+            if (!_dragCaptured) { History?.Capture("Adjust parameter"); _dragCaptured = true; }
             var dy = _dragStartY - e.GetPosition(this).Y; // up = increase
             Value = ValueFromT(_dragStartT + dy / DragRangePixels);
             e.Handled = true;
@@ -116,6 +132,7 @@ namespace Ongenet.Desktop.Controls
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
+            History?.Capture("Adjust parameter");
             Value = ValueFromT(Normalized + e.Delta.Y / 20.0);
             e.Handled = true;
         }
@@ -131,16 +148,16 @@ namespace Ongenet.Desktop.Controls
             var t = Normalized;
 
             // Knob body.
-            context.DrawEllipse(BodyBrush, null, center, radius * 0.62, radius * 0.62);
+            context.DrawEllipse(_bodyBrush, null, center, radius * 0.62, radius * 0.62);
 
             // Track arc (full sweep) + value arc (start → current).
-            DrawArc(context, TrackPen, center, radius, StartDeg, StartDeg - SweepDeg);
-            DrawArc(context, ValuePen, center, radius, StartDeg, StartDeg - SweepDeg * t);
+            DrawArc(context, _trackPen, center, radius, StartDeg, StartDeg - SweepDeg);
+            DrawArc(context, _valuePen, center, radius, StartDeg, StartDeg - SweepDeg * t);
 
             // Indicator line.
             var tip = PointOnCircle(center, radius * 0.82, StartDeg - SweepDeg * t);
             var basePt = PointOnCircle(center, radius * 0.28, StartDeg - SweepDeg * t);
-            context.DrawLine(IndicatorPen, basePt, tip);
+            context.DrawLine(_indicatorPen, basePt, tip);
         }
 
         // Draws an arc by sampling points along it (avoids ArcTo sweep-direction pitfalls).

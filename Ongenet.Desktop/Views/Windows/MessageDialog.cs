@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Views.Windows
 {
@@ -21,21 +22,21 @@ namespace Ongenet.Desktop.Views.Windows
             SizeToContent = SizeToContent.Height;
             CanResize = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Background = new SolidColorBrush(Color.Parse("#1e1e2e"));
+            Background = new SolidColorBrush(ThemePalette.Base);
 
             var heading = new TextBlock
             {
                 Text = title,
                 FontWeight = FontWeight.SemiBold,
                 FontSize = 14,
-                Foreground = new SolidColorBrush(Color.Parse("#cdd6f4"))
+                Foreground = new SolidColorBrush(ThemePalette.Text)
             };
 
             var body = new TextBlock
             {
                 Text = message,
                 TextWrapping = TextWrapping.Wrap,
-                Foreground = new SolidColorBrush(Color.Parse("#bac2de"))
+                Foreground = new SolidColorBrush(ThemePalette.Subtext1)
             };
 
             var buttons = new StackPanel

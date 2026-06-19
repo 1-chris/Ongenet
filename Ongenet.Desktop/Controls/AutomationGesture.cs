@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Automation;
@@ -15,33 +16,46 @@ namespace Ongenet.Desktop.Controls
     /// </summary>
     public static class AutomationGesture
     {
-        /// <summary>Pops the "Create automation track" flyout at <paramref name="anchor"/> for the given target.</summary>
-        public static void Offer(Control anchor, IAutomationTarget target)
+        /// <summary>
+        /// Pops the control's right-click flyout at <paramref name="anchor"/>. When <paramref name="reset"/> is
+        /// given, a "Reset to default" item is shown first; "Create automation track" follows when a target
+        /// track is selected.
+        /// </summary>
+        public static void Offer(Control anchor, IAutomationTarget target, Action? reset = null)
         {
             var sp = App.ServiceProvider;
             var automation = sp?.GetService<Services.IAutomationService>();
             var owner = sp?.GetService<ISelectionService>()?.SelectedTrack;
-            if (automation is null || owner is null) return;
-
-            var item = new MenuItem { Header = "Create automation track" };
-            item.Click += (_, _) => automation.CreateLane(owner, target);
-
-            var flyout = new MenuFlyout();
-            flyout.Items.Add(item);
-            flyout.ShowAt(anchor);
+            ShowMenu(anchor, target, reset, automation, owner);
         }
 
-        /// <summary>Pops the flyout for a target whose owner is given explicitly (e.g. the track inspector).</summary>
-        public static void Offer(Control anchor, Track? owner, IAutomationTarget target)
+        /// <summary>As above, but with the owning track given explicitly (e.g. the track inspector).</summary>
+        public static void Offer(Control anchor, Track? owner, IAutomationTarget target, Action? reset = null)
         {
             var automation = App.ServiceProvider?.GetService<Services.IAutomationService>();
-            if (automation is null || owner is null) return;
+            ShowMenu(anchor, target, reset, automation, owner);
+        }
 
-            var item = new MenuItem { Header = "Create automation track" };
-            item.Click += (_, _) => automation.CreateLane(owner, target);
-
+        private static void ShowMenu(Control anchor, IAutomationTarget target, Action? reset,
+            Services.IAutomationService? automation, Track? owner)
+        {
             var flyout = new MenuFlyout();
-            flyout.Items.Add(item);
+
+            if (reset is not null)
+            {
+                var resetItem = new MenuItem { Header = "Reset to default" };
+                resetItem.Click += (_, _) => reset();
+                flyout.Items.Add(resetItem);
+            }
+
+            if (automation is not null && owner is not null)
+            {
+                var item = new MenuItem { Header = "Create automation track" };
+                item.Click += (_, _) => automation.CreateLane(owner, target);
+                flyout.Items.Add(item);
+            }
+
+            if (flyout.Items.Count == 0) return;
             flyout.ShowAt(anchor);
         }
 

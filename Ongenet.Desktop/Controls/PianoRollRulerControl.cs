@@ -1,14 +1,14 @@
 using System.Globalization;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
     /// <summary>
     /// Renders the piano-roll's top ruler: a bar number + tick at each bar line.
     /// </summary>
-    public sealed class PianoRollRulerControl : Control
+    public sealed class PianoRollRulerControl : ThemedControl
     {
         public static readonly StyledProperty<double> PixelsPerBeatProperty =
             AvaloniaProperty.Register<PianoRollRulerControl, double>(nameof(PixelsPerBeat));
@@ -19,8 +19,14 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<int> BeatsPerBarProperty =
             AvaloniaProperty.Register<PianoRollRulerControl, int>(nameof(BeatsPerBar), 4);
 
-        private static readonly IBrush LabelBrush = new SolidColorBrush(Color.FromArgb(180, 205, 214, 244));
-        private static readonly IPen BarPen = new Pen(new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), 1);
+        private IBrush _labelBrush = Brushes.Gray;        // subtext
+        private IPen _barPen = new Pen(Brushes.Gray, 1);  // text (faint)
+
+        protected override void BuildThemeResources()
+        {
+            _labelBrush = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Text, 180));
+            _barPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Text, 90)), 1);
+        }
 
         static PianoRollRulerControl()
         {
@@ -43,12 +49,12 @@ namespace Ongenet.Desktop.Controls
             for (var beat = 0; beat <= totalBeats; beat += bar)
             {
                 var x = beat * ppb;
-                context.DrawLine(BarPen, new Point(x, 0), new Point(x, height));
+                context.DrawLine(_barPen, new Point(x, 0), new Point(x, height));
 
                 var label = new FormattedText(
                     (beat / bar + 1).ToString(),
                     CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                    Typeface.Default, 11, LabelBrush);
+                    Typeface.Default, 11, _labelBrush);
                 context.DrawText(label, new Point(x + 3, 3));
             }
         }

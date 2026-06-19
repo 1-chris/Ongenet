@@ -323,8 +323,9 @@
                             </ItemsControl>
                             <!-- Drop highlight while dragging an audio file over this lane -->
                             <Border IsVisible="{Binding IsDropTarget}" IsHitTestVisible="False"
-                                    Background="#33cba6f7"
-                                    BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="2"/>
+                                    BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="2">
+                                <Rectangle Fill="{StaticResource CatppuccinMauve}" Opacity="0.2"/>
+                            </Border>
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -348,29 +349,33 @@
             <!-- Drop overlay: "New audio track" ghost shown when dragging below the last lane -->
             <Canvas Grid.Row="1" Grid.Column="1" Name="DropOverlay" IsHitTestVisible="False">
                 <Border Name="NewTrackGhost" Height="64" IsVisible="False" CornerRadius="2"
-                        Background="#332ECC71"
                         BorderBrush="{StaticResource CatppuccinGreen}" BorderThickness="2">
-                    <TextBlock Name="NewTrackGhostLabel" Text="New audio track" Margin="10,0"
-                               VerticalAlignment="Center"
-                               FontWeight="SemiBold" Foreground="{StaticResource CatppuccinGreen}"/>
+                    <Grid>
+                        <Rectangle Fill="{StaticResource CatppuccinGreen}" Opacity="0.2"/>
+                        <TextBlock Name="NewTrackGhostLabel" Text="New audio track" Margin="10,0"
+                                   VerticalAlignment="Center"
+                                   FontWeight="SemiBold" Foreground="{StaticResource CatppuccinGreen}"/>
+                    </Grid>
                 </Border>
             </Canvas>
 
             <!-- Playhead + start marker lines (and the select-mode rubber band) over the lanes -->
             <Canvas Grid.Row="1" Grid.Column="1" Name="PlayheadOverlay" IsHitTestVisible="False" ClipToBounds="True">
-                <Rectangle Name="LoopRegion" IsVisible="False" Fill="#1F89DCEB"/>
+                <Rectangle Name="LoopRegion" IsVisible="False" Fill="{StaticResource CatppuccinSky}" Opacity="0.12"/>
                 <Rectangle Name="StartMarkerLine" Width="1" IsVisible="False"
                            Fill="{StaticResource CatppuccinOverlay1}"/>
                 <Rectangle Name="PlayheadLine" Width="2" IsVisible="False"
                            Fill="{StaticResource CatppuccinGreen}"/>
                 <Border Name="Band" IsVisible="False"
-                        Background="#33cba6f7" BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="1"/>
+                        BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="1">
+                    <Rectangle Fill="{StaticResource CatppuccinMauve}" Opacity="0.2"/>
+                </Border>
             </Canvas>
 
             <!-- Start-marker play icon in the ruler -->
             <Canvas Grid.Row="0" Grid.Column="1" Name="RulerOverlay" IsHitTestVisible="False" ClipToBounds="True">
                 <Rectangle Name="LoopRegionRuler" IsVisible="False" Height="{StaticResource RulerHeight}"
-                           Fill="#4089DCEB"/>
+                           Fill="{StaticResource CatppuccinSky}" Opacity="0.25"/>
                 <Path Name="StartMarkerIcon" IsVisible="False" Data="M0,0 L9,5 L0,10 Z"
                       Fill="{StaticResource CatppuccinGreen}"/>
             </Canvas>

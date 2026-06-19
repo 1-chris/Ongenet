@@ -13,11 +13,14 @@ namespace Ongenet.Desktop.ViewModels
     {
         private readonly ISelectionService _selection;
         private readonly IEventAggregator _events;
+        private readonly Services.IHistoryService _history;
 
-        public ClipInspectorViewModel(ISelectionService selection, IEventAggregator events)
+        public ClipInspectorViewModel(ISelectionService selection, IEventAggregator events,
+            Services.IHistoryService history)
         {
             _selection = selection;
             _events = events;
+            _history = history;
             _selection.SelectionChanged += OnSelectionChanged;
         }
 
@@ -52,6 +55,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (Clip is null || Clip.Name == value) return;
+                _history.Capture("Rename clip");
                 Clip.Name = value;
                 OnPropertyChanged();
                 Notify();
@@ -64,6 +68,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (Clip is null || value < 0 || Clip.StartBeat == value) return;
+                _history.Capture("Move clip");
                 Clip.StartBeat = value;
                 OnPropertyChanged();
                 Notify();
@@ -76,6 +81,7 @@ namespace Ongenet.Desktop.ViewModels
             set
             {
                 if (Clip is null || value <= 0 || Clip.LengthBeats == value) return;
+                _history.Capture("Resize clip");
                 Clip.LengthBeats = value;
                 OnPropertyChanged();
                 Notify();

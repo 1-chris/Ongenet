@@ -1,6 +1,6 @@
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -8,7 +8,7 @@ namespace Ongenet.Desktop.Controls
     /// Horizontal stereo master loudness meter for the top bar: two bars (L/R) with a green→red
     /// gradient on a dB scale, plus dB tick lines.
     /// </summary>
-    public sealed class MasterMeterControl : Control
+    public sealed class MasterMeterControl : ThemedControl
     {
         public static readonly StyledProperty<double> LevelLeftProperty =
             AvaloniaProperty.Register<MasterMeterControl, double>(nameof(LevelLeft));
@@ -16,8 +16,14 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<double> LevelRightProperty =
             AvaloniaProperty.Register<MasterMeterControl, double>(nameof(LevelRight));
 
-        private static readonly IBrush Background = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x25));
-        private static readonly IPen TickPen = new Pen(new SolidColorBrush(Color.FromArgb(120, 0x11, 0x11, 0x1b)), 1);
+        private IBrush _background = Brushes.Black;
+        private IPen _tickPen = new Pen(Brushes.Gray, 1);
+
+        protected override void BuildThemeResources()
+        {
+            _background = new SolidColorBrush(ThemePalette.Mantle);
+            _tickPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Crust, 120)), 1);
+        }
 
         static MasterMeterControl()
         {
@@ -33,7 +39,7 @@ namespace Ongenet.Desktop.Controls
             var h = Bounds.Height;
             if (w < 4 || h < 4) return;
 
-            context.FillRectangle(Background, new Rect(0, 0, w, h));
+            context.FillRectangle(_background, new Rect(0, 0, w, h));
 
             const double gap = 2;
             var barH = (h - gap) / 2;
@@ -44,7 +50,7 @@ namespace Ongenet.Desktop.Controls
             foreach (var db in MeterScale.Ticks)
             {
                 var x = MeterScale.NormalizeDb(db) * w;
-                context.DrawLine(TickPen, new Point(x, 0), new Point(x, h));
+                context.DrawLine(_tickPen, new Point(x, 0), new Point(x, h));
             }
         }
 
@@ -59,11 +65,11 @@ namespace Ongenet.Desktop.Controls
                 EndPoint = new RelativePoint(area.Width, 0, RelativeUnit.Absolute),
                 GradientStops =
                 {
-                    new GradientStop(Color.FromRgb(0xa6, 0xe3, 0xa1), 0.0),  // green
-                    new GradientStop(Color.FromRgb(0xa6, 0xe3, 0xa1), 0.6),
-                    new GradientStop(Color.FromRgb(0xf9, 0xe2, 0xaf), 0.8),  // yellow
-                    new GradientStop(Color.FromRgb(0xfa, 0xb3, 0x87), 0.9),  // orange
-                    new GradientStop(Color.FromRgb(0xf3, 0x38, 0x40), 1.0)   // bright red
+                    new GradientStop(ThemePalette.Green, 0.0),
+                    new GradientStop(ThemePalette.Green, 0.6),
+                    new GradientStop(ThemePalette.Yellow, 0.8),
+                    new GradientStop(ThemePalette.Peach, 0.9),
+                    new GradientStop(ThemePalette.Red, 1.0)
                 }
             };
 

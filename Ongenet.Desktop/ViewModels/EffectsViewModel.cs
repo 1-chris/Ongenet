@@ -23,14 +23,16 @@ namespace Ongenet.Desktop.ViewModels
         private readonly IEffectRegistry _registry;
         private readonly IEventAggregator _events;
         private readonly ITransportService _transport;
+        private readonly IHistoryService _history;
 
         public EffectsViewModel(ISelectionService selection, IEffectRegistry registry,
-            IEventAggregator events, ITransportService transport, IPlaybackClock clock)
+            IEventAggregator events, ITransportService transport, IPlaybackClock clock, IHistoryService history)
         {
             _selection = selection;
             _registry = registry;
             _events = events;
             _transport = transport;
+            _history = history;
             _selection.SelectionChanged += OnSelectionChanged;
             // Discovered CLAP effects appear here as they're registered (off the scan thread).
             _registry.Changed += () => Dispatcher.UIThread.Post(RebuildAddable);
@@ -94,6 +96,7 @@ namespace Ongenet.Desktop.ViewModels
         private void AddEffect(string id)
         {
             if (Track is not { } track || string.IsNullOrEmpty(id)) return;
+            _history.Capture("Add effect");
             var effect = _registry.Create(id);
             track.Effects.Add(effect);
             track.CommitEffects();
@@ -104,6 +107,7 @@ namespace Ongenet.Desktop.ViewModels
         private void RemoveEffect(EffectViewModel vm)
         {
             if (Track is not { } track) return;
+            _history.Capture("Remove effect");
             track.Effects.Remove(vm.Effect);
             track.CommitEffects();
             _events.Publish(new TracksChangedEvent());
@@ -117,6 +121,7 @@ namespace Ongenet.Desktop.ViewModels
             var index = track.Effects.IndexOf(vm.Effect);
             var target = index + delta;
             if (index < 0 || target < 0 || target >= track.Effects.Count) return;
+            _history.Capture("Reorder effect");
 
             track.Effects.RemoveAt(index);
             track.Effects.Insert(target, vm.Effect);

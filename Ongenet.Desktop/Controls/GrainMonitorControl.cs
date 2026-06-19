@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -15,15 +15,19 @@ namespace Ongenet.Desktop.Controls
     /// lifetime. Driven by its own ~60fps timer, draining new spawns from the instrument's
     /// <see cref="GrainMonitor"/> — animation runs on the UI clock, independent of the audio thread.
     /// </summary>
-    public sealed class GrainMonitorControl : Control
+    public sealed class GrainMonitorControl : ThemedControl
     {
         public static readonly StyledProperty<GrainMonitor?> MonitorProperty =
             AvaloniaProperty.Register<GrainMonitorControl, GrainMonitor?>(nameof(Monitor));
 
-        private static readonly IBrush Background = new SolidColorBrush(Color.Parse("#181825")); // mantle/crust
-        private static readonly IPen Axis = new Pen(new SolidColorBrush(Color.Parse("#313244")), 1);
-        private static readonly Color Forward = Color.Parse("#cba6f7"); // mauve
-        private static readonly Color Reverse = Color.Parse("#94e2d5"); // teal
+        private IBrush _background = Brushes.Black;
+        private IPen _axis = new Pen(Brushes.Gray, 1);
+
+        protected override void BuildThemeResources()
+        {
+            _background = new SolidColorBrush(ThemePalette.Mantle);
+            _axis = new Pen(new SolidColorBrush(ThemePalette.Surface0), 1);
+        }
 
         private readonly List<VisualGrain> _grains = new();
         private DispatcherTimer? _timer;
@@ -115,9 +119,9 @@ namespace Ongenet.Desktop.Controls
             var h = Bounds.Height;
             if (w < 2 || h < 2) return;
 
-            context.FillRectangle(Background, new Rect(0, 0, w, h));
+            context.FillRectangle(_background, new Rect(0, 0, w, h));
             // Centre line (pan = 0).
-            context.DrawLine(Axis, new Point(0, h / 2), new Point(w, h / 2));
+            context.DrawLine(_axis, new Point(0, h / 2), new Point(w, h / 2));
 
             var now = Environment.TickCount64;
             var midY = h / 2;
@@ -133,7 +137,7 @@ namespace Ongenet.Desktop.Controls
                 var x = g.X * w;
                 var y = midY + g.Pan * spread;
                 var radius = 2.0 + 4.0 * alpha;
-                var baseColor = g.Reverse ? Reverse : Forward;
+                var baseColor = g.Reverse ? ThemePalette.Teal : ThemePalette.Mauve;
                 var brush = new SolidColorBrush(baseColor, alpha);
                 context.DrawEllipse(brush, null, new Point(x, y), radius, radius);
             }

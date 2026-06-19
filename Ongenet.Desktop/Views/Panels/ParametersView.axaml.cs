@@ -23,7 +23,8 @@ namespace Ongenet.Desktop.Views.Panels
             if ((e.Source as StyledElement)?.DataContext is not BoolParameterViewModel bp) return;
 
             var anchor = e.Source as Control ?? this;
-            AutomationGesture.Offer(anchor, AutomationGesture.ForBool(bp.Parameter));
+            AutomationGesture.Offer(anchor, AutomationGesture.ForBool(bp.Parameter),
+                () => bp.Value = bp.Parameter.DefaultValue);
             e.Handled = true;
         }
     }

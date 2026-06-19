@@ -44,11 +44,17 @@ public sealed class Track
     /// </summary>
     public bool IsArmed { get; set; }
 
+    /// <summary>Default linear output gain for a new track / "Reset to default".</summary>
+    public const double DefaultVolume = 0.8;
+
+    /// <summary>Default stereo pan (centred) for a new track / "Reset to default".</summary>
+    public const double DefaultPan = 0.0;
+
     /// <summary>Linear output gain, 0..1.</summary>
-    public double Volume { get; set; } = 0.8;
+    public double Volume { get; set; } = DefaultVolume;
 
     /// <summary>Stereo pan, -1 (hard left) .. +1 (hard right).</summary>
-    public double Pan { get; set; }
+    public double Pan { get; set; } = DefaultPan;
 
     /// <summary>
     /// The track's colour, stored as a palette key (e.g. "CatppuccinMauve") or a "#rrggbb"

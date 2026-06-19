@@ -56,12 +56,10 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="pr:PianoKeyViewModel">
                             <Border Width="{StaticResource KeyGutterWidth}" Height="{Binding Height}"
+                                    Background="{StaticResource CatppuccinSurface1}"
                                     BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"
                                     PointerPressed="OnKeyPressed" PointerReleased="OnKeyReleased"
                                     PointerExited="OnKeyExited">
-                                <Border.Background>
-                                    <SolidColorBrush Color="{StaticResource CatppuccinSurface1Color}"/>
-                                </Border.Background>
                                 <Panel>
                                     <Border IsVisible="{Binding IsBlack}" Background="{StaticResource CatppuccinCrust}"/>
                                     <Border IsVisible="{Binding IsActive}" Background="{StaticResource CatppuccinMauve}"/>
@@ -86,7 +84,8 @@
                                                          BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
                     <Border Name="Band" IsVisible="False" IsHitTestVisible="False"
                             HorizontalAlignment="Left" VerticalAlignment="Top"
-                            Background="#33cba6f7" BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="1"/>
+                            Background="{StaticResource CatppuccinMauve}" Opacity="0.2"
+                            BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="1"/>
                     <ItemsControl ItemsSource="{Binding Notes}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>

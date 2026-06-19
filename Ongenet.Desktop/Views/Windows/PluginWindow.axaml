@@ -3,8 +3,8 @@
         x:Class="Ongenet.Desktop.Views.Windows.PluginWindow"
         Width="500" Height="360" MinWidth="200" MinHeight="120"
         CanResize="True"
-        Background="#1e1e2e"
+        Background="{StaticResource CatppuccinBase}"
         Title="Plugin">
     <!-- Intentionally empty: the CLAP plugin embeds its native GUI into this window's surface. -->
-    <Panel Background="#1e1e2e"/>
+    <Panel Background="{StaticResource CatppuccinBase}"/>
 </Window>

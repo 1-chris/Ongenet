@@ -28,6 +28,7 @@ namespace Ongenet.Desktop.ViewModels
         private readonly IInstrumentRegistry _instruments;
         private readonly IEditModeService _editMode;
         private readonly IRecordingService _recording;
+        private readonly Services.IHistoryService _history;
 
         // Canonical per-track lanes (one per track). The rendered <see cref="Lanes"/> collection
         // interleaves these with their (expanded) automation rows; both reference the same track lane
@@ -38,7 +39,8 @@ namespace Ongenet.Desktop.ViewModels
 
         public TimelineViewModel(IProjectService project, ISelectionService selection,
             IEventAggregator events, IAudioFileService audioFiles, ITransportService transport,
-            IInstrumentRegistry instruments, IEditModeService editMode, IRecordingService recording)
+            IInstrumentRegistry instruments, IEditModeService editMode, IRecordingService recording,
+            Services.IHistoryService history)
         {
             _project = project;
             _selection = selection;
@@ -48,6 +50,7 @@ namespace Ongenet.Desktop.ViewModels
             _instruments = instruments;
             _editMode = editMode;
             _recording = recording;
+            _history = history;
 
             SelectClipCommand = new RelayCommand<ClipViewModel>(OnClipClicked);
             AddInstrumentTrackCommand = new RelayCommand(AddInstrumentTrack);
@@ -166,6 +169,7 @@ namespace Ongenet.Desktop.ViewModels
         {
             var lane = TrackLaneAtRow(rowIndex);
             if (lane is null || lane.Model.Kind != TrackKind.Instrument) return;
+            _history.Capture("Create MIDI clip");
 
             var bar = BeatsPerBar;
             var start = Math.Max(0, Math.Floor(beat / bar) * bar);
@@ -200,6 +204,7 @@ namespace Ongenet.Desktop.ViewModels
             var model = clipVm.Model;
             const double eps = 1e-6;
             if (sliceBeat <= model.StartBeat + eps || sliceBeat >= model.EndBeat - eps) return;
+            _history.Capture("Slice clip");
 
             var origLength = model.LengthBeats;
             var leftLen = sliceBeat - model.StartBeat;
@@ -312,6 +317,7 @@ namespace Ongenet.Desktop.ViewModels
         {
             var lane = FindLaneOf(clip);
             if (lane is null) return;
+            _history.Capture("Duplicate clip");
             var copy = CloneClip(clip.Model);
             copy.StartBeat = clip.Model.StartBeat + clip.Model.LengthBeats;
             lane.Model.Clips.Add(copy);
@@ -344,6 +350,7 @@ namespace Ongenet.Desktop.ViewModels
             if (startFrame < 0) startFrame = 0;
             if (windowFrames <= 0 || startFrame >= totalFrames) return;
             if (startFrame + windowFrames > totalFrames) windowFrames = totalFrames - startFrame;
+            _history.Capture("Reverse clip");
 
             // Copy the clip's window frame-reversed (channels preserved within each frame) into a new buffer.
             var src = samples.Samples;
@@ -371,6 +378,7 @@ namespace Ongenet.Desktop.ViewModels
         {
             var lane = FindLaneOf(clip);
             if (lane is null) return;
+            _history.Capture("Delete clip");
             lane.Model.Clips.Remove(clip.Model);
             lane.Clips.Remove(clip);
             if (ReferenceEquals(_selection.SelectedClip, clip.Model)) _selection.SelectTrack(lane.Model);
@@ -406,6 +414,8 @@ namespace Ongenet.Desktop.ViewModels
         /// <summary>Deletes all clips currently marked selected.</summary>
         public void DeleteSelectedClips()
         {
+            if (!_trackLanes.Any(l => l.Clips.Any(c => c.IsSelected))) return;
+            _history.Capture("Delete clips");
             foreach (var lane in _trackLanes)
             {
                 var selected = lane.Clips.Where(c => c.IsSelected).ToList();
@@ -427,7 +437,12 @@ namespace Ongenet.Desktop.ViewModels
             if (target is null) return null;
             var origin = FindLaneOf(clip);
             if (origin is null || ReferenceEquals(origin, target)) return null;
-            if (target.Model.Kind != TrackKind.Instrument || !clip.Model.IsMidi) return null;
+
+            // Clips can only move between tracks of a compatible kind: audio clips onto audio tracks,
+            // MIDI clips onto instrument tracks. Buses (group/master) carry no clips.
+            var kind = target.Model.Kind;
+            var compatible = clip.Model.IsAudio ? kind == TrackKind.Audio : kind == TrackKind.Instrument;
+            if (!compatible) return null;
 
             origin.Model.Clips.Remove(clip.Model);
             origin.Clips.Remove(clip);
@@ -534,6 +549,26 @@ namespace Ongenet.Desktop.ViewModels
             return lane is null ? _trackLanes.Count : _trackLanes.IndexOf(lane);
         }
 
+        /// <summary>
+        /// When content-Y is within <paramref name="band"/> px of the line between two track rows (below the
+        /// master, above the bottom append zone), returns that boundary's track-insert index and its pixel Y.
+        /// Returns (-1, 0) when the pointer is not near an inter-track boundary — used to drop a dragged audio
+        /// file as a brand-new track inserted in place rather than onto an existing lane.
+        /// </summary>
+        public (int InsertIndex, double IndicatorY) HitTrackBoundary(double y, double band)
+        {
+            // Internal boundaries are the tops of rows 1..Count-1 (row 0's top sits above the pinned master;
+            // the bottom edge is already the "append new track" affordance handled by the ghost).
+            for (var i = 1; i < Lanes.Count; i++)
+            {
+                var top = RowTop(i);
+                if (Math.Abs(y - top) <= band)
+                    return (TrackInsertIndexForRow(i), top);
+            }
+
+            return (-1, 0);
+        }
+
         /// <summary>Number of rendered rows (used by the view for layout/hit-testing).</summary>
         public int RowCount => Lanes.Count;
 
@@ -554,7 +589,7 @@ namespace Ongenet.Desktop.ViewModels
         /// lane at <paramref name="laneIndex"/>, or on a new audio track if the index is past the
         /// last lane. Decoding runs off the UI thread; the clip appears once decoded.
         /// </summary>
-        public async void AddAudioClip(string path, TrackLaneViewModel? target, double beat)
+        public async void AddAudioClip(string path, TrackLaneViewModel? target, double beat, int newTrackIndex = -1)
         {
             ClearDropHighlight();
             var startBeat = Math.Max(0, Math.Round(beat));
@@ -566,10 +601,14 @@ namespace Ongenet.Desktop.ViewModels
                 catch { return null; }
             });
 
-            InsertClip(path, target, startBeat, loaded);
+            _history.Capture("Add audio clip");
+            InsertClip(path, target, startBeat, loaded, newTrackIndex);
         }
 
-        private void InsertClip(string path, TrackLaneViewModel? target, double startBeat, Core.Audio.Files.LoadedAudio? loaded)
+        // newTrackIndex >= 0 forces a NEW audio track inserted at that track index (drop between two tracks);
+        // otherwise the clip lands on `target` if given, else a new track appended at the end.
+        private void InsertClip(string path, TrackLaneViewModel? target, double startBeat,
+            Core.Audio.Files.LoadedAudio? loaded, int newTrackIndex = -1)
         {
             // Buses (group/master) hold no clips — a drop on one creates a new audio track instead.
             if (target is { Model.IsBus: true }) target = null;
@@ -631,13 +670,22 @@ namespace Ongenet.Desktop.ViewModels
                     ColorKey = "CatppuccinTeal"
                 };
                 track.Clips.Add(clip);
-                project.Tracks.Add(track);
 
-                lane = new TrackLaneViewModel(track, Metrics, this, this); // ctor builds the clip's view model
-                _trackLanes.Add(lane);
-                RebuildRows();
-                OnPropertyChanged(nameof(LaneCount));
-                _events.Publish(new TracksChangedEvent()); // let the engine pick up the new track
+                if (newTrackIndex >= 0)
+                {
+                    // Drop between two tracks: insert the new track in place (InsertTrack rebuilds + publishes).
+                    InsertTrack(track, newTrackIndex);
+                    lane = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, track)) ?? _trackLanes[^1];
+                }
+                else
+                {
+                    project.Tracks.Add(track);
+                    lane = new TrackLaneViewModel(track, Metrics, this, this); // ctor builds the clip's view model
+                    _trackLanes.Add(lane);
+                    RebuildRows();
+                    OnPropertyChanged(nameof(LaneCount));
+                    _events.Publish(new TracksChangedEvent()); // let the engine pick up the new track
+                }
             }
 
             ExtendTimeline(clip.EndBeat);
@@ -838,6 +886,7 @@ namespace Ongenet.Desktop.ViewModels
         public void DuplicateTrack(TrackLaneViewModel lane)
         {
             if (lane.Model.IsBus) return; // groups/master aren't duplicated
+            _history.Capture("Duplicate track");
 
             var src = lane.Model;
             var copy = new Track
@@ -865,6 +914,7 @@ namespace Ongenet.Desktop.ViewModels
         {
             if (lane.Model.Kind == TrackKind.Master) return;             // the master can't be deleted
             if (lane.Model.Kind == TrackKind.Group) { DeleteGroupKeepChildren(lane); return; } // default: ungroup
+            _history.Capture("Delete track");
 
             var wasSelected = ReferenceEquals(_selection.SelectedTrack, lane.Model);
             _project.Current.Tracks.Remove(lane.Model);
@@ -899,6 +949,7 @@ namespace Ongenet.Desktop.ViewModels
             // Keep only the roots of the selection (drop any whose ancestor is also selected).
             var roots = tracks.Where(t => selected.Contains(t.Id) && !HasSelectedAncestor(t, selected)).ToList();
             if (roots.Count == 0) return;
+            _history.Capture("Group tracks");
 
             var group = new Track
             {
@@ -931,6 +982,7 @@ namespace Ongenet.Desktop.ViewModels
         {
             var group = lane.Model;
             if (group.Kind != TrackKind.Group) return;
+            _history.Capture("Ungroup");
 
             var tracks = _project.Current.Tracks;
             foreach (var t in tracks.Where(t => t.ParentId == group.Id)) t.ParentId = group.ParentId;
@@ -947,6 +999,7 @@ namespace Ongenet.Desktop.ViewModels
         {
             var group = lane.Model;
             if (group.Kind != TrackKind.Group) return;
+            _history.Capture("Delete group");
 
             var tracks = _project.Current.Tracks;
             var doomed = tracks.Where(t => ReferenceEquals(t, group) || IsDescendantOf(t, group.Id, tracks)).ToList();
@@ -968,6 +1021,7 @@ namespace Ongenet.Desktop.ViewModels
             var tracks = _project.Current.Tracks;
             var parent = tracks.FirstOrDefault(x => x.Id == pid);
             if (parent is null) return;
+            _history.Capture("Detach from group");
 
             // Lift the track's whole subtree out and reinsert it right after the old group's subtree.
             var subtree = SubtreeOf(track, tracks);
@@ -1081,6 +1135,7 @@ namespace Ongenet.Desktop.ViewModels
         public void MoveTrack(Track dragged, DragDropPlan plan)
         {
             if (!plan.Valid) return;
+            _history.Capture("Move track");
 
             var tracks = _project.Current.Tracks;
             var subtree = SubtreeOf(dragged, tracks);
@@ -1153,6 +1208,7 @@ namespace Ongenet.Desktop.ViewModels
 
         public void RemoveAutomationLane(AutomationLaneViewModel lane)
         {
+            _history.Capture("Remove automation");
             var track = lane.OwnerTrack;
             track.AutoLanes.Remove(lane.Lane);
             track.CommitAutoLanes();
@@ -1164,6 +1220,7 @@ namespace Ongenet.Desktop.ViewModels
 
         public void AddAudioTrack()
         {
+            _history.Capture("Add audio track");
             var track = new Track { Name = $"Audio {AudioTrackNumber()}", Kind = TrackKind.Audio, ColorKey = "CatppuccinTeal" };
             InsertTrack(track, _trackLanes.Count);
         }
@@ -1176,6 +1233,7 @@ namespace Ongenet.Desktop.ViewModels
             IInstrument instrument;
             try { instrument = _instruments.Create(instrumentId); }
             catch { return; }
+            _history.Capture("Add instrument track");
 
             var track = new Track
             {

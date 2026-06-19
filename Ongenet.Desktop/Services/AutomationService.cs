@@ -15,11 +15,17 @@ namespace Ongenet.Desktop.Services
     public sealed class AutomationService : IAutomationService
     {
         private readonly IEventAggregator _events;
+        private readonly IHistoryService _history;
 
-        public AutomationService(IEventAggregator events) => _events = events;
+        public AutomationService(IEventAggregator events, IHistoryService history)
+        {
+            _events = events;
+            _history = history;
+        }
 
         public void CreateLane(Track owner, IAutomationTarget target)
         {
+            _history.Capture("Create automation");
             var lane = new AutomationLane(target) { Binding = DeriveBinding(owner, target) };
             // Default value = whatever the control is set to right now (flat curve).
             lane.AddPoint(new AutomationPoint(0, target.Read()));

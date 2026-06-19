@@ -1,10 +1,10 @@
 using System;
 using System.Globalization;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -14,7 +14,7 @@ namespace Ongenet.Desktop.Controls
     /// an <see cref="ISpectrumSource"/>. Subclasses draw their own curve/markers in
     /// <see cref="RenderOverlay"/> and use the shared <see cref="FreqToX"/>/<see cref="XToFreq"/> map.
     /// </summary>
-    public abstract class SpectrumGraphControl : Control
+    public abstract class SpectrumGraphControl : ThemedControl
     {
         protected const double MinFreq = 20.0;
         protected const double MaxFreq = 20000.0;
@@ -25,11 +25,21 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<ISpectrumSource?> SourceProperty =
             AvaloniaProperty.Register<SpectrumGraphControl, ISpectrumSource?>(nameof(Source));
 
-        private static readonly IBrush BackBrush = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x25));    // crust
-        private static readonly IPen GridPen = new Pen(new SolidColorBrush(Color.FromRgb(0x31, 0x32, 0x44)), 1);  // surface0
-        private static readonly IPen GridStrongPen = new Pen(new SolidColorBrush(Color.FromRgb(0x45, 0x47, 0x5a)), 1); // surface1
-        private static readonly IBrush SpectrumBrush = new SolidColorBrush(Color.FromArgb(0x66, 0x94, 0xe2, 0xd5)); // teal, faint
-        private static readonly IBrush LabelBrush = new SolidColorBrush(Color.FromRgb(0x6c, 0x70, 0x86));   // overlay1
+        private IBrush _backBrush = Brushes.Black;
+        private IPen _gridPen = new Pen(Brushes.Gray, 1);
+        private IPen _gridStrongPen = new Pen(Brushes.Gray, 1);
+        private IBrush _spectrumBrush = Brushes.Teal;
+        private IBrush _labelBrush = Brushes.Gray;
+
+        protected override void BuildThemeResources()
+        {
+            base.BuildThemeResources();
+            _backBrush = new SolidColorBrush(ThemePalette.Mantle);
+            _gridPen = new Pen(new SolidColorBrush(ThemePalette.Surface0), 1);
+            _gridStrongPen = new Pen(new SolidColorBrush(ThemePalette.Surface1), 1);
+            _spectrumBrush = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Teal, 0x66));
+            _labelBrush = new SolidColorBrush(ThemePalette.Overlay1);
+        }
 
         // (frequency, label, strong-line) for the x-axis band indicators.
         private static readonly (double Freq, string Label, bool Strong)[] AxisMarks =
@@ -101,7 +111,7 @@ namespace Ongenet.Desktop.Controls
             var h = Bounds.Height;
             if (w < 8 || h < 8) return;
 
-            context.DrawRectangle(BackBrush, null, new Rect(0, 0, w, h));
+            context.DrawRectangle(_backBrush, null, new Rect(0, 0, w, h));
 
             var plotH = Math.Max(1, h - LabelStripHeight);
 
@@ -132,7 +142,7 @@ namespace Ongenet.Desktop.Controls
                 ctx.EndFigure(true);
             }
 
-            context.DrawGeometry(SpectrumBrush, null, geometry);
+            context.DrawGeometry(_spectrumBrush, null, geometry);
         }
 
         private void DrawAxis(DrawingContext context, double w, double h, double plotH)
@@ -140,9 +150,9 @@ namespace Ongenet.Desktop.Controls
             foreach (var (freq, label, strong) in AxisMarks)
             {
                 var x = FreqToX(freq, w);
-                context.DrawLine(strong ? GridStrongPen : GridPen, new Point(x, 0), new Point(x, plotH));
+                context.DrawLine(strong ? _gridStrongPen : _gridPen, new Point(x, 0), new Point(x, plotH));
                 var ft = new FormattedText(label, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                    Typeface.Default, 9, LabelBrush);
+                    Typeface.Default, 9, _labelBrush);
                 var tx = Math.Clamp(x - ft.Width / 2, 1, w - ft.Width - 1);
                 context.DrawText(ft, new Point(tx, h - LabelStripHeight + 1));
             }

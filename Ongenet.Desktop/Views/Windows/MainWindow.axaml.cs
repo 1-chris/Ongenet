@@ -18,6 +18,7 @@ namespace Ongenet.Desktop.Views.Windows
     public partial class MainWindow : Window
     {
         private LogWindow? _logWindow;
+        private ThemeWindow? _themeWindow;
 
         // FL-Studio-style typing-keyboard note input: tracks which physical keys are currently
         // held (→ which MIDI notes are sounding) so auto-repeat KeyDowns don't re-trigger.
@@ -45,6 +46,7 @@ namespace Ongenet.Desktop.Views.Windows
         private IPreviewService? Preview => App.ServiceProvider?.GetService<IPreviewService>();
         private ISelectionService? Selection => App.ServiceProvider?.GetService<ISelectionService>();
         private ITransportService? Transport => App.ServiceProvider?.GetService<ITransportService>();
+        private Services.IHistoryService? History => App.ServiceProvider?.GetService<Services.IHistoryService>();
 
         private void OnGlobalKeyDown(object? sender, KeyEventArgs e)
         {
@@ -60,6 +62,9 @@ namespace Ongenet.Desktop.Views.Windows
                     case Key.S: _ = SaveAsync(); e.Handled = true; return;
                     case Key.O: _ = OpenAsync(); e.Handled = true; return;
                     case Key.N: _ = NewAsync(); e.Handled = true; return;
+                    case Key.Z when e.KeyModifiers.HasFlag(KeyModifiers.Shift): History?.Redo(); e.Handled = true; return;
+                    case Key.Z: History?.Undo(); e.Handled = true; return;
+                    case Key.Y: History?.Redo(); e.Handled = true; return;
                 }
             }
 
@@ -184,6 +189,24 @@ namespace Ongenet.Desktop.Views.Windows
             }
         }
 
+        private void OpenTheme_Click(object? sender, RoutedEventArgs e)
+        {
+            var viewModel = App.ServiceProvider?.GetService<ThemeEditorViewModel>();
+            if (viewModel is null) return;
+
+            if (_themeWindow is null)
+            {
+                _themeWindow = new ThemeWindow();
+                _themeWindow.SetViewModel(viewModel);
+                _themeWindow.Closed += (_, _) => _themeWindow = null;
+                _themeWindow.Show();
+            }
+            else
+            {
+                _themeWindow.Activate();
+            }
+        }
+
         // --- Project file: New / Open / Save / Save As ---
 
         private IProjectFileService? ProjectFile => App.ServiceProvider?.GetService<IProjectFileService>();
@@ -195,12 +218,15 @@ namespace Ongenet.Desktop.Views.Windows
         private void OnOpen_Click(object? sender, RoutedEventArgs e) => _ = OpenAsync();
         private void OnSave_Click(object? sender, RoutedEventArgs e) => _ = SaveAsync();
         private void OnSaveAs_Click(object? sender, RoutedEventArgs e) => _ = SaveAsAsync();
+        private void OnUndo_Click(object? sender, RoutedEventArgs e) => History?.Undo();
+        private void OnRedo_Click(object? sender, RoutedEventArgs e) => History?.Redo();
 
         private async Task NewAsync()
         {
             if (ProjectFile is not { } pf) return;
             if (!await ConfirmDiscardAsync(pf)) return;
             pf.NewProject();
+            History?.Clear(); // undo history doesn't carry across projects
         }
 
         private async Task OpenAsync()
@@ -223,6 +249,7 @@ namespace Ongenet.Desktop.Views.Windows
             try
             {
                 var result = await pf.LoadAsync(path);
+                History?.Clear(); // start fresh history for the opened project
                 if (result.Warnings.Count > 0)
                     await MessageDialog.Notify(this, "Project opened with warnings",
                         string.Join("\n", result.Warnings));

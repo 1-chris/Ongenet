@@ -449,7 +449,7 @@ public static class ProjectFile
         return lane;
     }
 
-    private static IAutomationTarget? BuildTarget(Track track, int kind, int effectIndex, int paramIndex)
+    internal static IAutomationTarget? BuildTarget(Track track, int kind, int effectIndex, int paramIndex)
     {
         switch ((AutomationTargetKind)kind)
         {

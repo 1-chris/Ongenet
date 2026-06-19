@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Desktop.Services;
 using Ongenet.Desktop.ViewModels;
 using Ongenet.Desktop.ViewModels.PianoRoll;
 
@@ -21,7 +23,10 @@ namespace Ongenet.Desktop.Views.Panels
 
         private Gesture _gesture = Gesture.None;
         private NoteViewModel? _note;
+        private bool _noteDragCaptured; // one history snapshot per move/resize drag of an existing note
         private double _pressBeat;
+
+        private static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
         private double _origStart;
         private double _origLength;
         private int _previewPitch = -1;
@@ -231,9 +236,10 @@ namespace Ongenet.Desktop.Views.Panels
 
             if (note is null)
             {
-                note = vm.AddNote(beat, pitch);
+                note = vm.AddNote(beat, pitch); // captures "Add note" itself
                 if (note is null) return;
                 _gesture = Gesture.Move;
+                _noteDragCaptured = true; // the add already snapshotted; don't recapture as it's dragged
             }
             else
             {
@@ -241,6 +247,7 @@ namespace Ongenet.Desktop.Views.Panels
                 var localX = gridPos.X - note.Left;
                 var zone = Math.Min(6.0, note.Width * 0.3);
                 _gesture = localX >= note.Width - zone ? Gesture.Resize : Gesture.Move;
+                _noteDragCaptured = false; // snapshot on the first real move/resize of this existing note
                 pitch = note.Model.Note;
             }
 
@@ -278,6 +285,12 @@ namespace Ongenet.Desktop.Views.Panels
             }
 
             if (_note is null) return;
+            if (!_noteDragCaptured)
+            {
+                History?.Capture(_gesture == Gesture.Move ? "Move note" : "Resize note");
+                _noteDragCaptured = true;
+            }
+
             var beat = vm.Metrics.PixelsToBeats(gridPos.X);
 
             if (_gesture == Gesture.Move)

@@ -24,18 +24,21 @@ namespace Ongenet.Desktop.ViewModels
         private readonly IEventAggregator _events;
         private readonly IEditModeService _editMode;
         private readonly IPreviewService _preview;
+        private readonly Services.IHistoryService _history;
 
         private Clip? _clip;
         private Track? _track;
 
         public PianoRollViewModel(IProjectService project, ISelectionService selection,
-            IEventAggregator events, IEditModeService editMode, IPreviewService preview)
+            IEventAggregator events, IEditModeService editMode, IPreviewService preview,
+            Services.IHistoryService history)
         {
             _project = project;
             _selection = selection;
             _events = events;
             _editMode = editMode;
             _preview = preview;
+            _history = history;
 
             Keys = BuildKeys();
 
@@ -88,6 +91,7 @@ namespace Ongenet.Desktop.ViewModels
         public NoteViewModel? AddNote(double beat, int note)
         {
             if (_clip is null) return null;
+            _history.Capture("Add note");
 
             var model = new MidiNote
             {
@@ -128,6 +132,7 @@ namespace Ongenet.Desktop.ViewModels
         public void DeleteNote(NoteViewModel note)
         {
             if (_clip is null) return;
+            _history.Capture("Delete note");
             _clip.Notes.Remove(note.Model);
             Notes.Remove(note);
             Publish();
@@ -159,6 +164,7 @@ namespace Ongenet.Desktop.ViewModels
             if (_clip is null) return;
             var selected = Notes.Where(n => n.IsSelected).ToList();
             if (selected.Count == 0) return;
+            _history.Capture("Delete notes");
             foreach (var note in selected)
             {
                 _clip.Notes.Remove(note.Model);

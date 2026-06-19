@@ -1,7 +1,7 @@
 using System;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
+using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
 {
@@ -9,7 +9,7 @@ namespace Ongenet.Desktop.Controls
     /// Draws the timeline's vertical grid behind a lane's clips: strong bar lines, medium beat
     /// lines, and faint sub-beat lines, with the sub-beat density following the zoom.
     /// </summary>
-    public sealed class TimelineGridControl : Control
+    public sealed class TimelineGridControl : ThemedControl
     {
         public static readonly StyledProperty<double> PixelsPerBeatProperty =
             AvaloniaProperty.Register<TimelineGridControl, double>(nameof(PixelsPerBeat));
@@ -20,9 +20,18 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<int> BeatsPerBarProperty =
             AvaloniaProperty.Register<TimelineGridControl, int>(nameof(BeatsPerBar), 4);
 
-        private static readonly IPen BarPen = new Pen(new SolidColorBrush(Color.FromArgb(80, 255, 255, 255)), 1);
-        private static readonly IPen BeatPen = new Pen(new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), 1);
-        private static readonly IPen SubPen = new Pen(new SolidColorBrush(Color.FromArgb(20, 255, 255, 255)), 1);
+        // Subtle contrast lines from the foreground token (light on dark themes, dark on light themes).
+        private IPen _barPen = new Pen(Brushes.Gray, 1);
+        private IPen _beatPen = new Pen(Brushes.Gray, 1);
+        private IPen _subPen = new Pen(Brushes.Gray, 1);
+
+        protected override void BuildThemeResources()
+        {
+            var fg = ThemePalette.Text;
+            _barPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(fg, 80)), 1);
+            _beatPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(fg, 40)), 1);
+            _subPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(fg, 20)), 1);
+        }
 
         static TimelineGridControl()
         {
@@ -50,9 +59,9 @@ namespace Ongenet.Desktop.Controls
                 var x = beat * ppb;
 
                 // Classify the line: bar > beat > sub.
-                var pen = SubPen;
-                if (IsMultiple(beat, bar)) pen = BarPen;
-                else if (IsMultiple(beat, 1.0)) pen = BeatPen;
+                var pen = _subPen;
+                if (IsMultiple(beat, bar)) pen = _barPen;
+                else if (IsMultiple(beat, 1.0)) pen = _beatPen;
 
                 context.DrawLine(pen, new Point(x, 0), new Point(x, height));
             }

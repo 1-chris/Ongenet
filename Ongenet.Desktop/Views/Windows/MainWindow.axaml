@@ -14,19 +14,34 @@
         ExtendClientAreaToDecorationsHint="True"
         Title="{Binding Title}">
 
-    <Panel>
-    <Border BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
-    <Panel>
-        <ExperimentalAcrylicBorder IsHitTestVisible="False">
-            <ExperimentalAcrylicBorder.Material>
-                <ExperimentalAcrylicMaterial
-                    BackgroundSource="Digger"
-                    TintColor="{StaticResource CatppuccinBaseColor}"
-                    TintOpacity="0.90"
-                    MaterialOpacity="0.75" />
-            </ExperimentalAcrylicBorder.Material>
-        </ExperimentalAcrylicBorder>
+    <Window.Resources>
+        <!-- Remove the Fluent active-tab accent "pipe" (the underline) — selection is shown by colour. -->
+        <SolidColorBrush x:Key="TabItemHeaderSelectedPipeFill" Color="Transparent"/>
+    </Window.Resources>
 
+    <Window.Styles>
+        <!-- Compact, distinct tab headers for the bottom (Instrument/Piano Roll/Effects) and right-side
+             (Files/Instruments) panels: normal-size font on a lighter strip than the panel content. -->
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        </Style>
+        <Style Selector="TabItem:pointerover">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="TabItem:selected">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        </Style>
+    </Window.Styles>
+
+    <Panel>
+    <Border Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+    <Panel>
         <Grid RowDefinitions="Auto, *">
             <!-- Custom Title Bar (exact port of the original MainWindow chrome) -->
             <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto" PointerPressed="TitleBar_PointerPressed">
@@ -46,8 +61,19 @@
                     <Button Content="Save As" Click="OnSaveAs_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
                             ToolTip.Tip="Save project as… (Ctrl+Shift+S)"/>
+                    <Button Content="↶" Click="OnUndo_Click" FontSize="13" Padding="8,2"
+                            IsEnabled="{Binding CanUndo}"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="Undo (Ctrl+Z)"/>
+                    <Button Content="↷" Click="OnRedo_Click" FontSize="13" Padding="8,2"
+                            IsEnabled="{Binding CanRedo}"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="Redo (Ctrl+Y)"/>
                     <Button Content="Logs" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <Button Content="Theme" Click="OpenTheme_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="Theme editor"/>
                     <!-- Save/Load progress indicator -->
                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                                 IsVisible="{Binding IsBusy}">

@@ -31,7 +31,9 @@ namespace Ongenet.Desktop.Views.Panels
             var owner = App.ServiceProvider?.GetService<ISelectionService>()?.SelectedTrack;
             if (owner is null) return;
 
-            AutomationGesture.Offer(button, owner, AutomationGesture.ForEffectEnabled(fx.Effect));
+            // An effect's default state is enabled.
+            AutomationGesture.Offer(button, owner, AutomationGesture.ForEffectEnabled(fx.Effect),
+                () => fx.IsEnabled = true);
             e.Handled = true;
         }
     }
