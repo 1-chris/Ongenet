@@ -25,7 +25,7 @@
             <Setter Property="MinHeight" Value="0"/>
         </Style>
         <Style Selector="ListBox TextBlock">
-             <Setter Property="FontFamily" Value="DejaVu Sans Mono, Monospace, avares://Ongenet.Desktop/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji, Noto Color Emoji, Noto Emoji, Twitter Color Emoji, EmojiOne Color, JoyPixels, Symbola, Segoe UI Emoji, Apple Color Emoji, Consolas, Courier New" />
+             <Setter Property="FontFamily" Value="Consolas, Menlo, DejaVu Sans Mono, Monospace, avares://Ongenet.Desktop/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji, Noto Color Emoji, Noto Emoji, Twitter Color Emoji, EmojiOne Color, JoyPixels, Symbola, Segoe UI Emoji, Apple Color Emoji, Courier New" />
         </Style>
         <Style Selector="Button.Action">
             <Setter Property="Background" Value="{StaticResource CatppuccinBase}"/>

@@ -85,7 +85,7 @@
                                     <TextBlock Grid.Column="1" Text="{Binding Token}" VerticalAlignment="Center"
                                                Margin="10,0" Foreground="{StaticResource CatppuccinText}"/>
                                     <TextBox Grid.Column="2" Text="{Binding Hex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             FontFamily="DejaVu Sans Mono, Monospace" FontSize="12"/>
+                                             FontFamily="Consolas, Menlo, DejaVu Sans Mono, Monospace" FontSize="12"/>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
