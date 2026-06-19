@@ -109,6 +109,11 @@ namespace Ongenet.Desktop.ViewModels
         /// <summary>The start marker position in beats.</summary>
         public double StartBeat => _transport.StartBeat;
 
+        /// <summary>Loop region start/end in beats, and whether a region is active (drawn on the ruler).</summary>
+        public double LoopStart => _transport.LoopStart;
+        public double LoopEnd => _transport.LoopEnd;
+        public bool IsLoopActive => _transport.IsLoopActive;
+
         /// <summary>Sets the start marker to the given beat, snapped to the nearest bar.</summary>
         public void SetStartBeat(double beat)
         {
@@ -269,6 +274,25 @@ namespace Ongenet.Desktop.ViewModels
         }
 
         // --- IClipActions (context menu) ---
+
+        /// <summary>
+        /// Duplicates the currently selected clip (Ctrl+D). The copy lands one clip-length to the right and
+        /// becomes the new selection, so repeated presses lay copies end-to-end down the timeline.
+        /// </summary>
+        public void DuplicateSelectedClip()
+        {
+            var selected = _selection.SelectedClip;
+            if (selected is null) return;
+            foreach (var lane in _trackLanes)
+            {
+                var clipVm = lane.Clips.FirstOrDefault(c => ReferenceEquals(c.Model, selected));
+                if (clipVm is not null)
+                {
+                    DuplicateClip(clipVm);
+                    return;
+                }
+            }
+        }
 
         public void DuplicateClip(ClipViewModel clip)
         {
@@ -624,6 +648,11 @@ namespace Ongenet.Desktop.ViewModels
                 {
                     var m = clipVm.Model;
                     if (!m.StretchToTempo || m.Samples is null || m.SourceTempo is not { } source) continue;
+
+                    // A sliced clip carries an explicit source window: keep its grid length fixed and let
+                    // the engine resample just that window to fit at the new tempo (so a 1-bar slice stays
+                    // 1 bar). Only whole loops get their musical length re-snapped by octaves.
+                    if (m.SourceLengthSeconds is not null) continue;
 
                     var duration = m.Samples.FrameCount / (double)m.Samples.SampleRate;
                     var beats = Core.Audio.TempoSync.MusicalBeats(duration, source, projBpm);

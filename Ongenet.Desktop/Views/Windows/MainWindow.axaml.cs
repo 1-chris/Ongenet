@@ -29,11 +29,34 @@ namespace Ongenet.Desktop.Views.Windows
 
         private IPreviewService? Preview => App.ServiceProvider?.GetService<IPreviewService>();
         private ISelectionService? Selection => App.ServiceProvider?.GetService<ISelectionService>();
+        private ITransportService? Transport => App.ServiceProvider?.GetService<ITransportService>();
 
         private void OnGlobalKeyDown(object? sender, KeyEventArgs e)
         {
             // Don't steal typing from text inputs (track rename, numeric fields, etc.).
             if (e.Source is TextBox) return;
+
+            // App shortcuts. These run before (and instead of) the typing-keyboard MIDI below, so a
+            // modified key like Shift+[ never also sounds a note.
+            switch (e.Key)
+            {
+                case Key.Space:
+                    TogglePlayStop();
+                    e.Handled = true;
+                    return;
+                case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    if (Transport is { } ts) ts.LoopStart = ts.StartBeat;
+                    e.Handled = true;
+                    return;
+                case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    if (Transport is { } te) te.LoopEnd = te.StartBeat;
+                    e.Handled = true;
+                    return;
+            }
+
+            // FL-style typing-keyboard note input — only on an unmodified key. This guarantees Shift/Ctrl/
+            // Alt + any key (e.g. Shift+[ for the loop, Ctrl+D to duplicate) never triggers a MIDI note.
+            if (e.KeyModifiers != KeyModifiers.None) return;
             if (Selection?.SelectedTrack?.Instrument is null) return;
             if (!ComputerKeyboard.TryGetNote(e.Key, out var note)) return;
             if (_heldKeys.ContainsKey(e.Key)) { e.Handled = true; return; }
@@ -41,6 +64,16 @@ namespace Ongenet.Desktop.Views.Windows
             _heldKeys[e.Key] = note;
             Preview?.NoteOn(note);
             e.Handled = true;
+        }
+
+        // Space toggles transport. Routed through the transport view model so it honours the same
+        // recording-aware stop and can-play guards as the toolbar buttons.
+        private void TogglePlayStop()
+        {
+            if (DataContext is not MainViewModel vm) return;
+            var transport = vm.Transport;
+            if (transport.IsPlaying || transport.IsRecording) transport.StopCommand.Execute(null);
+            else if (transport.CanPlay) transport.PlayCommand.Execute(null);
         }
 
         private void OnGlobalKeyUp(object? sender, KeyEventArgs e)

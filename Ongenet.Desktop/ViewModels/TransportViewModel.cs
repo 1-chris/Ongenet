@@ -48,7 +48,20 @@ namespace Ongenet.Desktop.ViewModels
             PlayCommand = new RelayCommand(_transport.Play);
             StopCommand = new RelayCommand(OnStop);
             RecordCommand = new RelayCommand(_recording.StartRecording);
+            SetLoopStartCommand = new RelayCommand(() => _transport.LoopStart = _transport.StartBeat);
+            SetLoopEndCommand = new RelayCommand(() => _transport.LoopEnd = _transport.StartBeat);
+
+            _transport.LoopChanged += () => OnPropertyChanged(nameof(IsLooping));
         }
+
+        /// <summary>Sets the loop start ("[") to the current start marker.</summary>
+        public RelayCommand SetLoopStartCommand { get; }
+
+        /// <summary>Sets the loop end ("]") to the current start marker.</summary>
+        public RelayCommand SetLoopEndCommand { get; }
+
+        /// <summary>True when a loop region is active (drives the loop-button highlight).</summary>
+        public bool IsLooping => _transport.IsLoopActive;
 
         /// <summary>Audio input/output device pickers shown in the top bar.</summary>
         public AudioDevicesViewModel Devices { get; }

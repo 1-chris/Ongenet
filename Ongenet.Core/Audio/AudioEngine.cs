@@ -35,6 +35,7 @@ public sealed class AudioEngine : IAudioEngine
     private int _nextEvent;
     private double _currentBeat;
     private double _samplesPerBeat = 1;
+    private double _arrangementEndBeat; // for whole-song auto-loop (snapshot at playback start)
 
     // --- Metronome count-in (recording pre-roll) ---
     private bool _countingIn;
@@ -157,6 +158,20 @@ public sealed class AudioEngine : IAudioEngine
 
         notes.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
 
+        // Snapshot the arrangement end (max of the user-set bar count and the furthest clip) so the
+        // engine can auto-loop the whole song when there's no explicit loop region.
+        var beatsPerBar = Math.Max(1, _project.Current.TimeSignature.Numerator);
+        var contentEnd = 0.0;
+        foreach (var track in _tracks)
+        {
+            foreach (var clip in track.Clips)
+            {
+                if (clip.EndBeat > contentEnd) contentEnd = clip.EndBeat;
+            }
+        }
+
+        _arrangementEndBeat = Math.Max(_project.Current.BarCount * (double)beatsPerBar, contentEnd);
+
         _active.Clear();
         _currentBeat = startBeat;
         _nextEvent = 0;
@@ -200,6 +215,22 @@ public sealed class AudioEngine : IAudioEngine
         var playing = _playing;
         var prevBeat = _currentBeat;
         var curBeat = prevBeat + frames / _samplesPerBeat;
+
+        // Looping: wrap the playhead back when it reaches the loop end (an explicit "[ ]" region if set,
+        // otherwise the whole arrangement). Not while recording — a take should run past the end. Done at
+        // block granularity, so the wrap point is accurate to within one buffer.
+        if (playing && !_transport.IsRecording)
+        {
+            var hasRegion = _transport.IsLoopActive;
+            var wrapStart = hasRegion ? _transport.LoopStart : _transport.StartBeat;
+            var wrapEnd = hasRegion ? _transport.LoopEnd : _arrangementEndBeat;
+            if (wrapEnd > wrapStart + 1e-9 && curBeat >= wrapEnd)
+            {
+                WrapPlayback(wrapStart);
+                prevBeat = wrapStart;
+                curBeat = prevBeat + frames / _samplesPerBeat;
+            }
+        }
 
         if (playing) ScheduleNotes(curBeat);
 
@@ -313,6 +344,20 @@ public sealed class AudioEngine : IAudioEngine
     {
         var decayed = current * MeterRelease;
         return peak > decayed ? peak : decayed;
+    }
+
+    // Resets playback to <paramref name="target"/> for a loop: silences sounding notes and re-points the
+    // note scheduler at the first event from there. Audio clips re-render from the new beat automatically.
+    private void WrapPlayback(double target)
+    {
+        for (var i = 0; i < _active.Count; i++) _active[i].Instrument.NoteOff(_active[i].Note);
+        _active.Clear();
+        AllNotesOff();
+
+        _currentBeat = target;
+        _nextEvent = 0;
+        var events = _events;
+        while (_nextEvent < events.Length && events[_nextEvent].OnBeat < target) _nextEvent++;
     }
 
     private void ScheduleNotes(double curBeat)

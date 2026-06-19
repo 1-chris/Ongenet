@@ -132,7 +132,9 @@
                                         <MenuItem Header="Add Audio Track" Command="{Binding AddAudioTrackCommand}"/>
                                     </ContextMenu>
                                 </Border.ContextMenu>
-                                <Grid ColumnDefinitions="4,*,Auto">
+                                <!-- Transparent fill makes the whole header row clickable for selection
+                                     (the row Border's own background is reserved for the selected highlight). -->
+                                <Grid ColumnDefinitions="4,*,Auto" Background="Transparent">
                                     <!-- colour strip -->
                                     <Border Grid.Column="0"
                                             Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
@@ -310,6 +312,7 @@
 
             <!-- Playhead + start marker lines (and the select-mode rubber band) over the lanes -->
             <Canvas Grid.Row="1" Grid.Column="1" Name="PlayheadOverlay" IsHitTestVisible="False" ClipToBounds="True">
+                <Rectangle Name="LoopRegion" IsVisible="False" Fill="#1F89DCEB"/>
                 <Rectangle Name="StartMarkerLine" Width="1" IsVisible="False"
                            Fill="{StaticResource CatppuccinOverlay1}"/>
                 <Rectangle Name="PlayheadLine" Width="2" IsVisible="False"
@@ -320,6 +323,8 @@
 
             <!-- Start-marker play icon in the ruler -->
             <Canvas Grid.Row="0" Grid.Column="1" Name="RulerOverlay" IsHitTestVisible="False" ClipToBounds="True">
+                <Rectangle Name="LoopRegionRuler" IsVisible="False" Height="{StaticResource RulerHeight}"
+                           Fill="#4089DCEB"/>
                 <Path Name="StartMarkerIcon" IsVisible="False" Data="M0,0 L9,5 L0,10 Z"
                       Fill="{StaticResource CatppuccinGreen}"/>
             </Canvas>

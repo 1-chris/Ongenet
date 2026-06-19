@@ -140,6 +140,26 @@ namespace Ongenet.Desktop.Views.Panels
             Canvas.SetLeft(StartMarkerIcon, iconX);
             Canvas.SetTop(StartMarkerIcon, 7);
             StartMarkerIcon.IsVisible = iconX >= -9 && iconX <= RulerOverlay.Bounds.Width;
+
+            // Loop region: a faint band over the lanes plus a stronger band on the ruler.
+            if (_vm.IsLoopActive)
+            {
+                var loopX = lanesOrigin + _vm.LoopStart * ppb;
+                var loopW = System.Math.Max(0, (_vm.LoopEnd - _vm.LoopStart) * ppb);
+                Canvas.SetLeft(LoopRegion, loopX);
+                LoopRegion.Width = loopW;
+                LoopRegion.Height = height;
+                LoopRegion.IsVisible = true;
+
+                Canvas.SetLeft(LoopRegionRuler, rulerOrigin + _vm.LoopStart * ppb);
+                LoopRegionRuler.Width = loopW;
+                LoopRegionRuler.IsVisible = true;
+            }
+            else
+            {
+                LoopRegion.IsVisible = false;
+                LoopRegionRuler.IsVisible = false;
+            }
         }
 
         // The X (in <paramref name="overlay"/>'s coordinates) at which the scroll viewer's content
@@ -163,14 +183,23 @@ namespace Ongenet.Desktop.Views.Panels
         private void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
         {
             if (DataContext is not TimelineViewModel vm) return;
-            switch ((e.Source as StyledElement)?.DataContext)
+
+            // Walk up from the click target to the header row's lane view model, so clicking anywhere on
+            // the header (name, meter, padding) selects the track — not just the small name text.
+            var v = e.Source as Visual;
+            while (v is not null)
             {
-                case TrackLaneViewModel lane:
-                    vm.SelectLane(lane);
-                    break;
-                case AutomationLaneViewModel auto:
-                    vm.SelectTrack(auto.OwnerTrack);
-                    break;
+                switch ((v as StyledElement)?.DataContext)
+                {
+                    case TrackLaneViewModel lane:
+                        vm.SelectLane(lane);
+                        return;
+                    case AutomationLaneViewModel auto:
+                        vm.SelectTrack(auto.OwnerTrack);
+                        return;
+                }
+
+                v = v.GetVisualParent();
             }
         }
 
@@ -480,9 +509,16 @@ namespace Ongenet.Desktop.Views.Panels
 
         private void OnKeyDown(object? sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Delete && DataContext is TimelineViewModel vm)
+            if (DataContext is not TimelineViewModel vm) return;
+
+            if (e.Key == Key.Delete)
             {
                 vm.DeleteSelectedClips();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.D && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                vm.DuplicateSelectedClip();
                 e.Handled = true;
             }
         }

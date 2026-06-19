@@ -34,6 +34,15 @@ public interface ITransportService
     /// </summary>
     bool IsRecording { get; set; }
 
+    /// <summary>Loop region start, in beats. Set via the "[" control. Raises <see cref="LoopChanged"/>.</summary>
+    double LoopStart { get; set; }
+
+    /// <summary>Loop region end, in beats. Set via the "]" control. Raises <see cref="LoopChanged"/>.</summary>
+    double LoopEnd { get; set; }
+
+    /// <summary>True when a usable loop region is set (<see cref="LoopEnd"/> &gt; <see cref="LoopStart"/>).</summary>
+    bool IsLoopActive { get; }
+
     /// <summary>Raised when <see cref="State"/> changes.</summary>
     event Action<TransportState>? StateChanged;
 
@@ -42,6 +51,9 @@ public interface ITransportService
 
     /// <summary>Raised when <see cref="StartBeat"/> changes.</summary>
     event Action? StartBeatChanged;
+
+    /// <summary>Raised when <see cref="LoopStart"/> or <see cref="LoopEnd"/> changes.</summary>
+    event Action? LoopChanged;
 
     /// <summary>Raised (from the audio thread) when the count-in finishes and content playback begins.</summary>
     event Action? CountInFinished;

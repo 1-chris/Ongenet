@@ -14,6 +14,8 @@ public class TransportService : ITransportService
     private Tempo _tempo = new(120.0);
     private double _startBeat;
     private double _playheadBeats;
+    private double _loopStart;
+    private double _loopEnd;
 
     public TransportState State
     {
@@ -59,9 +61,36 @@ public class TransportService : ITransportService
     /// <summary>True while a recording session is active (set by the recording service).</summary>
     public bool IsRecording { get; set; }
 
+    public double LoopStart
+    {
+        get => _loopStart;
+        set
+        {
+            var clamped = value < 0 ? 0 : value;
+            if (_loopStart == clamped) return;
+            _loopStart = clamped;
+            LoopChanged?.Invoke();
+        }
+    }
+
+    public double LoopEnd
+    {
+        get => _loopEnd;
+        set
+        {
+            var clamped = value < 0 ? 0 : value;
+            if (_loopEnd == clamped) return;
+            _loopEnd = clamped;
+            LoopChanged?.Invoke();
+        }
+    }
+
+    public bool IsLoopActive => _loopEnd > _loopStart;
+
     public event Action<TransportState>? StateChanged;
     public event Action<Tempo>? TempoChanged;
     public event Action? StartBeatChanged;
+    public event Action? LoopChanged;
     public event Action? CountInFinished;
 
     public void Play() => State = TransportState.Playing;
