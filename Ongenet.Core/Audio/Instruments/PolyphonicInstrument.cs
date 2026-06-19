@@ -43,7 +43,10 @@ public abstract class PolyphonicInstrument : IInstrument
 
     public abstract IInstrument Clone();
 
-    public void Prepare(AudioFormat format) => _format = format;
+    /// <summary>The engine format, available to subclasses that own extra DSP (e.g. a post-mix effect chain).</summary>
+    protected AudioFormat Format => _format;
+
+    public virtual void Prepare(AudioFormat format) => _format = format;
 
     public void NoteOn(int midiNote, float velocity)
     {
@@ -81,7 +84,15 @@ public abstract class PolyphonicInstrument : IInstrument
         }
     }
 
-    public void Render(Span<float> buffer)
+    /// <summary>
+    /// Renders the instrument into <paramref name="buffer"/> (additive). The default just sums the
+    /// active voices; subclasses can override to render the voices into a scratch buffer via
+    /// <see cref="RenderVoices"/>, run their own post-mix DSP, then add the result.
+    /// </summary>
+    public virtual void Render(Span<float> buffer) => RenderVoices(buffer);
+
+    /// <summary>Sums every active voice's output into <paramref name="buffer"/> (additive).</summary>
+    protected void RenderVoices(Span<float> buffer)
     {
         // Read voices without locking the audio thread against UI note events; each voice
         // checks its own active flag.

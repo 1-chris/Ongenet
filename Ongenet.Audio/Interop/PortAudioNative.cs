@@ -76,6 +76,20 @@ internal static class PortAudioNative
     }
 
     /// <summary>
+    /// Mirror of PortAudio's <c>PaStreamInfo</c>. Returned by <see cref="Pa_GetStreamInfo"/> and read
+    /// for the stream's <b>actual</b> sample rate — important because some host APIs (notably JACK) run
+    /// at a fixed server rate and ignore the requested rate even though the open call reports success.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PaStreamInfo
+    {
+        public int structVersion;
+        public double inputLatency;
+        public double outputLatency;
+        public double sampleRate;
+    }
+
+    /// <summary>
     /// PortAudio stream callback. Note: C's <c>unsigned long</c> is mapped to <see cref="uint"/>;
     /// frame counts and status flags are small, and on the x64 calling conventions each argument
     /// occupies its own register, so this is correct on both Windows (LLP64) and Linux (LP64).
@@ -132,6 +146,9 @@ internal static class PortAudioNative
     // Returns a const PaDeviceInfo* owned by PortAudio (do not free); IntPtr.Zero if the index is bad.
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr Pa_GetDeviceInfo(int device);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr Pa_GetStreamInfo(IntPtr stream);
 
     // Returns a const PaHostApiInfo* owned by PortAudio (do not free); IntPtr.Zero if the index is bad.
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

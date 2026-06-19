@@ -42,6 +42,16 @@
                                VerticalAlignment="Center" Margin="0,0,16,0"
                                Foreground="{StaticResource CatppuccinMauve}"/>
 
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,0"
+                                VerticalAlignment="Center" IsVisible="{Binding IsPresetProvider}">
+                        <TextBlock Text="Preset" VerticalAlignment="Center" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <ComboBox MinWidth="150" ItemsSource="{Binding PresetNames}"
+                                  SelectedIndex="{Binding SelectedPreset}"
+                                  PlaceholderText="Choose a preset…"
+                                  Background="{StaticResource CatppuccinSurface0}"/>
+                    </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
                                 VerticalAlignment="Center" IsVisible="{Binding IsSampler}">
                         <Button Content="Load sample…" Click="OnLoadSample"
@@ -70,6 +80,22 @@
                     <Grid>
                         <controls:GrainMonitorControl Monitor="{Binding GrainMonitor}"/>
                         <TextBlock Text="GRAINS" FontSize="9" Margin="6,4"
+                                   VerticalAlignment="Top" HorizontalAlignment="Left"
+                                   IsHitTestVisible="False"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    </Grid>
+                </Border>
+
+                <!-- Waveform preview (instruments that render a one-shot, e.g. Kicka) -->
+                <Border Grid.Row="2" Height="96" Margin="0,8,0,0" CornerRadius="4"
+                        ClipToBounds="True" IsVisible="{Binding IsPreviewable}"
+                        Background="{StaticResource CatppuccinCrust}"
+                        BorderBrush="{StaticResource CatppuccinSurface0}" BorderThickness="1">
+                    <Grid>
+                        <controls:WaveformControl Waveform="{Binding InstrumentPreview}"
+                                                  Revision="{Binding PreviewRevision}"
+                                                  Fill="{StaticResource CatppuccinMauve}"/>
+                        <TextBlock Text="WAVEFORM" FontSize="9" Margin="6,4"
                                    VerticalAlignment="Top" HorizontalAlignment="Left"
                                    IsHitTestVisible="False"
                                    Foreground="{StaticResource CatppuccinOverlay1}"/>

@@ -72,6 +72,7 @@ public sealed class AudioEngine : IAudioEngine
         _transport = transport;
         _project.ProjectChanged += RebuildTracks;
         _transport.StateChanged += OnTransportStateChanged;
+        _output.FormatChanged += RebuildTracks; // re-prepare DSP when the device's sample rate changes
         events.Subscribe<TracksChangedEvent>(_ => RebuildTracks());
         events.Subscribe<AutomationChangedEvent>(e => e.Track.CommitAutoLanes());
     }
@@ -612,6 +613,7 @@ public sealed class AudioEngine : IAudioEngine
         _playing = false;
         _project.ProjectChanged -= RebuildTracks;
         _transport.StateChanged -= OnTransportStateChanged;
+        _output.FormatChanged -= RebuildTracks;
         _output.Stop();
         _output.Dispose();
     }

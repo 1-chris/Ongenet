@@ -33,6 +33,8 @@ public sealed class PortAudioOutput : IAudioOutput
 
     public AudioFormat Format { get; private set; } = new(RequestedSampleRate, MaxChannels);
 
+    public event Action? FormatChanged;
+
     public bool IsRunning { get; private set; }
 
     public void Start(AudioRenderCallback callback)
@@ -107,7 +109,23 @@ public sealed class PortAudioOutput : IAudioOutput
 
         Check(code, "Pa_OpenStream");
         Check(PortAudioNative.Pa_StartStream(_stream), "Pa_StartStream");
-        Format = new AudioFormat((int)Math.Round(rate), _channels);
+
+        // Some host APIs (notably JACK) ignore the requested rate and run at their own fixed server
+        // rate while still reporting a successful open. Ask the stream for its ACTUAL sample rate and
+        // drive the engine with that — otherwise we'd render at 44.1 kHz but play out at, say, 48 kHz,
+        // pitching and speeding everything up.
+        var actualRate = rate;
+        var streamInfo = PortAudioNative.Pa_GetStreamInfo(_stream);
+        if (streamInfo != IntPtr.Zero)
+        {
+            var si = System.Runtime.InteropServices.Marshal.PtrToStructure<PortAudioNative.PaStreamInfo>(streamInfo);
+            if (si.sampleRate > 0) actualRate = si.sampleRate;
+        }
+
+        var newFormat = new AudioFormat((int)Math.Round(actualRate), _channels);
+        var changed = newFormat != Format;
+        Format = newFormat;
+        if (changed) FormatChanged?.Invoke();
     }
 
     private void CloseStream()

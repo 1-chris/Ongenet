@@ -19,6 +19,12 @@ public interface IAudioOutput : IDisposable
     /// <summary>The format the device runs at (known after <see cref="Start"/>).</summary>
     AudioFormat Format { get; }
 
+    /// <summary>
+    /// Raised when <see cref="Format"/> changes (e.g. opening a device whose actual sample rate differs,
+    /// or switching devices while running), so the engine can re-prepare its DSP at the new rate.
+    /// </summary>
+    event Action? FormatChanged;
+
     /// <summary>Whether the device is currently open and streaming.</summary>
     bool IsRunning { get; }
 
