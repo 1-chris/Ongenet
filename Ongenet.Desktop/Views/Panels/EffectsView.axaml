@@ -96,6 +96,30 @@
                                 </Border>
                             </DataTemplate>
 
+                            <!-- Sidechain: a source picker (Tempo / a track) above the generic knobs. -->
+                            <DataTemplate DataType="fx:SidechainEffectViewModel">
+                                <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                                        Background="{StaticResource CatppuccinSurface0}"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <StackPanel Spacing="6">
+                                        <panels:EffectHeaderView/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Source" VerticalAlignment="Center" Width="50"
+                                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                            <ComboBox Width="200" ItemsSource="{Binding Sources}"
+                                                      SelectedItem="{Binding SelectedSource, Mode=TwoWay}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="fx:SidechainSourceOption">
+                                                        <TextBlock Text="{Binding Name}"/>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <panels:ParametersView DataContext="{Binding Parameters}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
                             <!-- Default effect card (built-in effects + CLAP audio-effect plugins). -->
                             <DataTemplate DataType="fx:EffectViewModel">
                                 <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"

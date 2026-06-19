@@ -128,6 +128,10 @@ public sealed class OfflineRenderer
         var currentBeat = 0.0;
         long framesWritten = 0;
 
+        // Mirror the live engine's tempo/sidechain context so tempo-synced + sidechain effects render too.
+        var sidechain = new SidechainBus();
+        var ctx = new EffectContext { Format = format, Bpm = bpm, Playing = true, Sidechain = sidechain };
+
         using var writer = new WavWriter(path, channels, sampleRate);
 
         while (framesWritten < totalFrames)
@@ -139,6 +143,7 @@ public sealed class OfflineRenderer
 
             var prevBeat = currentBeat;
             currentBeat = prevBeat + framesThisBlock / samplesPerBeat;
+            ctx.PlayheadBeats = prevBeat;
 
             // Fire note on/off for this block.
             while (nextEvent < events.Count && events[nextEvent].OnBeat < currentBeat)
@@ -185,9 +190,17 @@ public sealed class OfflineRenderer
 
                 if (rt.Effects.Length > 0)
                 {
-                    foreach (var fx in rt.Effects) if (fx.Enabled) fx.Process(tempSpan);
+                    foreach (var fx in rt.Effects)
+                    {
+                        if (!fx.Enabled) continue;
+                        if (fx is IContextualEffect cae) cae.SetContext(ctx);
+                        fx.Process(tempSpan);
+                    }
+
                     hasContent = true;
                 }
+
+                if (sidechain.IsRequested(rt.Source.Id)) sidechain.Publish(rt.Source.Id, tempSpan, channels);
 
                 if (!hasContent) continue;
 
@@ -206,8 +219,15 @@ public sealed class OfflineRenderer
                 var busSpan = rb.Buffer.AsSpan(0, sampleCount);
                 if (rb.Track.Effects.Length > 0)
                 {
-                    foreach (var fx in rb.Track.Effects) if (fx.Enabled) fx.Process(busSpan);
+                    foreach (var fx in rb.Track.Effects)
+                    {
+                        if (!fx.Enabled) continue;
+                        if (fx is IContextualEffect cae) cae.SetContext(ctx);
+                        fx.Process(busSpan);
+                    }
                 }
+
+                if (sidechain.IsRequested(rb.Track.Source.Id)) sidechain.Publish(rb.Track.Source.Id, busSpan, channels);
 
                 var target = rb.Parent is not null ? rb.Parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
                 var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);

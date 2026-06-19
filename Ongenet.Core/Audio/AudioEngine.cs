@@ -59,6 +59,10 @@ public sealed class AudioEngine : IAudioEngine
     private float[] _temp = Array.Empty<float>();
     private float _masterL;
     private float _masterR;
+
+    // Per-block context + cross-track signal bus handed to effects that opt in via IContextualEffect.
+    private readonly Effects.SidechainBus _sidechain = new();
+    private readonly Effects.EffectContext _effectCtx = new();
     private bool _disposed;
 
     public AudioEngine(IAudioOutput output, IProjectService project, ITransportService transport, IEventAggregator events)
@@ -331,6 +335,13 @@ public sealed class AudioEngine : IAudioEngine
 
         var temp = _temp.AsSpan(0, buffer.Length);
 
+        // Per-block context for tempo-aware / sidechain effects (the bus's tap buffers persist across blocks).
+        _effectCtx.Format = _output.Format;
+        _effectCtx.Bpm = _samplesPerBeat > 0 ? _output.Format.SampleRate * 60.0 / _samplesPerBeat : 120.0;
+        _effectCtx.PlayheadBeats = prevBeat;
+        _effectCtx.Playing = playing;
+        _effectCtx.Sidechain = _sidechain;
+
         // 1) Content tracks: render → insert effects → strip → sum into their parent bus.
         foreach (var track in tracks)
         {
@@ -339,6 +350,8 @@ public sealed class AudioEngine : IAudioEngine
             if (IsSilenced(track, soloActive, routing))
             {
                 track.MeterLevel *= MeterRelease;
+                // A muted/un-soloed source shouldn't keep ducking its consumers — publish silence.
+                if (_sidechain.IsRequested(track.Id)) { temp.Clear(); _sidechain.Publish(track.Id, temp, channels); }
                 continue;
             }
 
@@ -368,9 +381,18 @@ public sealed class AudioEngine : IAudioEngine
             var effects = track.ActiveEffects;
             if (effects.Length > 0)
             {
-                foreach (var fx in effects) if (fx.Enabled) fx.Process(temp);
+                foreach (var fx in effects)
+                {
+                    if (!fx.Enabled) continue;
+                    if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
+                    fx.Process(temp);
+                }
+
                 hasContent = true;
             }
+
+            // Make this track's post-effect output available to any sidechain consumer that asked for it.
+            if (_sidechain.IsRequested(track.Id)) _sidechain.Publish(track.Id, temp, channels);
 
             if (!hasContent)
             {
@@ -400,8 +422,16 @@ public sealed class AudioEngine : IAudioEngine
             var effects = bt.ActiveEffects;
             if (effects.Length > 0)
             {
-                foreach (var fx in effects) if (fx.Enabled) fx.Process(busSpan);
+                foreach (var fx in effects)
+                {
+                    if (!fx.Enabled) continue;
+                    if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
+                    fx.Process(busSpan);
+                }
             }
+
+            // A group/master bus can be a sidechain source too (e.g. a "Drums" group triggering a duck).
+            if (_sidechain.IsRequested(bt.Id)) _sidechain.Publish(bt.Id, busSpan, channels);
 
             var target = bus.Parent is not null ? bus.Parent.Buffer.AsSpan(0, buffer.Length) : buffer;
             var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);

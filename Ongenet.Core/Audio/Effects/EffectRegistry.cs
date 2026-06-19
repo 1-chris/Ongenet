@@ -22,6 +22,7 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(CompressorEffect.TypeId, "Compressor", () => new CompressorEffect(), CatDynamics),
         new EffectInfo(LimiterEffect.TypeId, "Limiter", () => new LimiterEffect(), CatDynamics),
         new EffectInfo(GateEffect.TypeId, "Gate", () => new GateEffect(), CatDynamics),
+        new EffectInfo(SidechainEffect.TypeId, "Sidechain", () => new SidechainEffect(), CatDynamics),
         new EffectInfo(ChorusEffect.TypeId, "Chorus", () => new ChorusEffect(), CatModulation),
         new EffectInfo(PhaserEffect.TypeId, "Phaser", () => new PhaserEffect(), CatModulation),
         new EffectInfo(FlangerEffect.TypeId, "Flanger", () => new FlangerEffect(), CatModulation),
