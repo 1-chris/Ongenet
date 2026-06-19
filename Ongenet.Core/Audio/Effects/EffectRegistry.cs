@@ -13,6 +13,7 @@ public sealed class EffectRegistry : IEffectRegistry
     private const string CatModulation = "Modulation";
     private const string CatDelayReverb = "Delay & Reverb";
     private const string CatDistortion = "Distortion";
+    private const string CatPitch = "Pitch";
     private const string CatUtility = "Utility";
 
     private readonly List<EffectInfo> _builtIn = new()
@@ -31,6 +32,8 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(ReverbEffect.TypeId, "Reverb", () => new ReverbEffect(), CatDelayReverb),
         new EffectInfo(DistortionEffect.TypeId, "Distortion", () => new DistortionEffect(), CatDistortion),
         new EffectInfo(BitcrusherEffect.TypeId, "Bitcrusher", () => new BitcrusherEffect(), CatDistortion),
+        new EffectInfo(VocoderEffect.TypeId, "Vocoder", () => new VocoderEffect(), CatPitch),
+        new EffectInfo(AutoTuneEffect.TypeId, "Auto-Tune", () => new AutoTuneEffect(), CatPitch),
         new EffectInfo(StereoWidthEffect.TypeId, "Stereo Width", () => new StereoWidthEffect(), CatUtility),
         new EffectInfo(UtilityEffect.TypeId, "Utility", () => new UtilityEffect(), CatUtility)
     };

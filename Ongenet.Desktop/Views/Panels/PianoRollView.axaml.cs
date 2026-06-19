@@ -1,12 +1,18 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Desktop.Services;
 using Ongenet.Desktop.ViewModels;
 using Ongenet.Desktop.ViewModels.PianoRoll;
+using Ongenet.Desktop.Views.Windows;
 
 namespace Ongenet.Desktop.Views.Panels
 {
@@ -19,16 +25,21 @@ namespace Ongenet.Desktop.Views.Panels
     {
         private const double ZoomSensitivity = 0.005;
 
-        private enum Gesture { None, Move, Resize, Zoom, Band }
+        private enum Gesture { None, Move, Resize, Zoom, Band, Slice }
 
         private Gesture _gesture = Gesture.None;
         private NoteViewModel? _note;
         private bool _noteDragCaptured; // one history snapshot per move/resize drag of an existing note
+        private bool _multiEdit;        // dragging a multi-note selection in Edit mode
         private double _pressBeat;
 
         private static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
         private double _origStart;
         private double _origLength;
+        private int _origPitch;
+
+        private MidiGeneratorWindow? _generatorWindow;
+        private ArpeggioWindow? _arpWindow;
         private int _previewPitch = -1;
         private int _keyPreview = -1;
 
@@ -219,6 +230,18 @@ namespace Ongenet.Desktop.Views.Panels
 
             if (!point.Properties.IsLeftButtonPressed) return;
 
+            // Slice mode: click-drag draws a cut line; notes it crosses are split on release.
+            if (vm.IsSliceMode)
+            {
+                _gesture = Gesture.Slice;
+                SliceLine.StartPoint = gridPos;
+                SliceLine.EndPoint = gridPos;
+                SliceLine.IsVisible = true;
+                e.Pointer.Capture(PianoGrid);
+                e.Handled = true;
+                return;
+            }
+
             // Select mode: click-drag draws a rubber band.
             if (vm.IsSelectMode)
             {
@@ -240,21 +263,28 @@ namespace Ongenet.Desktop.Views.Panels
                 if (note is null) return;
                 _gesture = Gesture.Move;
                 _noteDragCaptured = true; // the add already snapshotted; don't recapture as it's dragged
+                _multiEdit = false;
             }
             else
             {
-                vm.SelectOnly(note);
+                // Clicking an unselected note selects only it; clicking one that's already part of a
+                // multi-selection keeps the selection so the whole group can be dragged/resized.
+                if (!note.IsSelected) vm.SelectOnly(note);
+                vm.RememberLength(note.Model.LengthBeats); // remember the last-clicked note's length
                 var localX = gridPos.X - note.Left;
                 var zone = Math.Min(6.0, note.Width * 0.3);
                 _gesture = localX >= note.Width - zone ? Gesture.Resize : Gesture.Move;
                 _noteDragCaptured = false; // snapshot on the first real move/resize of this existing note
                 pitch = note.Model.Note;
+                _multiEdit = vm.SelectedCount > 1;
+                if (_multiEdit) vm.CaptureSelectionBaseline();
             }
 
             _note = note;
             _pressBeat = beat;
             _origStart = note.Model.StartBeat;
             _origLength = note.Model.LengthBeats;
+            _origPitch = note.Model.Note;
             StartPreview(vm, pitch);
 
             e.Pointer.Capture(PianoGrid);
@@ -284,6 +314,13 @@ namespace Ongenet.Desktop.Views.Panels
                 return;
             }
 
+            if (_gesture == Gesture.Slice)
+            {
+                SliceLine.EndPoint = gridPos;
+                e.Handled = true;
+                return;
+            }
+
             if (_note is null) return;
             if (!_noteDragCaptured)
             {
@@ -297,11 +334,23 @@ namespace Ongenet.Desktop.Views.Panels
             {
                 var pitch = vm.Metrics.YToNote(gridPos.Y);
                 if (pitch != _previewPitch) StartPreview(vm, pitch);
-                vm.MoveNote(_note, _origStart + (beat - _pressBeat), pitch);
+                if (_multiEdit)
+                    vm.MoveSelectionBy(beat - _pressBeat, pitch - _origPitch);
+                else
+                    vm.MoveNote(_note, _origStart + (beat - _pressBeat), pitch);
             }
             else // Resize
             {
-                vm.ResizeNote(_note, _origLength + (beat - _pressBeat));
+                if (_multiEdit)
+                {
+                    // Scale every selected note's length proportionally to the dragged note's change.
+                    var factor = _origLength > 0 ? (_origLength + (beat - _pressBeat)) / _origLength : 1.0;
+                    vm.ScaleSelectionLength(factor);
+                }
+                else
+                {
+                    vm.ResizeNote(_note, _origLength + (beat - _pressBeat));
+                }
             }
 
             e.Handled = true;
@@ -311,11 +360,70 @@ namespace Ongenet.Desktop.Views.Panels
         {
             if (_gesture == Gesture.None) return;
             if (_gesture == Gesture.Band) Band.IsVisible = false;
+            if (_gesture == Gesture.Slice)
+            {
+                if (DataContext is PianoRollViewModel vm) DoSlice(vm);
+                SliceLine.IsVisible = false;
+            }
+
             StopPreview();
             _gesture = Gesture.None;
             _note = null;
+            _multiEdit = false;
             e.Pointer.Capture(null);
             e.Handled = true;
+        }
+
+        // --- Slice tool ---
+
+        // On release of a slice drag, splits every note the cut line crosses (or, for a click with no
+        // drag, the single note under the cursor). Captures one history entry for the whole gesture.
+        private void DoSlice(PianoRollViewModel vm)
+        {
+            var a = SliceLine.StartPoint;
+            var b = SliceLine.EndPoint;
+            var cuts = new List<(NoteViewModel note, double beat)>();
+            var dragLen = Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
+
+            if (dragLen < 3.0)
+            {
+                // A plain click: slice the note under the pointer at the grid-snapped beat.
+                var clickBeat = vm.Metrics.Snap(vm.Metrics.PixelsToBeats(a.X));
+                var hit = vm.Notes.FirstOrDefault(n => HitNote(n, a));
+                if (hit is not null) cuts.Add((hit, clickBeat));
+            }
+            else
+            {
+                foreach (var n in vm.Notes.ToList())
+                    if (TryLineCutBeat(a, b, n, vm, out var cutBeat))
+                        cuts.Add((n, cutBeat));
+            }
+
+            if (cuts.Count == 0) return;
+            History?.Capture("Slice");
+            foreach (var (note, beat) in cuts) vm.SliceNote(note, beat);
+        }
+
+        private static bool HitNote(NoteViewModel n, Point p)
+            => p.X >= n.Left && p.X <= n.Left + n.Width && p.Y >= n.Top && p.Y <= n.Top + n.Height;
+
+        // True if the segment a→b crosses the note's vertical centre within the note's horizontal extent;
+        // outputs the clip-local beat at the crossing. Horizontal drags (no unique crossing) are ignored.
+        private static bool TryLineCutBeat(Point a, Point b, NoteViewModel n, PianoRollViewModel vm, out double cutBeat)
+        {
+            cutBeat = 0;
+            var yc = n.Top + n.Height / 2;
+            if (yc < Math.Min(a.Y, b.Y) || yc > Math.Max(a.Y, b.Y)) return false;
+
+            var dy = b.Y - a.Y;
+            if (Math.Abs(dy) < 0.0001) return false;
+
+            var t = (yc - a.Y) / dy;
+            var x = a.X + t * (b.X - a.X);
+            if (x <= n.Left || x >= n.Left + n.Width) return false;
+
+            cutBeat = vm.Metrics.PixelsToBeats(x);
+            return true;
         }
 
         private void ShowBand(Point a, Point b)
@@ -344,5 +452,125 @@ namespace Ongenet.Desktop.Views.Panels
 
         private static NoteViewModel? ResolveNote(PointerEventArgs e)
             => (e.Source as StyledElement)?.DataContext as NoteViewModel;
+
+        // --- Control bar ---
+
+        private static readonly FilePickerFileType MidiFileType =
+            new("MIDI files") { Patterns = new[] { "*.mid", "*.midi" } };
+
+        private async void Import_Click(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not PianoRollViewModel vm || !vm.HasClip) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top is null) return;
+
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Import MIDI",
+                AllowMultiple = false,
+                FileTypeFilter = new[] { MidiFileType }
+            });
+            if (files.Count == 0) return;
+
+            var owner = top as Window;
+            MidiClipData data;
+            try
+            {
+                await using var stream = await files[0].OpenReadAsync();
+                data = StandardMidiFile.Read(stream);
+            }
+            catch (Exception ex)
+            {
+                if (owner is not null) await MessageDialog.Notify(owner, "Couldn't import MIDI", ex.Message);
+                return;
+            }
+
+            if (data.Notes.Count == 0)
+            {
+                if (owner is not null) await MessageDialog.Notify(owner, "No notes", "That MIDI file contains no notes.");
+                return;
+            }
+
+            if (vm.CurrentNotes.Count > 0 && owner is not null)
+            {
+                var ok = await MessageDialog.Confirm(owner, "Replace notes?",
+                    $"Import {data.Notes.Count} note(s) and replace the {vm.CurrentNotes.Count} already in this clip?",
+                    "Replace", "Cancel");
+                if (!ok) return;
+            }
+
+            vm.ReplaceNotes(data.Notes, data.LengthBeats, "Import MIDI");
+        }
+
+        private async void Export_Click(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not PianoRollViewModel vm || !vm.HasClip) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top is null) return;
+            var owner = top as Window;
+
+            if (vm.CurrentNotes.Count == 0)
+            {
+                if (owner is not null) await MessageDialog.Notify(owner, "Nothing to export", "This clip has no notes.");
+                return;
+            }
+
+            var name = string.IsNullOrWhiteSpace(vm.ClipName) ? "clip" : vm.ClipName;
+            var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Export MIDI",
+                SuggestedFileName = $"{name}.mid",
+                DefaultExtension = "mid",
+                FileTypeChoices = new[] { MidiFileType }
+            });
+            if (file is null) return;
+
+            try
+            {
+                await using var stream = await file.OpenWriteAsync();
+                StandardMidiFile.Write(stream, vm.CurrentNotes, vm.CurrentLengthBeats,
+                    vm.ProjectTempo, vm.ProjectTimeSignature);
+            }
+            catch (Exception ex)
+            {
+                if (owner is not null) await MessageDialog.Notify(owner, "Couldn't export MIDI", ex.Message);
+            }
+        }
+
+        private void Generator_Click(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not PianoRollViewModel vm) return;
+            var owner = TopLevel.GetTopLevel(this) as Window;
+
+            if (_generatorWindow is null)
+            {
+                _generatorWindow = new MidiGeneratorWindow();
+                _generatorWindow.SetViewModel(new MidiGeneratorViewModel(vm));
+                _generatorWindow.Closed += (_, _) => _generatorWindow = null;
+                if (owner is not null) _generatorWindow.Show(owner); else _generatorWindow.Show();
+            }
+            else
+            {
+                _generatorWindow.Activate();
+            }
+        }
+
+        private void Arp_Click(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not PianoRollViewModel vm) return;
+            var owner = TopLevel.GetTopLevel(this) as Window;
+
+            if (_arpWindow is null)
+            {
+                _arpWindow = new ArpeggioWindow();
+                _arpWindow.SetViewModel(new ArpeggiatorViewModel(vm));
+                _arpWindow.Closed += (_, _) => _arpWindow = null;
+                if (owner is not null) _arpWindow.Show(owner); else _arpWindow.Show();
+            }
+            else
+            {
+                _arpWindow.Activate();
+            }
+        }
     }
 }

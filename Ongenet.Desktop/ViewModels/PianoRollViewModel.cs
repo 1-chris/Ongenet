@@ -17,7 +17,11 @@ namespace Ongenet.Desktop.ViewModels
     /// </summary>
     public class PianoRollViewModel : ViewModelBase
     {
-        private const double DefaultNoteLengthBeats = 1.0;
+        // The pen length: new notes are painted at the length of the last note clicked/resized.
+        private double _lastNoteLength = 1.0;
+
+        // Snapshot of the selection at the start of a multi-note move/resize drag.
+        private readonly List<(NoteViewModel note, double start, double length, int pitch)> _selectionBaseline = new();
 
         private readonly IProjectService _project;
         private readonly ISelectionService _selection;
@@ -48,7 +52,7 @@ namespace Ongenet.Desktop.ViewModels
             // transport bar), exactly as the arrange view does.
             _events.Subscribe<ArrangementLengthChangedEvent>(_ => SyncTimeSignature());
             _project.ProjectChanged += SyncTimeSignature;
-            _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSelectMode));
+            _editMode.ModeChanged += RaiseModeProperties;
             _preview.ActiveNotesChanged += UpdateKeyHighlights;
 
             SyncTimeSignature();
@@ -64,8 +68,36 @@ namespace Ongenet.Desktop.ViewModels
             foreach (var key in Keys) key.IsActive = _preview.IsActive(key.MidiNote);
         }
 
+        // The three tool toggles act like radio buttons: exactly one is always active. Setting one
+        // true switches the shared mode; "unchecking" the active one is refused by re-raising the
+        // property so its toggle snaps back on.
+        /// <summary>True when the default Edit tool is active (move/resize/draw single or multiple notes).</summary>
+        public bool IsEditMode
+        {
+            get => _editMode.Mode == EditMode.Edit;
+            set { if (value) _editMode.Mode = EditMode.Edit; else OnPropertyChanged(); }
+        }
+
         /// <summary>True when Select (rubber-band multi-select) mode is active.</summary>
-        public bool IsSelectMode => _editMode.Mode == EditMode.Select;
+        public bool IsSelectMode
+        {
+            get => _editMode.Mode == EditMode.Select;
+            set { if (value) _editMode.Mode = EditMode.Select; else OnPropertyChanged(); }
+        }
+
+        /// <summary>True when the Slice tool is active (click-drag a line to cut notes).</summary>
+        public bool IsSliceMode
+        {
+            get => _editMode.Mode == EditMode.Slice;
+            set { if (value) _editMode.Mode = EditMode.Slice; else OnPropertyChanged(); }
+        }
+
+        private void RaiseModeProperties()
+        {
+            OnPropertyChanged(nameof(IsEditMode));
+            OnPropertyChanged(nameof(IsSelectMode));
+            OnPropertyChanged(nameof(IsSliceMode));
+        }
 
         /// <summary>Raised when a new clip is bound, so the view can fit it to the available width.</summary>
         public event Action? ClipBound;
@@ -97,7 +129,7 @@ namespace Ongenet.Desktop.ViewModels
             {
                 Note = note,
                 StartBeat = Metrics.Snap(beat),
-                LengthBeats = DefaultNoteLengthBeats
+                LengthBeats = _lastNoteLength
             };
             _clip.Notes.Add(model);
 
@@ -125,7 +157,14 @@ namespace Ongenet.Desktop.ViewModels
             var snapped = Metrics.Snap(lengthBeats);
             note.Model.LengthBeats = Math.Max(Metrics.SnapBeats, snapped);
             note.RefreshFromModel();
+            _lastNoteLength = note.Model.LengthBeats; // remember as the pen length
             Publish();
+        }
+
+        /// <summary>Records a note length as the pen length for future drawn notes.</summary>
+        public void RememberLength(double beats)
+        {
+            if (beats > 0) _lastNoteLength = beats;
         }
 
         /// <summary>Deletes a note.</summary>
@@ -172,6 +211,177 @@ namespace Ongenet.Desktop.ViewModels
             }
 
             Publish();
+        }
+
+        /// <summary>The notes currently marked selected.</summary>
+        public IReadOnlyList<NoteViewModel> SelectedNotes => Notes.Where(n => n.IsSelected).ToList();
+
+        /// <summary>How many notes are currently selected.</summary>
+        public int SelectedCount => Notes.Count(n => n.IsSelected);
+
+        // --- Multi-note edit (Edit tool, more than one note selected) ---
+
+        /// <summary>Snapshots the selection's positions/lengths at the start of a drag.</summary>
+        public void CaptureSelectionBaseline()
+        {
+            _selectionBaseline.Clear();
+            foreach (var n in Notes)
+            {
+                if (n.IsSelected)
+                    _selectionBaseline.Add((n, n.Model.StartBeat, n.Model.LengthBeats, n.Model.Note));
+            }
+        }
+
+        /// <summary>Moves every selected note by a (grid-snapped) beat delta and a pitch delta, from baseline.</summary>
+        public void MoveSelectionBy(double deltaBeats, int deltaPitch)
+        {
+            if (_clip is null) return;
+            var step = Metrics.SnapBeats;
+            var snappedDelta = step > 0 ? Math.Round(deltaBeats / step) * step : deltaBeats;
+
+            foreach (var (note, start, _, pitch) in _selectionBaseline)
+            {
+                note.Model.StartBeat = Math.Max(0, start + snappedDelta);
+                note.Model.Note = Math.Clamp(pitch + deltaPitch, 0, 127);
+                note.RefreshFromModel();
+            }
+
+            Publish();
+        }
+
+        /// <summary>Scales every selected note's length by a factor (relative to its own size), from baseline.</summary>
+        public void ScaleSelectionLength(double factor)
+        {
+            if (_clip is null || factor <= 0) return;
+            foreach (var (note, _, length, _) in _selectionBaseline)
+            {
+                var snapped = Metrics.Snap(length * factor);
+                note.Model.LengthBeats = Math.Max(Metrics.SnapBeats, snapped);
+                note.RefreshFromModel();
+            }
+
+            Publish();
+        }
+
+        // --- Slicing ---
+
+        /// <summary>
+        /// Splits a note at the given clip-local beat into two abutting notes (same pitch/velocity).
+        /// No-op if the cut falls outside the note. History is captured by the caller per gesture.
+        /// </summary>
+        public void SliceNote(NoteViewModel note, double cutBeatInClip)
+        {
+            if (_clip is null) return;
+            var start = note.Model.StartBeat;
+            var end = note.Model.EndBeat;
+            if (cutBeatInClip <= start + 1e-6 || cutBeatInClip >= end - 1e-6) return;
+
+            note.Model.LengthBeats = cutBeatInClip - start;
+            note.RefreshFromModel();
+
+            var right = new MidiNote
+            {
+                Note = note.Model.Note,
+                StartBeat = cutBeatInClip,
+                LengthBeats = end - cutBeatInClip,
+                Velocity = note.Model.Velocity
+            };
+            _clip.Notes.Add(right);
+            Notes.Add(new NoteViewModel(right, Metrics));
+            Publish();
+        }
+
+        // --- Bulk note operations (import / generator / arpeggiator) ---
+
+        /// <summary>True when a MIDI clip is bound (for toolbar command enabling).</summary>
+        public bool HasClip => _clip is not null;
+
+        /// <summary>The bound clip's notes (empty when none) — for export.</summary>
+        public IReadOnlyList<MidiNote> CurrentNotes => _clip?.Notes ?? (IReadOnlyList<MidiNote>)Array.Empty<MidiNote>();
+
+        /// <summary>The bound clip's length in beats (0 when none) — for export.</summary>
+        public double CurrentLengthBeats => _clip?.LengthBeats ?? 0;
+
+        /// <summary>The project tempo in BPM — for export.</summary>
+        public double ProjectTempo => _project.Current.Tempo.BeatsPerMinute;
+
+        /// <summary>The project time signature — for export.</summary>
+        public TimeSignature ProjectTimeSignature => _project.Current.TimeSignature;
+
+        /// <summary>Replaces all of the bound clip's notes (e.g. MIDI import or "replace" generate).</summary>
+        public void ReplaceNotes(IReadOnlyList<MidiNote> notes, double lengthBeats, string label)
+        {
+            if (_clip is null) return;
+            _history.Capture(label);
+            _clip.Notes.Clear();
+            _clip.Notes.AddRange(notes);
+            GrowClipToFit(lengthBeats);
+            RebuildNotes();
+            Publish();
+        }
+
+        /// <summary>Adds notes to the bound clip without removing existing ones (e.g. "insert" generate).</summary>
+        public void InsertNotes(IReadOnlyList<MidiNote> notes, string label)
+        {
+            if (_clip is null || notes.Count == 0) return;
+            _history.Capture(label);
+            var maxEnd = _clip.LengthBeats;
+            foreach (var n in notes)
+            {
+                _clip.Notes.Add(n);
+                if (n.EndBeat > maxEnd) maxEnd = n.EndBeat;
+            }
+
+            GrowClipToFit(maxEnd);
+            RebuildNotes();
+            Publish();
+        }
+
+        /// <summary>Replaces the currently-selected notes with a new set (used by "Convert to arpeggio").</summary>
+        public void ReplaceSelectionWith(IReadOnlyList<MidiNote> notes, string label)
+        {
+            if (_clip is null) return;
+            var selected = Notes.Where(n => n.IsSelected).Select(n => n.Model).ToHashSet();
+            if (selected.Count == 0) return;
+
+            _history.Capture(label);
+            _clip.Notes.RemoveAll(selected.Contains);
+            var maxEnd = _clip.LengthBeats;
+            foreach (var n in notes)
+            {
+                _clip.Notes.Add(n);
+                if (n.EndBeat > maxEnd) maxEnd = n.EndBeat;
+            }
+
+            GrowClipToFit(maxEnd);
+            RebuildNotes();
+            Publish();
+        }
+
+        // Grows the clip (and grid) so it spans at least the given beat length, rounded up to a bar.
+        // Never shrinks, so it won't surprise the arrange view by cutting material.
+        private void GrowClipToFit(double beats)
+        {
+            if (_clip is null) return;
+            var bar = Math.Max(1, Metrics.BeatsPerBar);
+            var bars = Math.Max(1, (int)Math.Ceiling(beats / bar - 1e-6));
+            var target = bars * bar;
+            if (target > _clip.LengthBeats)
+            {
+                _clip.LengthBeats = target;
+                // Tell the arrange view so the clip rectangle grows to match the new material.
+                _events.Publish(new ClipChangedEvent(_clip));
+            }
+
+            Metrics.TotalBeats = _clip.LengthBeats;
+        }
+
+        // Rebuilds the note view models from the bound clip's note list.
+        private void RebuildNotes()
+        {
+            Notes.Clear();
+            if (_clip is null) return;
+            foreach (var n in _clip.Notes) Notes.Add(new NoteViewModel(n, Metrics));
         }
 
         /// <summary>Previews a pitch through the selected instrument (and highlights the key).</summary>

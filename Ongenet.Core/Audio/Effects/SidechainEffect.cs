@@ -12,7 +12,7 @@ namespace Ongenet.Core.Audio.Effects;
 /// track/group (e.g. the kick) and it instead ducks whenever that track is loud, like a real sidechain
 /// compressor. The source signal is read through the engine's <see cref="ISidechainBus"/>.
 /// </summary>
-public sealed class SidechainEffect : IAudioEffect, IContextualEffect, IProjectStatefulComponent
+public sealed class SidechainEffect : IAudioEffect, IContextualEffect, IProjectStatefulComponent, ISourceTrackEffect
 {
     public const string TypeId = "sidechain";
 

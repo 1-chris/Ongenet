@@ -109,7 +109,31 @@
                                             <ComboBox Width="200" ItemsSource="{Binding Sources}"
                                                       SelectedItem="{Binding SelectedSource, Mode=TwoWay}">
                                                 <ComboBox.ItemTemplate>
-                                                    <DataTemplate x:DataType="fx:SidechainSourceOption">
+                                                    <DataTemplate x:DataType="fx:SourceTrackOption">
+                                                        <TextBlock Text="{Binding Name}"/>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <panels:ParametersView DataContext="{Binding Parameters}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
+                            <!-- Vocoder: a carrier-track picker above the generic knobs. -->
+                            <DataTemplate DataType="fx:VocoderEffectViewModel">
+                                <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                                        Background="{StaticResource CatppuccinSurface0}"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <StackPanel Spacing="6">
+                                        <panels:EffectHeaderView/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Carrier" VerticalAlignment="Center" Width="50"
+                                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                            <ComboBox Width="200" ItemsSource="{Binding Sources}"
+                                                      SelectedItem="{Binding SelectedSource, Mode=TwoWay}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="fx:SourceTrackOption">
                                                         <TextBlock Text="{Binding Name}"/>
                                                     </DataTemplate>
                                                 </ComboBox.ItemTemplate>
