@@ -246,6 +246,8 @@
                                                 <Border.ContextMenu>
                                                     <ContextMenu>
                                                         <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
+                                                        <MenuItem Header="Reverse" Command="{Binding ReverseCommand}"
+                                                                  IsVisible="{Binding IsAudio}"/>
                                                         <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
                                                     </ContextMenu>
                                                 </Border.ContextMenu>

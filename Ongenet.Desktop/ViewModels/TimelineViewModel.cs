@@ -306,6 +306,53 @@ namespace Ongenet.Desktop.ViewModels
             _selection.SelectClip(copy, lane.Model);
         }
 
+        /// <summary>
+        /// Reverses an audio clip's playback by baking a frame-reversed copy of just this clip's source
+        /// window into a fresh buffer. Only this clip is affected — other clips sharing the same source
+        /// (e.g. slices or duplicates) keep playing forwards. Reversing again restores the original order.
+        /// </summary>
+        public void ReverseClip(ClipViewModel clip)
+        {
+            var m = clip.Model;
+            if (!m.IsAudio || m.Samples is not { } samples || samples.FrameCount <= 0) return;
+
+            var channels = samples.Channels;
+            var sampleRate = samples.SampleRate;
+            var totalFrames = samples.FrameCount;
+            var fullDuration = totalFrames / (double)sampleRate;
+
+            // The portion of the source this clip currently plays (whole buffer for an un-sliced clip).
+            var wasWindowed = m.SourceLengthSeconds is not null;
+            var windowSeconds = m.SourceLengthSeconds ?? Math.Max(0.0, fullDuration - m.SourceOffsetSeconds);
+
+            var startFrame = (long)Math.Round(m.SourceOffsetSeconds * sampleRate);
+            var windowFrames = (long)Math.Round(windowSeconds * sampleRate);
+            if (startFrame < 0) startFrame = 0;
+            if (windowFrames <= 0 || startFrame >= totalFrames) return;
+            if (startFrame + windowFrames > totalFrames) windowFrames = totalFrames - startFrame;
+
+            // Copy the clip's window frame-reversed (channels preserved within each frame) into a new buffer.
+            var src = samples.Samples;
+            var reversed = new float[windowFrames * channels];
+            for (long i = 0; i < windowFrames; i++)
+            {
+                var srcBase = (startFrame + windowFrames - 1 - i) * channels;
+                var dstBase = i * channels;
+                for (var c = 0; c < channels; c++) reversed[dstBase + c] = src[srcBase + c];
+            }
+
+            var reversedBuffer = new AudioSampleBuffer(reversed, channels, sampleRate);
+            m.Samples = reversedBuffer;
+            m.Waveform = AudioWaveform.Build(reversedBuffer);
+            m.SourceOffsetSeconds = 0;
+            // The new buffer is exactly the window; preserve the slice/whole distinction so tempo re-fitting
+            // still behaves the same (frozen for slices, octave-snapped for whole loops).
+            m.SourceLengthSeconds = wasWindowed ? reversedBuffer.FrameCount / (double)sampleRate : null;
+
+            clip.RefreshFromModel();
+            _events.Publish(new ClipChangedEvent(m));
+        }
+
         public void DeleteClip(ClipViewModel clip)
         {
             var lane = FindLaneOf(clip);

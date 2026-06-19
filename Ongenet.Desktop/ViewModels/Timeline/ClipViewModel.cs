@@ -23,10 +23,12 @@ namespace Ongenet.Desktop.ViewModels.Timeline
             _metrics.PropertyChanged += OnMetricsChanged;
             DuplicateCommand = new RelayCommand(() => actions.DuplicateClip(this));
             DeleteCommand = new RelayCommand(() => actions.DeleteClip(this));
+            ReverseCommand = new RelayCommand(() => actions.ReverseClip(this));
         }
 
         public RelayCommand DuplicateCommand { get; }
         public RelayCommand DeleteCommand { get; }
+        public RelayCommand ReverseCommand { get; }
 
         /// <summary>The underlying domain clip.</summary>
         public Clip Model { get; }
