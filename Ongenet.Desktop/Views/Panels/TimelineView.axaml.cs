@@ -29,6 +29,12 @@ namespace Ongenet.Desktop.Views.Panels
 
         private ScrollViewer? _lanesScroll;
 
+        // Track-header drag-to-reorder state.
+        private const double DragThreshold = 5.0;
+        private TrackLaneViewModel? _dragLane;
+        private Point _dragStartPoint;
+        private bool _dragging;
+
         // Active-gesture state.
         private Gesture _gesture = Gesture.None;
         private ClipViewModel? _dragClip;
@@ -55,8 +61,11 @@ namespace Ongenet.Desktop.Views.Panels
             LanesList.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
             LanesList.AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
 
-            // Clicking a track header selects that track (and clears any clip selection).
+            // Clicking a track header selects that track (and clears any clip selection); dragging it
+            // reorders / re-groups tracks.
             HeaderScroll.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
+            HeaderScroll.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+            HeaderScroll.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
 
             // Clicking the bar ruler sets the start marker.
             RulerScroll.AddHandler(PointerPressedEvent, OnRulerPressed, RoutingStrategies.Tunnel);
@@ -184,6 +193,8 @@ namespace Ongenet.Desktop.Views.Panels
         {
             if (DataContext is not TimelineViewModel vm) return;
 
+            var rightClick = e.GetCurrentPoint(null).Properties.IsRightButtonPressed;
+
             // Walk up from the click target to the header row's lane view model, so clicking anywhere on
             // the header (name, meter, padding) selects the track — not just the small name text.
             var v = e.Source as Visual;
@@ -192,15 +203,87 @@ namespace Ongenet.Desktop.Views.Panels
                 switch ((v as StyledElement)?.DataContext)
                 {
                     case TrackLaneViewModel lane:
-                        vm.SelectLane(lane);
+                        // Right-click keeps an existing multi-selection (so "Group tracks" sees all of them);
+                        // Ctrl+click toggles membership; a plain click selects just this lane.
+                        if (rightClick) vm.EnsureContextSelection(lane);
+                        else if (e.KeyModifiers.HasFlag(KeyModifiers.Control)) vm.ToggleLaneSelection(lane);
+                        else vm.SelectLane(lane);
+
+                        // Arm a potential reorder drag (activates once the pointer moves past a threshold).
+                        // The master is pinned, so it can't be dragged.
+                        if (!rightClick && !lane.IsMaster)
+                        {
+                            _dragLane = lane;
+                            _dragStartPoint = e.GetPosition(HeaderScroll);
+                            _dragging = false;
+                        }
+
                         return;
                     case AutomationLaneViewModel auto:
-                        vm.SelectTrack(auto.OwnerTrack);
+                        if (!rightClick) vm.SelectTrack(auto.OwnerTrack);
                         return;
                 }
 
                 v = v.GetVisualParent();
             }
+        }
+
+        private void OnHeaderMoved(object? sender, PointerEventArgs e)
+        {
+            if (_dragLane is null || DataContext is not TimelineViewModel vm) return;
+            if (!e.GetCurrentPoint(HeaderScroll).Properties.IsLeftButtonPressed) { CancelDrag(); return; }
+
+            var pos = e.GetPosition(HeaderScroll);
+            if (!_dragging)
+            {
+                if (System.Math.Abs(pos.Y - _dragStartPoint.Y) < DragThreshold &&
+                    System.Math.Abs(pos.X - _dragStartPoint.X) < DragThreshold) return;
+                _dragging = true;
+                e.Pointer.Capture(HeaderScroll);
+            }
+
+            var plan = vm.ComputeDrop(pos.Y + HeaderScroll.Offset.Y, _dragLane.Model);
+            ShowDragIndicator(plan);
+            e.Handled = true;
+        }
+
+        private void OnHeaderReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            // A plain click (no drag started): don't touch capture/Handled so header buttons still work.
+            if (!_dragging) { _dragLane = null; return; }
+
+            if (_dragLane is not null && DataContext is TimelineViewModel vm)
+            {
+                var pos = e.GetPosition(HeaderScroll);
+                var plan = vm.ComputeDrop(pos.Y + HeaderScroll.Offset.Y, _dragLane.Model);
+                if (plan.Valid) vm.MoveTrack(_dragLane.Model, plan);
+            }
+
+            e.Handled = true;
+            CancelDrag();
+            e.Pointer.Capture(null);
+        }
+
+        private void ShowDragIndicator(TimelineViewModel.DragDropPlan plan)
+        {
+            if (!plan.Valid)
+            {
+                DragInsertLine.IsVisible = false;
+                return;
+            }
+
+            var y = plan.IndicatorY - HeaderScroll.Offset.Y;
+            Canvas.SetTop(DragInsertLine, y - 1.5);
+            Canvas.SetLeft(DragInsertLine, plan.IndicatorX);
+            DragInsertLine.Width = System.Math.Max(0, DragOverlay.Bounds.Width - plan.IndicatorX);
+            DragInsertLine.IsVisible = true;
+        }
+
+        private void CancelDrag()
+        {
+            _dragLane = null;
+            _dragging = false;
+            DragInsertLine.IsVisible = false;
         }
 
         private void OnLanesScrollChanged(object? sender, ScrollChangedEventArgs e)

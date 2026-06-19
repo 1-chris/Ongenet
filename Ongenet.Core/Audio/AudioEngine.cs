@@ -37,6 +37,10 @@ public sealed class AudioEngine : IAudioEngine
     private double _samplesPerBeat = 1;
     private double _arrangementEndBeat; // for whole-song auto-loop (snapshot at playback start)
 
+    // --- Bus routing (groups + master). Rebuilt whenever the track topology changes; published as a
+    //     single immutable snapshot so the audio thread always reads a consistent graph. ---
+    private volatile Routing _routing = new();
+
     // --- Metronome count-in (recording pre-roll) ---
     private bool _countingIn;
     private long _countInElapsed;       // samples elapsed since the count-in began
@@ -92,6 +96,74 @@ public sealed class AudioEngine : IAudioEngine
         }
 
         _tracks = tracks;
+        BuildRouting(tracks);
+    }
+
+    // Builds the bus graph from the current tracks: a Bus per group/master, linked to its parent bus,
+    // ordered deepest-first so a block can be mixed children → groups → master in a single pass.
+    private void BuildRouting(Track[] tracks)
+    {
+        var trackById = new Dictionary<Guid, Track>(tracks.Length);
+        foreach (var t in tracks) trackById[t.Id] = t;
+
+        var busById = new Dictionary<Guid, Bus>();
+        Bus? master = null;
+        Track? masterTrack = null;
+        foreach (var t in tracks)
+        {
+            if (!t.IsBus) continue;
+            var bus = new Bus { Track = t };
+            busById[t.Id] = bus;
+            if (t.Kind == TrackKind.Master) { master = bus; masterTrack = t; }
+        }
+
+        foreach (var bus in busById.Values)
+        {
+            if (bus.Track.Kind == TrackKind.Master) bus.Parent = null;
+            else bus.Parent = bus.Track.ParentId is { } pid && busById.TryGetValue(pid, out var p) ? p : master;
+        }
+
+        foreach (var bus in busById.Values)
+        {
+            var depth = 0;
+            var p = bus.Parent;
+            while (p is not null && depth < 64) { depth++; p = p.Parent; }
+            bus.Depth = depth;
+        }
+
+        _routing = new Routing
+        {
+            TrackById = trackById,
+            BusById = busById,
+            Master = master,
+            MasterTrack = masterTrack,
+            BusesDeepestFirst = busById.Values.OrderByDescending(b => b.Depth).ToArray()
+        };
+    }
+
+    // The bus a track's output feeds into (its ParentId group, or the master when unset).
+    private static Bus? ParentBusOf(Track track, Routing routing)
+        => track.ParentId is { } pid && routing.BusById.TryGetValue(pid, out var b) ? b : routing.Master;
+
+    // The parent track in the routing tree (the master is the implicit parent of top-level tracks).
+    private static Track? ParentTrackOf(Track track, Routing routing)
+    {
+        if (track.Kind == TrackKind.Master) return null;
+        if (track.ParentId is { } pid && routing.TrackById.TryGetValue(pid, out var p)) return p;
+        return routing.MasterTrack;
+    }
+
+    private static bool AnyAncestorSoloed(Track track, Routing routing)
+    {
+        var p = ParentTrackOf(track, routing);
+        var n = 0;
+        while (p is not null && n++ < 64)
+        {
+            if (p.IsSoloed) return true;
+            p = ParentTrackOf(p, routing);
+        }
+
+        return false;
     }
 
     private void OnTransportStateChanged(TransportState state)
@@ -235,6 +307,22 @@ public sealed class AudioEngine : IAudioEngine
         if (playing) ScheduleNotes(curBeat);
 
         var tracks = _tracks;
+        var routing = _routing;
+        var buses = routing.BusesDeepestFirst;
+
+        // Prepare each bus's accumulation buffer for this block.
+        foreach (var bus in buses)
+        {
+            if (bus.Buffer.Length < buffer.Length) bus.Buffer = new float[buffer.Length];
+            Array.Clear(bus.Buffer, 0, buffer.Length);
+        }
+
+        // Automation drives volume/pan/effect params on every track — buses included.
+        if (playing)
+        {
+            foreach (var track in tracks) ApplyAutomation(track, curBeat);
+        }
+
         var soloActive = false;
         foreach (var track in tracks)
         {
@@ -243,11 +331,12 @@ public sealed class AudioEngine : IAudioEngine
 
         var temp = _temp.AsSpan(0, buffer.Length);
 
+        // 1) Content tracks: render → insert effects → strip → sum into their parent bus.
         foreach (var track in tracks)
         {
-            if (playing) ApplyAutomation(track, curBeat);
+            if (track.IsBus) continue;
 
-            if (IsSilenced(track, soloActive))
+            if (IsSilenced(track, soloActive, routing))
             {
                 track.MeterLevel *= MeterRelease;
                 continue;
@@ -289,22 +378,34 @@ public sealed class AudioEngine : IAudioEngine
                 continue;
             }
 
-            // Strip (volume + pan) into the master buffer, capturing this track's peak.
-            var (leftGain, rightGain) = Mixing.StripGains(track.Volume, track.Pan);
-            var peak = 0f;
-            for (var frame = 0; frame < frames; frame++)
+            // Sum into the parent bus (or straight to the device buffer if there is no master bus).
+            var parent = ParentBusOf(track, routing);
+            var target = parent is not null ? parent.Buffer.AsSpan(0, buffer.Length) : buffer;
+            var (lg, rg) = Mixing.StripGains(track.Volume, track.Pan);
+            track.MeterLevel = MixInto(target, temp, lg, rg, channels, frames, track.MeterLevel);
+        }
+
+        // 2) Buses deepest-first: insert effects on the summed input → strip → into the parent bus
+        //    (the master, having no parent, strips straight into the device output below).
+        foreach (var bus in buses)
+        {
+            var bt = bus.Track;
+            if (bt.IsMuted)
             {
-                var i = frame * channels;
-                for (var c = 0; c < channels; c++)
-                {
-                    var v = temp[i + c] * Mixing.ChannelGain(c, leftGain, rightGain);
-                    buffer[i + c] += v;
-                    var a = v < 0 ? -v : v;
-                    if (a > peak) peak = a;
-                }
+                bt.MeterLevel *= MeterRelease;
+                continue;
             }
 
-            track.MeterLevel = MaxWithRelease(peak, track.MeterLevel);
+            var busSpan = bus.Buffer.AsSpan(0, buffer.Length);
+            var effects = bt.ActiveEffects;
+            if (effects.Length > 0)
+            {
+                foreach (var fx in effects) if (fx.Enabled) fx.Process(busSpan);
+            }
+
+            var target = bus.Parent is not null ? bus.Parent.Buffer.AsSpan(0, buffer.Length) : buffer;
+            var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
+            bt.MeterLevel = MixInto(target, busSpan, lg, rg, channels, frames, bt.MeterLevel);
         }
 
         if (playing)
@@ -344,6 +445,27 @@ public sealed class AudioEngine : IAudioEngine
     {
         var decayed = current * MeterRelease;
         return peak > decayed ? peak : decayed;
+    }
+
+    // Mixes <paramref name="source"/> through per-channel gains additively into <paramref name="target"/>,
+    // returning the strip's peak (with meter release) for the level meter.
+    private static float MixInto(Span<float> target, Span<float> source, float leftGain, float rightGain,
+        int channels, int frames, float currentMeter)
+    {
+        var peak = 0f;
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var i = frame * channels;
+            for (var c = 0; c < channels; c++)
+            {
+                var v = source[i + c] * Mixing.ChannelGain(c, leftGain, rightGain);
+                target[i + c] += v;
+                var a = v < 0 ? -v : v;
+                if (a > peak) peak = a;
+            }
+        }
+
+        return MaxWithRelease(peak, currentMeter);
     }
 
     // Resets playback to <paramref name="target"/> for a loop: silences sounding notes and re-points the
@@ -440,8 +562,10 @@ public sealed class AudioEngine : IAudioEngine
         }
     }
 
-    private static bool IsSilenced(Track track, bool soloActive)
-        => track.IsMuted || (soloActive && !track.IsSoloed);
+    // A content track is silenced by its own mute, or — when anything is soloed — unless it or one of its
+    // ancestor groups is soloed (so soloing a group plays its children; buses always pass soloed signals).
+    private static bool IsSilenced(Track track, bool soloActive, Routing routing)
+        => track.IsMuted || (soloActive && !(track.IsSoloed || AnyAncestorSoloed(track, routing)));
 
     private void AllNotesOff()
     {
@@ -465,4 +589,24 @@ public sealed class AudioEngine : IAudioEngine
     private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument Instrument, int Note, float Velocity);
 
     private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch, double SourceOffsetSeconds);
+
+    // A group/master mixing bus: an accumulation buffer that its children sum into, plus a link to the
+    // parent bus it strips into (null for the master, which strips into the device output).
+    private sealed class Bus
+    {
+        public Track Track = null!;
+        public Bus? Parent;
+        public float[] Buffer = Array.Empty<float>();
+        public int Depth;
+    }
+
+    // Immutable snapshot of the bus graph, swapped in atomically when the topology changes.
+    private sealed class Routing
+    {
+        public Bus[] BusesDeepestFirst = Array.Empty<Bus>();
+        public Dictionary<Guid, Bus> BusById = new();
+        public Dictionary<Guid, Track> TrackById = new();
+        public Bus? Master;
+        public Track? MasterTrack;
+    }
 }

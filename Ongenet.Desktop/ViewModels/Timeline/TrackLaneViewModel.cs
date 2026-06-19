@@ -32,6 +32,15 @@ namespace Ongenet.Desktop.ViewModels.Timeline
             AddInstrumentTrackCommand = new RelayCommand(() => _actions.AddInstrumentTrack());
             AddAudioTrackCommand = new RelayCommand(() => _actions.AddAudioTrack());
             ToggleAutomationCommand = new RelayCommand(() => _actions.ToggleAutomation(this));
+            ToggleCollapseCommand = new RelayCommand(() =>
+            {
+                if (IsGroup) _actions.ToggleGroup(this);
+                else _actions.ToggleAutomation(this);
+            });
+            GroupTracksCommand = new RelayCommand(() => _actions.GroupSelectedTracks());
+            DeleteGroupKeepChildrenCommand = new RelayCommand(() => _actions.DeleteGroupKeepChildren(this));
+            DeleteGroupAndChildrenCommand = new RelayCommand(() => _actions.DeleteGroupAndChildren(this));
+            DetachFromGroupCommand = new RelayCommand(() => _actions.DetachFromGroup(this));
 
             foreach (var clip in model.Clips)
             {
@@ -103,8 +112,77 @@ namespace Ongenet.Desktop.ViewModels.Timeline
         /// <summary>Collapses/expands this track's automation rows.</summary>
         public RelayCommand ToggleAutomationCommand { get; }
 
+        /// <summary>Header chevron: collapses a group's subtree, or a normal track's automation rows.</summary>
+        public RelayCommand ToggleCollapseCommand { get; }
+
+        /// <summary>Groups the current multi-selection under a new group bus.</summary>
+        public RelayCommand GroupTracksCommand { get; }
+
+        /// <summary>Removes this group but keeps its tracks (moves them up a level).</summary>
+        public RelayCommand DeleteGroupKeepChildrenCommand { get; }
+
+        /// <summary>Removes this group and every track nested inside it.</summary>
+        public RelayCommand DeleteGroupAndChildrenCommand { get; }
+
+        /// <summary>Moves this track one level out of its group.</summary>
+        public RelayCommand DetachFromGroupCommand { get; }
+
+        /// <summary>True when this track is nested inside a group (shows "Detach from group").</summary>
+        public bool IsInGroup => Model.ParentId is not null;
+
+        /// <summary>True for a group bus.</summary>
+        public bool IsGroup => Model.Kind == TrackKind.Group;
+
+        /// <summary>True for the master bus.</summary>
+        public bool IsMaster => Model.Kind == TrackKind.Master;
+
+        /// <summary>True for any bus (group or master).</summary>
+        public bool IsBus => Model.IsBus;
+
+        /// <summary>The master can't be deleted or duplicated.</summary>
+        public bool CanDeleteOrDuplicate => Model.Kind != TrackKind.Master;
+
+        /// <summary>Nesting depth (0 = top level), set by the timeline when rows are rebuilt.</summary>
+        private int _indentLevel;
+        public int IndentLevel
+        {
+            get => _indentLevel;
+            set
+            {
+                if (SetField(ref _indentLevel, value)) OnPropertyChanged(nameof(IndentWidth));
+            }
+        }
+
+        /// <summary>Left gutter indent in pixels for this row's header, from its nesting depth.</summary>
+        public double IndentWidth => _indentLevel * 16.0;
+
+        private System.Collections.Generic.IReadOnlyList<LaneGutterBar> _gutterBars = System.Array.Empty<LaneGutterBar>();
+
+        /// <summary>The stacked colour rails for this row (ancestor group colours + this track's own), set by the timeline.</summary>
+        public System.Collections.Generic.IReadOnlyList<LaneGutterBar> GutterBars
+        {
+            get => _gutterBars;
+            set => SetField(ref _gutterBars, value);
+        }
+
         /// <summary>True when the track has one or more automation lanes (shows the collapse chevron).</summary>
         public bool HasAutomation => Model.AutoLanes.Count > 0;
+
+        /// <summary>Whether the header chevron is shown (groups always; normal tracks only with automation).</summary>
+        public bool ShowCollapse => IsGroup || HasAutomation;
+
+        /// <summary>Whether this group's nested rows are hidden.</summary>
+        public bool GroupCollapsed
+        {
+            get => Model.GroupCollapsed;
+            set
+            {
+                if (Model.GroupCollapsed == value) return;
+                Model.GroupCollapsed = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CollapseGlyph));
+            }
+        }
 
         /// <summary>Whether this track's automation rows are hidden.</summary>
         public bool AutomationCollapsed
@@ -120,12 +198,13 @@ namespace Ongenet.Desktop.ViewModels.Timeline
         }
 
         /// <summary>Chevron glyph for the collapse toggle (▾ expanded / ▸ collapsed).</summary>
-        public string CollapseGlyph => Model.AutomationCollapsed ? "▸" : "▾";
+        public string CollapseGlyph => (IsGroup ? Model.GroupCollapsed : Model.AutomationCollapsed) ? "▸" : "▾";
 
         /// <summary>Re-reads automation-related header state after lanes are added/removed/collapsed.</summary>
         public void RefreshAutomationState()
         {
             OnPropertyChanged(nameof(HasAutomation));
+            OnPropertyChanged(nameof(ShowCollapse));
             OnPropertyChanged(nameof(AutomationCollapsed));
             OnPropertyChanged(nameof(CollapseGlyph));
         }

@@ -20,5 +20,20 @@ namespace Ongenet.Desktop.ViewModels.Timeline
 
         /// <summary>Removes one automation lane from its track (rebuilds the rendered rows).</summary>
         void RemoveAutomationLane(AutomationLaneViewModel lane);
+
+        /// <summary>Collapses/expands a group's nested rows (children + their automation).</summary>
+        void ToggleGroup(TrackLaneViewModel lane);
+
+        /// <summary>Groups the currently multi-selected tracks under a new group bus.</summary>
+        void GroupSelectedTracks();
+
+        /// <summary>Removes a group but keeps its tracks, moving them up to the group's parent.</summary>
+        void DeleteGroupKeepChildren(TrackLaneViewModel lane);
+
+        /// <summary>Removes a group and every track nested inside it.</summary>
+        void DeleteGroupAndChildren(TrackLaneViewModel lane);
+
+        /// <summary>Moves a track one level out of its group (popping it below the group).</summary>
+        void DetachFromGroup(TrackLaneViewModel lane);
     }
 }

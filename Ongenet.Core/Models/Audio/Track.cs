@@ -23,6 +23,15 @@ public sealed class Track
     /// <summary>The kind of material this track carries.</summary>
     public TrackKind Kind { get; set; } = TrackKind.Audio;
 
+    /// <summary>
+    /// The <see cref="Id"/> of the group/master bus this track's output routes into, or null to route
+    /// straight to the master. Drives both audio routing and the timeline's nesting/indentation.
+    /// </summary>
+    public Guid? ParentId { get; set; }
+
+    /// <summary>True for a bus (group or master) that sums child output rather than carrying clips.</summary>
+    public bool IsBus => Kind is TrackKind.Group or TrackKind.Master;
+
     /// <summary>Whether the track is muted.</summary>
     public bool IsMuted { get; set; }
 
@@ -87,4 +96,7 @@ public sealed class Track
 
     /// <summary>Transient UI state: whether this track's automation lanes are collapsed in the timeline.</summary>
     public bool AutomationCollapsed { get; set; }
+
+    /// <summary>Transient UI state: whether this group's nested rows (children + automation) are collapsed.</summary>
+    public bool GroupCollapsed { get; set; }
 }

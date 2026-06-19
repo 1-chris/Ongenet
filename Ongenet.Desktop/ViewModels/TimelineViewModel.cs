@@ -50,6 +50,8 @@ namespace Ongenet.Desktop.ViewModels
             _recording = recording;
 
             SelectClipCommand = new RelayCommand<ClipViewModel>(OnClipClicked);
+            AddInstrumentTrackCommand = new RelayCommand(AddInstrumentTrack);
+            AddAudioTrackCommand = new RelayCommand(AddAudioTrack);
 
             _project.ProjectChanged += Rebuild;
             _selection.SelectionChanged += OnSelectionChanged;
@@ -139,6 +141,18 @@ namespace Ongenet.Desktop.ViewModels
 
         /// <summary>Selects a lane's track, clearing any clip selection.</summary>
         public void SelectLane(TrackLaneViewModel lane) => _selection.SelectTrack(lane.Model);
+
+        /// <summary>Ctrl+click: toggles a lane's track in the multi-selection (for grouping).</summary>
+        public void ToggleLaneSelection(TrackLaneViewModel lane) => _selection.ToggleTrackSelection(lane.Model);
+
+        /// <summary>
+        /// Right-click selection: if the lane is already part of the multi-selection, leave it intact (so
+        /// "Group tracks" still sees all of them); otherwise select just this lane.
+        /// </summary>
+        public void EnsureContextSelection(TrackLaneViewModel lane)
+        {
+            if (!_selection.SelectedTracks.Contains(lane.Model)) _selection.SelectTrack(lane.Model);
+        }
 
         /// <summary>Selects a track directly (e.g. when an automation header is clicked).</summary>
         public void SelectTrack(Track track) => _selection.SelectTrack(track);
@@ -458,6 +472,10 @@ namespace Ongenet.Desktop.ViewModels
 
         public RelayCommand<ClipViewModel> SelectClipCommand { get; }
 
+        /// <summary>Add-track commands for the timeline's blank-area context menu.</summary>
+        public RelayCommand AddInstrumentTrackCommand { get; }
+        public RelayCommand AddAudioTrackCommand { get; }
+
         private void OnClipClicked(ClipViewModel? clip)
         {
             if (clip is null) return;
@@ -553,6 +571,9 @@ namespace Ongenet.Desktop.ViewModels
 
         private void InsertClip(string path, TrackLaneViewModel? target, double startBeat, Core.Audio.Files.LoadedAudio? loaded)
         {
+            // Buses (group/master) hold no clips — a drop on one creates a new audio track instead.
+            if (target is { Model.IsBus: true }) target = null;
+
             var project = _project.Current;
             // Use the live transport tempo (what the user sets), so an N-bar sample lands on N bars.
             var bpm = _transport.Tempo.BeatsPerMinute;
@@ -649,24 +670,88 @@ namespace Ongenet.Desktop.ViewModels
                 _trackLanes.Add(new TrackLaneViewModel(track, Metrics, this, this));
             }
 
+            RecomputeIndents();
             RebuildRows();
             ResizeArrangement();
         }
 
-        // Rebuilds the rendered <see cref="Lanes"/> from the track lanes: each track row followed by
-        // its automation rows (unless that track is collapsed). The same track-lane instances are
-        // reused so clip state survives; only the automation rows are fresh.
+        // Sets each lane's nesting depth and colour rails from its parent chain so headers indent under
+        // their group and each group's colour forms a continuous rail down through its descendants.
+        private void RecomputeIndents()
+        {
+            foreach (var lane in _trackLanes)
+            {
+                lane.IndentLevel = DepthOf(lane.Model);
+                lane.GutterBars = BuildGutterBars(lane.Model);
+            }
+        }
+
+        // Outermost ancestor group's colour first, then inward, then the track's own colour last.
+        private IReadOnlyList<Timeline.LaneGutterBar> BuildGutterBars(Track track)
+        {
+            var ancestors = new List<Timeline.LaneGutterBar>();
+            var pid = track.ParentId;
+            var guard = 0;
+            while (pid is { } id && guard++ < 256)
+            {
+                var parent = _project.Current.Tracks.FirstOrDefault(x => x.Id == id);
+                if (parent is null) break;
+                ancestors.Insert(0, new Timeline.LaneGutterBar(parent.ColorKey)); // outermost ends up first
+                pid = parent.ParentId;
+            }
+
+            ancestors.Add(new Timeline.LaneGutterBar(track.ColorKey)); // this row's own colour, deepest rail
+            return ancestors;
+        }
+
+        // Number of group ancestors above a track (0 = top level). The master is the implicit root and is
+        // never itself a ParentId, so top-level tracks/groups are depth 0.
+        private int DepthOf(Track track)
+        {
+            var depth = 0;
+            var pid = track.ParentId;
+            var guard = 0;
+            while (pid is { } id && guard++ < 256)
+            {
+                var parent = _project.Current.Tracks.FirstOrDefault(x => x.Id == id);
+                if (parent is null) break;
+                depth++;
+                pid = parent.ParentId;
+            }
+
+            return depth;
+        }
+
+        // Rebuilds the rendered <see cref="Lanes"/> from the track lanes in flattened-tree order: each row
+        // followed by its automation rows, skipping the subtree of any collapsed group. The same track-lane
+        // instances are reused so clip state survives; only the automation rows are fresh.
         private void RebuildRows()
         {
             Lanes.Clear();
+            var collapsedDepth = int.MaxValue; // while a group is collapsed, hide everything deeper than it
             foreach (var trackLane in _trackLanes)
             {
+                var depth = trackLane.IndentLevel;
+                if (depth > collapsedDepth) continue;
+                collapsedDepth = int.MaxValue;
+
                 Lanes.Add(trackLane);
                 trackLane.RefreshAutomationState();
+
+                if (trackLane.IsGroup && trackLane.Model.GroupCollapsed)
+                {
+                    collapsedDepth = depth; // hide this group's children and automation
+                    continue;
+                }
+
                 if (trackLane.Model.AutomationCollapsed) continue;
                 foreach (var auto in trackLane.Model.AutoLanes)
                 {
-                    Lanes.Add(new AutomationLaneViewModel(trackLane.Model, auto, Metrics, this));
+                    Lanes.Add(new AutomationLaneViewModel(trackLane.Model, auto, Metrics, this)
+                    {
+                        IndentWidth = (trackLane.IndentLevel + 1) * 16.0,
+                        GutterBars = trackLane.GutterBars // group/track rails continue through automation
+                    });
                 }
             }
 
@@ -746,11 +831,14 @@ namespace Ongenet.Desktop.ViewModels
 
         public void DuplicateTrack(TrackLaneViewModel lane)
         {
+            if (lane.Model.IsBus) return; // groups/master aren't duplicated
+
             var src = lane.Model;
             var copy = new Track
             {
                 Name = src.Name + " copy",
                 Kind = src.Kind,
+                ParentId = src.ParentId, // stay in the same group
                 IsMuted = src.IsMuted,
                 IsSoloed = src.IsSoloed,
                 Volume = src.Volume,
@@ -769,6 +857,9 @@ namespace Ongenet.Desktop.ViewModels
 
         public void DeleteTrack(TrackLaneViewModel lane)
         {
+            if (lane.Model.Kind == TrackKind.Master) return;             // the master can't be deleted
+            if (lane.Model.Kind == TrackKind.Group) { DeleteGroupKeepChildren(lane); return; } // default: ungroup
+
             var wasSelected = ReferenceEquals(_selection.SelectedTrack, lane.Model);
             _project.Current.Tracks.Remove(lane.Model);
             _trackLanes.Remove(lane);
@@ -782,6 +873,276 @@ namespace Ongenet.Desktop.ViewModels
         {
             lane.AutomationCollapsed = !lane.AutomationCollapsed;
             RebuildRows();
+        }
+
+        public void ToggleGroup(TrackLaneViewModel lane)
+        {
+            if (lane.Model.Kind != TrackKind.Group) return;
+            lane.GroupCollapsed = !lane.GroupCollapsed;
+            RebuildRows();
+        }
+
+        /// <summary>Groups the multi-selected tracks under a new group bus placed where the first one was.</summary>
+        public void GroupSelectedTracks()
+        {
+            var tracks = _project.Current.Tracks;
+            var selected = new HashSet<Guid>(_selection.SelectedTracks
+                .Where(t => t.Kind != TrackKind.Master).Select(t => t.Id));
+            if (selected.Count == 0) return;
+
+            // Keep only the roots of the selection (drop any whose ancestor is also selected).
+            var roots = tracks.Where(t => selected.Contains(t.Id) && !HasSelectedAncestor(t, selected)).ToList();
+            if (roots.Count == 0) return;
+
+            var group = new Track
+            {
+                Name = "Group",
+                Kind = TrackKind.Group,
+                ColorKey = "CatppuccinBlue",
+                Volume = 1.0,
+                ParentId = roots[0].ParentId // sit under the first selected track's parent
+            };
+
+            // Gather each root's subtree (root + descendants) in document order.
+            var moved = new List<Track>();
+            foreach (var root in roots) moved.AddRange(SubtreeOf(root, tracks));
+
+            var insertAt = tracks.IndexOf(moved[0]);
+            foreach (var t in moved) tracks.Remove(t);
+            insertAt = Math.Clamp(insertAt, 0, tracks.Count);
+
+            foreach (var root in roots) root.ParentId = group.Id;
+            tracks.Insert(insertAt, group);
+            tracks.InsertRange(insertAt + 1, moved);
+
+            _events.Publish(new TracksChangedEvent());
+            Rebuild();
+            _selection.SelectTrack(group);
+        }
+
+        /// <summary>Removes a group, moving its direct children up to the group's own parent (ungroup).</summary>
+        public void DeleteGroupKeepChildren(TrackLaneViewModel lane)
+        {
+            var group = lane.Model;
+            if (group.Kind != TrackKind.Group) return;
+
+            var tracks = _project.Current.Tracks;
+            foreach (var t in tracks.Where(t => t.ParentId == group.Id)) t.ParentId = group.ParentId;
+            tracks.Remove(group);
+
+            if (ReferenceEquals(_selection.SelectedTrack, group)) _selection.SelectTrack(null);
+            _events.Publish(new TracksChangedEvent());
+            Rebuild();
+            OnPropertyChanged(nameof(LaneCount));
+        }
+
+        /// <summary>Removes a group and every track nested inside it.</summary>
+        public void DeleteGroupAndChildren(TrackLaneViewModel lane)
+        {
+            var group = lane.Model;
+            if (group.Kind != TrackKind.Group) return;
+
+            var tracks = _project.Current.Tracks;
+            var doomed = tracks.Where(t => ReferenceEquals(t, group) || IsDescendantOf(t, group.Id, tracks)).ToList();
+            var clearedSelection = doomed.Any(t => ReferenceEquals(t, _selection.SelectedTrack));
+            foreach (var t in doomed) tracks.Remove(t);
+
+            if (clearedSelection) _selection.SelectTrack(null);
+            _events.Publish(new TracksChangedEvent());
+            Rebuild();
+            OnPropertyChanged(nameof(LaneCount));
+        }
+
+        /// <summary>Moves a track one level out of its group: it pops out as a sibling just below the group.</summary>
+        public void DetachFromGroup(TrackLaneViewModel lane)
+        {
+            var track = lane.Model;
+            if (track.ParentId is not { } pid) return; // already top level
+
+            var tracks = _project.Current.Tracks;
+            var parent = tracks.FirstOrDefault(x => x.Id == pid);
+            if (parent is null) return;
+
+            // Lift the track's whole subtree out and reinsert it right after the old group's subtree.
+            var subtree = SubtreeOf(track, tracks);
+            foreach (var t in subtree) tracks.Remove(t);
+
+            track.ParentId = parent.ParentId; // one level out
+            var parentSubtree = SubtreeOf(parent, tracks); // parent's remaining descendants
+            var insertAt = tracks.IndexOf(parentSubtree[^1]) + 1;
+            tracks.InsertRange(insertAt, subtree);
+
+            _events.Publish(new TracksChangedEvent());
+            Rebuild();
+            _selection.SelectTrack(track);
+        }
+
+        /// <summary>A computed drag-drop target: where the line is drawn, and how to perform the move.</summary>
+        public sealed record DragDropPlan(bool Valid, double IndicatorY, double IndicatorX, Guid? ParentId, Track? BeforeTrack);
+
+        /// <summary>
+        /// Works out where a dragged track would land for a pointer at content-Y <paramref name="contentY"/>:
+        /// the insertion line position/indent, the resulting parent group, and the track to insert before.
+        /// </summary>
+        public DragDropPlan ComputeDrop(double contentY, Track dragged)
+        {
+            var rows = new List<(TrackLaneViewModel Lane, double Top)>();
+            for (var i = 0; i < Lanes.Count; i++)
+            {
+                if (Lanes[i] is TrackLaneViewModel t) rows.Add((t, RowTop(i)));
+            }
+
+            if (rows.Count == 0) return new DragDropPlan(false, 0, 0, null, null);
+
+            var hoverIdx = -1;
+            for (var i = 0; i < rows.Count; i++)
+            {
+                if (contentY < rows[i].Top + TrackLaneViewModel.RowHeight) { hoverIdx = i; break; }
+            }
+
+            Guid? parentId;
+            Track? before;
+            double indicatorY;
+            int depth;
+
+            if (hoverIdx < 0)
+            {
+                // Below all rows → append at the bottom, top level.
+                parentId = null;
+                before = null;
+                indicatorY = RowsTotalHeight;
+                depth = 0;
+            }
+            else
+            {
+                var hover = rows[hoverIdx].Lane;
+                var top = rows[hoverIdx].Top;
+                var topHalf = contentY < top + TrackLaneViewModel.RowHeight / 2;
+
+                if (topHalf && !hover.IsMaster)
+                {
+                    // Insert just above the hovered row, as its sibling.
+                    parentId = hover.Model.ParentId;
+                    before = hover.Model;
+                    indicatorY = top;
+                    depth = hover.IndentLevel;
+                }
+                else if (!topHalf && hover.IsGroup && !hover.Model.GroupCollapsed)
+                {
+                    // Drop into the group as its first child.
+                    parentId = hover.Model.Id;
+                    before = hoverIdx + 1 < rows.Count && rows[hoverIdx + 1].Lane.IndentLevel == hover.IndentLevel + 1
+                        ? rows[hoverIdx + 1].Lane.Model
+                        : null;
+                    indicatorY = top + TrackLaneViewModel.RowHeight;
+                    depth = hover.IndentLevel + 1;
+                }
+                else
+                {
+                    // Insert after the hovered row's whole subtree, as its sibling (or top level if master).
+                    parentId = hover.IsMaster ? null : hover.Model.ParentId;
+                    var baseDepth = hover.IsMaster ? 0 : hover.IndentLevel;
+                    Track? next = null;
+                    var nextTop = RowsTotalHeight;
+                    for (var j = hoverIdx + 1; j < rows.Count; j++)
+                    {
+                        if (rows[j].Lane.IndentLevel <= baseDepth) { next = rows[j].Lane.Model; nextTop = rows[j].Top; break; }
+                    }
+
+                    before = next;
+                    indicatorY = nextTop;
+                    depth = baseDepth;
+                }
+            }
+
+            var valid = IsDropValid(dragged, parentId, before);
+            return new DragDropPlan(valid, indicatorY, depth * 8.0, parentId, before);
+        }
+
+        // A drop is invalid if it would put a group inside its own subtree, or is a no-op self-drop.
+        private bool IsDropValid(Track dragged, Guid? parentId, Track? before)
+        {
+            if (dragged.Kind == TrackKind.Master) return false;
+            if (before is not null && (ReferenceEquals(before, dragged) ||
+                                       IsDescendantOf(before, dragged.Id, _project.Current.Tracks))) return false;
+            if (parentId is { } pid && (pid == dragged.Id ||
+                                        (_project.Current.Tracks.FirstOrDefault(x => x.Id == pid) is { } p
+                                         && IsDescendantOf(p, dragged.Id, _project.Current.Tracks)))) return false;
+            return true;
+        }
+
+        /// <summary>Performs a drag-drop move computed by <see cref="ComputeDrop"/>.</summary>
+        public void MoveTrack(Track dragged, DragDropPlan plan)
+        {
+            if (!plan.Valid) return;
+
+            var tracks = _project.Current.Tracks;
+            var subtree = SubtreeOf(dragged, tracks);
+            var before = plan.BeforeTrack;
+            foreach (var t in subtree) tracks.Remove(t);
+
+            dragged.ParentId = plan.ParentId;
+
+            int insertAt;
+            if (before is not null && tracks.Contains(before))
+            {
+                insertAt = tracks.IndexOf(before);
+            }
+            else if (plan.ParentId is { } pid)
+            {
+                var parent = tracks.FirstOrDefault(x => x.Id == pid);
+                insertAt = parent is not null ? tracks.IndexOf(parent) + 1 : tracks.Count;
+            }
+            else
+            {
+                var master = _project.Current.Master;
+                insertAt = master is not null ? tracks.IndexOf(master) + 1 : 0;
+            }
+
+            insertAt = Math.Clamp(insertAt, 0, tracks.Count);
+            tracks.InsertRange(insertAt, subtree);
+
+            _events.Publish(new TracksChangedEvent());
+            Rebuild();
+            _selection.SelectTrack(dragged);
+        }
+
+        private bool HasSelectedAncestor(Track track, HashSet<Guid> selected)
+        {
+            var pid = track.ParentId;
+            var guard = 0;
+            while (pid is { } id && guard++ < 256)
+            {
+                if (selected.Contains(id)) return true;
+                pid = _project.Current.Tracks.FirstOrDefault(x => x.Id == id)?.ParentId;
+            }
+
+            return false;
+        }
+
+        // A track followed by all its descendants, in document order.
+        private static List<Track> SubtreeOf(Track root, List<Track> tracks)
+        {
+            var result = new List<Track> { root };
+            foreach (var t in tracks)
+            {
+                if (!ReferenceEquals(t, root) && IsDescendantOf(t, root.Id, tracks)) result.Add(t);
+            }
+
+            return result;
+        }
+
+        private static bool IsDescendantOf(Track track, Guid ancestorId, List<Track> tracks)
+        {
+            var pid = track.ParentId;
+            var guard = 0;
+            while (pid is { } id && guard++ < 256)
+            {
+                if (id == ancestorId) return true;
+                pid = tracks.FirstOrDefault(x => x.Id == id)?.ParentId;
+            }
+
+            return false;
         }
 
         public void RemoveAutomationLane(AutomationLaneViewModel lane)
@@ -823,9 +1184,12 @@ namespace Ongenet.Desktop.ViewModels
         // Inserts a track into the project + lanes at the given track index, publishes, and selects it.
         private void InsertTrack(Track track, int index)
         {
-            index = Math.Clamp(index, 0, _trackLanes.Count);
+            // The master is pinned at row 0; never insert another track above it.
+            var minIndex = _project.Current.Master is not null ? 1 : 0;
+            index = Math.Clamp(index, minIndex, _trackLanes.Count);
             _project.Current.Tracks.Insert(index, track);
             _trackLanes.Insert(index, new TrackLaneViewModel(track, Metrics, this, this));
+            RecomputeIndents();
             RebuildRows();
             OnPropertyChanged(nameof(LaneCount));
             ResizeArrangement();
@@ -913,12 +1277,14 @@ namespace Ongenet.Desktop.ViewModels
             {
                 var selectedTrack = _selection.SelectedTrack;
                 var selectedClip = _selection.SelectedClip;
+                var selectedTracks = _selection.SelectedTracks;
 
                 SelectedLane = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, selectedTrack));
 
                 foreach (var lane in _trackLanes)
                 {
-                    lane.IsSelected = ReferenceEquals(lane.Model, selectedTrack);
+                    // Highlight every multi-selected track (so the user sees the grouping selection).
+                    lane.IsSelected = selectedTracks.Contains(lane.Model);
                     foreach (var clip in lane.Clips)
                     {
                         clip.IsSelected = ReferenceEquals(clip.Model, selectedClip);

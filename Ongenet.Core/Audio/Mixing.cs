@@ -23,6 +23,20 @@ public static class Mixing
         => channel == 0 ? leftGain : channel == 1 ? rightGain : (leftGain + rightGain) * 0.5f;
 
     /// <summary>
+    /// Volume + balance pan → per-channel gains for a bus (group/master). Unlike <see cref="StripGains"/>'s
+    /// constant-power law (−3 dB at centre), a bus is unity at centre so stacking groups/master doesn't
+    /// compound attenuation: pan just trims the opposite channel.
+    /// </summary>
+    public static (float Left, float Right) BusGains(double volume, double pan)
+    {
+        var v = (float)Math.Clamp(volume, 0.0, 1.0);
+        var p = (float)Math.Clamp(pan, -1.0, 1.0);
+        var left = v * (p <= 0 ? 1f : 1f - p);
+        var right = v * (p >= 0 ? 1f : 1f + p);
+        return (left, right);
+    }
+
+    /// <summary>
     /// Renders an audio clip's samples (no strip) additively into a scratch buffer, resampling
     /// from the file rate to the device/render rate and positioning by the playhead beat.
     /// <paramref name="stretch"/> is an extra playback-rate multiplier (1.0 = native): the engine sets

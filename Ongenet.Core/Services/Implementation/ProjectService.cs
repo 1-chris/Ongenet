@@ -29,7 +29,7 @@ public class ProjectService : IProjectService
         ProjectChanged?.Invoke();
     }
 
-    /// <summary>A fresh project: one empty instrument track, ready to play.</summary>
+    /// <summary>A fresh project: the master bus plus one empty instrument track, ready to play.</summary>
     private Project CreateBlankProject()
     {
         var project = new Project
@@ -38,6 +38,15 @@ public class ProjectService : IProjectService
             Tempo = new Tempo(120.0),
             TimeSignature = TimeSignature.FourFour
         };
+
+        // The master bus is always present and pinned at the top; every other track routes through it.
+        project.Tracks.Add(new Track
+        {
+            Name = "Master",
+            Kind = TrackKind.Master,
+            ColorKey = "CatppuccinSubtext0",
+            Volume = 1.0 // unity so the master is transparent by default (bus pan law is unity at centre)
+        });
 
         project.Tracks.Add(new Track
         {

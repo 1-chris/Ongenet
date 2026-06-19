@@ -27,28 +27,37 @@
             BorderBrush="{StaticResource CatppuccinCrust}"
             BorderThickness="0,0,0,1"
             Padding="10,6">
-        <Grid ColumnDefinitions="*,Auto,*">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
 
-            <!-- Left: transport buttons + time readout -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10"
-                        VerticalAlignment="Center" HorizontalAlignment="Left">
-                <Button Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"
-                        Classes="Transport" ToolTip.Tip="Play">
-                    <Path Width="12" Height="12" Stretch="Uniform"
-                          Data="M0,0 L10,5 L0,10 Z"
-                          Fill="{StaticResource CatppuccinGreen}"/>
-                </Button>
-                <Button Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
-                        Classes="Transport" ToolTip.Tip="Stop">
-                    <Path Width="11" Height="11" Stretch="Uniform"
-                          Data="M0,0 L10,0 L10,10 L0,10 Z"
-                          Fill="{StaticResource CatppuccinRed}"/>
-                </Button>
-                <Button Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}"
-                        Classes="Transport" ToolTip.Tip="Record (one-bar count-in into armed tracks)">
-                    <Ellipse Width="13" Height="13" Fill="{StaticResource CatppuccinRed}"/>
-                </Button>
-                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <!-- Col 0: Render stacked above the transport buttons -->
+            <StackPanel Grid.Column="0" Spacing="5" VerticalAlignment="Center" Margin="0,0,14,0">
+                <Button Content="Render" Click="OnRender" IsEnabled="{Binding CanRender}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10,3"
+                        Background="{StaticResource CatppuccinSurface0}"
+                        ToolTip.Tip="Export the arrangement to a WAV file"/>
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <Button Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"
+                            Classes="Transport" ToolTip.Tip="Play (Space)">
+                        <Path Width="12" Height="12" Stretch="Uniform"
+                              Data="M0,0 L10,5 L0,10 Z"
+                              Fill="{StaticResource CatppuccinGreen}"/>
+                    </Button>
+                    <Button Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
+                            Classes="Transport" ToolTip.Tip="Stop (Space)">
+                        <Path Width="11" Height="11" Stretch="Uniform"
+                              Data="M0,0 L10,0 L10,10 L0,10 Z"
+                              Fill="{StaticResource CatppuccinRed}"/>
+                    </Button>
+                    <Button Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}"
+                            Classes="Transport" ToolTip.Tip="Record (one-bar count-in into armed tracks)">
+                        <Ellipse Width="13" Height="13" Fill="{StaticResource CatppuccinRed}"/>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Col 1: time readout + edit-mode/loop tools -->
+            <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center" Margin="0,0,14,0">
+                <StackPanel Orientation="Horizontal" Spacing="4">
                     <TextBlock Text="{Binding PlayheadTime}" FontFamily="monospace" FontSize="13"
                                VerticalAlignment="Center" Foreground="{StaticResource CatppuccinText}"/>
                     <TextBlock Text="/" VerticalAlignment="Center"
@@ -56,26 +65,24 @@
                     <TextBlock Text="{Binding TotalTime}" FontFamily="monospace" FontSize="13"
                                VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 </StackPanel>
-                <ToggleButton Content="Select" IsChecked="{Binding IsSelectMode}" FontSize="11" Padding="8,3"
-                              VerticalAlignment="Center"
-                              ToolTip.Tip="Select mode: click-drag to multi-select clips/notes"/>
-                <ToggleButton Content="Slice" IsChecked="{Binding IsSliceMode}" FontSize="11" Padding="8,3"
-                              VerticalAlignment="Center"
-                              ToolTip.Tip="Slice mode: click a clip to cut it in two at the grid"/>
-                <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <ToggleButton Content="Select" IsChecked="{Binding IsSelectMode}" FontSize="11" Padding="8,3"
+                                  ToolTip.Tip="Select mode: click-drag to multi-select clips/notes"/>
+                    <ToggleButton Content="Slice" IsChecked="{Binding IsSliceMode}" FontSize="11" Padding="8,3"
+                                  ToolTip.Tip="Slice mode: click a clip to cut it in two at the grid"/>
                     <Button Content="[" Command="{Binding SetLoopStartCommand}" FontSize="11" Padding="8,3"
                             ToolTip.Tip="Set loop start to the cursor (Shift+[)"/>
                     <Button Content="]" Command="{Binding SetLoopEndCommand}" FontSize="11" Padding="8,3"
                             ToolTip.Tip="Set loop end to the cursor (Shift+])"/>
-                    <Ellipse Width="8" Height="8" Margin="2,0,0,0" VerticalAlignment="Center"
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                              IsVisible="{Binding IsLooping}"
                              Fill="{StaticResource CatppuccinGreen}"
                              ToolTip.Tip="Loop region active"/>
                 </StackPanel>
             </StackPanel>
 
-            <!-- Centre: tempo + bars -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+            <!-- Centre: tempo + bars + time signature -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
                         VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock Text="Tempo" VerticalAlignment="Center"
                            Foreground="{StaticResource CatppuccinSubtext0}"/>
@@ -101,15 +108,12 @@
                           Width="70" VerticalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Right: audio devices + render button + master loudness meter -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10"
-                        HorizontalAlignment="Right" VerticalAlignment="Center">
-
-                <!-- Audio output / input device selection -->
-                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <!-- Col 3: audio devices stacked above the master loudness meter -->
+            <StackPanel Grid.Column="3" Spacing="5" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
                     <TextBlock Text="Out" VerticalAlignment="Center" FontSize="11"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <ComboBox Width="150" VerticalAlignment="Center" FontSize="11"
+                    <ComboBox Width="140" VerticalAlignment="Center" FontSize="11"
                               ItemsSource="{Binding Devices.OutputDevices}"
                               SelectedItem="{Binding Devices.SelectedOutput}"
                               ToolTip.Tip="Audio output device">
@@ -122,7 +126,7 @@
 
                     <TextBlock Text="In" VerticalAlignment="Center" FontSize="11" Margin="6,0,0,0"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <ComboBox Width="150" VerticalAlignment="Center" FontSize="11"
+                    <ComboBox Width="140" VerticalAlignment="Center" FontSize="11"
                               ItemsSource="{Binding Devices.InputDevices}"
                               SelectedItem="{Binding Devices.SelectedInput}"
                               ToolTip.Tip="Audio input device (for recording)">
@@ -141,10 +145,7 @@
                               ToolTip.Tip="Record the input as Stereo (as-is) or Mono (centered)"/>
                 </StackPanel>
 
-                <Button Content="Render" Click="OnRender" IsEnabled="{Binding CanRender}"
-                        Padding="10,4" Background="{StaticResource CatppuccinSurface0}"
-                        ToolTip.Tip="Export the arrangement to a WAV file"/>
-                <controls:MasterMeterControl Width="160" Height="20" VerticalAlignment="Center"
+                <controls:MasterMeterControl Height="20" MinWidth="200" HorizontalAlignment="Stretch"
                                              LevelLeft="{Binding MasterLevelLeft}"
                                              LevelRight="{Binding MasterLevelRight}"/>
             </StackPanel>

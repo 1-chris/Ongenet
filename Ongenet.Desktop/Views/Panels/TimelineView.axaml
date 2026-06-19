@@ -125,8 +125,17 @@
                                     Classes.selected="{Binding IsSelected}">
                                 <Border.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
-                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
+                                        <MenuItem Header="Group tracks" Command="{Binding GroupTracksCommand}"/>
+                                        <MenuItem Header="Detach from group" Command="{Binding DetachFromGroupCommand}"
+                                                  IsVisible="{Binding IsInGroup}"/>
+                                        <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"
+                                                  IsVisible="{Binding !IsBus}"/>
+                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}"
+                                                  IsVisible="{Binding !IsBus}"/>
+                                        <MenuItem Header="Delete group (keep tracks)" Command="{Binding DeleteGroupKeepChildrenCommand}"
+                                                  IsVisible="{Binding IsGroup}"/>
+                                        <MenuItem Header="Delete group + child tracks" Command="{Binding DeleteGroupAndChildrenCommand}"
+                                                  IsVisible="{Binding IsGroup}"/>
                                         <Separator/>
                                         <MenuItem Header="Add Instrument Track" Command="{Binding AddInstrumentTrackCommand}"/>
                                         <MenuItem Header="Add Audio Track" Command="{Binding AddAudioTrackCommand}"/>
@@ -134,16 +143,25 @@
                                 </Border.ContextMenu>
                                 <!-- Transparent fill makes the whole header row clickable for selection
                                      (the row Border's own background is reserved for the selected highlight). -->
-                                <Grid ColumnDefinitions="4,*,Auto" Background="Transparent">
-                                    <!-- colour strip -->
-                                    <Border Grid.Column="0"
-                                            Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent">
+                                    <!-- colour rails: one per nesting level (ancestor groups + own); a group's
+                                         colour forms a continuous rail down through all its descendants. -->
+                                    <ItemsControl Grid.Column="0" ItemsSource="{Binding GutterBars}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="tl:LaneGutterBar">
+                                                <Border Width="8" Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                     <StackPanel Grid.Column="1" Margin="8,6" Spacing="6" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" Spacing="3">
                                             <Button Classes="chev" Content="{Binding CollapseGlyph}"
-                                                    ToolTip.Tip="Collapse/expand automation"
-                                                    IsVisible="{Binding HasAutomation}"
-                                                    Command="{Binding ToggleAutomationCommand}"/>
+                                                    ToolTip.Tip="Collapse / expand"
+                                                    IsVisible="{Binding ShowCollapse}"
+                                                    Command="{Binding ToggleCollapseCommand}"/>
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
                                                        VerticalAlignment="Center"
                                                        TextTrimming="CharacterEllipsis"/>
@@ -157,6 +175,7 @@
                                                           Foreground="{StaticResource CatppuccinYellow}"/>
                                             <ToggleButton Classes="ms rec" Content="●" ToolTip.Tip="Arm for recording"
                                                           IsChecked="{Binding IsArmed, Mode=TwoWay}"
+                                                          IsVisible="{Binding !IsBus}"
                                                           Foreground="{StaticResource CatppuccinRed}"/>
                                         </StackPanel>
                                     </StackPanel>
@@ -170,10 +189,19 @@
                         <DataTemplate DataType="tl:AutomationLaneViewModel">
                             <Border Height="{Binding Height}" BorderBrush="{StaticResource CatppuccinCrust}"
                                     BorderThickness="0,0,1,1" Background="{StaticResource CatppuccinMantle}">
-                                <Grid ColumnDefinitions="4,16,*,Auto">
-                                    <Border Grid.Column="0" Opacity="0.5"
-                                            Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
-                                    <!-- indent rail -->
+                                <Grid ColumnDefinitions="Auto,16,*,Auto">
+                                    <!-- owning track's colour rails continue through its automation rows -->
+                                    <ItemsControl Grid.Column="0" ItemsSource="{Binding GutterBars}" Opacity="0.6">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="tl:LaneGutterBar">
+                                                <Border Width="8" Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <!-- indent rail marks the row as automation -->
                                     <Border Grid.Column="1" Background="{StaticResource CatppuccinCrust}"/>
                                     <StackPanel Grid.Column="2" Margin="6,4" Spacing="3" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Name}" FontSize="11"
@@ -202,6 +230,13 @@
                      DragDrop.AllowDrop="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <!-- Right-clicking blank space below the tracks offers to add a track. -->
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Add Instrument Track" Command="{Binding AddInstrumentTrackCommand}"/>
+                        <MenuItem Header="Add Audio Track" Command="{Binding AddAudioTrackCommand}"/>
+                    </ContextMenu>
+                </ListBox.ContextMenu>
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="0"/>
@@ -329,6 +364,13 @@
                            Fill="#4089DCEB"/>
                 <Path Name="StartMarkerIcon" IsVisible="False" Data="M0,0 L9,5 L0,10 Z"
                       Fill="{StaticResource CatppuccinGreen}"/>
+            </Canvas>
+
+            <!-- Track-reorder drag indicator: a horizontal insertion line spanning headers + lanes,
+                 indented to the would-be nesting depth. -->
+            <Canvas Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Name="DragOverlay" IsHitTestVisible="False" ClipToBounds="True">
+                <Rectangle Name="DragInsertLine" Height="3" IsVisible="False"
+                           Fill="{StaticResource CatppuccinYellow}"/>
             </Canvas>
         </Grid>
     </Border>

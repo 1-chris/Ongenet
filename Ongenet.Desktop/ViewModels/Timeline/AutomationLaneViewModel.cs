@@ -48,6 +48,13 @@ namespace Ongenet.Desktop.ViewModels.Timeline
         /// <summary>Palette key of the owning track, for the indent colour strip.</summary>
         public string ColorKey => OwnerTrack.ColorKey;
 
+        /// <summary>Header indent in pixels (one level deeper than the owning track), set by the timeline.</summary>
+        public double IndentWidth { get; set; }
+
+        /// <summary>The owning track's colour rails, so the group/track rails continue through this row.</summary>
+        public System.Collections.Generic.IReadOnlyList<LaneGutterBar> GutterBars { get; set; }
+            = System.Array.Empty<LaneGutterBar>();
+
         /// <summary>Width of the lane content, in pixels (the full arrange width).</summary>
         public double LaneWidth => _metrics.TotalWidth;
 

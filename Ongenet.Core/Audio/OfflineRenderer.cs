@@ -75,6 +75,52 @@ public sealed class OfflineRenderer
 
         events.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
 
+        // Build the bus graph (mirrors AudioEngine): a RenderBus per group/master, linked to its parent,
+        // ordered deepest-first so a block mixes children → groups → master in one pass.
+        var trackById = project.Tracks.ToDictionary(t => t.Id);
+        var busByTrackId = new Dictionary<Guid, RenderBus>();
+        var buses = new List<RenderBus>();
+        foreach (var rt in renderTracks)
+        {
+            if (!rt.Source.IsBus) continue;
+            var rb = new RenderBus(rt) { Buffer = new float[BlockFrames * channels] };
+            busByTrackId[rt.Source.Id] = rb;
+            buses.Add(rb);
+        }
+
+        var masterBus = buses.FirstOrDefault(b => b.Track.Source.Kind == TrackKind.Master);
+        var masterTrack = masterBus?.Track.Source;
+        foreach (var rb in buses)
+        {
+            rb.Parent = rb.Track.Source.Kind == TrackKind.Master ? null
+                : rb.Track.Source.ParentId is { } pid && busByTrackId.TryGetValue(pid, out var p) ? p : masterBus;
+        }
+
+        foreach (var rb in buses)
+        {
+            var d = 0;
+            var p = rb.Parent;
+            while (p is not null && d < 64) { d++; p = p.Parent; }
+            rb.Depth = d;
+        }
+
+        buses.Sort((a, b) => b.Depth.CompareTo(a.Depth)); // deepest first
+
+        Track? ParentTrack(Track t)
+        {
+            if (t.Kind == TrackKind.Master) return null;
+            if (t.ParentId is { } id && trackById.TryGetValue(id, out var p)) return p;
+            return masterTrack;
+        }
+
+        bool AncestorSoloed(Track t)
+        {
+            var p = ParentTrack(t);
+            var n = 0;
+            while (p is not null && n++ < 64) { if (p.IsSoloed) return true; p = ParentTrack(p); }
+            return false;
+        }
+
         var block = new float[BlockFrames * channels];
         var temp = new float[BlockFrames * channels];
         var active = new List<ScheduledNote>();
@@ -111,10 +157,13 @@ public sealed class OfflineRenderer
                 }
             }
 
-            // Mix each track into the block.
+            foreach (var rb in buses) Array.Clear(rb.Buffer, 0, sampleCount);
+
+            // 1) Content tracks: render → effects → strip → sum into their parent bus.
             foreach (var rt in renderTracks)
             {
-                if (rt.Source.IsMuted || (soloActive && !rt.Source.IsSoloed)) continue;
+                if (rt.Source.IsBus) continue;
+                if (rt.Source.IsMuted || (soloActive && !(rt.Source.IsSoloed || AncestorSoloed(rt.Source)))) continue;
 
                 var tempSpan = temp.AsSpan(0, sampleCount);
                 tempSpan.Clear();
@@ -142,19 +191,44 @@ public sealed class OfflineRenderer
 
                 if (!hasContent) continue;
 
-                var (leftGain, rightGain) = Mixing.StripGains(rt.Source.Volume, rt.Source.Pan);
-                for (var frame = 0; frame < framesThisBlock; frame++)
+                var parent = rt.Source.ParentId is { } pid && busByTrackId.TryGetValue(pid, out var pb) ? pb : masterBus;
+                var target = parent is not null ? parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
+                var (lg, rg) = Mixing.StripGains(rt.Source.Volume, rt.Source.Pan);
+                MixIntoBlock(target, tempSpan, lg, rg, channels, framesThisBlock);
+            }
+
+            // 2) Buses deepest-first: effects on the summed input → strip → into parent (master → block).
+            foreach (var rb in buses)
+            {
+                var bt = rb.Track.Source;
+                if (bt.IsMuted) continue;
+
+                var busSpan = rb.Buffer.AsSpan(0, sampleCount);
+                if (rb.Track.Effects.Length > 0)
                 {
-                    var i = frame * channels;
-                    for (var c = 0; c < channels; c++)
-                    {
-                        blockSpan[i + c] += tempSpan[i + c] * Mixing.ChannelGain(c, leftGain, rightGain);
-                    }
+                    foreach (var fx in rb.Track.Effects) if (fx.Enabled) fx.Process(busSpan);
                 }
+
+                var target = rb.Parent is not null ? rb.Parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
+                var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
+                MixIntoBlock(target, busSpan, lg, rg, channels, framesThisBlock);
             }
 
             writer.Write(blockSpan);
             framesWritten += framesThisBlock;
+        }
+    }
+
+    private static void MixIntoBlock(Span<float> target, Span<float> source, float leftGain, float rightGain,
+        int channels, int frames)
+    {
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var i = frame * channels;
+            for (var c = 0; c < channels; c++)
+            {
+                target[i + c] += source[i + c] * Mixing.ChannelGain(c, leftGain, rightGain);
+            }
         }
     }
 
@@ -165,6 +239,15 @@ public sealed class OfflineRenderer
         public IInstrument? Instrument { get; set; }
         public IAudioEffect[] Effects { get; set; } = Array.Empty<IAudioEffect>();
         public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch, double SourceOffset)> AudioClips { get; } = new();
+    }
+
+    private sealed class RenderBus
+    {
+        public RenderBus(RenderTrack track) => Track = track;
+        public RenderTrack Track { get; }
+        public RenderBus? Parent { get; set; }
+        public float[] Buffer { get; set; } = Array.Empty<float>();
+        public int Depth { get; set; }
     }
 
     private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument Instrument, int Note, float Velocity);
