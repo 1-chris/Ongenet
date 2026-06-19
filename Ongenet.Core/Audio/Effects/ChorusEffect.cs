@@ -13,6 +13,8 @@ public sealed class ChorusEffect : IAudioEffect
 {
     public const string TypeId = "chorus";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private const int Voices = 3;
     private const double BaseMs = 12.0;
     private const double SweepMs = 8.0;

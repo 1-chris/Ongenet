@@ -12,6 +12,8 @@ public sealed class BitcrusherEffect : IAudioEffect
 {
     public const string TypeId = "bitcrusher";
 
+    string IAudioEffect.TypeId => TypeId;
+
     public bool Enabled { get; set; } = true;
 
     public double Bits { get; set; } = 8.0;

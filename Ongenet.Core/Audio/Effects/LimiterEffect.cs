@@ -14,6 +14,8 @@ public sealed class LimiterEffect : IAudioEffect
 {
     public const string TypeId = "limiter";
 
+    string IAudioEffect.TypeId => TypeId;
+
     public bool Enabled { get; set; } = true;
 
     public double ThresholdDb { get; set; } = 0.0;   // input gain = -Threshold

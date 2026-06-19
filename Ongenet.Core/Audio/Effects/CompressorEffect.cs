@@ -13,6 +13,8 @@ public sealed class CompressorEffect : IAudioEffect
 {
     public const string TypeId = "compressor";
 
+    string IAudioEffect.TypeId => TypeId;
+
     public bool Enabled { get; set; } = true;
 
     public double ThresholdDb { get; set; } = -18.0;

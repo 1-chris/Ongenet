@@ -14,6 +14,9 @@ public interface IAudioEffect
     /// <summary>Display name.</summary>
     string Name { get; }
 
+    /// <summary>Stable registry type id, used to recreate this effect when loading a project.</summary>
+    string TypeId { get; }
+
     /// <summary>
     /// Whether the effect processes audio. When false the engine bypasses it (the signal passes
     /// through untouched) without removing it from the chain.

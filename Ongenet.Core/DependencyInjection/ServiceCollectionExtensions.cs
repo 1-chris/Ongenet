@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IInstrumentRegistry, InstrumentRegistry>();
         services.AddSingleton<IEffectRegistry, EffectRegistry>();
         services.AddSingleton<IProjectService, ProjectService>();
+        services.AddSingleton<IProjectFileService, ProjectFileService>();
         services.AddSingleton<ITransportService, TransportService>();
         services.AddSingleton<ISelectionService, SelectionService>();
         services.AddSingleton<IEditModeService, EditModeService>();

@@ -29,6 +29,12 @@ public class ProjectService : IProjectService
         ProjectChanged?.Invoke();
     }
 
+    public void SetCurrentProject(Project project)
+    {
+        Current = project;
+        ProjectChanged?.Invoke();
+    }
+
     /// <summary>A fresh project: the master bus plus one empty instrument track, ready to play.</summary>
     private Project CreateBlankProject()
     {

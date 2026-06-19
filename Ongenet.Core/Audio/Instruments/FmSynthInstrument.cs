@@ -13,6 +13,8 @@ public sealed class FmSynthInstrument : PolyphonicInstrument
 {
     public const string TypeId = "fmsynth";
 
+    protected override string GetTypeId() => TypeId;
+
     public double ModRatio { get; set; } = 2.0;
     public double ModIndex { get; set; } = 2.0;
     public double AttackSeconds { get; set; } = 0.005;

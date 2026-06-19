@@ -14,6 +14,8 @@ public sealed class ClapEffect : ClapPluginBase, IAudioEffect
 
     public bool Enabled { get; set; } = true;
 
+    string IAudioEffect.TypeId => MakeId(ModulePath, PluginId);
+
     public void Process(Span<float> buffer) => RenderAudio(buffer, feedInput: true, replace: true);
 
     public IAudioEffect Clone() => new ClapEffect(ModulePath, PluginId, Name) { Enabled = Enabled };

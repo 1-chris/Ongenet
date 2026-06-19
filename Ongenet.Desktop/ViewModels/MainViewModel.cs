@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Ongenet.Core.Models.Logging;
 using Ongenet.Core.Services.Implementation;
+using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Desktop.ViewModels
 {
@@ -12,6 +13,7 @@ namespace Ongenet.Desktop.ViewModels
     public class MainViewModel : ViewModelBase
     {
         private readonly ObservableCollection<LogEntry> _logEntries;
+        private readonly IProjectFileService _projectFile;
 
         public MainViewModel(
             TransportViewModel transport,
@@ -20,6 +22,7 @@ namespace Ongenet.Desktop.ViewModels
             BottomPanelViewModel bottomPanel,
             FileBrowserViewModel fileBrowser,
             InstrumentsViewModel instruments,
+            IProjectFileService projectFile,
             ObservableCollectionLoggerProvider? logProvider = null)
         {
             Transport = transport;
@@ -28,11 +31,26 @@ namespace Ongenet.Desktop.ViewModels
             BottomPanel = bottomPanel;
             FileBrowser = fileBrowser;
             Instruments = instruments;
+            _projectFile = projectFile;
+            _projectFile.Changed += () =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    OnPropertyChanged(nameof(Title));
+                    OnPropertyChanged(nameof(IsBusy));
+                    OnPropertyChanged(nameof(BusyStatus));
+                });
             _logEntries = logProvider?.LogEntries ?? new ObservableCollection<LogEntry>();
         }
 
-        /// <summary>App name + version for the window title (and OS taskbar), e.g. "Ongenet v0.1.0".</summary>
-        public string Title => $"{AppInfo.Name} {Version}";
+        /// <summary>Window title: project name (with a "*" when there are unsaved changes) + app version.</summary>
+        public string Title =>
+            $"{_projectFile.DisplayName}{(_projectFile.IsDirty ? "*" : "")} — {AppInfo.Name} {Version}";
+
+        /// <summary>True while a save/load is running (shows the title-bar progress indicator).</summary>
+        public bool IsBusy => _projectFile.IsBusy;
+
+        /// <summary>Busy indicator caption ("Saving…"/"Loading…").</summary>
+        public string BusyStatus => _projectFile.BusyStatus;
 
         /// <summary>Version label shown next to the name in the title bar, e.g. "v0.1.0".</summary>
         public string Version => $"v{AppInfo.Version}";

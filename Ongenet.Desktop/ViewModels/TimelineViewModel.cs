@@ -747,10 +747,16 @@ namespace Ongenet.Desktop.ViewModels
                 if (trackLane.Model.AutomationCollapsed) continue;
                 foreach (var auto in trackLane.Model.AutoLanes)
                 {
+                    // The owning track's rails continue down, plus one more rail in the track's colour so the
+                    // automation row is indented one level under it (no dark divider rail).
+                    var autoBars = new List<Timeline.LaneGutterBar>(trackLane.GutterBars)
+                    {
+                        new(trackLane.Model.ColorKey)
+                    };
                     Lanes.Add(new AutomationLaneViewModel(trackLane.Model, auto, Metrics, this)
                     {
                         IndentWidth = (trackLane.IndentLevel + 1) * 16.0,
-                        GutterBars = trackLane.GutterBars // group/track rails continue through automation
+                        GutterBars = autoBars
                     });
                 }
             }

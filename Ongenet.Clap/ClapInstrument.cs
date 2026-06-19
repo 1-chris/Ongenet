@@ -12,6 +12,8 @@ public sealed class ClapInstrument : ClapPluginBase, IInstrument
     public ClapInstrument(string modulePath, string pluginId, string displayName)
         : base(modulePath, pluginId, displayName) { }
 
+    string IInstrument.TypeId => MakeId(ModulePath, PluginId);
+
     public void NoteOn(int midiNote, float velocity) => EnqueueNoteOn(midiNote, velocity);
     public void NoteOff(int midiNote) => EnqueueNoteOff(midiNote);
     public void AllNotesOff() => EnqueueAllNotesOff();

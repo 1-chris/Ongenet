@@ -24,6 +24,14 @@ public sealed class DelegateAutomationTarget : IAutomationTarget
     public double Maximum { get; }
     public bool Stepped { get; }
 
+    /// <summary>
+    /// Hints used to build a serializable <see cref="AutomationBinding"/> when a lane is created. For
+    /// Volume/Pan/EffectEnabled the kind is set directly; for an instrument/effect parameter the kind is
+    /// left null and <see cref="BindSource"/> holds the <c>Parameter</c> to locate by reference.
+    /// </summary>
+    public AutomationTargetKind? BindKind { get; init; }
+    public object? BindSource { get; init; }
+
     public double Read() => _get();
     public void Write(double value) => _set(value);
 }

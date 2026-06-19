@@ -14,6 +14,8 @@ public sealed class FilterEffect : IAudioEffect, ISpectrumSource
 {
     public const string TypeId = "filter";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private static readonly string[] ModeNames = { "Low-pass", "Band-pass", "High-pass", "Notch", "Bypass" };
 
     public bool Enabled { get; set; } = true;

@@ -14,6 +14,8 @@ public sealed class OscillatorInstrument : PolyphonicInstrument
     /// <summary>Registry id for this instrument type.</summary>
     public const string TypeId = "oscillator";
 
+    protected override string GetTypeId() => TypeId;
+
     /// <summary>Current waveform. Read live by every voice while rendering.</summary>
     public Waveform Waveform { get; set; } = Waveform.Sawtooth;
 

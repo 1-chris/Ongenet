@@ -33,6 +33,11 @@ public abstract class PolyphonicInstrument : IInstrument
 
     public abstract string Name { get; }
 
+    // Routed through a protected hook so concrete instruments can keep their `const string TypeId`
+    // (a const and a same-named override can't coexist, so the interface member is explicit here).
+    string IInstrument.TypeId => GetTypeId();
+    protected abstract string GetTypeId();
+
     /// <summary>Editable parameters. Concrete instruments override; default is none.</summary>
     public virtual IReadOnlyList<Parameter> Parameters { get; } = Array.Empty<Parameter>();
 

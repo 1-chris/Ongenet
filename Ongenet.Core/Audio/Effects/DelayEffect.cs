@@ -13,6 +13,8 @@ public sealed class DelayEffect : IAudioEffect
 {
     public const string TypeId = "delay";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private const double MaxDelaySeconds = 2.0;
 
     public bool Enabled { get; set; } = true;

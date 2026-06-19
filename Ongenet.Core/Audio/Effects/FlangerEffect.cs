@@ -13,6 +13,8 @@ public sealed class FlangerEffect : IAudioEffect
 {
     public const string TypeId = "flanger";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private const double BaseMs = 1.0;
     private const double SweepMs = 6.0;
     private const double MaxMs = BaseMs + SweepMs + 2.0;

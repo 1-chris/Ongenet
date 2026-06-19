@@ -13,6 +13,8 @@ public sealed class DistortionEffect : IAudioEffect
 {
     public const string TypeId = "distortion";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private static readonly string[] ModeNames = { "Soft", "Hard", "Foldback" };
 
     public bool Enabled { get; set; } = true;

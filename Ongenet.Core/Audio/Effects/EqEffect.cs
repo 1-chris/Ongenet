@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Parameters;
+using Ongenet.Core.Persistence;
 
 namespace Ongenet.Core.Audio.Effects;
 
@@ -11,9 +12,11 @@ namespace Ongenet.Core.Audio.Effects;
 /// list is UI-editable; <see cref="CommitBands"/> publishes a lock-free snapshot the audio thread
 /// reads. Exposes its post-EQ output for the interactive spectrum display.
 /// </summary>
-public sealed class EqEffect : IAudioEffect, ISpectrumSource
+public sealed class EqEffect : IAudioEffect, ISpectrumSource, IProjectStatefulComponent
 {
     public const string TypeId = "eq";
+
+    string IAudioEffect.TypeId => TypeId;
 
     private readonly List<EqBand> _bands = new();
     private volatile EqBand[] _active = Array.Empty<EqBand>();
@@ -99,4 +102,34 @@ public sealed class EqEffect : IAudioEffect, ISpectrumSource
     }
 
     public int CaptureLatest(float[] dest) => _scope.CaptureLatest(dest);
+
+    // --- IProjectStatefulComponent: the band list (the EQ has no generic parameters) ---
+
+    public void WriteProjectState(OngenWriter writer)
+    {
+        writer.WriteInt(_bands.Count);
+        foreach (var band in _bands)
+        {
+            writer.WriteInt((int)band.Type);
+            writer.WriteDouble(band.Frequency);
+            writer.WriteDouble(band.GainDb);
+            writer.WriteDouble(band.Q);
+        }
+    }
+
+    public void ReadProjectState(OngenReader reader)
+    {
+        var count = reader.ReadInt();
+        _bands.Clear();
+        for (var i = 0; i < count; i++)
+        {
+            var type = (EqBandType)reader.ReadInt();
+            var freq = reader.ReadDouble();
+            var gain = reader.ReadDouble();
+            var q = reader.ReadDouble();
+            _bands.Add(new EqBand(type, freq, gain, q));
+        }
+
+        CommitBands();
+    }
 }

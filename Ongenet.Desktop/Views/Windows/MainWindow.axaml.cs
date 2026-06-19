@@ -1,7 +1,10 @@
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.Desktop.Input;
@@ -25,6 +28,18 @@ namespace Ongenet.Desktop.Views.Windows
             InitializeComponent();
             AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, OnGlobalKeyUp, RoutingStrategies.Tunnel);
+            Closing += OnClosing;
+        }
+
+        // Don't let the app exit while a save is still writing — that would truncate the file.
+        private void OnClosing(object? sender, WindowClosingEventArgs e)
+        {
+            if (ProjectFile?.IsBusy == true)
+            {
+                e.Cancel = true;
+                _ = MessageDialog.Notify(this, "Please wait",
+                    "A save is still in progress. Try closing again once it finishes.");
+            }
         }
 
         private IPreviewService? Preview => App.ServiceProvider?.GetService<IPreviewService>();
@@ -35,6 +50,18 @@ namespace Ongenet.Desktop.Views.Windows
         {
             // Don't steal typing from text inputs (track rename, numeric fields, etc.).
             if (e.Source is TextBox) return;
+
+            // Project file shortcuts (Ctrl+N/O/S, Ctrl+Shift+S).
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                switch (e.Key)
+                {
+                    case Key.S when e.KeyModifiers.HasFlag(KeyModifiers.Shift): _ = SaveAsAsync(); e.Handled = true; return;
+                    case Key.S: _ = SaveAsync(); e.Handled = true; return;
+                    case Key.O: _ = OpenAsync(); e.Handled = true; return;
+                    case Key.N: _ = NewAsync(); e.Handled = true; return;
+                }
+            }
 
             // App shortcuts. These run before (and instead of) the typing-keyboard MIDI below, so a
             // modified key like Shift+[ never also sounds a note.
@@ -155,6 +182,99 @@ namespace Ongenet.Desktop.Views.Windows
             {
                 _logWindow.Activate();
             }
+        }
+
+        // --- Project file: New / Open / Save / Save As ---
+
+        private IProjectFileService? ProjectFile => App.ServiceProvider?.GetService<IProjectFileService>();
+
+        private static readonly FilePickerFileType OngenFileType =
+            new("Ongenet project") { Patterns = new[] { "*.ongen" } };
+
+        private void OnNew_Click(object? sender, RoutedEventArgs e) => _ = NewAsync();
+        private void OnOpen_Click(object? sender, RoutedEventArgs e) => _ = OpenAsync();
+        private void OnSave_Click(object? sender, RoutedEventArgs e) => _ = SaveAsync();
+        private void OnSaveAs_Click(object? sender, RoutedEventArgs e) => _ = SaveAsAsync();
+
+        private async Task NewAsync()
+        {
+            if (ProjectFile is not { } pf) return;
+            if (!await ConfirmDiscardAsync(pf)) return;
+            pf.NewProject();
+        }
+
+        private async Task OpenAsync()
+        {
+            if (ProjectFile is not { } pf) return;
+            if (!await ConfirmDiscardAsync(pf)) return;
+
+            var top = TopLevel.GetTopLevel(this);
+            if (top is null) return;
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Open project",
+                AllowMultiple = false,
+                FileTypeFilter = new[] { OngenFileType }
+            });
+
+            var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+            if (string.IsNullOrEmpty(path)) return;
+
+            try
+            {
+                var result = await pf.LoadAsync(path);
+                if (result.Warnings.Count > 0)
+                    await MessageDialog.Notify(this, "Project opened with warnings",
+                        string.Join("\n", result.Warnings));
+            }
+            catch (Exception ex)
+            {
+                await MessageDialog.Notify(this, "Couldn't open project", ex.Message);
+            }
+        }
+
+        private async Task SaveAsync()
+        {
+            if (ProjectFile is not { } pf) return;
+            if (pf.CurrentPath is null) { await SaveAsAsync(); return; }
+
+            if (pf.OpenedFromNewerVersion && !await MessageDialog.Confirm(this, "Overwrite newer project?",
+                    "This project was created by a newer version of Ongenet. Saving now may discard data " +
+                    "this version couldn't read. Continue?", "Save anyway"))
+                return;
+
+            await DoSaveAsync(pf, pf.CurrentPath);
+        }
+
+        private async Task SaveAsAsync()
+        {
+            if (ProjectFile is not { } pf) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top is null) return;
+
+            var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Save project as",
+                SuggestedFileName = pf.DisplayName + ".ongen",
+                DefaultExtension = "ongen",
+                FileTypeChoices = new[] { OngenFileType }
+            });
+
+            var path = file?.TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path)) await DoSaveAsync(pf, path);
+        }
+
+        private async Task DoSaveAsync(IProjectFileService pf, string path)
+        {
+            try { await pf.SaveAsync(path); }
+            catch (Exception ex) { await MessageDialog.Notify(this, "Couldn't save project", ex.Message); }
+        }
+
+        private async Task<bool> ConfirmDiscardAsync(IProjectFileService pf)
+        {
+            if (!pf.IsDirty) return true;
+            return await MessageDialog.Confirm(this, "Discard changes?",
+                "You have unsaved changes that will be lost. Continue?", "Discard", "Cancel");
         }
     }
 }

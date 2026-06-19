@@ -18,7 +18,10 @@ public sealed class TripleOscInstrument : PolyphonicInstrument, ISampleHost
 {
     public const string TypeId = "3xosc";
 
+    protected override string GetTypeId() => TypeId;
+
     private volatile float[]? _customTable;
+    private volatile AudioSampleBuffer? _loadedSample; // retained so a project save can embed it
     private Parameter[]? _parameters;
 
     public TripleOscInstrument() : base(polyphony: 16) { }
@@ -62,11 +65,13 @@ public sealed class TripleOscInstrument : PolyphonicInstrument, ISampleHost
 
     // --- ISampleHost: the loaded sample becomes the Custom waveform cycle ---
     public string? SampleName { get; private set; }
+    public AudioSampleBuffer? CurrentSample => _loadedSample;
     internal float[]? CustomTable => _customTable;
 
     public void LoadSample(AudioSampleBuffer sample, string name)
     {
         _customTable = SampleMixdown.ToMono(sample);
+        _loadedSample = sample;
         SampleName = name;
     }
 
@@ -126,6 +131,7 @@ public sealed class TripleOscInstrument : PolyphonicInstrument, ISampleHost
             Gain = Gain
         };
         copy._customTable = _customTable;
+        copy._loadedSample = _loadedSample;
         copy.SampleName = SampleName;
         return copy;
     }

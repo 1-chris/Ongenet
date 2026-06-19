@@ -120,8 +120,10 @@
                     <ItemsControl.DataTemplates>
                         <!-- Track header -->
                         <DataTemplate DataType="tl:TrackLaneViewModel">
+                            <!-- No bottom border here; the inter-row divider is drawn over the content only
+                                 (below) so the gutter colour rails stay continuous between grouped rows. -->
                             <Border Height="{Binding Height}" BorderBrush="{StaticResource CatppuccinCrust}"
-                                    BorderThickness="0,0,1,1"
+                                    BorderThickness="0,0,1,0"
                                     Classes.selected="{Binding IsSelected}">
                                 <Border.ContextMenu>
                                     <ContextMenu>
@@ -182,16 +184,22 @@
                                     <!-- live output level -->
                                     <controls:LevelMeterControl Grid.Column="2" Width="6" Margin="0,8,6,8"
                                                                 Level="{Binding MeterLevel}"/>
+                                    <!-- inter-row divider, content only (keeps the gutter rails unbroken) -->
+                                    <Border Grid.Column="1" Grid.ColumnSpan="2" IsHitTestVisible="False"
+                                            BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>
                         <!-- Automation header (indented under its track) -->
                         <DataTemplate DataType="tl:AutomationLaneViewModel">
+                            <!-- No bottom border (divider drawn over the content only) so the owning track's
+                                 colour rail flows unbroken down through its automation rows. -->
                             <Border Height="{Binding Height}" BorderBrush="{StaticResource CatppuccinCrust}"
-                                    BorderThickness="0,0,1,1" Background="{StaticResource CatppuccinMantle}">
-                                <Grid ColumnDefinitions="Auto,16,*,Auto">
-                                    <!-- owning track's colour rails continue through its automation rows -->
-                                    <ItemsControl Grid.Column="0" ItemsSource="{Binding GutterBars}" Opacity="0.6">
+                                    BorderThickness="0,0,1,0" Background="{StaticResource CatppuccinMantle}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <!-- owning track's colour rails (plus one extra in the track's colour) continue
+                                         through and indent its automation rows -->
+                                    <ItemsControl Grid.Column="0" ItemsSource="{Binding GutterBars}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
@@ -201,9 +209,7 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <!-- indent rail marks the row as automation -->
-                                    <Border Grid.Column="1" Background="{StaticResource CatppuccinCrust}"/>
-                                    <StackPanel Grid.Column="2" Margin="6,4" Spacing="3" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="1" Margin="6,4" Spacing="3" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Name}" FontSize="11"
                                                    Foreground="{StaticResource CatppuccinSubtext0}"
                                                    TextTrimming="CharacterEllipsis"/>
@@ -212,9 +218,12 @@
                                                       Foreground="{StaticResource CatppuccinRed}"
                                                       HorizontalAlignment="Left"/>
                                     </StackPanel>
-                                    <Button Grid.Column="3" Classes="xbtn" Content="✕" ToolTip.Tip="Remove automation"
+                                    <Button Grid.Column="2" Classes="xbtn" Content="✕" ToolTip.Tip="Remove automation"
                                             VerticalAlignment="Top" Margin="0,4,4,0"
                                             Command="{Binding RemoveCommand}"/>
+                                    <!-- inter-row divider, content only (keeps the gutter rail unbroken) -->
+                                    <Border Grid.Column="1" Grid.ColumnSpan="2" IsHitTestVisible="False"
+                                            BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>

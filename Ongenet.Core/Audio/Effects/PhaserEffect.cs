@@ -13,6 +13,8 @@ public sealed class PhaserEffect : IAudioEffect
 {
     public const string TypeId = "phaser";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private const double MinFc = 200.0;
     private const double MaxFc = 2000.0;
     private const int MaxStages = 8;

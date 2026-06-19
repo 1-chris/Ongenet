@@ -12,6 +12,8 @@ public sealed class StereoWidthEffect : IAudioEffect
 {
     public const string TypeId = "stereowidth";
 
+    string IAudioEffect.TypeId => TypeId;
+
     public bool Enabled { get; set; } = true;
 
     public double Width { get; set; } = 1.0;

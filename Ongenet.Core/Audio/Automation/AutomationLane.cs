@@ -19,6 +19,9 @@ public sealed class AutomationLane
     public List<AutomationPoint> Points { get; } = new();
     public bool IsArmed { get; set; }
 
+    /// <summary>Serializable description of what this lane drives, for project save/load. Null if unknown.</summary>
+    public AutomationBinding? Binding { get; set; }
+
     public string Name => Target.Name;
     public double Minimum => Target.Minimum;
     public double Maximum => Target.Maximum;

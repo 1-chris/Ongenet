@@ -12,6 +12,8 @@ namespace Ongenet.Core.Audio.Instruments;
 public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
 {
     public const string TypeId = "sampler";
+
+    protected override string GetTypeId() => TypeId;
     private const int RootNote = 60; // C4 plays the sample at its original pitch
 
     private volatile AudioSampleBuffer? _sample;
@@ -25,6 +27,7 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
     public override string Name => "Basic Sampler";
 
     public AudioSampleBuffer? Sample => _sample;
+    public AudioSampleBuffer? CurrentSample => _sample;
 
     public void LoadSample(AudioSampleBuffer sample, string name)
     {

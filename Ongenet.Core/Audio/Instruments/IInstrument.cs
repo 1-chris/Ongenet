@@ -12,6 +12,9 @@ public interface IInstrument : ISampleSource
     /// <summary>Display name of the instrument.</summary>
     string Name { get; }
 
+    /// <summary>Stable registry type id, used to recreate this instrument when loading a project.</summary>
+    string TypeId { get; }
+
     /// <summary>Editable parameters, rendered generically by the instrument inspector.</summary>
     IReadOnlyList<Parameter> Parameters { get; }
 

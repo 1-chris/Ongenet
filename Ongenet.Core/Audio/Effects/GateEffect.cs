@@ -13,6 +13,8 @@ public sealed class GateEffect : IAudioEffect
 {
     public const string TypeId = "gate";
 
+    string IAudioEffect.TypeId => TypeId;
+
     public bool Enabled { get; set; } = true;
 
     public double ThresholdDb { get; set; } = -40.0;

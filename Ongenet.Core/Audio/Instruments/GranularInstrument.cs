@@ -21,6 +21,8 @@ public sealed class GranularInstrument : PolyphonicInstrument, ISampleHost
 {
     public const string TypeId = "granular";
 
+    protected override string GetTypeId() => TypeId;
+
     /// <summary>MIDI note that plays the source at its written pitch (transposed only by <see cref="PitchSemitones"/>).</summary>
     private const int RootNote = 60; // C4
 
@@ -89,6 +91,7 @@ public sealed class GranularInstrument : PolyphonicInstrument, ISampleHost
 
     public string? SampleName { get; private set; }
     public AudioSampleBuffer? Sample => _sample;
+    public AudioSampleBuffer? CurrentSample => _sample;
 
     /// <summary>Mono mixdown of the loaded source (one value per frame); grains read from this.</summary>
     internal float[]? Mono => _mono;

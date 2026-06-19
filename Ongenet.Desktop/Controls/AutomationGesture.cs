@@ -48,19 +48,24 @@ namespace Ongenet.Desktop.Controls
         // --- target builders for the common control kinds ---
 
         public static IAutomationTarget ForFloat(FloatParameter p)
-            => new DelegateAutomationTarget(p.Name, p.Min, p.Max, () => p.Value, v => p.Value = v);
+            => new DelegateAutomationTarget(p.Name, p.Min, p.Max, () => p.Value, v => p.Value = v)
+            { BindSource = p }; // kind resolved (instrument vs effect param) when the lane is created
 
         public static IAutomationTarget ForBool(BoolParameter p)
-            => new DelegateAutomationTarget(p.Name, 0, 1, () => p.Value ? 1 : 0, v => p.Value = v >= 0.5, stepped: true);
+            => new DelegateAutomationTarget(p.Name, 0, 1, () => p.Value ? 1 : 0, v => p.Value = v >= 0.5, stepped: true)
+            { BindSource = p };
 
         public static IAutomationTarget ForVolume(Track t)
-            => new DelegateAutomationTarget("Volume", 0, 1, () => t.Volume, v => t.Volume = v);
+            => new DelegateAutomationTarget("Volume", 0, 1, () => t.Volume, v => t.Volume = v)
+            { BindKind = AutomationTargetKind.TrackVolume, BindSource = t };
 
         public static IAutomationTarget ForPan(Track t)
-            => new DelegateAutomationTarget("Pan", -1, 1, () => t.Pan, v => t.Pan = v);
+            => new DelegateAutomationTarget("Pan", -1, 1, () => t.Pan, v => t.Pan = v)
+            { BindKind = AutomationTargetKind.TrackPan, BindSource = t };
 
         public static IAutomationTarget ForEffectEnabled(IAudioEffect fx)
             => new DelegateAutomationTarget($"{fx.Name} On/Off", 0, 1,
-                () => fx.Enabled ? 1 : 0, v => fx.Enabled = v >= 0.5, stepped: true);
+                () => fx.Enabled ? 1 : 0, v => fx.Enabled = v >= 0.5, stepped: true)
+            { BindKind = AutomationTargetKind.EffectEnabled, BindSource = fx };
     }
 }

@@ -13,6 +13,8 @@ public sealed class TremoloEffect : IAudioEffect
 {
     public const string TypeId = "tremolo";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private static readonly string[] WaveNames = { "Sine", "Triangle", "Square", "Saw" };
     private static readonly string[] ModeNames = { "Tremolo", "Auto-Pan" };
 

@@ -13,6 +13,8 @@ public sealed class UtilityEffect : IAudioEffect
 {
     public const string TypeId = "utility";
 
+    string IAudioEffect.TypeId => TypeId;
+
     public bool Enabled { get; set; } = true;
 
     public double GainDb { get; set; }

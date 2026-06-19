@@ -1,4 +1,6 @@
 using Ongenet.Core.Audio.Automation;
+using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
@@ -18,7 +20,7 @@ namespace Ongenet.Desktop.Services
 
         public void CreateLane(Track owner, IAutomationTarget target)
         {
-            var lane = new AutomationLane(target);
+            var lane = new AutomationLane(target) { Binding = DeriveBinding(owner, target) };
             // Default value = whatever the control is set to right now (flat curve).
             lane.AddPoint(new AutomationPoint(0, target.Read()));
 
@@ -26,6 +28,46 @@ namespace Ongenet.Desktop.Services
             owner.AutomationCollapsed = false; // reveal the new row
             owner.CommitAutoLanes();
             _events.Publish(new AutomationChangedEvent(owner));
+        }
+
+        // Works out a serializable binding from the target's creation hints, locating instrument/effect
+        // parameters by reference so duplicate parameter names (e.g. 3x Osc's three "Wave"s) stay distinct.
+        private static AutomationBinding? DeriveBinding(Track owner, IAutomationTarget target)
+        {
+            if (target is not DelegateAutomationTarget d) return null;
+
+            switch (d.BindKind)
+            {
+                case AutomationTargetKind.TrackVolume: return new(AutomationTargetKind.TrackVolume, -1, -1);
+                case AutomationTargetKind.TrackPan: return new(AutomationTargetKind.TrackPan, -1, -1);
+                case AutomationTargetKind.EffectEnabled:
+                    var fxIndex = d.BindSource is IAudioEffect fx ? owner.Effects.IndexOf(fx) : -1;
+                    return fxIndex >= 0 ? new(AutomationTargetKind.EffectEnabled, fxIndex, -1) : null;
+            }
+
+            // No kind set → an instrument/effect parameter; find it by reference.
+            if (d.BindSource is not Parameter param) return null;
+
+            if (owner.Instrument is { } inst)
+            {
+                var pi = IndexOf(inst.Parameters, param);
+                if (pi >= 0) return new(AutomationTargetKind.InstrumentParam, -1, pi);
+            }
+
+            for (var i = 0; i < owner.Effects.Count; i++)
+            {
+                var pi = IndexOf(owner.Effects[i].Parameters, param);
+                if (pi >= 0) return new(AutomationTargetKind.EffectParam, i, pi);
+            }
+
+            return null;
+        }
+
+        private static int IndexOf(System.Collections.Generic.IReadOnlyList<Parameter> list, Parameter p)
+        {
+            for (var i = 0; i < list.Count; i++)
+                if (ReferenceEquals(list[i], p)) return i;
+            return -1;
         }
     }
 }

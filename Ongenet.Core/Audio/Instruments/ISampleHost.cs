@@ -11,6 +11,9 @@ public interface ISampleHost
     /// <summary>Name of the loaded sample, or null if none.</summary>
     string? SampleName { get; }
 
+    /// <summary>The currently loaded sample buffer, or null — so a project save can embed it.</summary>
+    AudioSampleBuffer? CurrentSample { get; }
+
     /// <summary>Loads (or replaces) the sample to play.</summary>
     void LoadSample(AudioSampleBuffer sample, string name);
 }

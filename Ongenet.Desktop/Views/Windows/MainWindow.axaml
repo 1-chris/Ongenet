@@ -34,8 +34,27 @@
                     <TextBlock Text="Ongenet" FontSize="12" Foreground="{StaticResource CatppuccinMauve}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
                                VerticalAlignment="Center" Margin="-6,1,0,0"/>
+                    <Button Content="New" Click="OnNew_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="New project (Ctrl+N)"/>
+                    <Button Content="Open" Click="OnOpen_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="Open project (Ctrl+O)"/>
+                    <Button Content="Save" Click="OnSave_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="Save project (Ctrl+S)"/>
+                    <Button Content="Save As" Click="OnSaveAs_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="Save project as… (Ctrl+Shift+S)"/>
                     <Button Content="Logs" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <!-- Save/Load progress indicator -->
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                                IsVisible="{Binding IsBusy}">
+                        <ProgressBar IsIndeterminate="True" Width="70" Height="4" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BusyStatus}" FontSize="11" VerticalAlignment="Center"
+                                   Foreground="{StaticResource CatppuccinGreen}"/>
+                    </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <Button Name="MinimizeButton" Classes="TitleBarButton" Click="MinimizeButton_Click">

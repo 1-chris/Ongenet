@@ -17,4 +17,7 @@ public interface IProjectService
 
     /// <summary>Replaces <see cref="Current"/> with a fresh blank project (one instrument track).</summary>
     void NewProject();
+
+    /// <summary>Replaces <see cref="Current"/> with a loaded project and raises <see cref="ProjectChanged"/>.</summary>
+    void SetCurrentProject(Project project);
 }

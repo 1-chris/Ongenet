@@ -13,6 +13,8 @@ public sealed class ReverbEffect : IAudioEffect
 {
     public const string TypeId = "reverb";
 
+    string IAudioEffect.TypeId => TypeId;
+
     private const float FixedGain = 0.015f;
     private const float ScaleRoom = 0.28f;
     private const float OffsetRoom = 0.7f;
