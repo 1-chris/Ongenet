@@ -19,6 +19,7 @@ namespace Ongenet.Desktop.Views.Windows
     {
         private LogWindow? _logWindow;
         private ThemeWindow? _themeWindow;
+        private HistoryWindow? _historyWindow;
 
         // FL-Studio-style typing-keyboard note input: tracks which physical keys are currently
         // held (→ which MIDI notes are sounding) so auto-repeat KeyDowns don't re-trigger.
@@ -204,6 +205,24 @@ namespace Ongenet.Desktop.Views.Windows
             else
             {
                 _themeWindow.Activate();
+            }
+        }
+
+        private void OpenHistory_Click(object? sender, RoutedEventArgs e)
+        {
+            var viewModel = App.ServiceProvider?.GetService<HistoryViewModel>();
+            if (viewModel is null) return;
+
+            if (_historyWindow is null)
+            {
+                _historyWindow = new HistoryWindow();
+                _historyWindow.SetViewModel(viewModel);
+                _historyWindow.Closed += (_, _) => _historyWindow = null;
+                _historyWindow.Show();
+            }
+            else
+            {
+                _historyWindow.Activate();
             }
         }
 

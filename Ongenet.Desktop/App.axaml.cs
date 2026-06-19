@@ -93,6 +93,7 @@ namespace Ongenet.Desktop
             // Live theming (Catppuccin variants + custom themes).
             services.AddSingleton<Theming.IThemeService, Theming.ThemeService>();
             services.AddSingleton<ThemeEditorViewModel>();
+            services.AddSingleton<HistoryViewModel>();
 
             ServiceProvider = services.BuildServiceProvider();
 
