@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ongenet — a native, dependency-light DAW</title>
+<style>
+/* ---- Catppuccin Mocha palette ---- */
+:root {
+  --base:     #1e1e2e;
+  --mantle:   #181825;
+  --crust:    #11111b;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --overlay0: #6c7086;
+  --overlay1: #7f849c;
+  --text:     #cdd6f4;
+  --subtext1: #bac2de;
+  --subtext0: #a6adc8;
+  --blue:     #89b4fa;
+  --lavender: #b4befe;
+  --sapphire: #74c7ec;
+  --sky:      #89dceb;
+  --teal:     #94e2d5;
+  --green:    #a6e3a1;
+  --yellow:   #f9e2af;
+  --peach:    #fab387;
+  --maroon:   #eba0ac;
+  --red:      #f38ba8;
+  --mauve:    #cba6f7;
+  --pink:     #f5c2e7;
+  --flamingo: #f2cdcd;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--base);
+  color: var(--text);
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system,
+               "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  line-height: 1.6;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--blue); text-decoration: none; }
+a:hover { color: var(--sapphire); text-decoration: underline; }
+
+code {
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  background: var(--crust);
+  color: var(--peach);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+/* ---- Top bar ---- */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(24, 24, 37, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--surface0);
+}
+.topbar .wrap {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px;
+}
+.brand {
+  font-weight: 700; font-size: 1.25rem; letter-spacing: 0.5px;
+  color: var(--text);
+}
+.brand .dot { color: var(--mauve); }
+.navlinks { display: flex; gap: 22px; }
+.navlinks a {
+  color: var(--subtext0); font-size: 0.92rem; font-weight: 500;
+  text-decoration: none;
+}
+.navlinks a:hover { color: var(--lavender); }
+@media (max-width: 720px) { .navlinks { display: none; } }
+
+/* ---- Hero ---- */
+.hero { text-align: center; padding: 72px 0 36px; }
+.hero h1 {
+  font-size: 3.4rem; font-weight: 800; letter-spacing: -1px;
+  background: linear-gradient(110deg, var(--mauve), var(--blue) 45%, var(--teal));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: var(--mauve);
+}
+.hero .tag {
+  font-size: 1.3rem; color: var(--subtext1); margin-top: 14px;
+  max-width: 720px; margin-left: auto; margin-right: auto;
+}
+.hero .sub {
+  font-size: 1rem; color: var(--subtext0); margin-top: 10px;
+}
+.cta { margin-top: 30px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 13px 26px; border-radius: 10px;
+  font-weight: 600; font-size: 1rem; text-decoration: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+.btn:hover { transform: translateY(-2px); text-decoration: none; }
+.btn-primary {
+  background: linear-gradient(100deg, var(--mauve), var(--blue));
+  color: var(--crust);
+  box-shadow: 0 6px 22px rgba(203, 166, 247, 0.28);
+}
+.btn-primary:hover { color: var(--crust); box-shadow: 0 9px 28px rgba(137, 180, 250, 0.4); }
+.btn-ghost {
+  background: var(--surface0); color: var(--text);
+  border: 1px solid var(--surface1);
+}
+.btn-ghost:hover { background: var(--surface1); color: var(--text); }
+
+/* ---- Screenshot ---- */
+.shot {
+  margin: 44px auto 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--surface1);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  background: var(--mantle);
+}
+.shot img { display: block; width: 100%; height: auto; }
+.shot .cap {
+  font-size: 0.82rem; color: var(--overlay1); text-align: center;
+  padding: 9px; border-top: 1px solid var(--surface0); background: var(--crust);
+}
+
+/* ---- Sections ---- */
+section { padding: 56px 0; border-top: 1px solid var(--surface0); }
+section:first-of-type { border-top: none; }
+.section-head { text-align: center; margin-bottom: 40px; }
+.section-head .kicker {
+  text-transform: uppercase; letter-spacing: 2px; font-size: 0.78rem;
+  color: var(--mauve); font-weight: 700;
+}
+.section-head h2 { font-size: 2rem; font-weight: 700; margin-top: 6px; }
+.section-head p { color: var(--subtext0); margin-top: 10px; max-width: 680px; margin-inline: auto; }
+
+/* ---- Cards grid ---- */
+.grid { display: grid; gap: 18px; }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 860px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-radius: 12px;
+  padding: 22px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.card:hover { border-color: var(--surface2); transform: translateY(-3px); }
+.card h3 {
+  font-size: 1.12rem; font-weight: 700; margin-bottom: 7px;
+  display: flex; align-items: center; gap: 9px;
+}
+.card p { color: var(--subtext0); font-size: 0.94rem; }
+.card .pill {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; padding: 2px 8px; border-radius: 999px;
+  background: var(--surface0); color: var(--subtext1);
+}
+
+/* coloured accent bullet before instrument/feature names */
+.bullet {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* ---- Effects table-ish layout ---- */
+.fxgroup {
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-radius: 12px;
+  padding: 18px 22px;
+}
+.fxgroup h3 {
+  font-size: 1rem; font-weight: 700; margin-bottom: 12px;
+  color: var(--text); display: flex; align-items: center; gap: 9px;
+}
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-chip {
+  font-size: 0.86rem; font-weight: 500;
+  padding: 5px 12px; border-radius: 8px;
+  background: var(--surface0); color: var(--subtext1);
+  border: 1px solid var(--surface1);
+}
+
+/* ---- Feature detail blocks ---- */
+.feature {
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-left: 3px solid var(--mauve);
+  border-radius: 12px;
+  padding: 24px 26px;
+  margin-bottom: 18px;
+}
+.feature h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; }
+.feature p { color: var(--subtext1); margin-bottom: 10px; }
+.feature ul { list-style: none; margin-top: 8px; }
+.feature li {
+  color: var(--subtext0); font-size: 0.94rem;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.feature li::before {
+  content: "▸"; position: absolute; left: 0; color: var(--teal);
+}
+.feature.c-blue   { border-left-color: var(--blue); }
+.feature.c-green  { border-left-color: var(--green); }
+.feature.c-peach  { border-left-color: var(--peach); }
+.feature.c-pink   { border-left-color: var(--pink); }
+.feature.c-yellow { border-left-color: var(--yellow); }
+.feature.c-teal   { border-left-color: var(--teal); }
+.feature.c-red    { border-left-color: var(--red); }
+
+/* ---- Download band ---- */
+.band {
+  text-align: center;
+  background: linear-gradient(160deg, var(--mantle), var(--crust));
+  border: 1px solid var(--surface0);
+  border-radius: 16px;
+  padding: 48px 30px;
+  margin: 8px 0;
+}
+.band h2 { font-size: 1.9rem; font-weight: 700; }
+.band p { color: var(--subtext0); margin: 12px auto 26px; max-width: 560px; }
+
+/* ---- Footer ---- */
+footer {
+  border-top: 1px solid var(--surface0);
+  padding: 36px 0;
+  text-align: center;
+  color: var(--overlay0);
+  font-size: 0.88rem;
+}
+footer a { color: var(--subtext0); }
+</style>
+</head>
+<body>
+
+<!-- ===== Top bar ===== -->
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand">Ongenet<span class="dot">.</span></div>
+    <nav class="navlinks">
+      <a href="#instruments">Instruments</a>
+      <a href="#effects">Effects</a>
+      <a href="#features">Features</a>
+      <a href="https://github.com/1-chris/Ongenet/releases">Download</a>
+    </nav>
+  </div>
+</div>
+
+<!-- ===== Hero ===== -->
+<header class="wrap hero">
+  <h1>Ongenet</h1>
+  <p class="tag">A modern Digital Audio Workstation with a clean, native-free core
+     and a swappable device &amp; UI layer.</p>
+  <p class="sub">Built on Avalonia and .NET 10 &middot; Linux, Windows &amp; macOS &middot; dressed in Catppuccin Mocha.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/1-chris/Ongenet/releases">⬇ Download</a>
+    <a class="btn btn-ghost" href="https://github.com/1-chris/Ongenet">View on GitHub</a>
+  </div>
+
+  <figure class="shot">
+    <img src="screenshot.png" alt="The Ongenet DAW — arrange timeline, track inspector, piano roll and mixer in the Catppuccin Mocha theme.">
+    <figcaption class="cap">Ongenet running the Catppuccin Mocha theme — arrange timeline, track inspector, piano roll and metering.</figcaption>
+  </figure>
+</header>
+
+<main class="wrap">
+
+  <!-- ===== Instruments ===== -->
+  <section id="instruments">
+    <div class="section-head">
+      <div class="kicker">Sound sources</div>
+      <h2>Instruments</h2>
+      <p>Five built-in instruments ship in the core. Any CLAP instrument you have installed is
+         discovered at runtime and appears right alongside them.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--blue)"></span>Oscillator</h3>
+        <p>Polyphonic single-oscillator synth — one waveform per voice, shaped by an ADSR envelope.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--mauve)"></span>3&times; Osc</h3>
+        <p>Triple-oscillator subtractive synth in the spirit of FL Studio's 3x Osc: three oscillators,
+           each with its own waveform, coarse/fine tuning and phase offset.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--peach)"></span>FM Synth</h3>
+        <p>Two-operator FM — a sine carrier phase-modulated by a sine modulator with adjustable
+           ratio and index, ADSR-shaped.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--green)"></span>Basic Sampler</h3>
+        <p>Plays one loaded audio sample pitched across the keyboard (resampled around C4),
+           with an attack/release envelope.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--teal)"></span>Granular</h3>
+        <p>Continuously spawns short, overlapping windowed grains from a moving playhead
+           over a loaded source sample.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--pink)"></span>CLAP Plugins</h3>
+        <p>Third-party <code>.clap</code> instruments are scanned at startup and hosted directly —
+           including their native plugin GUIs — with no extra setup.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Effects ===== -->
+  <section id="effects">
+    <div class="section-head">
+      <div class="kicker">Processing</div>
+      <h2>Effects</h2>
+      <p>Fifteen built-in effects, organised by category and chainable per track in any order.
+         CLAP audio effects slot into the same chain.</p>
+    </div>
+    <div class="grid grid-2">
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--blue)"></span>EQ &amp; Filter</h3>
+        <div class="tags">
+          <span class="tag-chip">Parametric EQ</span>
+          <span class="tag-chip">Multi-mode Filter</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--red)"></span>Dynamics</h3>
+        <div class="tags">
+          <span class="tag-chip">Compressor</span>
+          <span class="tag-chip">Limiter</span>
+          <span class="tag-chip">Gate</span>
+          <span class="tag-chip">Sidechain</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--mauve)"></span>Modulation</h3>
+        <div class="tags">
+          <span class="tag-chip">Chorus</span>
+          <span class="tag-chip">Phaser</span>
+          <span class="tag-chip">Flanger</span>
+          <span class="tag-chip">Tremolo</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--teal)"></span>Delay &amp; Reverb</h3>
+        <div class="tags">
+          <span class="tag-chip">Delay</span>
+          <span class="tag-chip">Reverb</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--peach)"></span>Distortion</h3>
+        <div class="tags">
+          <span class="tag-chip">Distortion</span>
+          <span class="tag-chip">Bitcrusher</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--pink)"></span>Pitch</h3>
+        <div class="tags">
+          <span class="tag-chip">Vocoder</span>
+          <span class="tag-chip">Auto-Tune</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--yellow)"></span>Utility</h3>
+        <div class="tags">
+          <span class="tag-chip">Stereo Width</span>
+          <span class="tag-chip">Utility (gain / pan / mono / phase)</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--sky)"></span>Plugins</h3>
+        <div class="tags">
+          <span class="tag-chip">CLAP audio effects</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Features ===== -->
+  <section id="features">
+    <div class="section-head">
+      <div class="kicker">Workflow</div>
+      <h2>Features</h2>
+      <p>Everything you need to arrange, perform, edit and mix — built on a lock-free audio engine
+         with sample-accurate sequencing.</p>
+    </div>
+
+    <div class="feature c-blue">
+      <h3>Timeline &amp; arrangement</h3>
+      <p>A scrolling, zoomable arrange view where MIDI and audio clips live side by side.</p>
+      <ul>
+        <li>Drag-to-move, edge-resize and cross-track reparenting of clips, with zoom-adaptive grid snapping (bar / beat / ½ / ¼ / ⅛).</li>
+        <li>Middle-mouse horizontal zoom around the cursor; a moving playhead, start marker and clickable bar ruler.</li>
+        <li>Drop audio files straight from the built-in browser or the OS — WAV decodes natively, other formats transcode via ffmpeg.</li>
+        <li>Configurable arrangement length, time signature and tempo, with live time read-outs.</li>
+        <li>Edit / Select / Slice tools, rubber-band multi-select, duplicate, reverse and slice operations.</li>
+      </ul>
+    </div>
+
+    <div class="feature c-green">
+      <h3>Track grouping &amp; mixing</h3>
+      <p>Per-track strips feed group buses and the master, all metered live.</p>
+      <ul>
+        <li>Group tracks into bus tracks (group / ungroup / detach) — e.g. fold all your drums into one "Drums" group.</li>
+        <li>Constant-power pan, volume, mute and solo per track, audible in both live play and playback.</li>
+        <li>Live peak metering on every track header plus a stereo master loudness meter.</li>
+        <li>Per-track effect chains, reorderable top-to-bottom, with one-click bypass per effect.</li>
+      </ul>
+    </div>
+
+    <div class="feature c-red">
+      <h3>Sidechaining</h3>
+      <p>A dedicated Sidechain effect with two ducking modes, driven by a lock-free cross-track signal bus.</p>
+      <ul>
+        <li><strong>Tempo mode</strong> — a tempo-synced ducking pump retriggered per note division (1 bar &rarr; 1/16, incl. triplets), with adjustable amount, attack and release.</li>
+        <li><strong>Track mode</strong> — envelope-follower ducking keyed from any other track <em>or group</em> (so a whole drum group can be the trigger).</li>
+        <li>The same cross-track signal tap powers the <strong>Vocoder</strong>, whose carrier is read from another track.</li>
+        <li>Fully honoured on offline export, not just live playback.</li>
+      </ul>
+    </div>
+
+    <div class="feature c-mauve" style="border-left-color:var(--mauve)">
+      <h3>Piano roll</h3>
+      <p>A full-featured note editor with its own control bar, music tools and editing modes.</p>
+      <ul>
+        <li>Note CRUD with snapping, a "last length" pen, multi-note relative move &amp; resize, and note slicing.</li>
+        <li>Hand-rolled, dependency-free MIDI <strong>import &amp; export</strong> (Standard MIDI File, round-trip exact).</li>
+        <li><strong>Chord progression generator</strong> with diatonic scales and an optional chord-aware melody overlay.</li>
+        <li><strong>Arpeggiator</strong> — convert chords into arpeggios across keys and scales.</li>
+        <li>Edit / Select / Slice tools shared with the timeline, live instrument preview while editing, and middle-mouse zoom.</li>
+      </ul>
+    </div>
+
+    <div class="feature c-peach">
+      <h3>Automation</h3>
+      <p>Automate any knob, slider or switch over time with editable curves.</p>
+      <ul>
+        <li>Right-click almost any control to create an automation lane; lanes appear as collapsible rows under their track.</li>
+        <li>Editable curves — add, drag and delete points, bend segments between them, and watch bound controls move live during playback.</li>
+        <li>Record automation in real time by arming a lane and moving the control while the transport rolls.</li>
+      </ul>
+    </div>
+
+    <div class="feature c-yellow">
+      <h3>Recording &amp; performance</h3>
+      <p>Capture MIDI and audio with a familiar arm &rarr; count-in &rarr; record flow.</p>
+      <ul>
+        <li>Per-track arm, a one-bar metronome count-in, and clips that grow live on the timeline as you play.</li>
+        <li>Audio-track input recording with a live-drawing waveform; independent input/output device selection (mono or stereo).</li>
+        <li>Play instruments live from the on-screen keyboard or an FL-style computer-keyboard layout.</li>
+      </ul>
+    </div>
+
+    <div class="feature c-teal">
+      <h3>Tempo-synced samples</h3>
+      <p>Loops lock to the project grid automatically.</p>
+      <ul>
+        <li>Detects a sample's natural BPM from its name/folder or by onset analysis, then time-stretches it to the project tempo with half/double octave snapping.</li>
+        <li>Synced loops re-fit live when you change the project tempo; one-shots and recordings are left at native length.</li>
+        <li>A contextual Sample inspector lets you override the natural BPM and toggle stretching per clip.</li>
+      </ul>
+    </div>
+
+    <div class="feature c-pink">
+      <h3>Themes, history &amp; projects</h3>
+      <p>The conveniences that make a session pleasant to live in.</p>
+      <ul>
+        <li><strong>Live theming</strong> — 26 semantic tokens, every Catppuccin variant plus light/dark, a built-in theme editor and JSON import/export, all applied without a restart.</li>
+        <li><strong>Undo / redo</strong> — snapshot-based history with a jump-to-any-point History window (Ctrl+Z / Ctrl+Y).</li>
+        <li><strong>Single-file projects</strong> — the <code>.ongen</code> format bundles everything (samples de-duplicated) in one version-tolerant file.</li>
+        <li><strong>Offline export</strong> — render the whole arrangement to a WAV faster than real time, sidechain and all.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== Download band ===== -->
+  <section>
+    <div class="band">
+      <h2>Get Ongenet</h2>
+      <p>Self-contained builds for Linux, Windows and macOS are published on GitHub Releases —
+         no runtime to install.</p>
+      <a class="btn btn-primary" href="https://github.com/1-chris/Ongenet/releases">⬇ Go to downloads</a>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== Footer ===== -->
+<footer>
+  <div class="wrap">
+    Ongenet — built on Avalonia &amp; .NET 10.
+    &nbsp;&middot;&nbsp; <a href="https://github.com/1-chris/Ongenet">GitHub</a>
+    &nbsp;&middot;&nbsp; <a href="https://github.com/1-chris/Ongenet/releases">Releases</a>
+  </div>
+</footer>
+
+</body>
+</html>
