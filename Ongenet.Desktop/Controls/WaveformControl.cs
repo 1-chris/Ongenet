@@ -29,15 +29,36 @@ namespace Ongenet.Desktop.Controls
         public static readonly StyledProperty<int> RevisionProperty =
             AvaloniaProperty.Register<WaveformControl, int>(nameof(Revision));
 
+        /// <summary>Fraction of the source (0..1) at which the drawn window begins. Non-zero for a sliced clip.</summary>
+        public static readonly StyledProperty<double> StartFractionProperty =
+            AvaloniaProperty.Register<WaveformControl, double>(nameof(StartFraction));
+
+        /// <summary>Fraction of the source (0..1) at which the drawn window ends. Defaults to the whole source.</summary>
+        public static readonly StyledProperty<double> EndFractionProperty =
+            AvaloniaProperty.Register<WaveformControl, double>(nameof(EndFraction), 1.0);
+
         static WaveformControl()
         {
-            AffectsRender<WaveformControl>(WaveformProperty, FillProperty, RevisionProperty);
+            AffectsRender<WaveformControl>(WaveformProperty, FillProperty, RevisionProperty,
+                StartFractionProperty, EndFractionProperty);
         }
 
         public int Revision
         {
             get => GetValue(RevisionProperty);
             set => SetValue(RevisionProperty, value);
+        }
+
+        public double StartFraction
+        {
+            get => GetValue(StartFractionProperty);
+            set => SetValue(StartFractionProperty, value);
+        }
+
+        public double EndFraction
+        {
+            get => GetValue(EndFractionProperty);
+            set => SetValue(EndFractionProperty, value);
         }
 
         public AudioWaveform? Waveform
@@ -66,6 +87,12 @@ namespace Ongenet.Desktop.Controls
             var scale = mid * 0.92; // small margin so peaks don't touch the edges
             var columns = (int)Math.Ceiling(width);
 
+            // The window of the source this clip draws: [start, start+span] as fractions of the source.
+            // For an un-sliced clip this is the whole buffer (0..1).
+            var start = Math.Clamp(StartFraction, 0.0, 1.0);
+            var span = Math.Clamp(EndFraction, 0.0, 1.0) - start;
+            if (span <= 0) span = 1.0 - start;
+
             var geometry = new StreamGeometry();
             using (var ctx = geometry.Open())
             {
@@ -74,14 +101,14 @@ namespace Ongenet.Desktop.Controls
                 // Top contour, left to right.
                 for (var x = 0; x < columns; x++)
                 {
-                    PeakAt(waveform, x, width, out _, out var max);
+                    PeakAt(waveform, x, width, start, span, out _, out var max);
                     ctx.LineTo(new Point(x, mid - max * scale));
                 }
 
                 // Bottom contour, right to left, closing the filled shape.
                 for (var x = columns - 1; x >= 0; x--)
                 {
-                    PeakAt(waveform, x, width, out var min, out _);
+                    PeakAt(waveform, x, width, start, span, out var min, out _);
                     ctx.LineTo(new Point(x, mid - min * scale));
                 }
 
@@ -91,10 +118,11 @@ namespace Ongenet.Desktop.Controls
             context.DrawGeometry(brush, null, geometry);
         }
 
-        private static void PeakAt(AudioWaveform waveform, int column, double width, out float min, out float max)
+        private static void PeakAt(AudioWaveform waveform, int column, double width,
+            double start, double span, out float min, out float max)
         {
-            var frameStart = (long)(column / width * waveform.TotalFrames);
-            var frameEnd = (long)((column + 1) / width * waveform.TotalFrames);
+            var frameStart = (long)((start + column / width * span) * waveform.TotalFrames);
+            var frameEnd = (long)((start + (column + 1) / width * span) * waveform.TotalFrames);
             waveform.GetPeak(frameStart, frameEnd, out min, out max);
         }
     }

@@ -32,7 +32,6 @@ namespace Ongenet.Desktop.Views.Panels
         private double _zoomStartPpb;
         private double _zoomAnchorBeat;
         private double _zoomStartY;
-        private double _zoomAnchorScreenX;
 
         private PianoRollViewModel? _vm;
 
@@ -191,13 +190,14 @@ namespace Ongenet.Desktop.Views.Panels
             var gridPos = e.GetPosition(PianoGrid);
             var point = e.GetCurrentPoint(PianoGrid);
 
+            // Middle button → combined zoom/pan drag: vertical movement zooms, horizontal movement
+            // scrolls (the grabbed beat stays pinned under the cursor).
             if (point.Properties.IsMiddleButtonPressed)
             {
                 _gesture = Gesture.Zoom;
                 _zoomStartPpb = vm.Metrics.PixelsPerBeat;
                 _zoomAnchorBeat = vm.Metrics.PixelsToBeats(gridPos.X);
                 _zoomStartY = gridPos.Y;
-                _zoomAnchorScreenX = e.GetPosition(PrGridScroll).X;
                 e.Pointer.Capture(PianoGrid);
                 e.Handled = true;
                 return;
@@ -262,7 +262,8 @@ namespace Ongenet.Desktop.Views.Panels
             if (_gesture == Gesture.Zoom)
             {
                 vm.Metrics.PixelsPerBeat = _zoomStartPpb * Math.Exp(-(gridPos.Y - _zoomStartY) * ZoomSensitivity);
-                var x = Math.Max(0, _zoomAnchorBeat * vm.Metrics.PixelsPerBeat - _zoomAnchorScreenX);
+                // Pin the anchor beat under the current pointer X: vertical drag zooms, horizontal drag pans.
+                var x = Math.Max(0, _zoomAnchorBeat * vm.Metrics.PixelsPerBeat - e.GetPosition(PrGridScroll).X);
                 PrGridScroll.Offset = new Vector(x, PrGridScroll.Offset.Y);
                 e.Handled = true;
                 return;

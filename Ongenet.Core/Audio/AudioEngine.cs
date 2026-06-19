@@ -141,12 +141,15 @@ public sealed class AudioEngine : IAudioEngine
                 {
                     if (clip.Samples is { } samples && clip.EndBeat > startBeat)
                     {
-                        // Tempo-synced clips resample so the whole sample spans their beat-length at the
-                        // current tempo (keeps loops on the grid); others play at native speed.
+                        // Tempo-synced clips resample so the clip's source window spans its beat-length at
+                        // the current tempo (keeps loops on the grid); others play at native speed. A sliced
+                        // clip only spans part of the source (SourceLengthSeconds), so stretch off that.
+                        var sourceDur = clip.SourceLengthSeconds
+                            ?? Math.Max(0.0, samples.FrameCount / (double)samples.SampleRate - clip.SourceOffsetSeconds);
                         var stretch = clip.StretchToTempo
-                            ? TempoSync.Stretch(samples.FrameCount / (double)samples.SampleRate, bpm, clip.LengthBeats)
+                            ? TempoSync.Stretch(sourceDur, bpm, clip.LengthBeats)
                             : 1.0;
-                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples, stretch));
+                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples, stretch, clip.SourceOffsetSeconds));
                     }
                 }
             }
@@ -234,7 +237,7 @@ public sealed class AudioEngine : IAudioEngine
                     if (ReferenceEquals(acp.Track, track))
                     {
                         Mixing.RenderAudioClip(temp, acp.Samples, acp.StartBeat, acp.LengthBeats,
-                            prevBeat, _samplesPerBeat, _output.Format.SampleRate, channels, acp.Stretch);
+                            prevBeat, _samplesPerBeat, _output.Format.SampleRate, channels, acp.Stretch, acp.SourceOffsetSeconds);
                         hasContent = true;
                     }
                 }
@@ -416,5 +419,5 @@ public sealed class AudioEngine : IAudioEngine
 
     private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument Instrument, int Note, float Velocity);
 
-    private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch);
+    private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch, double SourceOffsetSeconds);
 }

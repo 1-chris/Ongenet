@@ -36,7 +36,11 @@ namespace Ongenet.Desktop.ViewModels
 
             _transport.StateChanged += _ => OnStateChanged();
             _transport.TempoChanged += _ => OnTempoChanged();
-            _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSelectMode));
+            _editMode.ModeChanged += () =>
+            {
+                OnPropertyChanged(nameof(IsSelectMode));
+                OnPropertyChanged(nameof(IsSliceMode));
+            };
             // Recording state may flip from the audio thread (count-in finishing) — marshal to UI.
             _recording.StateChanged += () =>
                 Avalonia.Threading.Dispatcher.UIThread.Post(OnRecordingStateChanged);
@@ -61,6 +65,13 @@ namespace Ongenet.Desktop.ViewModels
         {
             get => _editMode.Mode == EditMode.Select;
             set => _editMode.Mode = value ? EditMode.Select : EditMode.Edit;
+        }
+
+        /// <summary>Toggles Slice mode (click a clip to cut it in two); mutually exclusive with Select.</summary>
+        public bool IsSliceMode
+        {
+            get => _editMode.Mode == EditMode.Slice;
+            set => _editMode.Mode = value ? EditMode.Slice : EditMode.Edit;
         }
 
         /// <summary>True while an export render is in progress (disables the Render button).</summary>

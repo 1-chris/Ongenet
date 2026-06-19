@@ -27,15 +27,19 @@ public static class Mixing
     /// from the file rate to the device/render rate and positioning by the playhead beat.
     /// <paramref name="stretch"/> is an extra playback-rate multiplier (1.0 = native): the engine sets
     /// it so a tempo-synced clip's whole sample spans its beat-length at the project tempo.
+    /// <paramref name="sourceOffsetSeconds"/> shifts the read position into the buffer (non-zero for a
+    /// sliced clip's right-hand piece, which starts partway through the source).
     /// </summary>
     public static void RenderAudioClip(Span<float> temp, AudioSampleBuffer samples,
         double clipStartBeat, double clipLengthBeats, double blockStartBeat,
-        double samplesPerBeat, int deviceSampleRate, int channels, double stretch = 1.0)
+        double samplesPerBeat, int deviceSampleRate, int channels, double stretch = 1.0,
+        double sourceOffsetSeconds = 0.0)
     {
         if (stretch <= 0) stretch = 1.0;
         var ratio = (double)samples.SampleRate / deviceSampleRate * stretch;
         var frameCount = samples.FrameCount;
         var frames = temp.Length / channels;
+        var offsetFrames = sourceOffsetSeconds * samples.SampleRate;
 
         for (var frame = 0; frame < frames; frame++)
         {
@@ -43,7 +47,7 @@ public static class Mixing
             if (localBeat < 0) continue;
             if (localBeat >= clipLengthBeats) break;
 
-            var filePos = localBeat * samplesPerBeat * ratio;
+            var filePos = offsetFrames + localBeat * samplesPerBeat * ratio;
             var f0 = (long)filePos;
             if (f0 >= frameCount) break;
 

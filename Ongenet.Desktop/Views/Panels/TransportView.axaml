@@ -59,6 +59,9 @@
                 <ToggleButton Content="Select" IsChecked="{Binding IsSelectMode}" FontSize="11" Padding="8,3"
                               VerticalAlignment="Center"
                               ToolTip.Tip="Select mode: click-drag to multi-select clips/notes"/>
+                <ToggleButton Content="Slice" IsChecked="{Binding IsSliceMode}" FontSize="11" Padding="8,3"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Slice mode: click a clip to cut it in two at the grid"/>
             </StackPanel>
 
             <!-- Centre: tempo + bars -->

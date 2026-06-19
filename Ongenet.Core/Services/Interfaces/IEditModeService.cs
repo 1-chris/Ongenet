@@ -9,7 +9,10 @@ public enum EditMode
     Edit,
 
     /// <summary>Click-drag draws a rubber band to multi-select objects.</summary>
-    Select
+    Select,
+
+    /// <summary>Clicking a clip slices it into two pieces at the grid-snapped pointer position.</summary>
+    Slice
 }
 
 /// <summary>App-wide current edit mode, shared so the timeline and piano roll behave consistently.</summary>

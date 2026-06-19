@@ -38,7 +38,6 @@ namespace Ongenet.Desktop.Views.Panels
         private double _zoomStartPpb;
         private double _zoomAnchorBeat;
         private double _zoomStartY;
-        private double _zoomAnchorScreenX;
         private Point _bandStart;
 
         public TimelineView()
@@ -304,7 +303,9 @@ namespace Ongenet.Desktop.Views.Panels
             var point = e.GetCurrentPoint(LanesList);
             var pos = point.Position;
 
-            // Middle button → start a time-zoom drag.
+            // Middle button → start a combined zoom/pan drag: vertical movement zooms, horizontal
+            // movement scrolls (the grabbed beat is pinned under the cursor, so the timeline pans
+            // as the pointer moves sideways).
             if (point.Properties.IsMiddleButtonPressed)
             {
                 var (_, anchorBeat) = LocatePoint(pos, vm);
@@ -312,7 +313,6 @@ namespace Ongenet.Desktop.Views.Panels
                 _zoomStartPpb = vm.Metrics.PixelsPerBeat;
                 _zoomAnchorBeat = anchorBeat;
                 _zoomStartY = pos.Y;
-                _zoomAnchorScreenX = pos.X;
                 e.Pointer.Capture(LanesList);
                 e.Handled = true;
                 return;
@@ -321,6 +321,20 @@ namespace Ongenet.Desktop.Views.Panels
             if (!point.Properties.IsLeftButtonPressed) return;
 
             Focus(); // so the Delete key targets the selected clips
+
+            // Slice mode: click a clip to cut it in two at the grid-snapped pointer beat.
+            if (vm.IsSliceMode)
+            {
+                var sliceHit = ResolveClip(e);
+                if (sliceHit is not null)
+                {
+                    var (_, sliceBeat) = LocatePoint(pos, vm);
+                    vm.SliceClip(sliceHit.Value.Clip, vm.Metrics.Snap(sliceBeat));
+                    e.Handled = true;
+                }
+
+                return;
+            }
 
             // Select mode: click-drag draws a rubber band over the lanes.
             if (vm.IsSelectMode)
@@ -397,7 +411,9 @@ namespace Ongenet.Desktop.Views.Panels
                 _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
                 if (_lanesScroll is not null)
                 {
-                    var x = System.Math.Max(0, _zoomAnchorBeat * vm.Metrics.PixelsPerBeat - _zoomAnchorScreenX);
+                    // Keep the anchor beat under the current pointer X: vertical drag zooms, horizontal
+                    // drag pans.
+                    var x = System.Math.Max(0, _zoomAnchorBeat * vm.Metrics.PixelsPerBeat - pos.X);
                     _lanesScroll.Offset = new Vector(x, _lanesScroll.Offset.Y);
                 }
 

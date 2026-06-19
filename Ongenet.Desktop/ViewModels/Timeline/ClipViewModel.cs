@@ -45,6 +45,33 @@ namespace Ongenet.Desktop.ViewModels.Timeline
         /// <summary>Waveform peaks for an audio clip, or null.</summary>
         public AudioWaveform? Waveform => Model.Waveform;
 
+        /// <summary>
+        /// Fraction (0..1) of the source where this clip's waveform window begins — non-zero only for
+        /// the right-hand piece of a sliced clip, so it shows just its portion of the source.
+        /// </summary>
+        public double WaveStartFraction
+        {
+            get
+            {
+                if (Model.Waveform is not { } wf) return 0.0;
+                var dur = wf.DurationSeconds;
+                return dur > 0 ? System.Math.Clamp(Model.SourceOffsetSeconds / dur, 0.0, 1.0) : 0.0;
+            }
+        }
+
+        /// <summary>Fraction (0..1) of the source where this clip's waveform window ends (1 = whole source).</summary>
+        public double WaveEndFraction
+        {
+            get
+            {
+                if (Model.Waveform is not { } wf) return 1.0;
+                var dur = wf.DurationSeconds;
+                if (dur <= 0) return 1.0;
+                var end = Model.SourceLengthSeconds is { } len ? Model.SourceOffsetSeconds + len : dur;
+                return System.Math.Clamp(end / dur, 0.0, 1.0);
+            }
+        }
+
         /// <summary>True when this clip renders a waveform.</summary>
         public bool IsAudio => Model.IsAudio;
 
@@ -92,6 +119,8 @@ namespace Ongenet.Desktop.ViewModels.Timeline
             OnPropertyChanged(nameof(Left));
             OnPropertyChanged(nameof(Width));
             OnPropertyChanged(nameof(Waveform));
+            OnPropertyChanged(nameof(WaveStartFraction));
+            OnPropertyChanged(nameof(WaveEndFraction));
             OnPropertyChanged(nameof(IsAudio));
             OnPropertyChanged(nameof(IsMidi));
             OnPropertyChanged(nameof(ClipLengthBeats));

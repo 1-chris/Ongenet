@@ -63,13 +63,20 @@ namespace Ongenet.Desktop.ViewModels
             _transport.StartBeatChanged += () => OnPropertyChanged(nameof(StartBeat));
             // Re-fit tempo-synced audio clips to the grid whenever the project tempo changes.
             _transport.TempoChanged += _ => OnProjectTempoChanged();
-            _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSelectMode));
+            _editMode.ModeChanged += () =>
+            {
+                OnPropertyChanged(nameof(IsSelectMode));
+                OnPropertyChanged(nameof(IsSliceMode));
+            };
 
             Rebuild();
         }
 
         /// <summary>True when Select (rubber-band multi-select) mode is active.</summary>
         public bool IsSelectMode => _editMode.Mode == EditMode.Select;
+
+        /// <summary>True when Slice mode (click a clip to cut it) is active.</summary>
+        public bool IsSliceMode => _editMode.Mode == EditMode.Slice;
 
         /// <summary>Raises the per-lane meter levels (called from the view's meter timer).</summary>
         public void RefreshMeters()
@@ -157,6 +164,108 @@ namespace Ongenet.Desktop.ViewModels
             clip.RefreshFromModel();
             ExtendTimeline(clip.Model.EndBeat);
             _events.Publish(new ClipChangedEvent(clip.Model));
+        }
+
+        /// <summary>
+        /// Slices the clip in two at <paramref name="sliceBeat"/> (an absolute timeline beat, expected
+        /// grid-snapped by the caller). The existing clip becomes the left piece; a new clip is added for
+        /// the right piece. MIDI notes are partitioned (and notes straddling the cut are split); audio
+        /// pieces reference windows of the same source buffer so each plays only its portion. No-op if the
+        /// cut doesn't fall strictly inside the clip.
+        /// </summary>
+        public void SliceClip(ClipViewModel clipVm, double sliceBeat)
+        {
+            var lane = FindLaneOf(clipVm);
+            if (lane is null) return;
+
+            var model = clipVm.Model;
+            const double eps = 1e-6;
+            if (sliceBeat <= model.StartBeat + eps || sliceBeat >= model.EndBeat - eps) return;
+
+            var origLength = model.LengthBeats;
+            var leftLen = sliceBeat - model.StartBeat;
+            var rightLen = model.EndBeat - sliceBeat;
+
+            var right = new Clip
+            {
+                Name = model.Name,
+                StartBeat = sliceBeat,
+                LengthBeats = rightLen,
+                IsAudio = model.IsAudio,
+                StretchToTempo = model.StretchToTempo,
+                SourceTempo = model.SourceTempo,
+                AudioFilePath = model.AudioFilePath,
+                Waveform = model.Waveform,
+                Samples = model.Samples
+            };
+
+            if (model.IsAudio)
+            {
+                // Split the source window so each piece reads only its part of the buffer. Source seconds
+                // map linearly to clip beats (constant playback rate within a clip), for both stretched
+                // and native clips.
+                var fullDur = model.Samples is { } s && s.SampleRate > 0
+                    ? s.FrameCount / (double)s.SampleRate
+                    : 0.0;
+                var sourceLen = model.SourceLengthSeconds ?? Math.Max(0.0, fullDur - model.SourceOffsetSeconds);
+                var leftSourceLen = origLength > 0 ? sourceLen * (leftLen / origLength) : 0.0;
+
+                right.SourceOffsetSeconds = model.SourceOffsetSeconds + leftSourceLen;
+                right.SourceLengthSeconds = sourceLen - leftSourceLen;
+                model.SourceLengthSeconds = leftSourceLen;
+            }
+            else
+            {
+                // Partition notes around the cut (clip-relative). A note crossing the boundary is split so
+                // each piece keeps the part that falls within it.
+                var leftNotes = new List<MidiNote>();
+                foreach (var n in model.Notes)
+                {
+                    if (n.EndBeat <= leftLen + eps)
+                    {
+                        leftNotes.Add(n);
+                    }
+                    else if (n.StartBeat >= leftLen - eps)
+                    {
+                        right.Notes.Add(new MidiNote
+                        {
+                            Note = n.Note,
+                            StartBeat = n.StartBeat - leftLen,
+                            LengthBeats = n.LengthBeats,
+                            Velocity = n.Velocity
+                        });
+                    }
+                    else
+                    {
+                        leftNotes.Add(new MidiNote
+                        {
+                            Note = n.Note,
+                            StartBeat = n.StartBeat,
+                            LengthBeats = leftLen - n.StartBeat,
+                            Velocity = n.Velocity
+                        });
+                        right.Notes.Add(new MidiNote
+                        {
+                            Note = n.Note,
+                            StartBeat = 0,
+                            LengthBeats = n.EndBeat - leftLen,
+                            Velocity = n.Velocity
+                        });
+                    }
+                }
+
+                model.Notes.Clear();
+                model.Notes.AddRange(leftNotes);
+            }
+
+            model.LengthBeats = leftLen;
+
+            lane.Model.Clips.Add(right);
+            lane.Clips.Add(new ClipViewModel(right, lane.Model, Metrics, this));
+
+            clipVm.RefreshFromModel();
+            _events.Publish(new ClipChangedEvent(model));
+            _selection.SelectClip(model, lane.Model);
         }
 
         // --- IClipActions (context menu) ---
@@ -660,7 +769,9 @@ namespace Ongenet.Desktop.ViewModels
                 SourceTempo = src.SourceTempo,
                 AudioFilePath = src.AudioFilePath,
                 Waveform = src.Waveform,
-                Samples = src.Samples
+                Samples = src.Samples,
+                SourceOffsetSeconds = src.SourceOffsetSeconds,
+                SourceLengthSeconds = src.SourceLengthSeconds
             };
             foreach (var note in src.Notes)
             {

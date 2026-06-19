@@ -250,6 +250,8 @@
                                                 <Grid>
                                                     <controls:WaveformControl Waveform="{Binding Waveform}"
                                                                               Revision="{Binding WaveformRevision}"
+                                                                              StartFraction="{Binding WaveStartFraction}"
+                                                                              EndFraction="{Binding WaveEndFraction}"
                                                                               IsVisible="{Binding IsAudio}"
                                                                               IsHitTestVisible="False"
                                                                               Fill="{StaticResource CatppuccinCrust}"

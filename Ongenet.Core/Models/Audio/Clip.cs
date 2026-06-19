@@ -58,6 +58,22 @@ public sealed class Clip
     /// </summary>
     public bool IsAudio { get; set; }
 
+    /// <summary>
+    /// Offset into the source audio (in natural, un-tempo'd seconds) at which this clip begins
+    /// playing. Non-zero only for the right-hand piece produced by slicing an audio clip, so it
+    /// starts partway into the buffer. Tempo-independent, so it stays valid as the project tempo
+    /// changes.
+    /// </summary>
+    public double SourceOffsetSeconds { get; set; }
+
+    /// <summary>
+    /// How many seconds of the source this clip spans, or null for "from <see cref="SourceOffsetSeconds"/>
+    /// to the end of the buffer" (the default, un-sliced case). Set when an audio clip is sliced so a
+    /// tempo-synced piece stretches only its portion of the loop, and so the waveform shows just that
+    /// window.
+    /// </summary>
+    public double? SourceLengthSeconds { get; set; }
+
     /// <summary>The notes of a MIDI clip (empty for audio clips). Positions are clip-relative.</summary>
     public List<MidiNote> Notes { get; } = new();
 
