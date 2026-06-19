@@ -28,12 +28,12 @@ The repo includes two helper scripts at the solution root:
 
 | Script | What it does |
 | --- | --- |
-| `build-portaudio.sh` | Builds the native PortAudio libraries into `native/<rid>/` — `linux-x64/libportaudio.so.2` (native gcc + cmake) and `win-x64/portaudio.dll` (MinGW-w64 cross-compile, runtime statically linked). Skips any target whose toolchain is missing. |
+| `build-portaudio.sh` | Builds the native PortAudio libraries into `native/<rid>/` — `linux-x64/libportaudio.so.2` and `linux-arm64/libportaudio.so.2` (native gcc + cmake, each on its matching host arch) and `win-x64/portaudio.dll` (MinGW-w64 cross-compile, runtime statically linked). Skips any target whose toolchain — or host arch — is missing. |
 | `publish-desktop.sh` | Self-contained publish of `Ongenet.Desktop` for all platforms, bundling the matching PortAudio lib and zipping each to `dist/Ongenet-<rid>.zip`. |
 
 `publish-desktop.sh` runs `build-portaudio.sh` first, then produces **self-contained, single-file**
 executables (the .NET runtime is bundled, so target machines need no .NET install — that's why each
-executable is ~100 MB). It publishes `linux-x64`, `win-x64`, `osx-arm64`, and `osx-x64`.
+executable is ~100 MB). It publishes `linux-x64`, `linux-arm64`, `win-x64`, `osx-arm64`, and `osx-x64`.
 
 ```bash
 ./publish-desktop.sh                 # all platforms → dist/Ongenet-<rid>.zip
@@ -45,8 +45,8 @@ executable is ~100 MB). It publishes `linux-x64`, `win-x64`, `osx-arm64`, and `o
 
 Run targets inside each package:
 
-- **Linux**: `./Ongenet.bin` (renamed from `Ongenet.Desktop` so desktop environments don't mistake the
-  `.Desktop` suffix for a `.desktop` launcher).
+- **Linux** (`linux-x64` / `linux-arm64`): `./Ongenet.bin` (renamed from `Ongenet.Desktop` so desktop
+  environments don't mistake the `.Desktop` suffix for a `.desktop` launcher).
 - **Windows**: `Ongenet.Desktop.exe`
 - **macOS**: `./Ongenet.Desktop`
 
@@ -60,6 +60,10 @@ at an existing source tree) and needs, per target:
 - **linux-x64**: `gcc`, `cmake`, and ALSA dev headers (`alsa-lib-devel` / `libasound2-dev`).
   For first-class PipeWire/JACK support also install `pipewire-jack-audio-connection-kit-devel`
   (Fedora/Nobara) — the script then enables PortAudio's JACK backend automatically.
+- **linux-arm64**: same toolchain as `linux-x64`, but built **natively on an aarch64 host** — the `.so`
+  isn't cross-compiled from x86 (ALSA + JACK across archs needs the other arch's dev libs), so on an x86
+  machine this target is skipped. CI builds it on an `ubuntu-24.04-arm` runner; locally, build it on an
+  arm64 box and the lib lands in `native/linux-arm64/`.
 - **win-x64**: `cmake` plus the MinGW-w64 cross toolchain, including the C++ compiler:
   `sudo dnf install mingw64-gcc mingw64-gcc-c++ mingw64-winpthreads-static` (Fedora/Nobara).
 - **macOS**: cannot be cross-built from Linux (needs Apple's SDK). Build `libportaudio.2.dylib` on a

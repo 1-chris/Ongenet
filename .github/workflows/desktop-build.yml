@@ -4,8 +4,10 @@ name: Desktop Build
 # library into each one, and (on a v* tag) publishes them to a GitHub Release.
 #
 # Strategy — reuse the repo's own scripts so CI and local builds stay identical:
-#   * linux-x64 / win-x64 : built on Ubuntu. build-portaudio.sh already cross-compiles the Windows
-#                           PortAudio DLL via MinGW, so one Linux runner covers both.
+#   * linux-x64 / win-x64 : built on an x86_64 Ubuntu runner. build-portaudio.sh cross-compiles the
+#                           Windows PortAudio DLL via MinGW, so one x86 Linux runner covers both.
+#   * linux-arm64          : built on an arm64 Ubuntu runner. PortAudio's .so is built natively (ALSA +
+#                           JACK can't be cross-built across archs here), so it needs an aarch64 host.
 #   * osx-arm64 / osx-x64 : built on macOS runners. PortAudio can't be cross-built from Linux (needs
 #                           Apple's SDK), so each macOS job compiles libportaudio.2.dylib from source
 #                           for its arch, drops it in native/<rid>/, then publishes with --no-native.
@@ -41,8 +43,9 @@ jobs:
       fail-fast: false      # one platform failing shouldn't abandon the others
       matrix:
         include:
-          - { rid: linux-x64, os: ubuntu-latest }
-          - { rid: win-x64,   os: ubuntu-latest }            # cross-compiled via MinGW
+          - { rid: linux-x64,   os: ubuntu-latest }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm }       # native build on an arm64 runner
+          - { rid: win-x64,     os: ubuntu-latest }          # cross-compiled via MinGW
           # Both macOS targets build on the Apple Silicon runner. Intel (macos-13) runners are being
           # retired, so osx-x64 is cross-compiled: clang targets x86_64 via CMAKE_OSX_ARCHITECTURES and
           # `dotnet publish -r osx-x64` cross-publishes fine from an arm64 host.
@@ -58,16 +61,24 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      # --- Linux + Windows (ubuntu-latest) ----------------------------------------------------------
-      # Toolchain for build-portaudio.sh: cmake + ALSA headers (linux native), and the full MinGW-w64
-      # cross toolchain incl. C++ (PortAudio's CMake enables C++) for the Windows DLL. zip for packaging.
-      - name: Install Linux/Windows build toolchain
+      # --- Linux (x86_64 and arm64 runners) ---------------------------------------------------------
+      # Common toolchain for build-portaudio.sh's native .so build: cmake + ALSA/JACK dev headers. zip
+      # for packaging. Needed by linux-x64, linux-arm64 and the win-x64 (cross) job alike.
+      - name: Install Linux build toolchain
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake make zip \
-            libasound2-dev libjack-jackd2-dev \
+            libasound2-dev libjack-jackd2-dev
+
+      # The Windows DLL is cross-compiled from x86_64, so the full MinGW-w64 toolchain (incl. C++, which
+      # PortAudio's CMake enables) is only installed for the win-x64 job — these packages aren't needed
+      # (and may be unavailable) on the arm64 runner.
+      - name: Install MinGW cross toolchain (Windows target)
+        if: matrix.rid == 'win-x64'
+        run: |
+          sudo apt-get install -y --no-install-recommends \
             gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64
 
       - name: Build native PortAudio + publish (Linux/Windows)
@@ -127,9 +138,9 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ matrix.rid }}" in
-            linux-x64) nf="libportaudio.so.2" ;;
-            win-x64)   nf="portaudio.dll" ;;
-            osx-*)     nf="libportaudio.2.dylib" ;;
+            linux-*) nf="libportaudio.so.2" ;;
+            win-x64) nf="portaudio.dll" ;;
+            osx-*)   nf="libportaudio.2.dylib" ;;
           esac
           zip="dist/Ongenet-${{ matrix.rid }}.zip"
           echo "Checking $zip for $nf ..."

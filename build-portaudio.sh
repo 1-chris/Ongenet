@@ -1,20 +1,27 @@
 #!/bin/bash
 #
 # Builds the native PortAudio shared libraries this app loads at runtime, into native/<rid>/:
-#   native/linux-x64/libportaudio.so.2   (native gcc + cmake)
-#   native/win-x64/portaudio.dll         (MinGW-w64 cross-compile, statically linked runtime)
+#   native/linux-x64/libportaudio.so.2     (native gcc + cmake, on an x86_64 host)
+#   native/linux-arm64/libportaudio.so.2   (native gcc + cmake, on an aarch64 host)
+#   native/win-x64/portaudio.dll           (MinGW-w64 cross-compile, statically linked runtime)
+#
+# Linux .so files are built NATIVELY — the host arch must match the target arch (x86_64 host builds
+# linux-x64, aarch64 host builds linux-arm64). Cross-compiling PortAudio with ALSA + JACK across archs
+# needs a full sysroot of the other arch's audio dev libs, so — like macOS — linux-arm64 is built on an
+# arm64 machine / CI runner rather than cross-built from x86 (a mismatched host is skipped, not fatal).
 #
 # macOS dylibs are NOT built here — cross-compiling them from Linux needs Apple's SDK. Build those on
 # a macOS machine / CI runner (e.g. `brew install portaudio`) and drop them in native/osx-arm64/ and
 # native/osx-x64/ as libportaudio.2.dylib. publish.sh bundles whatever exists in native/<rid>/.
 #
 # Requirements:
-#   linux-x64 : gcc, cmake, make            (+ ALSA dev headers: libasound2-dev / alsa-lib-devel)
-#   win-x64   : cmake + MinGW-w64 cross gcc  (Fedora/Nobara: mingw64-gcc mingw64-winpthreads-static)
-#   network   : to clone PortAudio, OR set PORTAUDIO_SRC to an existing source tree.
+#   linux-x64   : gcc, cmake, make            (+ ALSA dev headers: libasound2-dev / alsa-lib-devel) on x86_64
+#   linux-arm64 : gcc, cmake, make            (+ ALSA dev headers) on an aarch64 host
+#   win-x64     : cmake + MinGW-w64 cross gcc  (Fedora/Nobara: mingw64-gcc mingw64-winpthreads-static)
+#   network     : to clone PortAudio, OR set PORTAUDIO_SRC to an existing source tree.
 #
-# Each target is skipped (not fatal) if its toolchain is missing, so this is safe to run anywhere.
-# Env overrides: PORTAUDIO_TAG (default v19.7.0), PORTAUDIO_SRC, RIDS="linux-x64 win-x64".
+# Each target is skipped (not fatal) if its toolchain (or host arch) is missing, so this is safe to run
+# anywhere. Env overrides: PORTAUDIO_TAG (default v19.7.0), PORTAUDIO_SRC, RIDS="linux-x64 win-x64".
 
 # This script lives at the solution root; it writes built libraries into ./native/<rid>/ and keeps
 # the PortAudio source/build tree under ./native/.build/ (both are git-ignored).
@@ -23,7 +30,7 @@ NATIVE="$ROOT/native"
 WORK="$NATIVE/.build"
 SRC="${PORTAUDIO_SRC:-$WORK/portaudio}"
 PA_TAG="${PORTAUDIO_TAG:-v19.7.0}"
-RIDS="${RIDS:-linux-x64 win-x64}"
+RIDS="${RIDS:-linux-x64 linux-arm64 win-x64}"
 
 want() { case " $RIDS " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 
@@ -38,14 +45,32 @@ ensure_src() {
         echo "  ! clone failed (offline?). Set PORTAUDIO_SRC to a local source tree."; return 1; }
 }
 
+# Build the Linux PortAudio .so for one RID (linux-x64 or linux-arm64). Built natively, so the host
+# arch must match the target arch — a mismatch is skipped (not fatal), see the header note.
 build_linux() {
-    want linux-x64 || return 0
+    local rid="$1"
+    want "$rid" || return 0
+
+    # Map RID -> required host arch, then bail non-fatally if this host can't build it natively.
+    local need_arch
+    case "$rid" in
+        linux-x64)   need_arch="x86_64" ;;
+        linux-arm64) need_arch="aarch64" ;;
+        *) echo "$rid: not a Linux RID"; return 0 ;;
+    esac
+    local host_arch; host_arch="$(uname -m)"
+    if [ "$host_arch" != "$need_arch" ]; then
+        echo "$rid: skipped — needs a $need_arch host (this is $host_arch). Cross-building PortAudio with"
+        echo "        ALSA+JACK across archs isn't supported here; build it on a matching machine / CI runner."
+        return 0
+    fi
+
     if ! command -v cmake >/dev/null 2>&1 || ! command -v gcc >/dev/null 2>&1; then
-        echo "linux-x64: skipped (need gcc + cmake)."; return 0
+        echo "$rid: skipped (need gcc + cmake)."; return 0
     fi
     ensure_src || return 0
-    echo "linux-x64: building..."
-    local b="$WORK/build-linux"
+    echo "$rid: building..."
+    local b="$WORK/build-$rid"
     rm -rf "$b"
 
     # PipeWire support: PortAudio has no native PipeWire backend — it reaches PipeWire via ALSA (the
@@ -77,9 +102,9 @@ build_linux() {
     so="$(readlink -f "$b/libportaudio.so" 2>/dev/null)"
     [ -f "$so" ] || so="$(ls "$b"/libportaudio.so.2* 2>/dev/null | head -n1)"
     if [ -z "$so" ] || [ ! -f "$so" ]; then echo "  ! could not locate built libportaudio.so"; return 0; fi
-    mkdir -p "$NATIVE/linux-x64"
-    cp -f "$so" "$NATIVE/linux-x64/libportaudio.so.2"
-    echo "  -> native/linux-x64/libportaudio.so.2"
+    mkdir -p "$NATIVE/$rid"
+    cp -f "$so" "$NATIVE/$rid/libportaudio.so.2"
+    echo "  -> native/$rid/libportaudio.so.2"
 }
 
 build_windows() {
@@ -125,6 +150,7 @@ build_windows() {
 }
 
 echo "Building native PortAudio ($RIDS)..."
-build_linux
+build_linux linux-x64
+build_linux linux-arm64
 build_windows
 echo "Native PortAudio step done."
