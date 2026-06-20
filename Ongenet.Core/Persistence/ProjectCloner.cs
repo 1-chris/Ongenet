@@ -2,6 +2,7 @@ using System.IO;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Models.Audio;
 
@@ -30,7 +31,29 @@ public static class ProjectCloner
         foreach (var t in src.Tracks)
             dst.Tracks.Add(CloneTrack(t, instruments, effects));
 
+        // MIDI mappings re-point to the cloned owner track (matched by preserved Id); the runtime target
+        // is left null and rebuilt from the binding by the mapping service after the snapshot is restored.
+        foreach (var m in src.MidiMappings)
+        {
+            var owner = FindTrack(dst, m.Owner.Id);
+            if (owner is null) continue;
+            dst.MidiMappings.Add(new MidiMapping
+            {
+                Owner = owner,
+                Channel = m.Channel,
+                Controller = m.Controller,
+                Binding = m.Binding,
+            });
+        }
+
         return dst;
+    }
+
+    private static Track? FindTrack(Project p, System.Guid id)
+    {
+        foreach (var t in p.Tracks)
+            if (t.Id == id) return t;
+        return null;
     }
 
     private static Track CloneTrack(Track s, IInstrumentRegistry instruments, IEffectRegistry effects)

@@ -56,6 +56,16 @@ namespace Ongenet.Desktop
             services.AddSingleton<IAudioOutput, PortAudioOutput>();
             services.AddSingleton<IAudioInput, PortAudioInput>();
 
+            // UI-thread marshalling seam (lets Core services hand UI notifications back safely) and
+            // external MIDI controller input (routes to the live-preview path on the selected track).
+            services.AddSingleton<IUiThreadDispatcher, Services.AvaloniaUiDispatcher>();
+            services.AddSingleton<IMidiMappingService, Services.MidiMappingService>();
+            services.AddSingleton<ITransportMapService, Services.TransportMapService>();
+            services.AddSingleton<IMidiInputService, Services.MidiInputService>();
+
+            // App-wide settings persisted to the per-user config file (device/theme/quantize/transport).
+            services.AddSingleton<Services.IAppSettingsService, Services.AppSettingsService>();
+
             // Parameter automation: creates lanes from the "Create automation track" right-click.
             services.AddSingleton<Services.IAutomationService, Services.AutomationService>();
 
@@ -95,6 +105,10 @@ namespace Ongenet.Desktop
             services.AddSingleton<ThemeEditorViewModel>();
             services.AddSingleton<HistoryViewModel>();
 
+            // Unified settings window (Audio / MIDI / Theme tabs).
+            services.AddSingleton<MidiSettingsViewModel>();
+            services.AddSingleton<SettingsViewModel>();
+
             ServiceProvider = services.BuildServiceProvider();
 
             // The SFZ "Sampler" rebuilds itself from persisted state on project load; give it the
@@ -108,6 +122,10 @@ namespace Ongenet.Desktop
             // Capture the palette brushes and apply the default theme.
             ServiceProvider.GetRequiredService<Theming.IThemeService>().Initialize();
 
+            // Apply persisted preferences (theme, audio/MIDI device, input quantize, transport maps) over
+            // the defaults, before the engine and MIDI input start, so they open on the saved devices.
+            TryApplySettings();
+
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.MainWindow = new MainWindow
@@ -119,6 +137,10 @@ namespace Ongenet.Desktop
                 var engine = ServiceProvider.GetRequiredService<IAudioEngine>();
                 TryStartAudio(engine);
 
+                // Bring up MIDI controller input (enumerates + opens a device in its constructor). Never
+                // let a backend failure take down the app — the DAW works fine without a controller.
+                var midi = TryStartMidi();
+
                 // Route CLAP host/plugin diagnostics (incl. GUI open steps) to the in-app log.
                 var clapLogger = ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Clap");
                 ClapInstrument.Log = msg => clapLogger?.LogInformation("{Message}", msg);
@@ -128,6 +150,7 @@ namespace Ongenet.Desktop
 
                 desktop.ShutdownRequested += (_, _) =>
                 {
+                    midi?.Dispose();
                     engine.Dispose();
                     DisposeTrackPlugins();
                 };
@@ -163,6 +186,44 @@ namespace Ongenet.Desktop
             {
                 var logger = ServiceProvider?.GetService<ILoggerFactory>()?.CreateLogger("Audio");
                 logger?.LogError(ex, "Failed to start the audio engine; continuing without audio output.");
+            }
+        }
+
+        /// <summary>Applies persisted app settings to the live services, logging on failure.</summary>
+        private static void TryApplySettings()
+        {
+            try
+            {
+                ServiceProvider!.GetRequiredService<Services.IAppSettingsService>().ApplyToServices();
+            }
+            catch (Exception ex)
+            {
+                var logger = ServiceProvider?.GetService<ILoggerFactory>()?.CreateLogger("Settings");
+                logger?.LogError(ex, "Failed to apply saved settings; continuing with defaults.");
+            }
+        }
+
+        /// <summary>
+        /// Resolves and starts MIDI input, logging (rather than crashing) on any backend failure.
+        /// Returns the service so it can be disposed on shutdown, or null if it could not be created.
+        /// </summary>
+        private static IMidiInputService? TryStartMidi()
+        {
+            try
+            {
+                var midi = ServiceProvider!.GetRequiredService<IMidiInputService>();
+                var logger = ServiceProvider!.GetService<ILoggerFactory>()?.CreateLogger("Midi");
+                logger?.LogInformation(
+                    midi.SelectedDevice is { } d
+                        ? $"MIDI input: {midi.Devices.Count} device(s); listening on \"{d.DisplayName}\"."
+                        : $"MIDI input: {midi.Devices.Count} device(s); none selected.");
+                return midi;
+            }
+            catch (Exception ex)
+            {
+                var logger = ServiceProvider?.GetService<ILoggerFactory>()?.CreateLogger("Midi");
+                logger?.LogError(ex, "Failed to initialise MIDI input; continuing without it.");
+                return null;
             }
         }
 

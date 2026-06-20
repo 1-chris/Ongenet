@@ -265,8 +265,7 @@ footer a { color: var(--subtext0); }
 <!-- ===== Hero ===== -->
 <header class="wrap hero">
   <h1>Ongenet</h1>
-  <p class="tag">A modern Digital Audio Workstation with a clean, native-free core
-     and a swappable device &amp; UI layer.</p>
+  <p class="tag">A modern Digital Audio Workstation.</p>
   <p class="sub">Built on Avalonia and .NET 10 &middot; Linux, Windows &amp; macOS &middot; dressed in Catppuccin Mocha.</p>
   <div class="cta">
     <a class="btn btn-primary" href="https://github.com/1-chris/Ongenet/releases">⬇ Download</a>
@@ -286,7 +285,7 @@ footer a { color: var(--subtext0); }
     <div class="section-head">
       <div class="kicker">Sound sources</div>
       <h2>Instruments</h2>
-      <p>Five built-in instruments ship in the core. Any CLAP instrument you have installed is
+      <p>Eight built-in instruments ship in the core. Any CLAP instrument you have installed is
          discovered at runtime and appears right alongside them.</p>
     </div>
     <div class="grid grid-3">
@@ -313,6 +312,23 @@ footer a { color: var(--subtext0); }
         <h3><span class="bullet" style="background:var(--teal)"></span>Granular</h3>
         <p>Continuously spawns short, overlapping windowed grains from a moving playhead
            over a loaded source sample.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--lavender)"></span>Padda</h3>
+        <p>Lush pad synth — two fat unison layers plus a sine sub and noise through a modulated
+           resonant filter, finished with an internal chorus &rarr; delay &rarr; reverb chain.
+           Ships an init patch and five presets.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--red)"></span>Kicka</h3>
+        <p>Kick-drum synth from clean drumkit thumps to hardstyle screams — a transient "tok" plus a
+           pitch-swept, distortion-stacked tail over a clean parallel sub, with the low end kept mono.</p>
+      </div>
+      <div class="card">
+        <h3><span class="bullet" style="background:var(--yellow)"></span>Sampler (SFZ)</h3>
+        <p>Multi-sample SFZ engine — load any <code>.sfz</code> patch and it maps notes and velocities
+           across regions with velocity layers and round-robin, each voice with its own envelopes
+           and filter.</p>
       </div>
       <div class="card">
         <h3><span class="bullet" style="background:var(--pink)"></span>CLAP Plugins</h3>
@@ -464,7 +480,21 @@ footer a { color: var(--subtext0); }
       <ul>
         <li>Per-track arm, a one-bar metronome count-in, and clips that grow live on the timeline as you play.</li>
         <li>Audio-track input recording with a live-drawing waveform; independent input/output device selection (mono or stereo).</li>
-        <li>Play instruments live from the on-screen keyboard or an FL-style computer-keyboard layout.</li>
+        <li>Play instruments live from a hardware MIDI controller, the on-screen keyboard, or an FL-style computer-keyboard layout.</li>
+        <li>Optional input quantize snaps recorded notes to the grid (1/4 … 1/32, including triplets).</li>
+      </ul>
+    </div>
+
+    <div class="feature" style="border-left-color:var(--sapphire)">
+      <h3>MIDI controllers</h3>
+      <p>Full hardware MIDI support on every platform, with no extra dependencies — each OS's native
+         MIDI API is driven directly.</p>
+      <ul>
+        <li><strong>Cross-platform input</strong> — the ALSA <em>sequencer</em> on Linux (works with PipeWire, JACK, USB, software and Bluetooth MIDI), WinMM on Windows, and CoreMIDI on macOS.</li>
+        <li><strong>Play &amp; record</strong> — perform the selected instrument live with velocity, and capture into MIDI clips with optional input quantize.</li>
+        <li><strong>MIDI learn</strong> — right-click any knob, slider or switch and wiggle a control on your device to bind a CC to it; mappings save with the project and survive undo / redo.</li>
+        <li><strong>Transport &amp; expression</strong> — map pads or buttons to play-pause, stop and record; pitch bend, mod wheel, sustain and aftertouch reach the instrument.</li>
+        <li>Device, mappings and live input activity all live in the <strong>Settings</strong> window; your choice persists to the standard per-OS config location.</li>
       </ul>
     </div>
 
@@ -482,7 +512,7 @@ footer a { color: var(--subtext0); }
       <h3>Themes, history &amp; projects</h3>
       <p>The conveniences that make a session pleasant to live in.</p>
       <ul>
-        <li><strong>Live theming</strong> — 26 semantic tokens, every Catppuccin variant plus light/dark, a built-in theme editor and JSON import/export, all applied without a restart.</li>
+        <li><strong>Live theming</strong> — 26 semantic tokens, every Catppuccin variant plus light/dark, a built-in theme editor (in the Settings window) and JSON import/export, all applied without a restart.</li>
         <li><strong>Undo / redo</strong> — snapshot-based history with a jump-to-any-point History window (Ctrl+Z / Ctrl+Y).</li>
         <li><strong>Single-file projects</strong> — the <code>.ongen</code> format bundles everything (samples de-duplicated) in one version-tolerant file.</li>
         <li><strong>Offline export</strong> — render the whole arrangement to a WAV faster than real time, sidechain and all.</li>

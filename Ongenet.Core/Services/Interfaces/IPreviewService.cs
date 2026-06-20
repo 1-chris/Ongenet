@@ -3,14 +3,18 @@ using System;
 namespace Ongenet.Core.Services.Interfaces;
 
 /// <summary>
-/// Single path for "live preview" notes (mouse on the on-screen keyboards, or the computer
-/// keyboard) routed to the currently selected track's instrument. Tracks which notes are
-/// sounding so the on-screen keyboards can highlight them.
+/// Single path for "live" notes — mouse on the on-screen keyboards, the computer keyboard, or an
+/// external MIDI controller — routed to the currently selected track's instrument. Tracks which notes
+/// are sounding so the on-screen keyboards can highlight them. Thread-safe: live input may arrive on a
+/// background MIDI thread while the UI thread also previews notes.
 /// </summary>
 public interface IPreviewService
 {
-    /// <summary>Starts a preview note on the selected instrument (no-op if already on).</summary>
+    /// <summary>Starts a preview note at the default velocity (no-op if already on).</summary>
     void NoteOn(int midiNote);
+
+    /// <summary>Starts a preview note at <paramref name="velocity"/> (0..1); no-op if already on.</summary>
+    void NoteOn(int midiNote, float velocity);
 
     /// <summary>Stops a preview note.</summary>
     void NoteOff(int midiNote);
@@ -24,11 +28,14 @@ public interface IPreviewService
     /// <summary>Sends a pitch-bend change (14-bit, centre 8192) to the selected instrument.</summary>
     void PitchBend(int value14);
 
-    /// <summary>Raised whenever the set of active notes changes.</summary>
+    /// <summary>Sends channel aftertouch (pressure, 0..127) to the selected instrument.</summary>
+    void ChannelAftertouch(int value);
+
+    /// <summary>Raised whenever the set of active notes changes (marshalled to the UI thread).</summary>
     event Action? ActiveNotesChanged;
 
-    /// <summary>Raised when a preview note starts (the live MIDI-input stream, for recording).</summary>
-    event Action<int>? NotePressed;
+    /// <summary>Raised when a preview note starts, carrying its 0..1 velocity (for recording).</summary>
+    event Action<int, float>? NotePressed;
 
     /// <summary>Raised when a preview note stops.</summary>
     event Action<int>? NoteReleased;

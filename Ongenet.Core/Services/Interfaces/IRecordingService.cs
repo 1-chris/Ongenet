@@ -13,6 +13,12 @@ public interface IRecordingService
     /// <summary>True while a recording session is active (count-in or capturing).</summary>
     bool IsRecording { get; }
 
+    /// <summary>
+    /// Input-quantize grid in beats: recorded note starts snap to the nearest multiple. 0 (default)
+    /// disables quantize, capturing notes at their exact played position. E.g. 0.25 = 1/16 in 4/4.
+    /// </summary>
+    double InputQuantizeBeats { get; set; }
+
     /// <summary>Raised when <see cref="IsRecording"/> changes (may fire from the audio thread).</summary>
     event Action? StateChanged;
 

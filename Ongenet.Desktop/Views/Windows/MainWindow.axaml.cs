@@ -18,7 +18,7 @@ namespace Ongenet.Desktop.Views.Windows
     public partial class MainWindow : Window
     {
         private LogWindow? _logWindow;
-        private ThemeWindow? _themeWindow;
+        private SettingsWindow? _settingsWindow;
         private HistoryWindow? _historyWindow;
 
         // FL-Studio-style typing-keyboard note input: tracks which physical keys are currently
@@ -190,21 +190,21 @@ namespace Ongenet.Desktop.Views.Windows
             }
         }
 
-        private void OpenTheme_Click(object? sender, RoutedEventArgs e)
+        private void OpenSettings_Click(object? sender, RoutedEventArgs e)
         {
-            var viewModel = App.ServiceProvider?.GetService<ThemeEditorViewModel>();
+            var viewModel = App.ServiceProvider?.GetService<SettingsViewModel>();
             if (viewModel is null) return;
 
-            if (_themeWindow is null)
+            if (_settingsWindow is null)
             {
-                _themeWindow = new ThemeWindow();
-                _themeWindow.SetViewModel(viewModel);
-                _themeWindow.Closed += (_, _) => _themeWindow = null;
-                _themeWindow.Show();
+                _settingsWindow = new SettingsWindow();
+                _settingsWindow.SetViewModel(viewModel);
+                _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+                _settingsWindow.Show();
             }
             else
             {
-                _themeWindow.Activate();
+                _settingsWindow.Activate();
             }
         }
 

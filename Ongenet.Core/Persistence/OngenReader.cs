@@ -20,6 +20,9 @@ public sealed class OngenReader : IDisposable
         _reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
     }
 
+    /// <summary>True while there is more data to read (for optional trailing sections in older files).</summary>
+    public bool HasMore => _stream.Position < _stream.Length;
+
     public int ReadInt() => _reader.ReadInt32();
     public long ReadLong() => _reader.ReadInt64();
     public bool ReadBool() => _reader.ReadBoolean();

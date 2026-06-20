@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Ongenet.Core.Audio.Midi;
 
 namespace Ongenet.Core.Models.Audio;
 
@@ -26,4 +27,8 @@ public sealed class Project
 
     /// <summary>The master bus all audio routes through, or null if one hasn't been created yet.</summary>
     public Track? Master => Tracks.FirstOrDefault(t => t.Kind == TrackKind.Master);
+
+    /// <summary>MIDI-controller mappings ("MIDI learn"): CC → parameter. Managed by the mapping service.</summary>
+    public List<MidiMapping> MidiMappings { get; } = new();
+
 }

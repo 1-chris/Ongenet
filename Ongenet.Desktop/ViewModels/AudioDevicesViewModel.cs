@@ -1,21 +1,24 @@
 using System.Collections.Generic;
 using Avalonia.Threading;
 using Ongenet.Core.Audio;
+using Ongenet.Desktop.Services;
 
 namespace Ongenet.Desktop.ViewModels
 {
     /// <summary>
-    /// Backs the top-bar audio device pickers. Surfaces the machine's input/output devices from
-    /// <see cref="IAudioDeviceService"/> and round-trips the user's selection back to it — which
-    /// reopens the affected stream on the chosen device.
+    /// Backs the audio device pickers in the Settings window. Surfaces the machine's input/output
+    /// devices from <see cref="IAudioDeviceService"/> and round-trips the user's selection back to it —
+    /// which reopens the affected stream on the chosen device — and persists the choice.
     /// </summary>
     public class AudioDevicesViewModel : ViewModelBase
     {
         private readonly IAudioDeviceService _devices;
+        private readonly IAppSettingsService? _settings;
 
-        public AudioDevicesViewModel(IAudioDeviceService devices)
+        public AudioDevicesViewModel(IAudioDeviceService devices, IAppSettingsService? settings = null)
         {
             _devices = devices;
+            _settings = settings;
             _devices.DevicesChanged += () => Dispatcher.UIThread.Post(RaiseLists);
         }
 
@@ -57,6 +60,8 @@ namespace Ongenet.Desktop.ViewModels
                 if (_devices.InputChannelMode == value) return;
                 _devices.InputChannelMode = value;
                 OnPropertyChanged();
+                _settings?.CaptureAndSave(); // device changes persist via events; mode has no event
+
             }
         }
 

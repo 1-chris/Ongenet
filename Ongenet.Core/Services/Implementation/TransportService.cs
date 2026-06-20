@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services.Interfaces;
 
@@ -13,7 +14,10 @@ public class TransportService : ITransportService
     private TransportState _state = TransportState.Stopped;
     private Tempo _tempo = new(120.0);
     private double _startBeat;
-    private double _playheadBeats;
+    // Stored as the raw bits of a double and accessed via Interlocked: the audio thread writes the
+    // playhead every block while the UI and MIDI-input threads read it (e.g. to timestamp recorded
+    // notes). A plain double field is not guaranteed atomic across threads by the .NET memory model.
+    private long _playheadBits;
     private double _loopStart;
     private double _loopEnd;
 
@@ -48,12 +52,15 @@ public class TransportService : ITransportService
             if (_startBeat == clamped) return;
             _startBeat = clamped;
             // While stopped, the playhead rests on the marker so the UI shows where Play begins.
-            if (_state == TransportState.Stopped) _playheadBeats = clamped;
+            if (_state == TransportState.Stopped) SetPlayhead(clamped);
             StartBeatChanged?.Invoke();
         }
     }
 
-    public double PlayheadBeats => _playheadBeats;
+    public double PlayheadBeats => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _playheadBits));
+
+    private void SetPlayhead(double beats)
+        => Interlocked.Exchange(ref _playheadBits, BitConverter.DoubleToInt64Bits(beats));
 
     /// <summary>Count-in length in beats for the next Play; reset on Stop.</summary>
     public int CountInBeats { get; set; }
@@ -98,11 +105,11 @@ public class TransportService : ITransportService
     public void Stop()
     {
         State = TransportState.Stopped;
-        _playheadBeats = _startBeat;
+        SetPlayhead(_startBeat);
         CountInBeats = 0;
     }
 
-    public void NotifyPlayhead(double beats) => _playheadBeats = beats;
+    public void NotifyPlayhead(double beats) => SetPlayhead(beats);
 
     public void NotifyCountInFinished() => CountInFinished?.Invoke();
 }

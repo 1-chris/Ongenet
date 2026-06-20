@@ -74,9 +74,9 @@
                             ToolTip.Tip="History"/>
                     <Button Content="Logs" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <Button Content="Theme" Click="OpenTheme_Click" FontSize="11" Padding="8,2"
+                    <Button Content="Settings" Click="OpenSettings_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="Theme editor"/>
+                            ToolTip.Tip="Settings (audio, MIDI, theme)"/>
                     <!-- Save/Load progress indicator -->
                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                                 IsVisible="{Binding IsBusy}">

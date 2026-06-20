@@ -38,7 +38,7 @@ namespace Ongenet.Desktop.Services
 
         // Works out a serializable binding from the target's creation hints, locating instrument/effect
         // parameters by reference so duplicate parameter names (e.g. 3x Osc's three "Wave"s) stay distinct.
-        private static AutomationBinding? DeriveBinding(Track owner, IAutomationTarget target)
+        public AutomationBinding? DeriveBinding(Track owner, IAutomationTarget target)
         {
             if (target is not DelegateAutomationTarget d) return null;
 

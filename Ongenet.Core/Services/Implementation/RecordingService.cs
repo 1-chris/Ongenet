@@ -32,6 +32,10 @@ public sealed class RecordingService : IRecordingService
 
     private readonly List<LiveTake> _takes = new();
     private readonly Dictionary<int, OpenNote> _open = new(); // note -> note being captured
+    // _open is written from the live-input thread (OnNotePressed/OnNoteReleased — the UI thread for
+    // mouse/keyboard, a background MIDI thread for hardware input) and read/mutated on the UI thread in
+    // RefreshLive/StopRecording, so all access is guarded by this lock.
+    private readonly object _openLock = new();
     private readonly List<AutoCapture> _autoCaptures = new();
     private bool _autoStarted;
 
@@ -62,6 +66,8 @@ public sealed class RecordingService : IRecordingService
     }
 
     public bool IsRecording => _isRecording;
+
+    public double InputQuantizeBeats { get; set; }
 
     public event Action? StateChanged;
 
@@ -139,7 +145,11 @@ public sealed class RecordingService : IRecordingService
         // Close any still-held notes at the final playhead and flush one last live update (this also
         // drains the final captured audio blocks while _capturing is still true).
         var endBeat = _transport.PlayheadBeats;
-        foreach (var open in _open.Values) open.EndBeat ??= endBeat;
+        lock (_openLock)
+        {
+            foreach (var open in _open.Values) open.EndBeat ??= endBeat;
+        }
+
         RefreshLive();
 
         // Tidy each take clip's length up to whole bars so it sits cleanly on the grid.
@@ -176,7 +186,7 @@ public sealed class RecordingService : IRecordingService
         _capturing = false;
         _isRecording = false;
         _transport.IsRecording = false;
-        _open.Clear();
+        lock (_openLock) _open.Clear();
         _takes.Clear();
         _autoCaptures.Clear();
         _audioTakes.Clear();
@@ -197,22 +207,29 @@ public sealed class RecordingService : IRecordingService
         SampleAutomation();
         PumpAudioTakes();
 
-        if (_open.Count == 0 && !TakesStarted) return; // no MIDI captured yet — no clip
+        bool hasOpen;
+        lock (_openLock) hasOpen = _open.Count > 0;
+        if (!hasOpen && !TakesStarted) return; // no MIDI captured yet — no clip
 
         EnsureTakeClips();
         var playhead = _transport.PlayheadBeats;
 
         // Place/grow each captured note; finalised ones (with an end) are committed and dropped.
-        foreach (var note in _open.Keys.ToList())
+        // Note models live on clips (UI-thread owned); _open is shared with the live-input thread, so
+        // hold _openLock across the whole pass (no event publishing happens inside it).
+        lock (_openLock)
         {
-            var open = _open[note];
-            open.Models ??= CreateNoteModels(note, open.StartBeat);
+            foreach (var note in _open.Keys.ToList())
+            {
+                var open = _open[note];
+                open.Models ??= CreateNoteModels(note, open.StartBeat, open.Velocity);
 
-            var end = open.EndBeat ?? playhead;
-            var length = Math.Max(MinNoteBeats, end - open.StartBeat);
-            foreach (var model in open.Models) model.LengthBeats = length;
+                var end = open.EndBeat ?? playhead;
+                var length = Math.Max(MinNoteBeats, end - open.StartBeat);
+                foreach (var model in open.Models) model.LengthBeats = length;
 
-            if (open.EndBeat.HasValue) _open.Remove(note);
+                if (open.EndBeat.HasValue) _open.Remove(note);
+            }
         }
 
         // Grow each take clip to cover the playhead, then repaint.
@@ -326,16 +343,22 @@ public sealed class RecordingService : IRecordingService
         }
     }
 
-    private void OnNotePressed(int note)
+    private void OnNotePressed(int note, float velocity)
     {
         if (!_capturing) return;
-        _open[note] = new OpenNote { StartBeat = _transport.PlayheadBeats };
+        lock (_openLock)
+        {
+            _open[note] = new OpenNote { StartBeat = _transport.PlayheadBeats, Velocity = velocity };
+        }
     }
 
     private void OnNoteReleased(int note)
     {
         if (!_capturing) return;
-        if (_open.TryGetValue(note, out var open)) open.EndBeat = _transport.PlayheadBeats;
+        lock (_openLock)
+        {
+            if (_open.TryGetValue(note, out var open)) open.EndBeat = _transport.PlayheadBeats;
+        }
     }
 
     private bool TakesStarted => _takes.Count > 0 && _takes[0].Clip is not null;
@@ -354,8 +377,10 @@ public sealed class RecordingService : IRecordingService
     }
 
     // Adds a note model (clip-relative) to every take clip and returns the created models.
-    private List<MidiNote> CreateNoteModels(int note, double startBeatAbs)
+    private List<MidiNote> CreateNoteModels(int note, double startBeatAbs, float velocity)
     {
+        // Input quantize snaps the note's absolute start to the grid before it's made clip-relative.
+        var start = Audio.Midi.MidiQuantize.Snap(startBeatAbs, InputQuantizeBeats);
         var models = new List<MidiNote>(_takes.Count);
         foreach (var take in _takes)
         {
@@ -363,9 +388,9 @@ public sealed class RecordingService : IRecordingService
             var model = new MidiNote
             {
                 Note = note,
-                StartBeat = Math.Max(0, startBeatAbs - clip.StartBeat),
+                StartBeat = Math.Max(0, start - clip.StartBeat),
                 LengthBeats = MinNoteBeats,
-                Velocity = 0.9f
+                Velocity = velocity
             };
             clip.Notes.Add(model);
             models.Add(model);
@@ -396,6 +421,7 @@ public sealed class RecordingService : IRecordingService
     private sealed class OpenNote
     {
         public double StartBeat { get; init; }
+        public float Velocity { get; init; } = 0.9f;
         public double? EndBeat { get; set; }
         public List<MidiNote>? Models { get; set; }
     }

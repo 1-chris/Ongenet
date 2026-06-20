@@ -108,43 +108,8 @@
                           Width="70" VerticalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Col 3: audio devices stacked above the master loudness meter -->
+            <!-- Col 3: master loudness meter (audio device selection now lives in the Settings window) -->
             <StackPanel Grid.Column="3" Spacing="5" VerticalAlignment="Center" HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
-                    <TextBlock Text="Out" VerticalAlignment="Center" FontSize="11"
-                               Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <ComboBox Width="140" VerticalAlignment="Center" FontSize="11"
-                              ItemsSource="{Binding Devices.OutputDevices}"
-                              SelectedItem="{Binding Devices.SelectedOutput}"
-                              ToolTip.Tip="Audio output device">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="audio:AudioDevice">
-                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-
-                    <TextBlock Text="In" VerticalAlignment="Center" FontSize="11" Margin="6,0,0,0"
-                               Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <ComboBox Width="140" VerticalAlignment="Center" FontSize="11"
-                              ItemsSource="{Binding Devices.InputDevices}"
-                              SelectedItem="{Binding Devices.SelectedInput}"
-                              ToolTip.Tip="Audio input device (for recording)">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="audio:AudioDevice">
-                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-
-                    <!-- Mono collapses a single-channel source (e.g. a mic on the left channel) to a
-                         centered signal; Stereo records the device's channels as-is. -->
-                    <ComboBox Width="78" VerticalAlignment="Center" FontSize="11"
-                              ItemsSource="{Binding Devices.InputChannelModes}"
-                              SelectedItem="{Binding Devices.InputChannelMode}"
-                              ToolTip.Tip="Record the input as Stereo (as-is) or Mono (centered)"/>
-                </StackPanel>
-
                 <controls:MasterMeterControl Height="20" MinWidth="200" HorizontalAlignment="Stretch"
                                              LevelLeft="{Binding MasterLevelLeft}"
                                              LevelRight="{Binding MasterLevelRight}"/>

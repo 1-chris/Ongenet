@@ -8,6 +8,7 @@ using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Models.Audio;
 
@@ -92,6 +93,49 @@ public static class ProjectFile
 
         w.WriteInt(p.Tracks.Count);
         foreach (var t in p.Tracks) WriteTrack(w, t, store);
+
+        // MIDI-controller mappings: a trailing self-describing chunk so older readers (which stop after
+        // the tracks) ignore it, and newer readers skip it gracefully when an old file lacks it.
+        WriteMidiMappings(w, p);
+    }
+
+    private static void WriteMidiMappings(OngenWriter w, Project p)
+    {
+        w.WriteChunk(c =>
+        {
+            c.WriteInt(p.MidiMappings.Count);
+            foreach (var m in p.MidiMappings)
+            {
+                c.WriteInt(p.Tracks.IndexOf(m.Owner)); // owner referenced by track index
+                c.WriteInt(m.Channel);
+                c.WriteInt(m.Controller);
+                c.WriteInt((int)m.Binding.Kind);
+                c.WriteInt(m.Binding.EffectIndex);
+                c.WriteInt(m.Binding.ParamIndex);
+            }
+        });
+    }
+
+    private static void ReadMidiMappings(OngenReader c, Project project)
+    {
+        var count = c.ReadInt();
+        for (var i = 0; i < count; i++)
+        {
+            var ownerIndex = c.ReadInt();
+            var channel = c.ReadInt();
+            var controller = c.ReadInt();
+            var kind = c.ReadInt();
+            var eff = c.ReadInt();
+            var param = c.ReadInt();
+            if (ownerIndex < 0 || ownerIndex >= project.Tracks.Count) continue;
+            project.MidiMappings.Add(new MidiMapping
+            {
+                Owner = project.Tracks[ownerIndex],
+                Channel = channel,
+                Controller = controller,
+                Binding = new AutomationBinding((AutomationTargetKind)kind, eff, param),
+            });
+        }
     }
 
     private static void WriteTrack(OngenWriter w, Track t, SampleStore store)
@@ -266,6 +310,9 @@ public static class ProjectFile
             var trackCount = r.ReadInt();
             for (var i = 0; i < trackCount; i++)
                 project.Tracks.Add(ReadTrack(r, instruments, effects, samples, warnings));
+
+            // Optional trailing MIDI-mappings chunk (absent in files saved before this feature).
+            if (r.HasMore) r.ReadChunk(c => ReadMidiMappings(c, project));
         }
 
         return new LoadResult(project, loopStart, loopEnd, startBeat, warnings, fromNewer);
@@ -449,7 +496,12 @@ public static class ProjectFile
         return lane;
     }
 
-    internal static IAutomationTarget? BuildTarget(Track track, int kind, int effectIndex, int paramIndex)
+    /// <summary>
+    /// Reconstructs a runtime <see cref="IAutomationTarget"/> from a persisted binding (kind +
+    /// effect/param indices) against <paramref name="track"/>. Public so MIDI-controller mappings can
+    /// resolve their targets the same way automation lanes do on load. Returns null if it can't bind.
+    /// </summary>
+    public static IAutomationTarget? BuildTarget(Track track, int kind, int effectIndex, int paramIndex)
     {
         switch ((AutomationTargetKind)kind)
         {

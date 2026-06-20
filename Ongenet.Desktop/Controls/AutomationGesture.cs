@@ -53,10 +53,37 @@ namespace Ongenet.Desktop.Controls
                 var item = new MenuItem { Header = "Create automation track" };
                 item.Click += (_, _) => automation.CreateLane(owner, target);
                 flyout.Items.Add(item);
+
+                AddMidiLearnItems(flyout, automation, owner, target);
             }
 
             if (flyout.Items.Count == 0) return;
             flyout.ShowAt(anchor);
+        }
+
+        // Adds "MIDI Learn" (or "Remove MIDI mapping" when one already exists) for the clicked parameter.
+        private static void AddMidiLearnItems(MenuFlyout flyout, Services.IAutomationService automation,
+            Track owner, IAutomationTarget target)
+        {
+            var midi = App.ServiceProvider?.GetService<IMidiMappingService>();
+            if (midi is null) return;
+
+            var binding = automation.DeriveBinding(owner, target);
+            if (binding is null) return;
+
+            var existing = midi.FindMapping(owner, binding);
+            if (existing is null)
+            {
+                var learn = new MenuItem { Header = "MIDI learn" };
+                learn.Click += (_, _) => midi.BeginLearn(owner, target);
+                flyout.Items.Add(learn);
+            }
+            else
+            {
+                var remove = new MenuItem { Header = $"Remove MIDI mapping (CC {existing.Controller})" };
+                remove.Click += (_, _) => midi.Remove(existing);
+                flyout.Items.Add(remove);
+            }
         }
 
         // --- target builders for the common control kinds ---
