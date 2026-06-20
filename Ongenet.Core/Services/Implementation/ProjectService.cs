@@ -54,12 +54,13 @@ public class ProjectService : IProjectService
             Volume = 1.0 // unity so the master is transparent by default (bus pan law is unity at centre)
         });
 
+        // A fresh instrument track starts with an empty rack — the user drags instruments in from the
+        // library (the Instrument panel shows a drop zone until then).
         project.Tracks.Add(new Track
         {
             Name = "Instrument 1",
             Kind = TrackKind.Instrument,
-            ColorKey = "CatppuccinMauve",
-            Instrument = _instruments.Create(InstrumentRegistry.DefaultInstrumentId)
+            ColorKey = "CatppuccinMauve"
         });
 
         return project;

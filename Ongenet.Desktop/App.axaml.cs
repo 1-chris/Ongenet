@@ -181,7 +181,13 @@ namespace Ongenet.Desktop
             if (project is null) return;
             foreach (var track in project.Tracks)
             {
-                if (track.Instrument is IDisposable inst) inst.Dispose();
+                foreach (var slot in track.Instruments)
+                {
+                    if (slot.Instrument is IDisposable inst) inst.Dispose();
+                    foreach (var fx in slot.Effects)
+                        if (fx is IDisposable d) d.Dispose();
+                }
+
                 foreach (var fx in track.Effects)
                     if (fx is IDisposable d) d.Dispose();
             }

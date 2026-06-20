@@ -71,9 +71,18 @@ public static class ProjectCloner
             Pan = s.Pan,
             ColorKey = s.ColorKey,
             AutomationCollapsed = s.AutomationCollapsed,
-            GroupCollapsed = s.GroupCollapsed,
-            Instrument = s.Instrument is null ? null : CloneComponent(s.Instrument, instruments.Create(s.Instrument.TypeId))
+            GroupCollapsed = s.GroupCollapsed
         };
+
+        // Clone the instrument rack: a fresh instrument + its own effect chain per slot.
+        foreach (var srcSlot in s.Instruments)
+        {
+            var inst = CloneComponent(srcSlot.Instrument, instruments.Create(srcSlot.Instrument.TypeId));
+            var slot = new InstrumentSlot(inst) { Enabled = srcSlot.Enabled };
+            foreach (var fx in srcSlot.Effects) slot.Effects.Add((IAudioEffect)CloneComponent(fx, effects.Create(fx.TypeId)));
+            slot.CommitEffects();
+            t.Instruments.Add(slot);
+        }
 
         foreach (var clip in s.Clips) t.Clips.Add(CloneClip(clip));
         foreach (var fx in s.Effects) t.Effects.Add((IAudioEffect)CloneComponent(fx, effects.Create(fx.TypeId)));
@@ -81,6 +90,7 @@ public static class ProjectCloner
             if (CloneAutoLane(lane, t) is { } cloned)
                 t.AutoLanes.Add(cloned);
 
+        t.CommitInstruments();
         t.CommitEffects();
         t.CommitAutoLanes();
         return t;

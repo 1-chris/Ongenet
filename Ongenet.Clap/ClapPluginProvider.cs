@@ -44,7 +44,7 @@ public sealed class ClapPluginProvider
 
                 if (d.IsInstrument)
                 {
-                    _instruments.Register(new InstrumentInfo(id, name, () => new ClapInstrument(path, pluginId, name)));
+                    _instruments.Register(new InstrumentInfo(id, name, () => new ClapInstrument(path, pluginId, name), "Plugins"));
                     instruments++;
                 }
 

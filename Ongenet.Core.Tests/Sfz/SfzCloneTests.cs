@@ -67,11 +67,13 @@ public class SfzCloneTests
         try
         {
             var project = new Project();
-            project.Tracks.Add(new Track { Kind = TrackKind.Instrument, Instrument = LoadedInstrument() });
+            var track = new Track { Kind = TrackKind.Instrument };
+            track.Instruments.Add(new InstrumentSlot(LoadedInstrument()));
+            project.Tracks.Add(track);
 
             var clone = ProjectCloner.Clone(project, new InstrumentRegistry(), new EffectRegistry());
 
-            var cloned = Assert.IsType<SfzInstrument>(clone.Tracks[0].Instrument);
+            var cloned = Assert.IsType<SfzInstrument>(clone.Tracks[0].Instruments[0].Instrument);
             Assert.Single(cloned.Regions);
             Assert.Equal(0, loader.Calls); // the history clone must not re-read the library from disk
         }

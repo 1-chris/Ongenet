@@ -1,7 +1,3 @@
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using Avalonia.Threading;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
@@ -13,9 +9,9 @@ using Ongenet.Desktop.ViewModels.Effects;
 namespace Ongenet.Desktop.ViewModels
 {
     /// <summary>
-    /// Effects tab for the selected track: lists the track's insert effects (each with its
-    /// parameters and a remove button) and offers an "Add effect" menu of available effects.
-    /// Works for instrument and audio tracks alike.
+    /// Effects tab for the selected track: the track-level (post) insert chain that processes the summed
+    /// output of every instrument in the rack. The chain editor itself lives in the reusable
+    /// <see cref="EffectChainViewModel"/> (shared with each instrument slot's own pre-chain).
     /// </summary>
     public class EffectsViewModel : ViewModelBase
     {
@@ -23,6 +19,7 @@ namespace Ongenet.Desktop.ViewModels
         private readonly IEffectRegistry _registry;
         private readonly IEventAggregator _events;
         private readonly ITransportService _transport;
+        private readonly IPlaybackClock _clock;
         private readonly IHistoryService _history;
 
         public EffectsViewModel(ISelectionService selection, IEffectRegistry registry,
@@ -32,57 +29,10 @@ namespace Ongenet.Desktop.ViewModels
             _registry = registry;
             _events = events;
             _transport = transport;
+            _clock = clock;
             _history = history;
             _selection.SelectionChanged += OnSelectionChanged;
-            // Discovered CLAP effects appear here as they're registered (off the scan thread).
-            _registry.Changed += () => Dispatcher.UIThread.Post(RebuildAddable);
-            // Reflect automation moving effect knobs / on-off state live during playback.
-            clock.Tick += OnPlaybackTick;
-
-            RebuildAddable();
             Rebuild();
-        }
-
-        // While playing, re-read each effect's enabled state + parameters so automation shows live.
-        private void OnPlaybackTick()
-        {
-            if (_transport.State != TransportState.Playing) return;
-            foreach (var fx in Effects) fx.Refresh();
-        }
-
-        // Preferred display order for the add-effect menu categories.
-        private static readonly string[] CategoryOrder =
-            { "Dynamics", "EQ & Filter", "Modulation", "Delay & Reverb", "Distortion", "Utility", "Plugins" };
-
-        /// <summary>The "Add effect" menu, grouped by category (each entry adds its effect to the track).</summary>
-        public IReadOnlyList<EffectCategoryViewModel> AddableCategories { get; private set; } =
-            new List<EffectCategoryViewModel>();
-
-        // Rebuilds the add-effect menu from the registry (built-ins + discovered CLAP effects), grouped.
-        private void RebuildAddable()
-        {
-            int Rank(string category)
-            {
-                var i = System.Array.IndexOf(CategoryOrder, category);
-                return i < 0 ? CategoryOrder.Length : i;
-            }
-
-            AddableCategories = _registry.Available
-                .GroupBy(info => info.Category)
-                .OrderBy(g => Rank(g.Key)).ThenBy(g => g.Key)
-                .Select(g => new EffectCategoryViewModel(g.Key,
-                    g.Select(info => new AvailableEffectViewModel(
-                        info.DisplayName, new RelayCommand(() => AddEffect(info.Id)))).ToList()))
-                .ToList();
-
-            OnPropertyChanged(nameof(AddableCategories));
-        }
-
-        /// <summary>Refreshes the open/close button of the effect backed by <paramref name="editor"/>.</summary>
-        public void RefreshEditor(IPluginEditor editor)
-        {
-            foreach (var vm in Effects)
-                if (ReferenceEquals(vm.Editor, editor)) { vm.NotifyEditorState(); return; }
         }
 
         private Track? Track => _selection.SelectedTrack;
@@ -90,80 +40,20 @@ namespace Ongenet.Desktop.ViewModels
         public bool HasTrack => Track is not null;
         public string TrackName => Track?.Name ?? string.Empty;
 
-        /// <summary>The selected track's effect chain.</summary>
-        public ObservableCollection<EffectViewModel> Effects { get; } = new();
+        /// <summary>The selected track's (post) effect chain editor, or null when no track is selected.</summary>
+        public EffectChainViewModel? Chain { get; private set; }
 
-        private void AddEffect(string id)
-        {
-            if (Track is not { } track || string.IsNullOrEmpty(id)) return;
-            _history.Capture("Add effect");
-            var effect = _registry.Create(id);
-            track.Effects.Add(effect);
-            track.CommitEffects();
-            _events.Publish(new TracksChangedEvent()); // engine prepares + picks up the chain
-            Rebuild();
-        }
-
-        private void RemoveEffect(EffectViewModel vm)
-        {
-            if (Track is not { } track) return;
-            _history.Capture("Remove effect");
-            track.Effects.Remove(vm.Effect);
-            track.CommitEffects();
-            _events.Publish(new TracksChangedEvent());
-            Rebuild();
-        }
-
-        // Reorders an effect in the chain (the engine processes track.Effects in order).
-        private void MoveEffect(EffectViewModel vm, int delta)
-        {
-            if (Track is not { } track) return;
-            var index = track.Effects.IndexOf(vm.Effect);
-            var target = index + delta;
-            if (index < 0 || target < 0 || target >= track.Effects.Count) return;
-            _history.Capture("Reorder effect");
-
-            track.Effects.RemoveAt(index);
-            track.Effects.Insert(target, vm.Effect);
-            track.CommitEffects();
-            _events.Publish(new TracksChangedEvent());
-            Rebuild();
-        }
+        /// <summary>Refreshes the open/close button of the effect backed by <paramref name="editor"/>.</summary>
+        public void RefreshEditor(IPluginEditor editor) => Chain?.RefreshEditor(editor);
 
         private void Rebuild()
         {
-            Effects.Clear();
-            if (Track is { } track)
-            {
-                foreach (var effect in track.Effects)
-                {
-                    Effects.Add(effect switch
-                    {
-                        EqEffect eq => new EqEffectViewModel(eq, RemoveEffect, MoveUp, MoveDown),
-                        FilterEffect filter => new FilterEffectViewModel(filter, RemoveEffect, MoveUp, MoveDown),
-                        SidechainEffect sc => new SidechainEffectViewModel(sc, RemoveEffect, MoveUp, MoveDown),
-                        StutteroEffect st => new StutteroEffectViewModel(st, RemoveEffect, MoveUp, MoveDown),
-                        VocoderEffect vc => new VocoderEffectViewModel(vc, RemoveEffect, MoveUp, MoveDown),
-                        _ => new EffectViewModel(effect, RemoveEffect, MoveUp, MoveDown)
-                    });
-                }
-            }
-
-            for (var i = 0; i < Effects.Count; i++)
-            {
-                Effects[i].Position = i + 1;
-                Effects[i].IsFirst = i == 0;
-                Effects[i].IsLast = i == Effects.Count - 1;
-            }
-
-            OnPropertyChanged(nameof(HasEffects));
+            Chain = Track is { } track
+                ? new EffectChainViewModel(track.Effects, track.CommitEffects,
+                    () => _events.Publish(new TracksChangedEvent()), _registry, _history, _transport, _clock)
+                : null;
+            OnPropertyChanged(nameof(Chain));
         }
-
-        private void MoveUp(EffectViewModel vm) => MoveEffect(vm, -1);
-        private void MoveDown(EffectViewModel vm) => MoveEffect(vm, +1);
-
-        /// <summary>True when the selected track has at least one effect (drives the chain caption).</summary>
-        public bool HasEffects => Effects.Count > 0;
 
         private void OnSelectionChanged()
         {

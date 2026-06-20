@@ -30,6 +30,12 @@ namespace Ongenet.Desktop.Views.Windows
             InitializeComponent();
             AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, OnGlobalKeyUp, RoutingStrategies.Tunnel);
+            // Clicking a tab on a collapsed panel expands it (and selects that tab). Tunnel + handledEventsToo
+            // so we run before the TabItem consumes the press.
+            BottomTabs.AddHandler(PointerPressedEvent, OnBottomTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+            RightTabs.AddHandler(PointerPressedEvent, OnRightTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Start with the Files/Instruments sidebar collapsed to its sideways tab strip.
+            SetRightCollapsed(true);
             Closing += OnClosing;
         }
 
@@ -42,6 +48,99 @@ namespace Ongenet.Desktop.Views.Windows
                 _ = MessageDialog.Notify(this, "Please wait",
                     "A save is still in progress. Try closing again once it finishes.");
             }
+        }
+
+        // --- Collapsible panels (bottom / left / right). Each remembers its pre-collapse size. ---
+
+        private GridLength _bottomSaved = new(432);
+        private GridLength _leftSaved = new(240);
+        private GridLength _rightSaved = new(260);
+        private bool _bottomCollapsed, _leftCollapsed, _rightCollapsed;
+
+        // Named ColumnDefinition/RowDefinition don't generate code-behind fields, so reach them via the grid.
+        private RowDefinition BottomSplitterRow => CenterColumn.RowDefinitions[1];
+        private RowDefinition BottomRow => CenterColumn.RowDefinitions[2];
+        private ColumnDefinition LeftCol => WorkspaceGrid.ColumnDefinitions[0];
+        private ColumnDefinition LeftSplitterCol => WorkspaceGrid.ColumnDefinitions[1];
+        private ColumnDefinition RightSplitterCol => WorkspaceGrid.ColumnDefinitions[3];
+        private ColumnDefinition RightCol => WorkspaceGrid.ColumnDefinitions[4];
+
+        private void ToggleBottomPanel(object? sender, RoutedEventArgs e) => SetBottomCollapsed(!_bottomCollapsed);
+
+        private void SetBottomCollapsed(bool collapsed)
+        {
+            if (collapsed == _bottomCollapsed) return;
+            _bottomCollapsed = collapsed;
+            // Hiding the tab contents lets the Auto-sized row shrink to just the tab strip.
+            BottomFirstContent.IsVisible = BottomPianoContent.IsVisible =
+                BottomEffectsContent.IsVisible = !collapsed;
+            BottomSplitter.IsVisible = !collapsed;
+            BottomSplitterRow.Height = new GridLength(collapsed ? 0 : 4);
+            if (collapsed)
+            {
+                _bottomSaved = BottomRow.Height;
+                BottomRow.Height = GridLength.Auto;
+                BottomToggle.Content = "▴";
+            }
+            else
+            {
+                BottomRow.Height = _bottomSaved;
+                BottomToggle.Content = "▾";
+            }
+        }
+
+        // Clicking a tab on the collapsed bottom strip expands the panel (the click also selects the tab).
+        private void OnBottomTabsPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (_bottomCollapsed) SetBottomCollapsed(false);
+        }
+
+        private void ToggleLeftPanel(object? sender, RoutedEventArgs e)
+        {
+            _leftCollapsed = !_leftCollapsed;
+            LeftContent.IsVisible = !_leftCollapsed;
+            LeftSplitter.IsVisible = !_leftCollapsed;
+            LeftSplitterCol.Width = new GridLength(_leftCollapsed ? 0 : 4);
+            if (_leftCollapsed)
+            {
+                _leftSaved = LeftCol.Width;
+                LeftCol.Width = GridLength.Auto;
+                LeftToggle.Content = "▸";
+            }
+            else
+            {
+                LeftCol.Width = _leftSaved;
+                LeftToggle.Content = "◂";
+            }
+        }
+
+        private void ToggleRightPanel(object? sender, RoutedEventArgs e) => SetRightCollapsed(!_rightCollapsed);
+
+        private void SetRightCollapsed(bool collapsed)
+        {
+            if (collapsed == _rightCollapsed) return;
+            _rightCollapsed = collapsed;
+            // Hide the tab contents so the Auto-sized column shrinks to just the sideways tab strip.
+            RightFilesContent.IsVisible = RightInstrContent.IsVisible = !collapsed;
+            RightSplitter.IsVisible = !collapsed;
+            RightSplitterCol.Width = new GridLength(collapsed ? 0 : 4);
+            if (collapsed)
+            {
+                _rightSaved = RightCol.Width;
+                RightCol.Width = GridLength.Auto;
+                RightToggle.Content = "◂";
+            }
+            else
+            {
+                RightCol.Width = _rightSaved;
+                RightToggle.Content = "▸";
+            }
+        }
+
+        // Clicking a sideways tab on the collapsed right strip expands the panel (the click also selects it).
+        private void OnRightTabsPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (_rightCollapsed) SetRightCollapsed(false);
         }
 
         private IPreviewService? Preview => App.ServiceProvider?.GetService<IPreviewService>();
@@ -90,7 +189,7 @@ namespace Ongenet.Desktop.Views.Windows
             // FL-style typing-keyboard note input — only on an unmodified key. This guarantees Shift/Ctrl/
             // Alt + any key (e.g. Shift+[ for the loop, Ctrl+D to duplicate) never triggers a MIDI note.
             if (e.KeyModifiers != KeyModifiers.None) return;
-            if (Selection?.SelectedTrack?.Instrument is null) return;
+            if (Selection?.SelectedTrack is not { Kind: Core.Models.Audio.TrackKind.Instrument }) return;
             if (!ComputerKeyboard.TryGetNote(e.Key, out var note)) return;
             if (_heldKeys.ContainsKey(e.Key)) { e.Handled = true; return; }
 

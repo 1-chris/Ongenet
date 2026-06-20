@@ -67,10 +67,22 @@ public sealed class Track
     public List<Clip> Clips { get; } = new();
 
     /// <summary>
-    /// The live instrument for an <see cref="TrackKind.Instrument"/> track, or null. The audio
-    /// engine mixes this; the instrument inspector edits it.
+    /// The instrument rack for an <see cref="TrackKind.Instrument"/> track: zero or more instruments,
+    /// each with its own bypass flag and (pre) effect chain. The track's MIDI drives every enabled slot
+    /// simultaneously. UI-facing list — edit, then call <see cref="CommitInstruments"/>.
     /// </summary>
-    public IInstrument? Instrument { get; set; }
+    public List<InstrumentSlot> Instruments { get; } = new();
+
+    private volatile InstrumentSlot[] _activeInstruments = Array.Empty<InstrumentSlot>();
+
+    /// <summary>Lock-free snapshot of the instrument rack read by the audio engine.</summary>
+    public InstrumentSlot[] ActiveInstruments => _activeInstruments;
+
+    /// <summary>Publishes the current <see cref="Instruments"/> list to the audio thread.</summary>
+    public void CommitInstruments() => _activeInstruments = Instruments.ToArray();
+
+    /// <summary>The first instrument in the rack, or null. Convenience for read-only call sites.</summary>
+    public IInstrument? PrimaryInstrument => Instruments.Count > 0 ? Instruments[0].Instrument : null;
 
     /// <summary>
     /// Transient peak output level (0..1, with release) written by the audio engine each block and

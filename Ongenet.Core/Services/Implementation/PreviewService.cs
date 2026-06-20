@@ -40,7 +40,7 @@ public class PreviewService : IPreviewService
         lock (_lock)
         {
             if (!_active.Add(midiNote)) return;
-            _selection.SelectedTrack?.Instrument?.NoteOn(midiNote, velocity);
+            ForEachInstrument(i => i.NoteOn(midiNote, velocity));
             var vel = (byte)Math.Clamp((int)(velocity * 127f), 0, 127);
             ForwardToEffects(new MidiMessage(MidiMessageKind.NoteOn, 0, (byte)midiNote, vel));
         }
@@ -56,7 +56,7 @@ public class PreviewService : IPreviewService
         lock (_lock)
         {
             if (!_active.Remove(midiNote)) return;
-            _selection.SelectedTrack?.Instrument?.NoteOff(midiNote);
+            ForEachInstrument(i => i.NoteOff(midiNote));
             ForwardToEffects(new MidiMessage(MidiMessageKind.NoteOff, 0, (byte)midiNote, 0));
         }
 
@@ -71,20 +71,30 @@ public class PreviewService : IPreviewService
 
     public void ControlChange(int controller, int value)
     {
-        _selection.SelectedTrack?.Instrument?.ControlChange(controller, value);
+        ForEachInstrument(i => i.ControlChange(controller, value));
         ForwardToEffects(new MidiMessage(MidiMessageKind.ControlChange, 0, (byte)controller, (byte)value));
     }
 
     public void PitchBend(int value14)
     {
-        _selection.SelectedTrack?.Instrument?.PitchBend(value14);
+        ForEachInstrument(i => i.PitchBend(value14));
         ForwardToEffects(new MidiMessage(MidiMessageKind.PitchBend, 0, (byte)(value14 & 0x7F), (byte)((value14 >> 7) & 0x7F)));
     }
 
     public void ChannelAftertouch(int value)
     {
-        _selection.SelectedTrack?.Instrument?.ChannelAftertouch(value);
+        ForEachInstrument(i => i.ChannelAftertouch(value));
         ForwardToEffects(new MidiMessage(MidiMessageKind.ChannelAftertouch, 0, (byte)value, 0));
+    }
+
+    // Routes a preview action to every enabled instrument in the selected track's rack. Reads the
+    // committed snapshot (thread-safe array) since live input can arrive on a background MIDI thread.
+    private void ForEachInstrument(Action<Audio.Instruments.IInstrument> act)
+    {
+        var track = _selection.SelectedTrack;
+        if (track is null) return;
+        foreach (var slot in track.ActiveInstruments)
+            if (slot.Enabled) act(slot.Instrument);
     }
 
     // Live notes/CC also reach the selected track's MIDI-aware insert effects (e.g. a stutter effect

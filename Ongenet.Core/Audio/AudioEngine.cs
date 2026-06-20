@@ -59,6 +59,7 @@ public sealed class AudioEngine : IAudioEngine
     private float _clickAmp;
 
     private float[] _temp = Array.Empty<float>();
+    private float[] _slotTemp = Array.Empty<float>(); // per-instrument render scratch (slot → slot fx → sum into _temp)
     private float _masterL;
     private float _masterR;
 
@@ -98,7 +99,12 @@ public sealed class AudioEngine : IAudioEngine
         var tracks = _project.Current.Tracks.ToArray();
         foreach (var track in tracks)
         {
-            track.Instrument?.Prepare(_output.Format);
+            foreach (var slot in track.ActiveInstruments)
+            {
+                slot.Instrument.Prepare(_output.Format);
+                foreach (var fx in slot.ActiveEffects) fx.Prepare(_output.Format);
+            }
+
             foreach (var effect in track.ActiveEffects) effect.Prepare(_output.Format);
         }
 
@@ -203,8 +209,9 @@ public sealed class AudioEngine : IAudioEngine
         {
             // MIDI clips drive the track's instrument (sound) and any MIDI-aware insert effect (gestures).
             var midiFx = MidiEffectsOf(track);
-            if (track is { Kind: TrackKind.Instrument, Instrument: { } instrument })
+            if (track.Kind == TrackKind.Instrument && track.ActiveInstruments.Length > 0)
             {
+                var slots = track.ActiveInstruments;
                 foreach (var clip in track.Clips)
                 {
                     if (!clip.IsMidi) continue;
@@ -213,7 +220,7 @@ public sealed class AudioEngine : IAudioEngine
                         var onBeat = clip.StartBeat + note.StartBeat;
                         var offBeat = onBeat + note.LengthBeats;
                         if (offBeat <= startBeat) continue;
-                        notes.Add(new ScheduledNote(onBeat, offBeat, instrument, midiFx, note.Note, note.Velocity));
+                        notes.Add(new ScheduledNote(onBeat, offBeat, slots, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
@@ -302,6 +309,7 @@ public sealed class AudioEngine : IAudioEngine
     {
         buffer.Clear();
         if (_temp.Length < buffer.Length) _temp = new float[buffer.Length];
+        if (_slotTemp.Length < buffer.Length) _slotTemp = new float[buffer.Length];
 
         var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
         var frames = buffer.Length / channels;
@@ -382,10 +390,27 @@ public sealed class AudioEngine : IAudioEngine
             var hasContent = false;
             temp.Clear();
 
-            if (track.Instrument is { } instrument)
+            // Instrument rack: render each enabled slot through its own (pre) effect chain, then sum into
+            // the track buffer. The track-level effects below then process the combined output (post chain).
+            var slots = track.ActiveInstruments;
+            if (slots.Length > 0)
             {
-                instrument.Render(temp);
-                hasContent = true;
+                var slotTemp = _slotTemp.AsSpan(0, buffer.Length);
+                foreach (var slot in slots)
+                {
+                    if (!slot.Enabled) continue;
+                    slotTemp.Clear();
+                    slot.Instrument.Render(slotTemp);
+                    foreach (var fx in slot.ActiveEffects)
+                    {
+                        if (!fx.Enabled) continue;
+                        if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
+                        fx.Process(slotTemp);
+                    }
+
+                    for (var i = 0; i < slotTemp.Length; i++) temp[i] += slotTemp[i];
+                    hasContent = true;
+                }
             }
             else if (playing && track.Kind == TrackKind.Audio)
             {
@@ -635,7 +660,7 @@ public sealed class AudioEngine : IAudioEngine
     {
         foreach (var track in _tracks)
         {
-            track.Instrument?.AllNotesOff();
+            foreach (var slot in track.ActiveInstruments) slot.Instrument.AllNotesOff();
             foreach (var fx in track.ActiveEffects)
                 if (fx is IMidiAwareEffect m) m.AllNotesOff();
         }
@@ -653,15 +678,23 @@ public sealed class AudioEngine : IAudioEngine
         _output.Dispose();
     }
 
-    // A scheduled note targets an instrument (sound) and/or a track's MIDI-aware effects (gestures);
-    // either may be absent. MidiEffects is the track's snapshot, captured when playback began.
-    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument? Instrument,
+    // A scheduled note targets a track's instrument rack (sound — every enabled slot) and/or its
+    // MIDI-aware effects (gestures); either may be absent. Slots and MidiEffects are the track's
+    // snapshots, captured when playback began (slot.Enabled is read live so toggles take effect).
+    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, InstrumentSlot[]? Slots,
         IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
     {
         public void Fire(bool on)
         {
-            if (on) Instrument?.NoteOn(Note, Velocity);
-            else Instrument?.NoteOff(Note);
+            if (Slots is not null)
+            {
+                foreach (var slot in Slots)
+                {
+                    if (!slot.Enabled) continue;
+                    if (on) slot.Instrument.NoteOn(Note, Velocity);
+                    else slot.Instrument.NoteOff(Note);
+                }
+            }
 
             if (MidiEffects.Length == 0) return;
             var vel = (byte)Math.Clamp((int)(Velocity * 127f), 0, 127);

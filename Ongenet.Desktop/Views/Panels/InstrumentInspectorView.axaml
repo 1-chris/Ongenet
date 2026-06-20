@@ -4,9 +4,9 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.Desktop.ViewModels"
              xmlns:inst="using:Ongenet.Desktop.ViewModels.Instruments"
+             xmlns:instc="using:Ongenet.Core.Audio.Instruments"
              xmlns:panels="using:Ongenet.Desktop.Views.Panels"
-             xmlns:controls="using:Ongenet.Desktop.Controls"
-             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="240"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="280"
              x:Class="Ongenet.Desktop.Views.Panels.InstrumentInspectorView"
              x:DataType="vm:InstrumentInspectorViewModel">
 
@@ -28,136 +28,79 @@
         </Style>
     </UserControl.Styles>
 
-    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12" Name="Root">
         <Grid>
-            <TextBlock Text="Select an instrument track." IsVisible="{Binding !HasInstrument}"
+            <TextBlock Text="Select an instrument track." IsVisible="{Binding !HasInstrumentTrack}"
                        Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
 
-            <!-- Rows: header / parameters (fills + scrolls) / grain monitor / keyboard -->
-            <Grid IsVisible="{Binding HasInstrument}" RowDefinitions="Auto,*,Auto,Auto">
+            <!-- Rows: header (add menu) / rack (fills + scrolls) / keyboard -->
+            <Grid IsVisible="{Binding HasInstrumentTrack}" RowDefinitions="Auto,*,Auto">
 
-                <!-- Header: name, sampler loader, plugin-UI button -->
-                <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="{Binding InstrumentName}" FontWeight="Bold" FontSize="12"
-                               VerticalAlignment="Center" Margin="0,0,16,0"
-                               Foreground="{StaticResource CatppuccinMauve}"/>
+                <!-- Header: add-instrument menu + caption -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                    <Button Content="+ Add instrument" Background="{StaticResource CatppuccinSurface0}">
+                        <Button.Flyout>
+                            <Flyout>
+                                <ScrollViewer MaxHeight="420">
+                                    <ItemsControl ItemsSource="{Binding AddableCategories}" Width="180">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:InstrumentCategoryViewModel">
+                                                <StackPanel Margin="0,0,0,6">
+                                                    <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="Bold"
+                                                               Margin="2,4,2,2"
+                                                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                    <ItemsControl ItemsSource="{Binding Instruments}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="instc:InstrumentInfo">
+                                                                <Button Content="{Binding DisplayName}" Click="OnAddInstrument"
+                                                                        HorizontalAlignment="Stretch" Margin="0,1"
+                                                                        HorizontalContentAlignment="Left"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <TextBlock Text="{Binding TrackName}" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock Text="all instruments play together · drag from the Instruments panel to add"
+                               VerticalAlignment="Center" FontSize="11" FontStyle="Italic"
+                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,0"
-                                VerticalAlignment="Center" IsVisible="{Binding IsPresetProvider}">
-                        <TextBlock Text="Preset" VerticalAlignment="Center" FontSize="11"
-                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
-                        <ComboBox MinWidth="150" ItemsSource="{Binding PresetNames}"
-                                  SelectedIndex="{Binding SelectedPreset}"
-                                  PlaceholderText="Choose a preset…"
-                                  Background="{StaticResource CatppuccinSurface0}"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
-                                VerticalAlignment="Center" IsVisible="{Binding IsSampler}">
-                        <Button Content="Load sample…" Click="OnLoadSample"
-                                Background="{StaticResource CatppuccinSurface0}"/>
-                        <TextBlock Text="{Binding SampleName}" VerticalAlignment="Center"
-                                   MaxWidth="220" FontSize="11" TextTrimming="CharacterEllipsis"
-                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
-                                VerticalAlignment="Center" IsVisible="{Binding IsSfz}">
-                        <Button Content="Load SFZ…" Click="OnLoadSfz"
-                                Background="{StaticResource CatppuccinSurface0}"/>
-                        <TextBlock Text="{Binding SfzStatus}" VerticalAlignment="Center"
-                                   MaxWidth="260" FontSize="11" TextTrimming="CharacterEllipsis"
-                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
-                        <ProgressBar Width="120" Height="6" Minimum="0" Maximum="1"
-                                     Value="{Binding SfzLoadProgress}" IsVisible="{Binding IsSfzLoading}"
-                                     VerticalAlignment="Center"
-                                     Foreground="{StaticResource CatppuccinMauve}"/>
-                    </StackPanel>
-
-                    <Button Content="{Binding EditorButtonText}" Click="OnTogglePluginUi"
-                            IsVisible="{Binding HasEditor}" VerticalAlignment="Center"
-                            Background="{StaticResource CatppuccinSurface0}"
-                            ToolTip.Tip="Open the plugin's own interface"/>
-                </WrapPanel>
-
-                <!-- Parameters: grouped fieldsets that wrap across the width, scroll vertically on overflow -->
+                <!-- Rack of instrument cards, or an empty-state drop zone -->
                 <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
-                    <panels:GroupedParametersView DataContext="{Binding ParameterGroups}"/>
+                    <Grid>
+                        <Border IsVisible="{Binding IsEmpty}" Height="120" CornerRadius="6"
+                                BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="2"
+                                Background="{StaticResource CatppuccinCrust}">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                                <TextBlock Text="No instruments yet" FontWeight="Bold" HorizontalAlignment="Center"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <TextBlock Text="Drag an instrument here from the Instruments panel, or use “+ Add instrument”."
+                                           FontSize="11" HorizontalAlignment="Center" TextWrapping="Wrap"
+                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl ItemsSource="{Binding Slots}" IsVisible="{Binding !IsEmpty}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="inst:InstrumentSlotViewModel">
+                                    <panels:InstrumentSlotView/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
                 </ScrollViewer>
 
-                <!-- Grain monitor (granular synth only) -->
-                <Border Grid.Row="2" Height="96" Margin="0,8,0,0" CornerRadius="4"
-                        ClipToBounds="True" IsVisible="{Binding IsGranular}"
-                        BorderBrush="{StaticResource CatppuccinSurface0}" BorderThickness="1">
-                    <Grid>
-                        <controls:GrainMonitorControl Monitor="{Binding GrainMonitor}"/>
-                        <TextBlock Text="GRAINS" FontSize="9" Margin="6,4"
-                                   VerticalAlignment="Top" HorizontalAlignment="Left"
-                                   IsHitTestVisible="False"
-                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    </Grid>
-                </Border>
-
-                <!-- Waveform preview (instruments that render a one-shot, e.g. Kicka) -->
-                <Border Grid.Row="2" Height="96" Margin="0,8,0,0" CornerRadius="4"
-                        ClipToBounds="True" IsVisible="{Binding IsPreviewable}"
-                        Background="{StaticResource CatppuccinCrust}"
-                        BorderBrush="{StaticResource CatppuccinSurface0}" BorderThickness="1">
-                    <Grid>
-                        <controls:WaveformControl Waveform="{Binding InstrumentPreview}"
-                                                  Revision="{Binding PreviewRevision}"
-                                                  Fill="{StaticResource CatppuccinMauve}"/>
-                        <TextBlock Text="WAVEFORM" FontSize="9" Margin="6,4"
-                                   VerticalAlignment="Top" HorizontalAlignment="Left"
-                                   IsHitTestVisible="False"
-                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    </Grid>
-                </Border>
-
-                <!-- SFZ "Sampler": zone map + amp envelope + live controllers -->
-                <Border Grid.Row="2" Height="150" Margin="0,8,0,0" CornerRadius="4"
-                        ClipToBounds="True" IsVisible="{Binding IsSfz}"
-                        Background="{StaticResource CatppuccinCrust}"
-                        BorderBrush="{StaticResource CatppuccinSurface0}" BorderThickness="1">
-                    <Grid ColumnDefinitions="*,220">
-                        <Grid Grid.Column="0">
-                            <controls:ZoneMapControl Zones="{Binding SfzZones}" Revision="{Binding SfzRevision}"/>
-                            <TextBlock Text="ZONES  (key × velocity)" FontSize="9" Margin="6,4"
-                                       VerticalAlignment="Top" HorizontalAlignment="Left"
-                                       IsHitTestVisible="False"
-                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
-                        </Grid>
-
-                        <DockPanel Grid.Column="1" Margin="8,4,6,6" LastChildFill="True">
-                            <TextBlock DockPanel.Dock="Top" Text="AMP ENVELOPE" FontSize="9"
-                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
-
-                            <!-- Live controllers along the bottom; envelope fills the rest. -->
-                            <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" Margin="0,6,0,0">
-                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                                    <TextBlock Text="Mod" FontSize="10"
-                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                    <Slider Minimum="0" Maximum="127" Value="{Binding ModWheel, Mode=TwoWay}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
-                                    <TextBlock Text="Bend" FontSize="10"
-                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                    <Slider Minimum="0" Maximum="16383" Value="{Binding PitchBendValue, Mode=TwoWay}"
-                                            PointerReleased="OnBendReleased" PointerCaptureLost="OnBendCaptureLost"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <controls:EnvelopeDisplayControl MinHeight="40"
-                                Delay="{Binding EnvDelay}" Attack="{Binding EnvAttack}"
-                                Hold="{Binding EnvHold}" Decay="{Binding EnvDecay}"
-                                Sustain="{Binding EnvSustain}" Release="{Binding EnvRelease}"/>
-                        </DockPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Mini keyboard -->
-                <StackPanel Grid.Row="3" Spacing="4" Margin="0,8,0,0">
+                <!-- Shared mini keyboard: plays every enabled instrument at once -->
+                <StackPanel Grid.Row="2" Spacing="4" Margin="0,8,0,0">
                     <TextBlock Text="Click keys to play" FontSize="11"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">

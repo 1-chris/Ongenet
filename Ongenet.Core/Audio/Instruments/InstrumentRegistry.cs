@@ -11,16 +11,21 @@ namespace Ongenet.Core.Audio.Instruments;
 public sealed class InstrumentRegistry : IInstrumentRegistry
 {
     private readonly object _lock = new();
+    // Category labels used to group built-in instruments in the library (mirrors the effect registry).
+    private const string CatSynth = "Synth";
+    private const string CatSampler = "Sampler";
+    private const string CatDrum = "Drum";
+
     private readonly List<InstrumentInfo> _builtIn = new()
     {
-        new InstrumentInfo(OscillatorInstrument.TypeId, "Oscillator", () => new OscillatorInstrument()),
-        new InstrumentInfo(TripleOscInstrument.TypeId, "3x Osc", () => new TripleOscInstrument()),
-        new InstrumentInfo(FmSynthInstrument.TypeId, "FM Synth", () => new FmSynthInstrument()),
-        new InstrumentInfo(BasicSamplerInstrument.TypeId, "Basic Sampler", () => new BasicSamplerInstrument()),
-        new InstrumentInfo(GranularInstrument.TypeId, "Granular", () => new GranularInstrument()),
-        new InstrumentInfo(PaddaInstrument.TypeId, "Padda", () => new PaddaInstrument()),
-        new InstrumentInfo(KickaInstrument.TypeId, "Kicka", () => new KickaInstrument()),
-        new InstrumentInfo(Sfz.SfzInstrument.TypeId, "Sampler", () => new Sfz.SfzInstrument())
+        new InstrumentInfo(OscillatorInstrument.TypeId, "Oscillator", () => new OscillatorInstrument(), CatSynth),
+        new InstrumentInfo(TripleOscInstrument.TypeId, "3x Osc", () => new TripleOscInstrument(), CatSynth),
+        new InstrumentInfo(FmSynthInstrument.TypeId, "FM Synth", () => new FmSynthInstrument(), CatSynth),
+        new InstrumentInfo(PaddaInstrument.TypeId, "Padda", () => new PaddaInstrument(), CatSynth),
+        new InstrumentInfo(BasicSamplerInstrument.TypeId, "Basic Sampler", () => new BasicSamplerInstrument(), CatSampler),
+        new InstrumentInfo(Sfz.SfzInstrument.TypeId, "Sampler", () => new Sfz.SfzInstrument(), CatSampler),
+        new InstrumentInfo(GranularInstrument.TypeId, "Granular", () => new GranularInstrument(), CatSampler),
+        new InstrumentInfo(KickaInstrument.TypeId, "Kicka", () => new KickaInstrument(), CatDrum)
     };
 
     // Dynamically discovered instruments (e.g. CLAP plugins), added at runtime.

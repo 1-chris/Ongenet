@@ -24,7 +24,9 @@ namespace Ongenet.Core.Persistence;
 public static class ProjectFile
 {
     /// <summary>Bumped whenever the on-disk layout changes. Newer files opened in an older app degrade gracefully.</summary>
-    public const int FormatVersion = 1;
+    /// <remarks>v2: instrument tracks store an instrument rack (a list of slots, each with its own effect
+    /// chain) instead of a single optional instrument. v1 files load as a one-slot rack.</remarks>
+    public const int FormatVersion = 2;
 
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("ONGENPRJ"); // 8 bytes
     private const string ManifestEntry = "ongen.manifest";
@@ -154,8 +156,15 @@ public static class ProjectFile
             c.WriteBool(t.AutomationCollapsed);
             c.WriteBool(t.GroupCollapsed);
 
-            c.WriteBool(t.Instrument is not null);
-            if (t.Instrument is not null) WriteComponent(c, t.Instrument.TypeId, t.Instrument, t.Instrument.Parameters, store, false, t.Instrument as ISampleHost);
+            // Instrument rack: a list of slots, each its own instrument + (pre) effect chain.
+            c.WriteInt(t.Instruments.Count);
+            foreach (var slot in t.Instruments)
+            {
+                var inst = slot.Instrument;
+                WriteComponent(c, inst.TypeId, inst, inst.Parameters, store, slot.Enabled, inst as ISampleHost);
+                c.WriteInt(slot.Effects.Count);
+                foreach (var e in slot.Effects) WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
+            }
 
             c.WriteInt(t.Effects.Count);
             foreach (var e in t.Effects) WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
@@ -309,7 +318,7 @@ public static class ProjectFile
 
             var trackCount = r.ReadInt();
             for (var i = 0; i < trackCount; i++)
-                project.Tracks.Add(ReadTrack(r, instruments, effects, samples, warnings));
+                project.Tracks.Add(ReadTrack(r, instruments, effects, samples, warnings, fileVersion));
 
             // Optional trailing MIDI-mappings chunk (absent in files saved before this feature).
             if (r.HasMore) r.ReadChunk(c => ReadMidiMappings(c, project));
@@ -319,7 +328,7 @@ public static class ProjectFile
     }
 
     private static Track ReadTrack(OngenReader r, IInstrumentRegistry instruments, IEffectRegistry effects,
-        SampleLoader samples, List<string> warnings)
+        SampleLoader samples, List<string> warnings, int fileVersion)
     {
         Track track = null!;
         r.ReadChunk(c =>
@@ -336,9 +345,31 @@ public static class ProjectFile
             track.AutomationCollapsed = c.ReadBool();
             track.GroupCollapsed = c.ReadBool();
 
-            // Instrument
-            if (c.ReadBool())
-                track.Instrument = ReadInstrument(c, instruments, samples, warnings);
+            // Instrument rack. v1 stored a single optional instrument (bool + component); v2+ stores a
+            // count-prefixed list of slots, each an instrument followed by its own effect chain.
+            if (fileVersion < 2)
+            {
+                if (c.ReadBool() && ReadInstrument(c, instruments, samples, warnings) is { } legacy)
+                    track.Instruments.Add(new InstrumentSlot(legacy) { Enabled = true });
+            }
+            else
+            {
+                var slotCount = c.ReadInt();
+                for (var i = 0; i < slotCount; i++)
+                {
+                    var (inst, enabled) = ReadInstrumentSlot(c, instruments, samples, warnings);
+                    var fxCountSlot = c.ReadInt();
+                    var slotFx = new List<IAudioEffect>();
+                    for (var j = 0; j < fxCountSlot; j++)
+                        if (ReadEffect(c, effects, warnings) is { } sfx) slotFx.Add(sfx);
+
+                    if (inst is null) continue; // instrument type unavailable; its effects are dropped
+                    var slot = new InstrumentSlot(inst) { Enabled = enabled };
+                    foreach (var sfx in slotFx) slot.Effects.Add(sfx);
+                    slot.CommitEffects();
+                    track.Instruments.Add(slot);
+                }
+            }
 
             // Effects
             var fxCount = c.ReadInt();
@@ -363,9 +394,38 @@ public static class ProjectFile
         });
 
         // Populate the audio-thread snapshots the engine reads.
+        track.CommitInstruments();
         track.CommitEffects();
         track.CommitAutoLanes();
         return track;
+    }
+
+    // Reads one rack slot's instrument (v2+), returning the instrument (null if its type is unavailable)
+    // and its persisted enabled flag.
+    private static (IInstrument? Instrument, bool Enabled) ReadInstrumentSlot(OngenReader r,
+        IInstrumentRegistry instruments, SampleLoader samples, List<string> warnings)
+    {
+        IInstrument? inst = null;
+        var enabled = true;
+        r.ReadChunk(c =>
+        {
+            var typeId = c.ReadString();
+            enabled = c.ReadBool();
+            var sampleRef = c.ReadString();
+            var sampleName = c.ReadString();
+
+            try { inst = instruments.Create(typeId); }
+            catch { warnings.Add($"Instrument '{typeId}' is unavailable; it was skipped."); inst = null; }
+
+            var persisted = ReadParameters(c);
+            if (inst is not null) ApplyParameters(inst.Parameters, persisted);
+
+            if (inst is ISampleHost host && sampleRef.Length > 0 && samples.Get(sampleRef) is { } buf)
+                host.LoadSample(buf, sampleName);
+
+            ReadCustomState(c, inst);
+        });
+        return (inst, enabled);
     }
 
     private static IInstrument? ReadInstrument(OngenReader r, IInstrumentRegistry instruments,
@@ -518,7 +578,10 @@ public static class ProjectFile
                 if (effectIndex < 0 || effectIndex >= track.Effects.Count) return null;
                 return FromParameter(track.Effects[effectIndex].Parameters, paramIndex);
             case AutomationTargetKind.InstrumentParam:
-                return track.Instrument is null ? null : FromParameter(track.Instrument.Parameters, paramIndex);
+                // effectIndex carries the rack slot index (v1 files used -1 for the single instrument → slot 0).
+                var slot = effectIndex < 0 ? 0 : effectIndex;
+                if (slot >= track.Instruments.Count) return null;
+                return FromParameter(track.Instruments[slot].Instrument.Parameters, paramIndex);
             default:
                 return null;
         }

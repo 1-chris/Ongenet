@@ -318,9 +318,8 @@ namespace Ongenet.Desktop.Views.Panels
 
             e.DragEffects = DragDropEffects.Copy;
 
-            // An audio file dragged near the line between two tracks inserts a NEW track there, shown
-            // with the same insertion line used for track reordering.
-            if (isAudio && !isInstrument)
+            // An audio file or instrument dragged near the line between two tracks inserts a NEW track
+            // there, shown with the same insertion line used for track reordering.
             {
                 var (insertIndex, indicatorY) = LocateBoundary(e, vm);
                 if (insertIndex >= 0)
@@ -362,7 +361,8 @@ namespace Ongenet.Desktop.Views.Panels
             var (insertIndex, _) = LocateBoundary(e, vm);
             if (e.DataTransfer.TryGetValue(DragFormats.Instrument) is { } instrumentId)
             {
-                vm.CreateInstrumentTrack(instrumentId, vm.TrackInsertIndexForRow(rowIndex));
+                var laneIndex = insertIndex >= 0 ? insertIndex : vm.TrackInsertIndexForRow(rowIndex);
+                vm.CreateInstrumentTrack(instrumentId, laneIndex);
             }
             else if (e.DataTransfer.TryGetValue(DragFormats.AudioFile) is { } path)
             {
@@ -617,11 +617,44 @@ namespace Ongenet.Desktop.Views.Panels
             }
 
             vm.NotifyClipGeometryChanged(_dragClip);
+            if (_gesture == Gesture.Move) UpdateClipDragGhost(vm, pos);
             e.Handled = true;
+        }
+
+        // Shows a translucent preview on the compatible track under the pointer while moving a clip, so the
+        // destination lane is visible before the drop. Hidden when over the clip's own lane or a wrong kind.
+        private void UpdateClipDragGhost(TimelineViewModel vm, Point pos)
+        {
+            if (_dragClip is null) { ClipDragGhost.IsVisible = false; return; }
+
+            var (targetRow, _) = LocatePoint(pos, vm);
+            var targetLane = vm.TrackLaneAtRow(targetRow);
+            var origin = vm.FindLaneOf(_dragClip);
+            var kind = targetLane?.Model.Kind;
+            var compatible = _dragClip.Model.IsAudio
+                ? kind == Core.Models.Audio.TrackKind.Audio
+                : kind == Core.Models.Audio.TrackKind.Instrument;
+
+            if (targetLane is null || origin is null || ReferenceEquals(origin, targetLane) || !compatible)
+            {
+                ClipDragGhost.IsVisible = false;
+                return;
+            }
+
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            var scrollX = _lanesScroll?.Offset.X ?? 0;
+            var scrollY = _lanesScroll?.Offset.Y ?? 0;
+
+            var rowIndex = vm.Lanes.IndexOf(targetLane);
+            Canvas.SetTop(ClipDragGhost, vm.RowTop(rowIndex) + 6 - scrollY); // clips sit 6px from the lane top
+            Canvas.SetLeft(ClipDragGhost, _dragClip.Left - scrollX);
+            ClipDragGhost.Width = System.Math.Max(2, _dragClip.Width);
+            ClipDragGhost.IsVisible = true;
         }
 
         private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
         {
+            ClipDragGhost.IsVisible = false;
             if (_gesture == Gesture.None) { return; }
             if (DataContext is TimelineViewModel vm && _gesture == Gesture.Move && _dragClip is not null)
             {

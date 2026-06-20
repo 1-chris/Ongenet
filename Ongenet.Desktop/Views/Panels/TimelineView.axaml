@@ -346,7 +346,8 @@
                 </ListBox.DataTemplates>
             </ListBox>
 
-            <!-- Drop overlay: "New audio track" ghost shown when dragging below the last lane -->
+            <!-- Drop overlay: "New audio track" ghost shown when dragging below the last lane, plus the
+                 clip-move ghost showing where a clip dragged onto another track will land -->
             <Canvas Grid.Row="1" Grid.Column="1" Name="DropOverlay" IsHitTestVisible="False">
                 <Border Name="NewTrackGhost" Height="64" IsVisible="False" CornerRadius="2"
                         BorderBrush="{StaticResource CatppuccinGreen}" BorderThickness="2">
@@ -356,6 +357,10 @@
                                    VerticalAlignment="Center"
                                    FontWeight="SemiBold" Foreground="{StaticResource CatppuccinGreen}"/>
                     </Grid>
+                </Border>
+                <Border Name="ClipDragGhost" Height="52" IsVisible="False" CornerRadius="3" Opacity="0.6"
+                        BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="2">
+                    <Rectangle Fill="{StaticResource CatppuccinMauve}" Opacity="0.25"/>
                 </Border>
             </Canvas>
 

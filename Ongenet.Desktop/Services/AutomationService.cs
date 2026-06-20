@@ -54,10 +54,12 @@ namespace Ongenet.Desktop.Services
             // No kind set → an instrument/effect parameter; find it by reference.
             if (d.BindSource is not Parameter param) return null;
 
-            if (owner.Instrument is { } inst)
+            // Instrument-rack parameter: the slot index is carried in the binding's EffectIndex field so
+            // the right instrument is found again on load (and after re-ordering the rack).
+            for (var s = 0; s < owner.Instruments.Count; s++)
             {
-                var pi = IndexOf(inst.Parameters, param);
-                if (pi >= 0) return new(AutomationTargetKind.InstrumentParam, -1, pi);
+                var pi = IndexOf(owner.Instruments[s].Instrument.Parameters, param);
+                if (pi >= 0) return new(AutomationTargetKind.InstrumentParam, s, pi);
             }
 
             for (var i = 0; i < owner.Effects.Count; i++)

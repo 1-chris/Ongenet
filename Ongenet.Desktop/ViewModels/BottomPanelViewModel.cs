@@ -11,6 +11,7 @@ namespace Ongenet.Desktop.ViewModels
     {
         private const int FirstTab = 0;
         private const int PianoRollTab = 1;
+        private const int EffectsTab = 2;
 
         private readonly ISelectionService _selection;
         private int _selectedTabIndex;
@@ -41,6 +42,16 @@ namespace Ongenet.Desktop.ViewModels
         /// <summary>Header of the contextual first tab.</summary>
         public string FirstTabHeader => IsSampleSelected ? "Sample" : "Instrument";
 
+        // A bus (the master or a group) carries no instrument and no MIDI/audio clips, so the Instrument
+        // and Piano Roll tabs are meaningless there — only its Effects chain applies.
+        private bool IsBusSelected => _selection.SelectedTrack is { IsBus: true };
+
+        /// <summary>Whether the contextual first (Instrument/Sample) tab is shown.</summary>
+        public bool ShowFirstTab => IsSampleSelected || !IsBusSelected;
+
+        /// <summary>Whether the Piano Roll tab is shown.</summary>
+        public bool ShowPianoRollTab => !IsBusSelected;
+
         public int SelectedTabIndex
         {
             get => _selectedTabIndex;
@@ -52,6 +63,15 @@ namespace Ongenet.Desktop.ViewModels
             OnPropertyChanged(nameof(IsSampleSelected));
             OnPropertyChanged(nameof(IsInstrumentMode));
             OnPropertyChanged(nameof(FirstTabHeader));
+            OnPropertyChanged(nameof(ShowFirstTab));
+            OnPropertyChanged(nameof(ShowPianoRollTab));
+
+            // A bus exposes only Effects; make sure the (now hidden) Instrument/Piano Roll tab isn't left selected.
+            if (IsBusSelected)
+            {
+                SelectedTabIndex = EffectsTab;
+                return;
+            }
 
             switch (_selection.SelectedClip)
             {

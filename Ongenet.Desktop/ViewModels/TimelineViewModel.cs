@@ -898,9 +898,19 @@ namespace Ongenet.Desktop.ViewModels
                 IsSoloed = src.IsSoloed,
                 Volume = src.Volume,
                 Pan = src.Pan,
-                ColorKey = src.ColorKey,
-                Instrument = src.Instrument?.Clone()
+                ColorKey = src.ColorKey
             };
+
+            // Clone the instrument rack: each slot's instrument + its own effect chain, preserving bypass.
+            foreach (var slot in src.Instruments)
+            {
+                var copySlot = new Core.Models.Audio.InstrumentSlot(slot.Instrument.Clone()) { Enabled = slot.Enabled };
+                foreach (var fx in slot.Effects) copySlot.Effects.Add(fx.Clone());
+                copySlot.CommitEffects();
+                copy.Instruments.Add(copySlot);
+            }
+
+            copy.CommitInstruments();
             foreach (var clip in src.Clips)
             {
                 copy.Clips.Add(CloneClip(clip));
@@ -1239,9 +1249,10 @@ namespace Ongenet.Desktop.ViewModels
             {
                 Name = $"{instrument.Name} {InstrumentTrackNumber()}",
                 Kind = TrackKind.Instrument,
-                ColorKey = "CatppuccinMauve",
-                Instrument = instrument
+                ColorKey = "CatppuccinMauve"
             };
+            track.Instruments.Add(new Core.Models.Audio.InstrumentSlot(instrument));
+            track.CommitInstruments();
             InsertTrack(track, laneIndex);
         }
 
@@ -1298,6 +1309,11 @@ namespace Ongenet.Desktop.ViewModels
         {
             var lane = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, track));
             lane?.RefreshFromModel();
+
+            // A colour change must repaint the gutter rails, which are a snapshot list rebuilt only on a
+            // full Rebuild(). The changed track's colour also forms an ancestor rail on its descendants,
+            // so refresh every lane's bars (cheap for realistic track counts).
+            foreach (var l in _trackLanes) l.GutterBars = BuildGutterBars(l.Model);
         }
 
         private void RefreshClip(Core.Models.Audio.Clip clip)

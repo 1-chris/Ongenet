@@ -38,7 +38,7 @@ namespace Ongenet.Desktop.ViewModels
                 var clip = _selection.SelectedClip;
                 if (clip is { IsMidi: true }) return false; // piano roll owns the panel
                 var track = _selection.SelectedTrack;
-                if (clip is null && track is { Kind: TrackKind.Instrument, Instrument: not null }) return false;
+                if (clip is null && track is { Kind: TrackKind.Instrument }) return false;
                 return true;
             }
         }

@@ -14,21 +14,34 @@
                        FontSize="11" Margin="12,12,12,8" TextWrapping="Wrap"
                        Foreground="{StaticResource CatppuccinSubtext0}"/>
 
-            <ItemsControl Name="InstrumentList" ItemsSource="{Binding Instruments}" Margin="6,0">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="inst:InstrumentInfo">
-                        <Border Margin="2" Padding="10,8" CornerRadius="4"
-                                Background="{StaticResource CatppuccinSurface0}"
-                                BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="🎹" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"
-                                           FontWeight="SemiBold"/>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl Name="InstrumentList" ItemsSource="{Binding Categories}" Margin="6,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:InstrumentCategoryViewModel">
+                            <StackPanel Margin="0,0,0,6">
+                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Bold"
+                                           Margin="4,8,4,2"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <ItemsControl ItemsSource="{Binding Instruments}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="inst:InstrumentInfo">
+                                            <Border Margin="2" Padding="10,8" CornerRadius="4"
+                                                    Background="{StaticResource CatppuccinSurface0}"
+                                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="🎹" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"
+                                                               FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </DockPanel>
     </Border>
 </UserControl>

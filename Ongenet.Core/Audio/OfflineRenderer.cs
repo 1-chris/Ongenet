@@ -45,16 +45,23 @@ public sealed class OfflineRenderer
             rt.Effects = track.Effects.Select(e => { var c = e.Clone(); c.Prepare(format); return c; }).ToArray();
             var midiFx = MidiEffectsOf(rt.Effects);
 
-            if (track is { Kind: TrackKind.Instrument, Instrument: { } instrument })
+            if (track.Kind == TrackKind.Instrument && track.Instruments.Count > 0)
             {
-                rt.Instrument = instrument.Clone();
-                rt.Instrument.Prepare(format);
+                foreach (var s in track.Instruments)
+                {
+                    var inst = s.Instrument.Clone();
+                    inst.Prepare(format);
+                    var slotFx = s.Effects.Select(e => { var c = e.Clone(); c.Prepare(format); return c; }).ToArray();
+                    rt.Slots.Add(new RenderSlot(inst, s.Enabled, slotFx));
+                }
+
+                var slots = rt.Slots.ToArray();
                 foreach (var clip in track.Clips.Where(c => c.IsMidi))
                 {
                     foreach (var note in clip.Notes)
                     {
                         var onBeat = clip.StartBeat + note.StartBeat;
-                        events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, rt.Instrument, midiFx, note.Note, note.Velocity));
+                        events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, slots, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
@@ -139,6 +146,7 @@ public sealed class OfflineRenderer
 
         var block = new float[BlockFrames * channels];
         var temp = new float[BlockFrames * channels];
+        var slotTemp = new float[BlockFrames * channels];
         var active = new List<ScheduledNote>();
         var nextEvent = 0;
         var currentBeat = 0.0;
@@ -190,10 +198,24 @@ public sealed class OfflineRenderer
                 tempSpan.Clear();
                 var hasContent = false;
 
-                if (rt.Instrument is not null)
+                if (rt.Slots.Count > 0)
                 {
-                    rt.Instrument.Render(tempSpan);
-                    hasContent = true;
+                    var slotSpan = slotTemp.AsSpan(0, sampleCount);
+                    foreach (var slot in rt.Slots)
+                    {
+                        if (!slot.Enabled) continue;
+                        slotSpan.Clear();
+                        slot.Instrument.Render(slotSpan);
+                        foreach (var fx in slot.Effects)
+                        {
+                            if (!fx.Enabled) continue;
+                            if (fx is IContextualEffect cae) cae.SetContext(ctx);
+                            fx.Process(slotSpan);
+                        }
+
+                        for (var i = 0; i < slotSpan.Length; i++) tempSpan[i] += slotSpan[i];
+                        hasContent = true;
+                    }
                 }
                 else
                 {
@@ -272,9 +294,25 @@ public sealed class OfflineRenderer
     {
         public RenderTrack(Track source) => Source = source;
         public Track Source { get; }
-        public IInstrument? Instrument { get; set; }
+        public List<RenderSlot> Slots { get; } = new();
         public IAudioEffect[] Effects { get; set; } = Array.Empty<IAudioEffect>();
         public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch, double SourceOffset)> AudioClips { get; } = new();
+    }
+
+    // A cloned instrument-rack slot for offline render: the instrument, its bypass flag, and its own
+    // (cloned) effect chain processed before the track-level effects.
+    private sealed class RenderSlot
+    {
+        public RenderSlot(IInstrument instrument, bool enabled, IAudioEffect[] effects)
+        {
+            Instrument = instrument;
+            Enabled = enabled;
+            Effects = effects;
+        }
+
+        public IInstrument Instrument { get; }
+        public bool Enabled { get; }
+        public IAudioEffect[] Effects { get; }
     }
 
     private sealed class RenderBus
@@ -293,13 +331,20 @@ public sealed class OfflineRenderer
         return aware;
     }
 
-    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument? Instrument,
+    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, RenderSlot[]? Slots,
         IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
     {
         public void Fire(bool on)
         {
-            if (on) Instrument?.NoteOn(Note, Velocity);
-            else Instrument?.NoteOff(Note);
+            if (Slots is not null)
+            {
+                foreach (var slot in Slots)
+                {
+                    if (!slot.Enabled) continue;
+                    if (on) slot.Instrument.NoteOn(Note, Velocity);
+                    else slot.Instrument.NoteOff(Note);
+                }
+            }
 
             if (MidiEffects.Length == 0) return;
             var vel = (byte)Math.Clamp((int)(Velocity * 127f), 0, 127);

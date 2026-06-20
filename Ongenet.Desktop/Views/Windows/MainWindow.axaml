@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Ongenet.Desktop.Views.Windows.MainWindow"
         x:DataType="vm:MainViewModel"
-        Width="1670" Height="700"
+        Width="1670" Height="900"
         TransparencyLevelHint="Blur, AcrylicBlur, Transparent"
         Background="Transparent"
         SystemDecorations="None"
@@ -36,6 +36,12 @@
         <Style Selector="TabItem:selected">
             <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
             <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        </Style>
+        <!-- Right-sidebar sideways tabs: trim the horizontal padding (which becomes the strip width once the
+             header is rotated) so the strip is only as wide as the text is tall. -->
+        <Style Selector="TabControl#RightTabs TabItem">
+            <Setter Property="Padding" Value="2,10"/>
+            <Setter Property="MinWidth" Value="0"/>
         </Style>
     </Window.Styles>
 
@@ -103,55 +109,116 @@
 
                 <views:TransportView Grid.Row="0" DataContext="{Binding Transport}"/>
 
-                <Grid Grid.Row="1" ColumnDefinitions="240,4,*,4,260">
-                    <!-- Left: track settings -->
-                    <views:TrackInspectorView Grid.Column="0" MinWidth="180"
-                                              DataContext="{Binding TrackInspector}"/>
-                    <GridSplitter Grid.Column="1" ResizeDirection="Columns"
+                <Grid Grid.Row="1" Name="WorkspaceGrid">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="240"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="260"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: track settings (collapsible) -->
+                    <Grid Grid.Column="0" RowDefinitions="Auto,*" Background="{StaticResource CatppuccinMantle}">
+                        <Border Grid.Row="0" Height="26" Background="{StaticResource CatppuccinSurface0}">
+                            <Button Name="LeftToggle" Content="◂" Click="ToggleLeftPanel"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Background="Transparent" Padding="8,0" FontSize="11"
+                                    Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="Collapse / expand panel"/>
+                        </Border>
+                        <views:TrackInspectorView Grid.Row="1" Name="LeftContent" MinWidth="180"
+                                                  DataContext="{Binding TrackInspector}"/>
+                    </Grid>
+                    <GridSplitter Grid.Column="1" Name="LeftSplitter" ResizeDirection="Columns"
                                   Background="{StaticResource CatppuccinCrust}"/>
 
                     <!-- Centre: timeline over the contextual bottom panel -->
-                    <Grid Grid.Column="2" RowDefinitions="*,4,240">
+                    <Grid Grid.Column="2" Name="CenterColumn">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="432"/>
+                        </Grid.RowDefinitions>
                         <views:TimelineView Grid.Row="0" DataContext="{Binding Timeline}"/>
-                        <GridSplitter Grid.Row="1" ResizeDirection="Rows"
+                        <GridSplitter Grid.Row="1" Name="BottomSplitter" ResizeDirection="Rows"
                                       HorizontalAlignment="Stretch"
                                       Background="{StaticResource CatppuccinCrust}"/>
-                        <!-- Bottom panel: tabbed Instrument / Piano Roll / Effects (contextual to selection) -->
-                        <TabControl Grid.Row="2" MinHeight="90" DataContext="{Binding BottomPanel}"
-                                    SelectedIndex="{Binding SelectedTabIndex}"
+                        <!-- Bottom panel: tabbed Instrument / Piano Roll / Effects (collapsible to just the tabs) -->
+                        <Grid Grid.Row="2">
+                            <TabControl Name="BottomTabs" MinHeight="0" DataContext="{Binding BottomPanel}"
+                                        SelectedIndex="{Binding SelectedTabIndex}"
+                                        Background="{StaticResource CatppuccinMantle}">
+                                <!-- Contextual first tab: Instrument inspector, or Sample inspector for an audio clip -->
+                                <TabItem Header="{Binding FirstTabHeader}" IsVisible="{Binding ShowFirstTab}">
+                                    <Panel Name="BottomFirstContent">
+                                        <ContentControl IsVisible="{Binding IsInstrumentMode}">
+                                            <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
+                                        </ContentControl>
+                                        <ContentControl IsVisible="{Binding IsSampleSelected}">
+                                            <views:SampleInspectorView DataContext="{Binding Sample}"/>
+                                        </ContentControl>
+                                    </Panel>
+                                </TabItem>
+                                <TabItem Header="Piano Roll" IsVisible="{Binding ShowPianoRollTab}">
+                                    <views:PianoRollView Name="BottomPianoContent" DataContext="{Binding PianoRoll}"/>
+                                </TabItem>
+                                <TabItem Header="Effects">
+                                    <views:EffectsView Name="BottomEffectsContent" DataContext="{Binding Effects}"/>
+                                </TabItem>
+                            </TabControl>
+                            <Button Name="BottomToggle" Content="▾" Click="ToggleBottomPanel"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Background="Transparent" Padding="10,4" FontSize="11"
+                                    Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="Collapse / expand panel"/>
+                        </Grid>
+                    </Grid>
+
+                    <GridSplitter Grid.Column="3" Name="RightSplitter" ResizeDirection="Columns"
+                                  Background="{StaticResource CatppuccinCrust}"/>
+
+                    <!-- Right: tabbed Files / Instruments with sideways tabs (collapsible to just the tabs) -->
+                    <Grid Grid.Column="4" RowDefinitions="Auto,*" Background="{StaticResource CatppuccinMantle}">
+                        <Border Grid.Row="0" Height="26" Background="{StaticResource CatppuccinSurface0}">
+                            <!-- Square sized to ~the sideways tab-strip width, left-aligned so the centred
+                                 chevron sits directly above the tabs (and keeps the collapsed strip tight). -->
+                            <Button Name="RightToggle" Content="▸" Click="ToggleRightPanel"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Width="24" Padding="0" FontSize="11"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    Background="Transparent"
+                                    Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="Collapse / expand panel"/>
+                        </Border>
+                        <TabControl Grid.Row="1" Name="RightTabs" TabStripPlacement="Left" Padding="0"
                                     Background="{StaticResource CatppuccinMantle}">
-                            <!-- Contextual first tab: Instrument inspector, or Sample inspector for an audio clip -->
-                            <TabItem Header="{Binding FirstTabHeader}">
-                                <Panel>
-                                    <ContentControl IsVisible="{Binding IsInstrumentMode}">
-                                        <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
-                                    </ContentControl>
-                                    <ContentControl IsVisible="{Binding IsSampleSelected}">
-                                        <views:SampleInspectorView DataContext="{Binding Sample}"/>
-                                    </ContentControl>
-                                </Panel>
+                            <TabItem>
+                                <TabItem.Header>
+                                    <LayoutTransformControl>
+                                        <LayoutTransformControl.LayoutTransform>
+                                            <RotateTransform Angle="90"/>
+                                        </LayoutTransformControl.LayoutTransform>
+                                        <TextBlock Text="Files"/>
+                                    </LayoutTransformControl>
+                                </TabItem.Header>
+                                <views:FileBrowserView Name="RightFilesContent" MinWidth="180"
+                                                       DataContext="{Binding FileBrowser}"/>
                             </TabItem>
-                            <TabItem Header="Piano Roll">
-                                <views:PianoRollView DataContext="{Binding PianoRoll}"/>
-                            </TabItem>
-                            <TabItem Header="Effects">
-                                <views:EffectsView DataContext="{Binding Effects}"/>
+                            <TabItem>
+                                <TabItem.Header>
+                                    <LayoutTransformControl>
+                                        <LayoutTransformControl.LayoutTransform>
+                                            <RotateTransform Angle="90"/>
+                                        </LayoutTransformControl.LayoutTransform>
+                                        <TextBlock Text="Instruments"/>
+                                    </LayoutTransformControl>
+                                </TabItem.Header>
+                                <views:InstrumentsView Name="RightInstrContent" MinWidth="180"
+                                                       DataContext="{Binding Instruments}"/>
                             </TabItem>
                         </TabControl>
                     </Grid>
-
-                    <GridSplitter Grid.Column="3" ResizeDirection="Columns"
-                                  Background="{StaticResource CatppuccinCrust}"/>
-
-                    <!-- Right: tabbed Files / Instruments -->
-                    <TabControl Grid.Column="4" MinWidth="180" Background="{StaticResource CatppuccinMantle}">
-                        <TabItem Header="Files">
-                            <views:FileBrowserView DataContext="{Binding FileBrowser}"/>
-                        </TabItem>
-                        <TabItem Header="Instruments">
-                            <views:InstrumentsView DataContext="{Binding Instruments}"/>
-                        </TabItem>
-                    </TabControl>
                 </Grid>
             </Grid>
         </Grid>

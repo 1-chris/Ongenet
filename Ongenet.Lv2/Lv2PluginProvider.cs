@@ -49,7 +49,7 @@ public sealed class Lv2PluginProvider
 
                 if (d.IsInstrument)
                 {
-                    _instruments.Register(new InstrumentInfo(id, d.Name, () => new Lv2Instrument(descriptor)));
+                    _instruments.Register(new InstrumentInfo(id, d.Name, () => new Lv2Instrument(descriptor), "Plugins"));
                     instruments++;
                 }
 
