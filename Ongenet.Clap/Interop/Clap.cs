@@ -328,11 +328,11 @@ public static unsafe class ClapApi
     private static ClapHostThreadCheck* _extThread;
     private static ClapHostGui* _extGui;
 
-    /// <summary>Recovers the managed instrument backing a host pointer (via host_data GCHandle).</summary>
-    private static ClapInstrument? HostInstance(ClapHost* host)
+    /// <summary>Recovers the managed plugin (instrument OR effect) backing a host pointer.</summary>
+    private static ClapPluginBase? HostInstance(ClapHost* host)
     {
         if (host == null || host->HostData == null) return null;
-        try { return GCHandle.FromIntPtr((nint)host->HostData).Target as ClapInstrument; }
+        try { return GCHandle.FromIntPtr((nint)host->HostData).Target as ClapPluginBase; }
         catch { return null; }
     }
 
@@ -477,14 +477,20 @@ public static unsafe class ClapApi
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static void HostLog(ClapHost* host, int severity, byte* msg)
-        => ClapInstrument.Log?.Invoke($"[plugin] {ReadUtf8(msg)}");
+        => ClapPluginBase.Log?.Invoke($"[plugin] {ReadUtf8(msg)}");
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static byte HostIsMainThread(ClapHost* host)
         => Environment.CurrentManagedThreadId == _mainThreadId ? (byte)1 : (byte)0;
 
+    // True only on the thread that last entered process() for this plugin (the audio thread). Returning
+    // a constant 0 made every plugin that thread-checks in process() spam "called on wrong thread!".
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static byte HostIsAudioThread(ClapHost* host) => 0;
+    private static byte HostIsAudioThread(ClapHost* host)
+    {
+        var inst = HostInstance(host);
+        return inst != null && inst.AudioThreadId == Environment.CurrentManagedThreadId ? (byte)1 : (byte)0;
+    }
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static void HostResizeHintsChanged(ClapHost* host) { }

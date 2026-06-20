@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Ongenet.Audio;
 using Ongenet.Clap;
+using Ongenet.Lv2;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
@@ -84,6 +85,15 @@ namespace Ongenet.Desktop
                 return new ClapPluginProvider(instruments, effects, msg => logger?.LogInformation("{Message}", msg));
             });
 
+            // LV2 plugin hosting: scans installed *.lv2 bundles and registers them as instruments + effects.
+            services.AddSingleton(sp =>
+            {
+                var instruments = sp.GetRequiredService<IInstrumentRegistry>();
+                var effects = sp.GetRequiredService<IEffectRegistry>();
+                var logger = sp.GetService<ILoggerFactory>()?.CreateLogger("Lv2");
+                return new Lv2PluginProvider(instruments, effects, msg => logger?.LogInformation("{Message}", msg));
+            });
+
             // ViewModels. Panel view models are singletons: they share the one transport,
             // selection, and project for the lifetime of the single main window.
             services.AddSingleton<AudioDevicesViewModel>();
@@ -147,6 +157,11 @@ namespace Ongenet.Desktop
 
                 // Scan for CLAP plugins in the background; they appear in the Instruments tab + effects menu as found.
                 ServiceProvider.GetRequiredService<ClapPluginProvider>().ScanAsync();
+
+                // Route LV2 host/plugin diagnostics to the in-app log, then scan in the background too.
+                var lv2Logger = ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Lv2");
+                Lv2PluginBase.Log = msg => lv2Logger?.LogInformation("{Message}", msg);
+                ServiceProvider.GetRequiredService<Lv2PluginProvider>().ScanAsync();
 
                 desktop.ShutdownRequested += (_, _) =>
                 {

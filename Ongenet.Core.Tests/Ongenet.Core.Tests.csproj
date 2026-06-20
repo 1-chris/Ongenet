@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+    <ProjectReference Include="..\Ongenet.Lv2\Ongenet.Lv2.csproj" />
   </ItemGroup>
 
 </Project>

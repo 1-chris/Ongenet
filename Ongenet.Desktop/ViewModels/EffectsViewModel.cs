@@ -142,6 +142,7 @@ namespace Ongenet.Desktop.ViewModels
                         EqEffect eq => new EqEffectViewModel(eq, RemoveEffect, MoveUp, MoveDown),
                         FilterEffect filter => new FilterEffectViewModel(filter, RemoveEffect, MoveUp, MoveDown),
                         SidechainEffect sc => new SidechainEffectViewModel(sc, RemoveEffect, MoveUp, MoveDown),
+                        StutteroEffect st => new StutteroEffectViewModel(st, RemoveEffect, MoveUp, MoveDown),
                         VocoderEffect vc => new VocoderEffectViewModel(vc, RemoveEffect, MoveUp, MoveDown),
                         _ => new EffectViewModel(effect, RemoveEffect, MoveUp, MoveDown)
                     });

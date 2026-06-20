@@ -10,6 +10,7 @@ swappable device/UI layer around it.
 | `Ongenet.Core` | none | The heart of the app, fully platform-agnostic. Audio models (project / tracks / clips / MIDI notes), the lock-free audio **engine** (sequencer, per-track mixing, metering, automation), the **instrument** framework (Oscillator, 3x Osc, FM, Basic Sampler, Granular, Padda, Kicka, SFZ Sampler) and **effects** chain (filter, EQ, dynamics, modulation, delay/reverb…), the shared DSP toolkit (`Audio/Dsp`), the parameter framework, WAV decode/encode, a cross-platform **MIDI** model (running-status parser, learn/transport mappings), and the app services (project, transport, selection, recording, edit-mode, MIDI input/mapping) plus DI registration, an in-process event aggregator, and logging. Depends only on the BCL. |
 | `Ongenet.Audio` | PortAudio | The audio **and MIDI** device backend. P/Invoke layers over **PortAudio** (`PortAudioOutput` for audio I/O) and each platform's native **MIDI** API — the **ALSA sequencer** on Linux (works with PipeWire/JACK), **WinMM** on Windows and **CoreMIDI** on macOS, behind a single `IMidiInputBackend` seam. This is the only project that touches native audio/MIDI libraries; Core depends solely on the device seams, so the backend is swappable. |
 | `Ongenet.Clap` | CLAP plugins | CLAP plugin hosting: a direct interop over the [CLAP](https://cleveraudio.org/) ABI that scans for, loads, and bridges third-party `.clap` instruments and effects (incl. their plugin GUIs) into Core's instrument/effect registries. Plugins are discovered at runtime; none are required to run the app. |
+| `Ongenet.Lv2` | LV2 plugins | LV2 plugin hosting, written from scratch over the [LV2](https://lv2plug.in/) ABI — no `lilv`/`suil`. A hand-written **Turtle/RDF** parser discovers `.lv2` bundles; audio runs through the port-based `connect_port`/`run` model (control ports become automatable parameters, MIDI is delivered via an LV2 Atom sequence), with the **URID-map**, **Options** and **Worker** host features and native **X11 plugin-UI** embedding. Instruments and effects are bridged into Core's registries; discovered at runtime, none required. |
 | `Ongenet.Desktop` | Avalonia | The Avalonia desktop UI. Hand-rolled MVVM (`ViewModelBase` / `RelayCommand`), DI bootstrap in `App.axaml.cs`, a Catppuccin Mocha theme, the arrange/timeline view, piano roll, instrument & effect inspectors, mixer/meters, the editable automation lanes, a unified **Settings** window (audio / MIDI / theme), app-settings persistence, and a debug Log window. References all of the above. |
 
 All projects target **.NET 10**.
@@ -17,8 +18,8 @@ All projects target **.NET 10**.
 ## Instruments
 
 Eight built-in instruments ship in `Ongenet.Core` (`Audio/Instruments`), all registered in the
-`InstrumentRegistry`. Any CLAP instrument you have installed is discovered at runtime and appears
-alongside them.
+`InstrumentRegistry`. Any CLAP or LV2 instrument you have installed is discovered at runtime and
+appears alongside them.
 
 | Instrument | Description |
 | --- | --- |
@@ -33,17 +34,45 @@ alongside them.
 
 ## Effects
 
-Fifteen built-in effects ship in `Ongenet.Core` (`Audio/Effects`), registered in the `EffectRegistry`
-and grouped by category. CLAP effects are likewise discovered at runtime and slot into the same chain.
+Nineteen built-in effects ship in `Ongenet.Core` (`Audio/Effects`), registered in the `EffectRegistry`
+and grouped by category. CLAP and LV2 effects are likewise discovered at runtime and slot into the
+same chain.
 
 | Category | Effects |
 | --- | --- |
 | **EQ & Filter** | EQ, Filter |
-| **Dynamics** | Compressor, Limiter, Gate |
-| **Modulation** | Chorus, Phaser, Flanger, Tremolo |
+| **Dynamics** | Compressor, Limiter, Gate, Sidechain |
+| **Modulation** | Chorus, Phaser, Flanger, Tremolo, **Stuttero** |
 | **Delay & Reverb** | Delay, Reverb |
 | **Distortion** | Distortion, Bitcrusher |
+| **Pitch** | Vocoder, Auto-Tune |
 | **Utility** | Stereo Width, Utility |
+
+**Stuttero** is our own Stutter Edit-style stutter / beat-repeat performance effect: it captures
+incoming audio and chops it into tempo-synced slices (1/4 down to 1/512), shaped by a drawable
+per-slice gate curve and a reorderable multi-FX rack (tape-stop, lo-fi, comb, phaser, chorus,
+low-pass). "Gestures" bundle those settings with time-variant curves (stutter-rate sweep, filter
+cutoff, per-module depth) and fire either from the transport (Auto) or from mapped MIDI keys (MIDI
+mode), with a hold-to-freeze buffer.
+
+## Plugins
+
+Beyond the built-ins, Ongenet hosts third-party **CLAP** and **LV2** plugins. Both are implemented
+from scratch — direct ABI interop, **no wrapper libraries** (no `lilv`, `suil` or CLAP helper libs) —
+and discovered at startup from the standard per-OS locations (plus `CLAP_PATH` / `LV2_PATH`). Instrument
+plugins appear in the Instruments tab; audio-effect plugins appear under **Plugins** in the add-effect
+menu. Nothing is bundled and none are required — with no plugins installed, the app runs exactly as before.
+
+| Format | Notes |
+| --- | --- |
+| **CLAP** | Direct [CLAP](https://cleveraudio.org/) ABI interop: scans `.clap` modules, exposes their parameters, and bridges note/audio/parameter flow. |
+| **LV2** | `.lv2` bundle discovery via a hand-written **Turtle/RDF** parser; the port-based `connect_port`/`run` model (control ports → automatable parameters, MIDI via an LV2 Atom sequence); the **URID-map**, **Options** and **Worker** host features, so sampler- and engine-class plugins (e.g. Cardinal / VCV Rack) load too. |
+
+- **Native plugin GUIs** open in their own window (*Open plugin UI*). On Linux the UI is embedded into a
+  GL-compatible X11 surface, so even heavyweight OpenGL UIs (Cardinal, Surge XT) render correctly.
+- Plugin parameters are first-class: shown in the inspector, automatable, and bindable via **MIDI learn**.
+- Plugins survive save/reload — a `.ongen` project re-creates them by stable id (the CLAP module/id, or
+  the LV2 plugin URI) as long as the plugin is still installed.
 
 ## MIDI
 

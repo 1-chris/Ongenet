@@ -28,6 +28,7 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(PhaserEffect.TypeId, "Phaser", () => new PhaserEffect(), CatModulation),
         new EffectInfo(FlangerEffect.TypeId, "Flanger", () => new FlangerEffect(), CatModulation),
         new EffectInfo(TremoloEffect.TypeId, "Tremolo", () => new TremoloEffect(), CatModulation),
+        new EffectInfo(StutteroEffect.TypeId, "Stuttero", () => new StutteroEffect(), CatModulation),
         new EffectInfo(DelayEffect.TypeId, "Delay", () => new DelayEffect(), CatDelayReverb),
         new EffectInfo(ReverbEffect.TypeId, "Reverb", () => new ReverbEffect(), CatDelayReverb),
         new EffectInfo(DistortionEffect.TypeId, "Distortion", () => new DistortionEffect(), CatDistortion),

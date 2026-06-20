@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Core.Services.Implementation;
@@ -39,6 +41,8 @@ public class PreviewService : IPreviewService
         {
             if (!_active.Add(midiNote)) return;
             _selection.SelectedTrack?.Instrument?.NoteOn(midiNote, velocity);
+            var vel = (byte)Math.Clamp((int)(velocity * 127f), 0, 127);
+            ForwardToEffects(new MidiMessage(MidiMessageKind.NoteOn, 0, (byte)midiNote, vel));
         }
 
         // Outside the lock: recording capture (NotePressed) runs synchronously on the caller's thread;
@@ -53,6 +57,7 @@ public class PreviewService : IPreviewService
         {
             if (!_active.Remove(midiNote)) return;
             _selection.SelectedTrack?.Instrument?.NoteOff(midiNote);
+            ForwardToEffects(new MidiMessage(MidiMessageKind.NoteOff, 0, (byte)midiNote, 0));
         }
 
         NoteReleased?.Invoke(midiNote);
@@ -65,13 +70,32 @@ public class PreviewService : IPreviewService
     }
 
     public void ControlChange(int controller, int value)
-        => _selection.SelectedTrack?.Instrument?.ControlChange(controller, value);
+    {
+        _selection.SelectedTrack?.Instrument?.ControlChange(controller, value);
+        ForwardToEffects(new MidiMessage(MidiMessageKind.ControlChange, 0, (byte)controller, (byte)value));
+    }
 
     public void PitchBend(int value14)
-        => _selection.SelectedTrack?.Instrument?.PitchBend(value14);
+    {
+        _selection.SelectedTrack?.Instrument?.PitchBend(value14);
+        ForwardToEffects(new MidiMessage(MidiMessageKind.PitchBend, 0, (byte)(value14 & 0x7F), (byte)((value14 >> 7) & 0x7F)));
+    }
 
     public void ChannelAftertouch(int value)
-        => _selection.SelectedTrack?.Instrument?.ChannelAftertouch(value);
+    {
+        _selection.SelectedTrack?.Instrument?.ChannelAftertouch(value);
+        ForwardToEffects(new MidiMessage(MidiMessageKind.ChannelAftertouch, 0, (byte)value, 0));
+    }
+
+    // Live notes/CC also reach the selected track's MIDI-aware insert effects (e.g. a stutter effect
+    // whose gestures are played from the keyboard), in addition to its instrument.
+    private void ForwardToEffects(in MidiMessage message)
+    {
+        var track = _selection.SelectedTrack;
+        if (track is null) return;
+        foreach (var fx in track.ActiveEffects)
+            if (fx is IMidiAwareEffect aware) aware.HandleMidi(message);
+    }
 
     private void RaiseActiveNotesChanged()
     {

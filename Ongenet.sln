@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Clap", "Ongenet.Cla
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Core.Tests", "Ongenet.Core.Tests\Ongenet.Core.Tests.csproj", "{B5BAB266-C342-446D-86FF-8833CF0B9B22}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Lv2", "Ongenet.Lv2\Ongenet.Lv2.csproj", "{81CD0CA7-693F-4936-863F-87220DB8898B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{B5BAB266-C342-446D-86FF-8833CF0B9B22}.Release|x64.Build.0 = Release|Any CPU
 		{B5BAB266-C342-446D-86FF-8833CF0B9B22}.Release|x86.ActiveCfg = Release|Any CPU
 		{B5BAB266-C342-446D-86FF-8833CF0B9B22}.Release|x86.Build.0 = Release|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Debug|x64.Build.0 = Debug|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Debug|x86.Build.0 = Debug|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Release|x64.ActiveCfg = Release|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Release|x64.Build.0 = Release|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Release|x86.ActiveCfg = Release|Any CPU
+		{81CD0CA7-693F-4936-863F-87220DB8898B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

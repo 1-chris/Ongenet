@@ -38,5 +38,6 @@
         <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
         <ProjectReference Include="..\Ongenet.Audio\Ongenet.Audio.csproj" />
         <ProjectReference Include="..\Ongenet.Clap\Ongenet.Clap.csproj" />
+        <ProjectReference Include="..\Ongenet.Lv2\Ongenet.Lv2.csproj" />
     </ItemGroup>
 </Project>

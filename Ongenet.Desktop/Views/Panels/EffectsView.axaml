@@ -144,6 +144,153 @@
                                 </Border>
                             </DataTemplate>
 
+                            <!-- Stuttero: gestures, a shared curve editor, and the reorderable FX rack. -->
+                            <DataTemplate DataType="fx:StutteroEffectViewModel">
+                                <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                                        Background="{StaticResource CatppuccinSurface0}"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <StackPanel Spacing="8">
+                                        <panels:EffectHeaderView/>
+                                        <panels:ParametersView DataContext="{Binding Parameters}"/>
+
+                                        <!-- Auto-mode gesture + gesture list -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Auto gesture" VerticalAlignment="Center" Width="80"
+                                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                            <ComboBox Width="180" ItemsSource="{Binding AutoGestureOptions}"
+                                                      SelectedIndex="{Binding AutoGestureIndex, Mode=TwoWay}"/>
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="200,*" Height="190">
+                                            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+                                                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                                                    <Button Content="+ Gesture" Command="{Binding AddGestureCommand}"
+                                                            Background="{StaticResource CatppuccinSurface1}"/>
+                                                    <Button Content="–" Command="{Binding RemoveGestureCommand}"
+                                                            Background="{StaticResource CatppuccinSurface1}"/>
+                                                </StackPanel>
+                                                <ListBox ItemsSource="{Binding Gestures}"
+                                                         SelectedItem="{Binding SelectedGesture, Mode=TwoWay}"
+                                                         Background="{StaticResource CatppuccinMantle}">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="fx:GestureItemViewModel">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <TextBlock Text="{Binding Name}"/>
+                                                                <TextBlock Text="{Binding TriggerKeyName}" FontSize="10"
+                                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </DockPanel>
+
+                                            <!-- Selected gesture detail -->
+                                            <ScrollViewer Grid.Column="1">
+                                                <StackPanel Spacing="6" IsVisible="{Binding HasSelectedGesture}"
+                                                            DataContext="{Binding SelectedGesture}">
+                                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto"
+                                                          x:DataType="fx:GestureItemViewModel">
+                                                        <TextBlock Text="Name" Grid.Row="0" Grid.Column="0" Width="70"
+                                                                   VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                                        <TextBox Text="{Binding Name, Mode=TwoWay}" Grid.Row="0" Grid.Column="1" Margin="0,0,0,2"/>
+                                                    </Grid>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8" x:DataType="fx:GestureItemViewModel">
+                                                        <StackPanel>
+                                                            <TextBlock Text="Rate" FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                                            <ComboBox Width="80" ItemsSource="{Binding RateOptions}"
+                                                                      SelectedIndex="{Binding RateIndex, Mode=TwoWay}"/>
+                                                        </StackPanel>
+                                                        <StackPanel>
+                                                            <TextBlock Text="Buffer" FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                                            <ComboBox Width="90" ItemsSource="{Binding BufferOptions}"
+                                                                      SelectedIndex="{Binding BufferModeIndex, Mode=TwoWay}"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    <StackPanel x:DataType="fx:GestureItemViewModel">
+                                                        <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
+                                                                   Text="{Binding TriggerKeyName, StringFormat='Trigger key: {0}'}"/>
+                                                        <Slider Minimum="-1" Maximum="127" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                                Value="{Binding TriggerKey, Mode=TwoWay}"/>
+                                                        <Grid ColumnDefinitions="*,*">
+                                                            <StackPanel Grid.Column="0">
+                                                                <TextBlock Text="Buffer length (beats)" FontSize="10"
+                                                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                                                <Slider Minimum="0.0625" Maximum="4" Value="{Binding BufferLengthBeats, Mode=TwoWay}"/>
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1">
+                                                                <TextBlock Text="Tail (ms)" FontSize="10"
+                                                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                                                <Slider Minimum="0" Maximum="120" Value="{Binding TailMs, Mode=TwoWay}"/>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </ScrollViewer>
+                                        </Grid>
+
+                                        <!-- Curve editor + target/preset toolbar -->
+                                        <StackPanel Spacing="4" IsVisible="{Binding HasSelectedGesture}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <ComboBox Width="150" ItemsSource="{Binding CurveTargets}"
+                                                          SelectedItem="{Binding SelectedTarget, Mode=TwoWay}">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="fx:CurveTargetViewModel">
+                                                            <TextBlock Text="{Binding Label}"/>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
+                                                <ComboBox Width="110" ItemsSource="{Binding CurvePresets}"
+                                                          SelectedIndex="{Binding SelectedPreset, Mode=TwoWay}"/>
+                                                <Button Content="Apply" Command="{Binding ApplyPresetCommand}"
+                                                        Background="{StaticResource CatppuccinSurface1}"/>
+                                                <CheckBox Content="Palindrome" IsChecked="{Binding Palindrome, Mode=TwoWay}"/>
+                                                <Button Content="Clear" Command="{Binding ClearCurveCommand}"
+                                                        IsEnabled="{Binding CanClearCurve}"
+                                                        Background="{StaticResource CatppuccinSurface1}"/>
+                                            </StackPanel>
+                                            <Border CornerRadius="4" ClipToBounds="True" Height="150"
+                                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1"
+                                                    Background="{StaticResource CatppuccinMantle}">
+                                                <controls:CurveEditorControl Curve="{Binding EditCurve}"
+                                                                             Revision="{Binding CurveRevision}"
+                                                                             SnapDivisions="16"/>
+                                            </Border>
+                                            <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
+                                                       Text="Double-click to add a node · drag to move · drag a segment to bend · right-click to delete"/>
+                                        </StackPanel>
+
+                                        <!-- Reorderable FX rack -->
+                                        <TextBlock Text="FX rack (top = first)" FontWeight="Bold" FontSize="11"
+                                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                        <ItemsControl ItemsSource="{Binding Modules}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="fx:ModuleItemViewModel">
+                                                    <Border Margin="0,0,0,4" Padding="6" CornerRadius="3"
+                                                            Background="{StaticResource CatppuccinMantle}"
+                                                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                                        <StackPanel Spacing="4">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}"/>
+                                                                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"/>
+                                                                <Button Grid.Column="2" Content="▲" Command="{Binding MoveUpCommand}"
+                                                                        IsEnabled="{Binding !IsFirst}" Padding="6,0" Margin="2,0"
+                                                                        Background="{StaticResource CatppuccinSurface1}"/>
+                                                                <Button Grid.Column="3" Content="▼" Command="{Binding MoveDownCommand}"
+                                                                        IsEnabled="{Binding !IsLast}" Padding="6,0"
+                                                                        Background="{StaticResource CatppuccinSurface1}"/>
+                                                            </Grid>
+                                                            <Expander Header="parameters" IsVisible="{Binding IsEnabled}">
+                                                                <panels:ParametersView DataContext="{Binding Parameters}"/>
+                                                            </Expander>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+
                             <!-- Default effect card (built-in effects + CLAP audio-effect plugins). -->
                             <DataTemplate DataType="fx:EffectViewModel">
                                 <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"

@@ -4,6 +4,7 @@ using System.Linq;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Models.Audio;
 
 namespace Ongenet.Core.Audio;
@@ -40,6 +41,10 @@ public sealed class OfflineRenderer
         {
             var rt = new RenderTrack(track);
 
+            // Clone the effects up front so the note schedule can target the cloned MIDI-aware ones.
+            rt.Effects = track.Effects.Select(e => { var c = e.Clone(); c.Prepare(format); return c; }).ToArray();
+            var midiFx = MidiEffectsOf(rt.Effects);
+
             if (track is { Kind: TrackKind.Instrument, Instrument: { } instrument })
             {
                 rt.Instrument = instrument.Clone();
@@ -49,11 +54,23 @@ public sealed class OfflineRenderer
                     foreach (var note in clip.Notes)
                     {
                         var onBeat = clip.StartBeat + note.StartBeat;
-                        events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, rt.Instrument, note.Note, note.Velocity));
+                        events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, rt.Instrument, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
-            else if (track.Kind == TrackKind.Audio)
+            else if (midiFx.Length > 0 && track.Kind != TrackKind.Audio)
+            {
+                foreach (var clip in track.Clips.Where(c => c.IsMidi))
+                {
+                    foreach (var note in clip.Notes)
+                    {
+                        var onBeat = clip.StartBeat + note.StartBeat;
+                        events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, null, midiFx, note.Note, note.Velocity));
+                    }
+                }
+            }
+
+            if (track.Kind == TrackKind.Audio)
             {
                 foreach (var clip in track.Clips)
                 {
@@ -69,7 +86,6 @@ public sealed class OfflineRenderer
                 }
             }
 
-            rt.Effects = track.Effects.Select(e => { var c = e.Clone(); c.Prepare(format); return c; }).ToArray();
             renderTracks.Add(rt);
         }
 
@@ -149,7 +165,7 @@ public sealed class OfflineRenderer
             while (nextEvent < events.Count && events[nextEvent].OnBeat < currentBeat)
             {
                 var ev = events[nextEvent++];
-                ev.Instrument.NoteOn(ev.Note, ev.Velocity);
+                ev.Fire(on: true);
                 active.Add(ev);
             }
 
@@ -157,7 +173,7 @@ public sealed class OfflineRenderer
             {
                 if (active[i].OffBeat <= currentBeat)
                 {
-                    active[i].Instrument.NoteOff(active[i].Note);
+                    active[i].Fire(on: false);
                     active.RemoveAt(i);
                 }
             }
@@ -270,5 +286,25 @@ public sealed class OfflineRenderer
         public int Depth { get; set; }
     }
 
-    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument Instrument, int Note, float Velocity);
+    // The track's MIDI-aware effects (cloned), for delivering gesture-triggering notes during render.
+    private static IMidiAwareEffect[] MidiEffectsOf(IAudioEffect[] effects)
+    {
+        var aware = effects.OfType<IMidiAwareEffect>().ToArray();
+        return aware;
+    }
+
+    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument? Instrument,
+        IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
+    {
+        public void Fire(bool on)
+        {
+            if (on) Instrument?.NoteOn(Note, Velocity);
+            else Instrument?.NoteOff(Note);
+
+            if (MidiEffects.Length == 0) return;
+            var vel = (byte)Math.Clamp((int)(Velocity * 127f), 0, 127);
+            var msg = new MidiMessage(on ? MidiMessageKind.NoteOn : MidiMessageKind.NoteOff, 0, (byte)Note, on ? vel : (byte)0);
+            foreach (var fx in MidiEffects) fx.HandleMidi(msg);
+        }
+    }
 }

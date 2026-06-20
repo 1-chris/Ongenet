@@ -5,6 +5,7 @@ using Ongenet.Clap.Interop;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Parameters;
+using Ongenet.Core.Platform;
 
 namespace Ongenet.Clap;
 
@@ -21,6 +22,8 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
     private const int EventCapacity = 1024;
     private const int EventStride = 64; // >= sizeof(ClapEventParamValue)
     private const int MaxParamsShown = 64;
+    private const int EmbedDefaultW = 800;
+    private const int EmbedDefaultH = 600;
 
     /// <summary>Optional diagnostic sink (set once at startup); surfaces plugin + GUI logs to the app log.</summary>
     public static Action<string>? Log;
@@ -75,6 +78,14 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
     private bool _editorOpen;
     private int _editorW;
     private int _editorH;
+
+    // Intermediate GL-compatible X11 child we embed the plugin GUI into (Linux/X11; see X11Embed).
+    private nint _x11Display;
+    private nint _embedWindow;
+
+    // The thread that last entered process(); used by the host's clap.thread-check callback.
+    private volatile int _audioThreadId;
+    internal int AudioThreadId => _audioThreadId;
 
     private IReadOnlyList<Parameter>? _parameters;
 
@@ -300,6 +311,9 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
     {
         if (!_activated || _plugin == null || _plugin->Process == null) return;
 
+        // Record the audio thread so the host's thread-check answers process() correctly.
+        _audioThreadId = Environment.CurrentManagedThreadId;
+
         var channels = _format.Channels < 1 ? 1 : _format.Channels;
         var frames = buffer.Length / channels;
         if (frames <= 0) return;
@@ -451,7 +465,23 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
         var api = ClapApi.Utf8(_guiApi);
         try
         {
-            var window = new ClapApi.ClapWindow { Api = api, Handle = (void*)windowHandle };
+            // For embedded X11 GUIs, parent into an intermediate default-visual child rather than the
+            // Avalonia window directly — a GL-based plugin UI can't make a GLX context in Avalonia's
+            // 32-bit ARGB window (it renders black / fails). Floating GUIs own their window, so skip it.
+            var parentHandle = windowHandle;
+            if (!floating && OperatingSystem.IsLinux() && _guiApi == ClapApi.WindowApiX11 && !_guiCreated)
+            {
+                if (X11Embed.Create(windowHandle, EmbedDefaultW, EmbedDefaultH, out _x11Display, out _embedWindow))
+                    parentHandle = _embedWindow;
+                else
+                    Log?.Invoke($"CLAP '{Name}': X11 embed window failed; using host window directly.");
+            }
+            else if (!floating && _embedWindow != 0)
+            {
+                parentHandle = _embedWindow; // reuse the existing child on reopen
+            }
+
+            var window = new ClapApi.ClapWindow { Api = api, Handle = (void*)parentHandle };
 
             // Create once; thereafter just show/hide (destroy/recreate leaves many plugins black,
             // and on X11 the embedded child dies with its parent window anyway).
@@ -482,6 +512,10 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
                     if (_gui->GetSize(_plugin, &w, &h) != 0) { _editorW = (int)w; _editorH = (int)h; }
                 }
 
+                // Size the embed child to the plugin's preferred size so its GUI fills it.
+                if (_embedWindow != 0 && _editorW > 0 && _editorH > 0)
+                    X11Embed.Resize(_x11Display, _embedWindow, _editorW, _editorH);
+
                 _guiCreated = true;
             }
 
@@ -495,6 +529,8 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
     public void SetEditorSize(int width, int height)
     {
         if (!_editorOpen || _gui == null || _gui->SetSize == null || width <= 0 || height <= 0) return;
+        // Keep the embed child filling the host window so the plugin's GUI tracks resizes.
+        if (_embedWindow != 0) X11Embed.Resize(_x11Display, _embedWindow, width, height);
         var canResize = _gui->CanResize == null || _gui->CanResize(_plugin) != 0;
         if (canResize) _gui->SetSize(_plugin, (uint)width, (uint)height);
     }
@@ -513,6 +549,9 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
             if (_editorOpen && _gui->Hide != null) _gui->Hide(_plugin);
             if (_gui->Destroy != null) _gui->Destroy(_plugin);
         }
+
+        // Destroy the embed child only after the plugin GUI inside it is gone.
+        X11Embed.Destroy(ref _x11Display, ref _embedWindow);
 
         _guiCreated = false;
         _editorOpen = false;
@@ -544,6 +583,7 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
         if (wasDestroyed)
         {
             _guiCreated = false;
+            X11Embed.Destroy(ref _x11Display, ref _embedWindow);
             lock (_loopLock) { _timers.Clear(); _fds.Clear(); }
         }
     }

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
@@ -199,6 +201,8 @@ public sealed class AudioEngine : IAudioEngine
 
         foreach (var track in _tracks)
         {
+            // MIDI clips drive the track's instrument (sound) and any MIDI-aware insert effect (gestures).
+            var midiFx = MidiEffectsOf(track);
             if (track is { Kind: TrackKind.Instrument, Instrument: { } instrument })
             {
                 foreach (var clip in track.Clips)
@@ -209,11 +213,27 @@ public sealed class AudioEngine : IAudioEngine
                         var onBeat = clip.StartBeat + note.StartBeat;
                         var offBeat = onBeat + note.LengthBeats;
                         if (offBeat <= startBeat) continue;
-                        notes.Add(new ScheduledNote(onBeat, offBeat, instrument, note.Note, note.Velocity));
+                        notes.Add(new ScheduledNote(onBeat, offBeat, instrument, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
-            else if (track.Kind == TrackKind.Audio)
+            else if (midiFx.Length > 0 && track.Kind != TrackKind.Audio)
+            {
+                // A non-instrument track (e.g. a bus) carrying MIDI clips can still trigger its effects.
+                foreach (var clip in track.Clips)
+                {
+                    if (!clip.IsMidi) continue;
+                    foreach (var note in clip.Notes)
+                    {
+                        var onBeat = clip.StartBeat + note.StartBeat;
+                        var offBeat = onBeat + note.LengthBeats;
+                        if (offBeat <= startBeat) continue;
+                        notes.Add(new ScheduledNote(onBeat, offBeat, null, midiFx, note.Note, note.Velocity));
+                    }
+                }
+            }
+
+            if (track.Kind == TrackKind.Audio)
             {
                 foreach (var clip in track.Clips)
                 {
@@ -338,7 +358,10 @@ public sealed class AudioEngine : IAudioEngine
 
         // Per-block context for tempo-aware / sidechain effects (the bus's tap buffers persist across blocks).
         _effectCtx.Format = _output.Format;
-        _effectCtx.Bpm = _samplesPerBeat > 0 ? _output.Format.SampleRate * 60.0 / _samplesPerBeat : 120.0;
+        // Use the transport tempo directly so it's valid even when stopped (_samplesPerBeat is only set on
+        // play); tempo-aware effects that run during live audition (e.g. Stuttero) need a real BPM.
+        var ctxBpm = _transport.Tempo.BeatsPerMinute;
+        _effectCtx.Bpm = ctxBpm > 0 ? ctxBpm : 120.0;
         _effectCtx.PlayheadBeats = prevBeat;
         _effectCtx.Playing = playing;
         _effectCtx.Sidechain = _sidechain;
@@ -503,7 +526,7 @@ public sealed class AudioEngine : IAudioEngine
     // note scheduler at the first event from there. Audio clips re-render from the new beat automatically.
     private void WrapPlayback(double target)
     {
-        for (var i = 0; i < _active.Count; i++) _active[i].Instrument.NoteOff(_active[i].Note);
+        for (var i = 0; i < _active.Count; i++) _active[i].Fire(on: false);
         _active.Clear();
         AllNotesOff();
 
@@ -513,13 +536,23 @@ public sealed class AudioEngine : IAudioEngine
         while (_nextEvent < events.Length && events[_nextEvent].OnBeat < target) _nextEvent++;
     }
 
+    // The track's MIDI-aware insert effects (empty array when none), captured for the note scheduler.
+    private static IMidiAwareEffect[] MidiEffectsOf(Track track)
+    {
+        var effects = track.ActiveEffects;
+        List<IMidiAwareEffect>? aware = null;
+        foreach (var fx in effects)
+            if (fx is IMidiAwareEffect m) (aware ??= new List<IMidiAwareEffect>()).Add(m);
+        return aware?.ToArray() ?? Array.Empty<IMidiAwareEffect>();
+    }
+
     private void ScheduleNotes(double curBeat)
     {
         var events = _events;
         while (_nextEvent < events.Length && events[_nextEvent].OnBeat < curBeat)
         {
             var ev = events[_nextEvent];
-            ev.Instrument.NoteOn(ev.Note, ev.Velocity);
+            ev.Fire(on: true);
             _active.Add(ev);
             _nextEvent++;
         }
@@ -528,7 +561,7 @@ public sealed class AudioEngine : IAudioEngine
         {
             if (_active[i].OffBeat <= curBeat)
             {
-                _active[i].Instrument.NoteOff(_active[i].Note);
+                _active[i].Fire(on: false);
                 _active.RemoveAt(i);
             }
         }
@@ -603,6 +636,8 @@ public sealed class AudioEngine : IAudioEngine
         foreach (var track in _tracks)
         {
             track.Instrument?.AllNotesOff();
+            foreach (var fx in track.ActiveEffects)
+                if (fx is IMidiAwareEffect m) m.AllNotesOff();
         }
     }
 
@@ -618,7 +653,22 @@ public sealed class AudioEngine : IAudioEngine
         _output.Dispose();
     }
 
-    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument Instrument, int Note, float Velocity);
+    // A scheduled note targets an instrument (sound) and/or a track's MIDI-aware effects (gestures);
+    // either may be absent. MidiEffects is the track's snapshot, captured when playback began.
+    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, IInstrument? Instrument,
+        IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
+    {
+        public void Fire(bool on)
+        {
+            if (on) Instrument?.NoteOn(Note, Velocity);
+            else Instrument?.NoteOff(Note);
+
+            if (MidiEffects.Length == 0) return;
+            var vel = (byte)Math.Clamp((int)(Velocity * 127f), 0, 127);
+            var msg = new MidiMessage(on ? MidiMessageKind.NoteOn : MidiMessageKind.NoteOff, 0, (byte)Note, on ? vel : (byte)0);
+            foreach (var fx in MidiEffects) fx.HandleMidi(msg);
+        }
+    }
 
     private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch, double SourceOffsetSeconds);
 
