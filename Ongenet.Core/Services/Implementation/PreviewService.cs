@@ -33,4 +33,10 @@ public class PreviewService : IPreviewService
     }
 
     public bool IsActive(int midiNote) => _active.Contains(midiNote);
+
+    public void ControlChange(int controller, int value)
+        => _selection.SelectedTrack?.Instrument?.ControlChange(controller, value);
+
+    public void PitchBend(int value14)
+        => _selection.SelectedTrack?.Instrument?.PitchBend(value14);
 }

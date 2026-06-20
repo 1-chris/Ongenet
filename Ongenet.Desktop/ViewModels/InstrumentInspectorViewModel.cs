@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Instruments.Sfz;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.Desktop.Services;
@@ -110,6 +112,123 @@ namespace Ongenet.Desktop.ViewModels
         private ISampleHost? SampleHost => Instrument as ISampleHost;
         public bool IsSampler => SampleHost is not null;
         public string SampleName => SampleHost?.SampleName ?? "(no sample loaded)";
+
+        // --- SFZ "Sampler" support ---
+
+        private SfzInstrument? Sfz => Instrument as SfzInstrument;
+
+        /// <summary>True when the selected instrument is the SFZ "Sampler" (shows the SFZ loader).</summary>
+        public bool IsSfz => Sfz is not null;
+
+        private bool _sfzLoading;
+        private double _sfzLoadProgress;
+
+        /// <summary>Loaded SFZ file + region count, a "loading" notice, or a placeholder.</summary>
+        public string SfzStatus => _sfzLoading
+            ? $"Loading… {_sfzLoadProgress * 100:0}%"
+            : Sfz is { SfzPath.Length: > 0 } s
+                ? $"{System.IO.Path.GetFileName(s.SfzPath)} — {s.Regions.Count} region(s)"
+                : "(no SFZ loaded)";
+
+        /// <summary>True while a patch is loading (shows the progress bar).</summary>
+        public bool IsSfzLoading => _sfzLoading;
+
+        /// <summary>Load progress, 0..1.</summary>
+        public double SfzLoadProgress => _sfzLoadProgress;
+
+        /// <summary>
+        /// Parses an .sfz file and loads it into the selected SFZ instrument. Loading (which can take a
+        /// while for a large library) runs on a background thread so the UI never freezes, reporting progress.
+        /// </summary>
+        public async void LoadSfzFromPath(string path)
+        {
+            if (Sfz is not { } sfz || _sfzLoading) return;
+            var loader = App.ServiceProvider?.GetService<ISfzLoadService>();
+            if (loader is null) return;
+
+            _sfzLoading = true;
+            _sfzLoadProgress = 0;
+            OnPropertyChanged(nameof(SfzStatus));
+            OnPropertyChanged(nameof(IsSfzLoading));
+            OnPropertyChanged(nameof(SfzLoadProgress));
+
+            // Progress<double> marshals callbacks back to this (UI) thread.
+            var progress = new Progress<double>(p =>
+            {
+                _sfzLoadProgress = p;
+                OnPropertyChanged(nameof(SfzLoadProgress));
+                OnPropertyChanged(nameof(SfzStatus));
+            });
+            var result = await Task.Run(() => loader.Load(path, progress));
+
+            _sfzLoading = false;
+            OnPropertyChanged(nameof(IsSfzLoading));
+            if (result is null) { OnPropertyChanged(nameof(SfzStatus)); return; }
+
+            App.ServiceProvider?.GetService<IHistoryService>()?.Capture("Load SFZ");
+            sfz.ApplyLoad(result);
+            RebuildParameters();
+            OnPropertyChanged(nameof(SfzStatus));
+            OnPropertyChanged(nameof(InstrumentName));
+            NotifySfzVisuals();
+        }
+
+        /// <summary>The loaded regions, for the zone-map control.</summary>
+        public IReadOnlyList<SfzRegionRuntime> SfzZones => Sfz?.Regions ?? Array.Empty<SfzRegionRuntime>();
+
+        /// <summary>True when there are regions to visualise.</summary>
+        public bool HasZones => SfzZones.Count > 0;
+
+        private int _sfzRevision;
+
+        /// <summary>Bumped when a new patch loads, to force the zone map to repaint.</summary>
+        public int SfzRevision => _sfzRevision;
+
+        // Representative amp envelope (the first region) for the envelope display.
+        private SfzRegionRuntime? FirstZone => Sfz is { Regions.Count: > 0 } s ? s.Regions[0] : null;
+        public double EnvDelay => FirstZone?.AmpEg.Delay ?? 0;
+        public double EnvAttack => FirstZone?.AmpEg.Attack ?? 0;
+        public double EnvHold => FirstZone?.AmpEg.Hold ?? 0;
+        public double EnvDecay => FirstZone?.AmpEg.Decay ?? 0;
+        public double EnvSustain => FirstZone?.AmpEg.Sustain ?? 1.0;
+        public double EnvRelease => FirstZone?.AmpEg.Release ?? 0;
+
+        // --- Live MIDI controllers (drive the selected instrument via the preview service) ---
+
+        private double _modWheel;
+
+        /// <summary>Mod wheel (CC1), 0..127.</summary>
+        public double ModWheel
+        {
+            get => _modWheel;
+            set { if (SetField(ref _modWheel, value)) _preview.ControlChange(1, (int)value); }
+        }
+
+        private double _pitchBendValue = 8192;
+
+        /// <summary>Pitch bend, 0..16383 (centre 8192).</summary>
+        public double PitchBendValue
+        {
+            get => _pitchBendValue;
+            set { if (SetField(ref _pitchBendValue, value)) _preview.PitchBend((int)value); }
+        }
+
+        /// <summary>Recentres the pitch-bend control (called when the user lets go of the slider).</summary>
+        public void ResetPitchBend() => PitchBendValue = 8192;
+
+        private void NotifySfzVisuals()
+        {
+            _sfzRevision++;
+            OnPropertyChanged(nameof(SfzZones));
+            OnPropertyChanged(nameof(HasZones));
+            OnPropertyChanged(nameof(SfzRevision));
+            OnPropertyChanged(nameof(EnvDelay));
+            OnPropertyChanged(nameof(EnvAttack));
+            OnPropertyChanged(nameof(EnvHold));
+            OnPropertyChanged(nameof(EnvDecay));
+            OnPropertyChanged(nameof(EnvSustain));
+            OnPropertyChanged(nameof(EnvRelease));
+        }
 
         // --- Granular support (grain monitor) ---
 
@@ -302,6 +421,9 @@ namespace Ongenet.Desktop.ViewModels
             OnPropertyChanged(nameof(SelectedPreset));
             OnPropertyChanged(nameof(IsSampler));
             OnPropertyChanged(nameof(SampleName));
+            OnPropertyChanged(nameof(IsSfz));
+            OnPropertyChanged(nameof(SfzStatus));
+            NotifySfzVisuals();
             OnPropertyChanged(nameof(IsGranular));
             OnPropertyChanged(nameof(GrainMonitor));
             OnPropertyChanged(nameof(IsPreviewable));

@@ -61,6 +61,19 @@
                                    Foreground="{StaticResource CatppuccinSubtext0}"/>
                     </StackPanel>
 
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
+                                VerticalAlignment="Center" IsVisible="{Binding IsSfz}">
+                        <Button Content="Load SFZ…" Click="OnLoadSfz"
+                                Background="{StaticResource CatppuccinSurface0}"/>
+                        <TextBlock Text="{Binding SfzStatus}" VerticalAlignment="Center"
+                                   MaxWidth="260" FontSize="11" TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <ProgressBar Width="120" Height="6" Minimum="0" Maximum="1"
+                                     Value="{Binding SfzLoadProgress}" IsVisible="{Binding IsSfzLoading}"
+                                     VerticalAlignment="Center"
+                                     Foreground="{StaticResource CatppuccinMauve}"/>
+                    </StackPanel>
+
                     <Button Content="{Binding EditorButtonText}" Click="OnTogglePluginUi"
                             IsVisible="{Binding HasEditor}" VerticalAlignment="Center"
                             Background="{StaticResource CatppuccinSurface0}"
@@ -99,6 +112,47 @@
                                    VerticalAlignment="Top" HorizontalAlignment="Left"
                                    IsHitTestVisible="False"
                                    Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    </Grid>
+                </Border>
+
+                <!-- SFZ "Sampler": zone map + amp envelope + live controllers -->
+                <Border Grid.Row="2" Height="150" Margin="0,8,0,0" CornerRadius="4"
+                        ClipToBounds="True" IsVisible="{Binding IsSfz}"
+                        Background="{StaticResource CatppuccinCrust}"
+                        BorderBrush="{StaticResource CatppuccinSurface0}" BorderThickness="1">
+                    <Grid ColumnDefinitions="*,220">
+                        <Grid Grid.Column="0">
+                            <controls:ZoneMapControl Zones="{Binding SfzZones}" Revision="{Binding SfzRevision}"/>
+                            <TextBlock Text="ZONES  (key × velocity)" FontSize="9" Margin="6,4"
+                                       VerticalAlignment="Top" HorizontalAlignment="Left"
+                                       IsHitTestVisible="False"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        </Grid>
+
+                        <DockPanel Grid.Column="1" Margin="8,4,6,6" LastChildFill="True">
+                            <TextBlock DockPanel.Dock="Top" Text="AMP ENVELOPE" FontSize="9"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+                            <!-- Live controllers along the bottom; envelope fills the rest. -->
+                            <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" Margin="0,6,0,0">
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="Mod" FontSize="10"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <Slider Minimum="0" Maximum="127" Value="{Binding ModWheel, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="Bend" FontSize="10"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <Slider Minimum="0" Maximum="16383" Value="{Binding PitchBendValue, Mode=TwoWay}"
+                                            PointerReleased="OnBendReleased" PointerCaptureLost="OnBendCaptureLost"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <controls:EnvelopeDisplayControl MinHeight="40"
+                                Delay="{Binding EnvDelay}" Attack="{Binding EnvAttack}"
+                                Hold="{Binding EnvHold}" Decay="{Binding EnvDecay}"
+                                Sustain="{Binding EnvSustain}" Release="{Binding EnvRelease}"/>
+                        </DockPanel>
                     </Grid>
                 </Border>
 

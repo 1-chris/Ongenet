@@ -89,5 +89,32 @@ namespace Ongenet.Desktop.Views.Panels
             var path = files.FirstOrDefault()?.TryGetLocalPath();
             if (!string.IsNullOrEmpty(path)) vm.LoadSampleFromPath(path);
         }
+
+        private async void OnLoadSfz(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not InstrumentInspectorViewModel vm) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top is null) return;
+
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Load SFZ instrument",
+                AllowMultiple = false,
+                FileTypeFilter = new List<FilePickerFileType>
+                {
+                    new("SFZ instrument") { Patterns = new[] { "*.sfz" } }
+                }
+            });
+
+            var path = files.FirstOrDefault()?.TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path)) vm.LoadSfzFromPath(path);
+        }
+
+        // Pitch bend springs back to centre when the user lets go of the slider.
+        private void OnBendReleased(object? sender, PointerReleasedEventArgs e)
+            => (DataContext as InstrumentInspectorViewModel)?.ResetPitchBend();
+
+        private void OnBendCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+            => (DataContext as InstrumentInspectorViewModel)?.ResetPitchBend();
     }
 }

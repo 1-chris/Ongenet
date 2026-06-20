@@ -27,6 +27,19 @@ public interface IInstrument : ISampleSource
     /// <summary>Releases all sounding notes (e.g. on stop or track change).</summary>
     void AllNotesOff();
 
+    /// <summary>
+    /// A MIDI Continuous Controller change (<paramref name="controller"/> 0..127,
+    /// <paramref name="value"/> 0..127). Default no-op; instruments that respond to CCs (e.g. the SFZ
+    /// sampler's mod matrix) override it.
+    /// </summary>
+    void ControlChange(int controller, int value) { }
+
+    /// <summary>A pitch-bend change as a 14-bit value (0..16383, centre 8192). Default no-op.</summary>
+    void PitchBend(int value14) { }
+
+    /// <summary>Channel aftertouch (pressure), 0..127. Default no-op.</summary>
+    void ChannelAftertouch(int value) { }
+
     /// <summary>Creates a fresh copy of this instrument with the same parameters (for track duplication).</summary>
     IInstrument Clone();
 }

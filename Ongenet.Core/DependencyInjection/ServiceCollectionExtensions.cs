@@ -46,6 +46,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAudioFileDecoder, FfmpegAudioDecoder>();
         services.AddSingleton<IAudioFileService, AudioFileService>();
 
+        // SFZ instrument loading (parse + decode referenced samples). Used by the inspector and to
+        // rebuild "Sampler" instruments on project load.
+        services.AddSingleton<Audio.Instruments.Sfz.ISfzLoadService, Audio.Instruments.Sfz.SfzLoadService>();
+
         // Offline render (export to WAV).
         services.AddSingleton<OfflineRenderer>();
         return services;

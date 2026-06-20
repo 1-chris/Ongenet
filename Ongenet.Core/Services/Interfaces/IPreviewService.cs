@@ -18,6 +18,12 @@ public interface IPreviewService
     /// <summary>Whether a note is currently sounding (for keyboard highlighting).</summary>
     bool IsActive(int midiNote);
 
+    /// <summary>Sends a CC change to the selected instrument (e.g. mod wheel, sustain pedal).</summary>
+    void ControlChange(int controller, int value);
+
+    /// <summary>Sends a pitch-bend change (14-bit, centre 8192) to the selected instrument.</summary>
+    void PitchBend(int value14);
+
     /// <summary>Raised whenever the set of active notes changes.</summary>
     event Action? ActiveNotesChanged;
 

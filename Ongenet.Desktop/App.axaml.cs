@@ -97,6 +97,11 @@ namespace Ongenet.Desktop
 
             ServiceProvider = services.BuildServiceProvider();
 
+            // The SFZ "Sampler" rebuilds itself from persisted state on project load; give it the
+            // loader (persistence runs without DI, so it needs a static handle to the decoders).
+            Core.Audio.Instruments.Sfz.SfzInstrument.Loader =
+                ServiceProvider.GetService<Core.Audio.Instruments.Sfz.ISfzLoadService>();
+
             // Establish the font-size resources used across the app.
             ApplyFontScale(1.0);
 

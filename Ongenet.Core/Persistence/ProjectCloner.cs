@@ -106,7 +106,13 @@ public static class ProjectCloner
     private static T CloneComponent<T>(T src, T dst) where T : class
     {
         CopyParameters(GetParameters(src), GetParameters(dst));
-        CopyCustomState(src, dst);
+
+        // Heavy in-memory state (e.g. the SFZ sampler's decoded library) is shared by reference rather
+        // than serialized — the serialize path would re-read it from disk, freezing the UI on every edit.
+        if (src is IRuntimeCloneable && dst is IRuntimeCloneable dr)
+            dr.CopyRuntimeStateFrom(src);
+        else
+            CopyCustomState(src, dst);
 
         if (src is ISampleHost sh && dst is ISampleHost dh && sh.CurrentSample is { } buf)
             dh.LoadSample(buf, sh.SampleName ?? ""); // share the (immutable) sample buffer by reference
