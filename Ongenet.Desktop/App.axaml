@@ -9,8 +9,11 @@
         <!-- Resolves a track ColorKey (palette key or hex) to a brush. -->
         <converters:CoreColorToBrushConverter x:Key="ColorKeyToBrush"/>
 
-        <FontFamily x:Key="AppFontFamily">Inter, Noto Sans, avares://Ongenet.Desktop/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji, Noto Color Emoji, Noto Emoji, Apple Color Emoji, Segoe UI Emoji, Twitter Color Emoji, EmojiOne Color, JoyPixels, Symbola, DejaVu Sans, sans-serif</FontFamily>
-        <FontFamily x:Key="ContentControlThemeFontFamily">Inter, Noto Sans, avares://Ongenet.Desktop/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji, Noto Color Emoji, Noto Emoji, Apple Color Emoji, Segoe UI Emoji, Twitter Color Emoji, EmojiOne Color, JoyPixels, Symbola, DejaVu Sans, sans-serif</FontFamily>
+        <!-- Text families only. Emoji is NOT listed here: it lives in FontManagerOptions.FontFallbacks
+             (Program.cs) so it is consulted only after a real text font fails. Putting an emoji font in
+             this chain made Win/Mac font matchers bind the ASCII digits 0-9 to the emoji keycap glyphs. -->
+        <FontFamily x:Key="AppFontFamily">Inter, Noto Sans, DejaVu Sans, sans-serif</FontFamily>
+        <FontFamily x:Key="ContentControlThemeFontFamily">Inter, Noto Sans, DejaVu Sans, sans-serif</FontFamily>
 
         <!-- Catppuccin Mocha Palette Colors -->
         <Color x:Key="CatppuccinRosewaterColor">#f5e0dc</Color>

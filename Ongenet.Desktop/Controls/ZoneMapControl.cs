@@ -27,6 +27,10 @@ namespace Ongenet.Desktop.Controls
         private Color[] _palette = Array.Empty<Color>();
         private IBrush _emptyBrush = Brushes.Gray;
 
+        // Explicit text typeface instead of Typeface.Default, for consistency with the other
+        // custom-drawn controls (keeps glyph resolution off the emoji fallback font).
+        private static readonly Typeface LabelTypeface = new(new FontFamily("Inter, Noto Sans, sans-serif"));
+
         static ZoneMapControl()
         {
             AffectsRender<ZoneMapControl>(ZonesProperty, RevisionProperty);
@@ -77,7 +81,7 @@ namespace Ongenet.Desktop.Controls
             if (zones is null || zones.Count == 0)
             {
                 var ft = new FormattedText("No SFZ loaded", System.Globalization.CultureInfo.CurrentCulture,
-                    FlowDirection.LeftToRight, Typeface.Default, 12, _emptyBrush);
+                    FlowDirection.LeftToRight, LabelTypeface, 12, _emptyBrush);
                 context.DrawText(ft, new Point(8, h / 2 - 8));
                 return;
             }

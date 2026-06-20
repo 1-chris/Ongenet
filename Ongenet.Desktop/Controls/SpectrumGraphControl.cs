@@ -31,6 +31,10 @@ namespace Ongenet.Desktop.Controls
         private IBrush _spectrumBrush = Brushes.Teal;
         private IBrush _labelBrush = Brushes.Gray;
 
+        // Explicit text typeface (frequency labels are digits) — see PianoRollRulerControl for why
+        // Typeface.Default is avoided: it lets the emoji font capture digit glyphs on Win/Mac.
+        private static readonly Typeface LabelTypeface = new(new FontFamily("Inter, Noto Sans, sans-serif"));
+
         protected override void BuildThemeResources()
         {
             base.BuildThemeResources();
@@ -152,7 +156,7 @@ namespace Ongenet.Desktop.Controls
                 var x = FreqToX(freq, w);
                 context.DrawLine(strong ? _gridStrongPen : _gridPen, new Point(x, 0), new Point(x, plotH));
                 var ft = new FormattedText(label, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                    Typeface.Default, 9, _labelBrush);
+                    LabelTypeface, 9, _labelBrush);
                 var tx = Math.Clamp(x - ft.Width / 2, 1, w - ft.Width - 1);
                 context.DrawText(ft, new Point(tx, h - LabelStripHeight + 1));
             }

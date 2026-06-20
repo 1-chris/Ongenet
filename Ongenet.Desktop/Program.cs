@@ -16,12 +16,13 @@ class Program
             .WithInterFont()
             .With(new FontManagerOptions
             {
-                FontFallbacks = OperatingSystem.IsLinux()
-                    ? new[]
-                    {
-                        new FontFallback { FontFamily = "avares://Ongenet.Desktop/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji" }
-                    }
-                    : Array.Empty<FontFallback>()
+                // Emoji is a last-resort glyph fallback on EVERY platform, never a primary text family.
+                // The font manager only reaches it for codepoints the text fonts can't supply, so digits
+                // and letters always render in Inter — keeping the emoji keycap glyphs off the digits.
+                FontFallbacks = new[]
+                {
+                    new FontFallback { FontFamily = "avares://Ongenet.Desktop/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji" }
+                }
             })
             .LogToTrace();
 }

@@ -22,6 +22,10 @@ namespace Ongenet.Desktop.Controls
         private IBrush _labelBrush = Brushes.Gray;        // subtext
         private IPen _barPen = new Pen(Brushes.Gray, 1);  // text (faint)
 
+        // Explicit text typeface. Typeface.Default resolves to the app default family whose glyph
+        // fallback can bind digits to the emoji font on Win/Mac; naming the text chain avoids that.
+        private static readonly Typeface LabelTypeface = new(new FontFamily("Inter, Noto Sans, sans-serif"));
+
         protected override void BuildThemeResources()
         {
             _labelBrush = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Text, 180));
@@ -54,7 +58,7 @@ namespace Ongenet.Desktop.Controls
                 var label = new FormattedText(
                     (beat / bar + 1).ToString(),
                     CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                    Typeface.Default, 11, _labelBrush);
+                    LabelTypeface, 11, _labelBrush);
                 context.DrawText(label, new Point(x + 3, 3));
             }
         }
