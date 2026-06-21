@@ -111,6 +111,10 @@ namespace Ongenet.Desktop.ViewModels
         /// <summary>Current playhead position in beats (polled by the view while playing).</summary>
         public double PlayheadBeats => _transport.PlayheadBeats;
 
+        /// <summary>Playback rate in beats per second — lets the view interpolate the playhead smoothly
+        /// between the engine's (per-audio-block) position reports.</summary>
+        public double BeatsPerSecond => _transport.Tempo.BeatsPerMinute / 60.0;
+
         /// <summary>The start marker position in beats.</summary>
         public double StartBeat => _transport.StartBeat;
 

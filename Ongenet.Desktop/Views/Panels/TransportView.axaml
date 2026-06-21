@@ -58,8 +58,10 @@
             <!-- Col 1: time readout + edit-mode/loop tools -->
             <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center" Margin="0,0,14,0">
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <TextBlock Text="{Binding PlayheadTime}" FontFamily="Consolas, Menlo, DejaVu Sans Mono, monospace" FontSize="13"
-                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinText}"/>
+                    <!-- Render-only control (not a TextBlock): the playhead time changes ~30x/sec while
+                         playing, and a bound TextBlock re-runs an expensive measure layout each frame. -->
+                    <controls:TimeReadoutControl Text="{Binding PlayheadTime}" FontSize="13"
+                                                 VerticalAlignment="Center"/>
                     <TextBlock Text="/" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinOverlay1}"/>
                     <TextBlock Text="{Binding TotalTime}" FontFamily="Consolas, Menlo, DejaVu Sans Mono, monospace" FontSize="13"

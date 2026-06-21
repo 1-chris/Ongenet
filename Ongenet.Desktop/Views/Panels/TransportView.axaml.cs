@@ -3,22 +3,22 @@ using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Desktop.Services;
 using Ongenet.Desktop.ViewModels;
 
 namespace Ongenet.Desktop.Views.Panels
 {
-    /// <summary>Top-bar transport controls. Polls the master meter + playhead time on a timer.</summary>
+    /// <summary>Top-bar transport controls. Refreshes the master meter + playhead time from the shared
+    /// PlaybackClock (pumped by the timeline's render-frame loop) — not its own timer, which competed
+    /// with the render frame and capped playback at 30fps.</summary>
     public partial class TransportView : UserControl
     {
-        private readonly DispatcherTimer _timer;
-
         public TransportView()
         {
             InitializeComponent();
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
-            _timer.Tick += (_, _) => (DataContext as TransportViewModel)?.RefreshMeters();
-            _timer.Start();
+            var clock = App.ServiceProvider?.GetService<IPlaybackClock>();
+            if (clock is not null) clock.Tick += () => (DataContext as TransportViewModel)?.RefreshMeters();
         }
 
         // Render → choose a WAV path → export off the UI thread.

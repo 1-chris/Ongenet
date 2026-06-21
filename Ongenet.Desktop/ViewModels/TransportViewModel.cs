@@ -197,12 +197,22 @@ namespace Ongenet.Desktop.ViewModels
         public double MasterLevelLeft => _engine.MasterLevelLeft;
         public double MasterLevelRight => _engine.MasterLevelRight;
 
-        /// <summary>Refreshes the polled values (master meter + playhead time) — called on the view timer.</summary>
+        private long _lastTimeRefreshMs;
+
+        /// <summary>Refreshes the polled values — called once per render frame via the PlaybackClock.
+        /// Meters (cheap, no text) refresh every call; the sub-second time readout is throttled to ~10Hz
+        /// because re-shaping its text every frame makes the compositor miss vsync (drops to 30fps).</summary>
         public void RefreshMeters()
         {
             OnPropertyChanged(nameof(MasterLevelLeft));
             OnPropertyChanged(nameof(MasterLevelRight));
-            OnPropertyChanged(nameof(PlayheadTime));
+
+            var now = Environment.TickCount64;
+            if (now - _lastTimeRefreshMs >= 100) // ~10Hz
+            {
+                _lastTimeRefreshMs = now;
+                OnPropertyChanged(nameof(PlayheadTime));
+            }
         }
 
         private int BeatsPerBar => Math.Max(1, _project.Current.TimeSignature.Numerator);

@@ -74,20 +74,42 @@ namespace Ongenet.Desktop.Views.Panels
             // Clicking the bar ruler sets the start marker.
             RulerScroll.AddHandler(PointerPressedEvent, OnRulerPressed, RoutingStrategies.Tunnel);
 
-            // Always-on ~30fps tick: advances the playhead overlay and refreshes the track meters.
-            _playheadTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
-            _playheadTimer.Tick += (_, _) => OnTick();
-            _playheadTimer.Start();
+            // Advances the playhead overlay and refreshes the track meters. While playing this runs off
+            // the compositor's render frame (vsync-aligned, smooth ~display rate); while stopped it falls
+            // back to a cheap timer for live-input meter polling / scrub. A plain DispatcherTimer can't
+            // hold a clean 60Hz (it jitters under dispatcher load); RequestAnimationFrame can.
+            _ticker = new Services.FrameTicker(this, OnTick);
 
-            // Reposition overlays on any layout change (resize/zoom/scroll), so they stay aligned
-            // with the content regardless of window size.
-            LayoutUpdated += (_, _) => UpdateOverlays();
+            // NB: we deliberately do NOT reposition overlays from LayoutUpdated. That event fires
+            // after every layout pass in the whole window, and UpdateOverlays writes layout-affecting
+            // properties (Canvas.Left/Height/IsVisible) — so doing it from LayoutUpdated re-dirties
+            // layout and feeds itself a fresh pass each frame while the playhead is moving, pinning the
+            // layout manager and dropping the UI to ~10fps during playback. Resize alignment is handled
+            // by OnPropertyChanged(BoundsProperty) below; scroll/zoom/playhead are handled by the
+            // scroll/metrics/vm handlers and the 30fps tick.
+
+            // Move the overlay lines/markers via RenderTransform (a pure render-thread op) instead of
+            // Canvas.Left. Canvas.Left changes invalidate *layout* (arrange), and because the playhead
+            // is repositioned every frame while the transport runs, that was forcing a full layout pass
+            // ~30x/sec (measured at ~85ms each → ~13fps). A render transform costs zero layout.
+            PlayheadLine.RenderTransform = _playheadXform;
+            StartMarkerLine.RenderTransform = _startMarkerXform;
+            StartMarkerIcon.RenderTransform = _startIconXform;
+            LoopRegion.RenderTransform = _loopXform;
+            LoopRegionRuler.RenderTransform = _loopRulerXform;
 
             DataContextChanged += OnDataContextChanged;
         }
 
-        private DispatcherTimer _playheadTimer;
+        private readonly Services.FrameTicker _ticker;
         private TimelineViewModel? _vm;
+
+        // Persistent translate transforms for the overlay elements (mutated each frame; never reallocated).
+        private readonly Avalonia.Media.TranslateTransform _playheadXform = new();
+        private readonly Avalonia.Media.TranslateTransform _startMarkerXform = new();
+        private readonly Avalonia.Media.TranslateTransform _startIconXform = new();
+        private readonly Avalonia.Media.TranslateTransform _loopXform = new();
+        private readonly Avalonia.Media.TranslateTransform _loopRulerXform = new();
 
         private void OnDataContextChanged(object? sender, EventArgs e)
         {
@@ -104,19 +126,67 @@ namespace Ongenet.Desktop.Views.Panels
                 _vm.Metrics.PropertyChanged += OnMetricsPropertyChanged;
                 UpdateOverlays();
             }
+
+            _ticker.SetFast(_vm?.IsPlaying ?? false);
         }
+
+        // The single per-frame UI driver. Runs off the timeline's render-frame loop (RAF while playing,
+        // a slow timer while idle). Besides the playhead/meters, it pumps the shared PlaybackClock so the
+        // transport meter/time + inspectors refresh from THIS one loop (PlaybackClock self-throttles to
+        // ~30Hz) — having them on their own competing timers wrecked vsync pacing (dropped to 30fps).
+        private IPlaybackClock? _clock;
 
         private void OnTick()
         {
             _vm?.RefreshRecording();
             UpdateOverlays();
             _vm?.RefreshMeters();
+            (_clock ??= App.ServiceProvider?.GetService<IPlaybackClock>())?.Pump();
+        }
+
+        // Interpolated playhead position. The engine only reports the playhead once per audio block
+        // (~24-30Hz here), so reading it directly makes the scene change — and thus the compositor
+        // present — only at that rate. Playback advances at exactly tempo (beats/sec) in real time, so
+        // between reported samples we extrapolate from the last sample using wall-clock. The playhead
+        // then moves every render frame → smooth 60fps independent of the audio buffer size.
+        private double _phAnchorBeat = double.NaN;
+        private long _phAnchorMs;
+
+        private double SmoothPlayheadBeats()
+        {
+            if (_vm is null) return 0;
+            var raw = _vm.PlayheadBeats;
+            var now = Environment.TickCount64;
+
+            // Re-anchor when stopped or when a fresh audio sample arrives (raw advances at exactly the
+            // tempo, so the new sample lands ~where we'd extrapolated — the reset is seamless).
+            if (!_vm.IsPlaying || raw != _phAnchorBeat)
+            {
+                _phAnchorBeat = raw;
+                _phAnchorMs = now;
+                return raw;
+            }
+
+            // Cap the extrapolation window so a stalled/paused engine can't run the playhead away.
+            var elapsed = Math.Min((now - _phAnchorMs) / 1000.0, 0.10);
+            return _phAnchorBeat + elapsed * _vm.BeatsPerSecond;
+        }
+
+        // Realign the overlays when the control is resized (the only layout change the scroll/metrics/vm
+        // handlers and the 30fps tick don't already cover). Reacting to BoundsProperty specifically —
+        // rather than the global LayoutUpdated event — keeps this from re-running on unrelated layout
+        // passes elsewhere in the window.
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+            if (change.Property == BoundsProperty) UpdateOverlays();
         }
 
         private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName is nameof(TimelineViewModel.IsPlaying) or nameof(TimelineViewModel.StartBeat))
             {
+                if (e.PropertyName == nameof(TimelineViewModel.IsPlaying)) _ticker.SetFast(_vm?.IsPlaying ?? false);
                 UpdateOverlays();
             }
         }
@@ -140,17 +210,17 @@ namespace Ongenet.Desktop.Views.Panels
 
             var startX = lanesOrigin + _vm.StartBeat * ppb;
             StartMarkerLine.Height = height;
-            Canvas.SetLeft(StartMarkerLine, startX);
+            _startMarkerXform.X = startX;
             StartMarkerLine.IsVisible = startX >= 0 && startX <= width;
 
-            var playX = lanesOrigin + _vm.PlayheadBeats * ppb;
+            var playX = lanesOrigin + SmoothPlayheadBeats() * ppb;
             PlayheadLine.Height = height;
-            Canvas.SetLeft(PlayheadLine, playX);
+            _playheadXform.X = playX;
             PlayheadLine.IsVisible = playX >= 0 && playX <= width;
 
             var rulerOrigin = ContentOriginX(RulerScroll, RulerOverlay);
             var iconX = rulerOrigin + _vm.StartBeat * ppb;
-            Canvas.SetLeft(StartMarkerIcon, iconX);
+            _startIconXform.X = iconX;
             Canvas.SetTop(StartMarkerIcon, 7);
             StartMarkerIcon.IsVisible = iconX >= -9 && iconX <= RulerOverlay.Bounds.Width;
 
@@ -159,12 +229,12 @@ namespace Ongenet.Desktop.Views.Panels
             {
                 var loopX = lanesOrigin + _vm.LoopStart * ppb;
                 var loopW = System.Math.Max(0, (_vm.LoopEnd - _vm.LoopStart) * ppb);
-                Canvas.SetLeft(LoopRegion, loopX);
+                _loopXform.X = loopX;
                 LoopRegion.Width = loopW;
                 LoopRegion.Height = height;
                 LoopRegion.IsVisible = true;
 
-                Canvas.SetLeft(LoopRegionRuler, rulerOrigin + _vm.LoopStart * ppb);
+                _loopRulerXform.X = rulerOrigin + _vm.LoopStart * ppb;
                 LoopRegionRuler.Width = loopW;
                 LoopRegionRuler.IsVisible = true;
             }

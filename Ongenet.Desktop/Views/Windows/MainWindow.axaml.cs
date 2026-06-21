@@ -39,6 +39,24 @@ namespace Ongenet.Desktop.Views.Windows
             Closing += OnClosing;
         }
 
+        // Auto-enable the renderer diagnostics overlay when ONGENET_FPS=1, so jank can be measured
+        // without touching the keyboard. Toggle at runtime with F8.
+        protected override void OnOpened(EventArgs e)
+        {
+            base.OnOpened(e);
+            if (Environment.GetEnvironmentVariable("ONGENET_FPS") == "1") ToggleRenderDiagnostics();
+        }
+
+        private void ToggleRenderDiagnostics()
+        {
+            var on = RendererDiagnostics.DebugOverlays != Avalonia.Rendering.RendererDebugOverlays.None;
+            RendererDiagnostics.DebugOverlays = on
+                ? Avalonia.Rendering.RendererDebugOverlays.None
+                : Avalonia.Rendering.RendererDebugOverlays.Fps
+                  | Avalonia.Rendering.RendererDebugOverlays.RenderTimeGraph
+                  | Avalonia.Rendering.RendererDebugOverlays.LayoutTimeGraph;
+        }
+
         // Don't let the app exit while a save is still writing — that would truncate the file.
         private void OnClosing(object? sender, WindowClosingEventArgs e)
         {
@@ -174,6 +192,13 @@ namespace Ongenet.Desktop.Views.Windows
             {
                 case Key.Space:
                     TogglePlayStop();
+                    e.Handled = true;
+                    return;
+                case Key.F8:
+                    // Toggle Avalonia's renderer diagnostics overlay (FPS + render/layout time graphs)
+                    // to diagnose UI jank. Render graph high = render/GPU bound; layout graph high =
+                    // layout bound; both low but FPS low = frame-scheduling/vsync bound.
+                    ToggleRenderDiagnostics();
                     e.Handled = true;
                     return;
                 case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
