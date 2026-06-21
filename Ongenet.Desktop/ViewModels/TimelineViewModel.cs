@@ -4,8 +4,11 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
@@ -1247,6 +1250,13 @@ namespace Ongenet.Desktop.ViewModels
             IInstrument instrument;
             try { instrument = _instruments.Create(instrumentId); }
             catch { return; }
+            CreateInstrumentTrack(instrument, laneIndex);
+        }
+
+        /// <summary>Creates an instrument track hosting an already-built instrument (e.g. a loaded preset or
+        /// sound-font sampler dragged from the library).</summary>
+        public void CreateInstrumentTrack(IInstrument instrument, int laneIndex)
+        {
             _history.Capture("Add instrument track");
 
             var track = new Track
@@ -1258,6 +1268,45 @@ namespace Ongenet.Desktop.ViewModels
             track.Instruments.Add(new Core.Models.Audio.InstrumentSlot(instrument));
             track.CommitInstruments();
             InsertTrack(track, laneIndex);
+        }
+
+        /// <summary>Creates an instrument track with a Sampler holding the dropped sound font.</summary>
+        public void CreateSoundFontTrack(string path, int laneIndex)
+        {
+            if (!string.IsNullOrEmpty(path)) _ = CreateSoundFontTrackAsync(path, laneIndex);
+        }
+
+        /// <summary>Creates an instrument track from a dropped instrument preset (.ongenpreset).</summary>
+        public void CreateInstrumentPresetTrack(string presetPath, int laneIndex)
+        {
+            if (LoadPresetInstrument(presetPath) is { } instrument) CreateInstrumentTrack(instrument, laneIndex);
+        }
+
+        // Loads the sound font off the UI thread *first*, then creates the track — so the inspector card,
+        // built when the new track is selected, reads the sampler's already-applied patch (name + regions)
+        // instead of showing "(no instrument loaded)".
+        private async Task CreateSoundFontTrackAsync(string path, int laneIndex)
+        {
+            var sampler = new SamplerInstrument();
+            var loader = App.ServiceProvider?.GetService<ISamplerLoadService>();
+            if (loader is not null)
+            {
+                var result = await Task.Run(() => loader.Load(path));
+                if (result is not null) sampler.ApplyLoad(result);
+            }
+            CreateInstrumentTrack(sampler, laneIndex);
+        }
+
+        private IInstrument? LoadPresetInstrument(string path)
+        {
+            try
+            {
+                var effects = App.ServiceProvider?.GetService<IEffectRegistry>();
+                if (effects is null) return null;
+                using var fs = File.OpenRead(path);
+                return Ongenet.Core.Persistence.PresetFile.Load(fs, _instruments, effects)?.Instrument;
+            }
+            catch { return null; }
         }
 
         // Inserts a track into the project + lanes at the given track index, publishes, and selects it.

@@ -379,7 +379,10 @@ namespace Ongenet.Desktop.Views.Panels
             // Audio can arrive from the in-app file browser (DragFormats.AudioFile) or from the OS
             // file manager as files.
             var isAudio = e.DataTransfer.Contains(DragFormats.AudioFile) || ExternalAudioPaths(e, vm).Count > 0;
-            var isInstrument = e.DataTransfer.Contains(DragFormats.Instrument);
+            // A soundfont or instrument preset spawns an instrument track just like an instrument does.
+            var isInstrument = e.DataTransfer.Contains(DragFormats.Instrument)
+                               || e.DataTransfer.Contains(DragFormats.SoundFont)
+                               || e.DataTransfer.Contains(DragFormats.Preset);
             if (!isAudio && !isInstrument)
             {
                 e.DragEffects = DragDropEffects.None;
@@ -433,6 +436,16 @@ namespace Ongenet.Desktop.Views.Panels
             {
                 var laneIndex = insertIndex >= 0 ? insertIndex : vm.TrackInsertIndexForRow(rowIndex);
                 vm.CreateInstrumentTrack(instrumentId, laneIndex);
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.SoundFont) is { } soundFontPath)
+            {
+                var laneIndex = insertIndex >= 0 ? insertIndex : vm.TrackInsertIndexForRow(rowIndex);
+                vm.CreateSoundFontTrack(soundFontPath, laneIndex);
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.Preset) is { } presetPath)
+            {
+                var laneIndex = insertIndex >= 0 ? insertIndex : vm.TrackInsertIndexForRow(rowIndex);
+                vm.CreateInstrumentPresetTrack(presetPath, laneIndex);
             }
             else if (e.DataTransfer.TryGetValue(DragFormats.AudioFile) is { } path)
             {

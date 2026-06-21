@@ -25,10 +25,12 @@ namespace Ongenet.Desktop.Views.Panels
             AddHandler(DragDrop.DragLeaveEvent, OnCardDragLeave);
         }
 
-        // An instrument or instrument-preset drop uses the vertical zone (above / replace / below); a
-        // sound-font drop loads into the card (only when it is a Sampler).
+        // Instrument, instrument-preset and sound-font drops all use the vertical zone (above / replace /
+        // below); in the replace zone a sound font loads into a Sampler card or replaces a non-sampler.
         private static bool IsZoned(DragEventArgs e)
-            => e.DataTransfer.Contains(DragFormats.Instrument) || e.DataTransfer.Contains(DragFormats.Preset);
+            => e.DataTransfer.Contains(DragFormats.Instrument)
+               || e.DataTransfer.Contains(DragFormats.Preset)
+               || e.DataTransfer.Contains(DragFormats.SoundFont);
 
         // Maps the pointer's vertical position within the card to a rack edit: top/bottom thirds insert
         // above/below, the middle replaces.
@@ -49,12 +51,6 @@ namespace Ongenet.Desktop.Views.Panels
                 e.DragEffects = DragDropEffects.Copy;
                 ShowDropIndicator(ZoneAt(e));
                 e.Handled = true; // don't let the rack's empty-area "append" handler also fire
-            }
-            else if (e.DataTransfer.Contains(DragFormats.SoundFont) && DataContext is InstrumentSlotViewModel { IsSoundFont: true })
-            {
-                e.DragEffects = DragDropEffects.Copy;
-                ShowDropIndicator(InstrumentSlotViewModel.RackDropZone.Replace); // loads into this Sampler
-                e.Handled = true;
             }
             else
             {
@@ -80,7 +76,7 @@ namespace Ongenet.Desktop.Views.Panels
             }
             else if (e.DataTransfer.TryGetValue(DragFormats.SoundFont) is { } sfPath)
             {
-                if (vm.DropSoundFont(sfPath)) e.Handled = true;
+                if (vm.DropSoundFont(sfPath, ZoneAt(e))) e.Handled = true;
             }
         }
 

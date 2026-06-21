@@ -95,34 +95,69 @@ namespace Ongenet.Desktop.ViewModels.Effects
         /// <summary>Adds an effect of the given type to the end of the chain (used by the menu + drag-drop).</summary>
         public void AddEffect(string id)
         {
-            if (string.IsNullOrEmpty(id)) return;
-            IAudioEffect fx;
-            try { fx = _registry.Create(id); }
-            catch { return; }
-            _history.Capture("Add effect");
-            _effects.Add(fx);
-            _commit();
-            _changed();
-            Rebuild();
+            if (CreateEffect(id) is { } fx) Apply("Add effect", () => _effects.Add(fx));
+        }
+
+        /// <summary>Inserts an effect of the given type at <paramref name="index"/> (zoned drag-drop).</summary>
+        public void InsertEffect(int index, string id)
+        {
+            if (CreateEffect(id) is { } fx) Apply("Add effect", () => _effects.Insert(Clamp(index), fx));
+        }
+
+        /// <summary>Replaces the effect at <paramref name="index"/> with a new one (zoned drag-drop).</summary>
+        public void ReplaceEffectAt(int index, string id)
+        {
+            if (InRange(index) && CreateEffect(id) is { } fx) Apply("Replace effect", () => _effects[index] = fx);
         }
 
         /// <summary>Adds an effect loaded from a dropped <c>.ongenpreset</c> to the end of the chain.</summary>
         public void AddEffectPreset(string presetPath)
         {
-            var instruments = App.ServiceProvider?.GetService<IInstrumentRegistry>();
-            if (instruments is null) return;
+            if (LoadEffectPreset(presetPath) is { } fx) Apply("Add effect preset", () => _effects.Add(fx));
+        }
 
-            IAudioEffect? fx;
+        /// <summary>Inserts a dropped effect preset at <paramref name="index"/> (zoned drag-drop).</summary>
+        public void InsertEffectPreset(int index, string presetPath)
+        {
+            if (LoadEffectPreset(presetPath) is { } fx) Apply("Add effect preset", () => _effects.Insert(Clamp(index), fx));
+        }
+
+        /// <summary>Replaces the effect at <paramref name="index"/> with a dropped effect preset (zoned drag-drop).</summary>
+        public void ReplaceEffectPresetAt(int index, string presetPath)
+        {
+            if (InRange(index) && LoadEffectPreset(presetPath) is { } fx) Apply("Replace effect", () => _effects[index] = fx);
+        }
+
+        /// <summary>Position of an effect card in the chain (used by the view to map a drop to an index).</summary>
+        public int IndexOf(EffectViewModel vm) => _effects.IndexOf(vm.Effect);
+
+        private IAudioEffect? CreateEffect(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            try { return _registry.Create(id); }
+            catch { return null; }
+        }
+
+        private IAudioEffect? LoadEffectPreset(string presetPath)
+        {
+            var instruments = App.ServiceProvider?.GetService<IInstrumentRegistry>();
+            if (instruments is null) return null;
             try
             {
                 using var fs = System.IO.File.OpenRead(presetPath);
-                fx = Ongenet.Core.Persistence.PresetFile.Load(fs, instruments, _registry)?.Effect;
+                return Ongenet.Core.Persistence.PresetFile.Load(fs, instruments, _registry)?.Effect;
             }
-            catch { return; }
-            if (fx is null) return;
+            catch { return null; }
+        }
 
-            _history.Capture("Add effect preset");
-            _effects.Add(fx);
+        private int Clamp(int index) => Math.Clamp(index, 0, _effects.Count);
+        private bool InRange(int index) => index >= 0 && index < _effects.Count;
+
+        // Captures undo, mutates the chain, then commits to the audio thread + rebuilds the cards.
+        private void Apply(string historyLabel, Action mutate)
+        {
+            _history.Capture(historyLabel);
+            mutate();
             _commit();
             _changed();
             Rebuild();

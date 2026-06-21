@@ -111,13 +111,14 @@ namespace Ongenet.Desktop
             services.AddSingleton<EffectsViewModel>();
             services.AddSingleton<BottomPanelViewModel>();
             services.AddSingleton<FileBrowserViewModel>();
-            services.AddSingleton<InstrumentsViewModel>();
 
             // Library tabs + shared audio preview.
             services.AddSingleton<AudioPreviewViewModel>();
+            services.AddSingleton<ViewModels.Library.EverythingLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectsLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.SampleLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.SoundFontLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.InstrumentLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.InstrumentPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectChainPresetLibraryViewModel>();

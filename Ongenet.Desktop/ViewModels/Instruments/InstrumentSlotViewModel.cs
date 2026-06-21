@@ -37,6 +37,8 @@ namespace Ongenet.Desktop.ViewModels.Instruments
         private readonly Action<InstrumentSlotViewModel, string> _replaceWith;          // (target, instrumentId)
         private readonly Action<InstrumentSlotViewModel, string, bool> _insertPresetRelative; // (target, presetPath, below)
         private readonly Action<InstrumentSlotViewModel, string> _replacePresetWith;          // (target, presetPath)
+        private readonly Action<InstrumentSlotViewModel, string, bool> _insertSoundFontRelative; // (target, sfPath, below)
+        private readonly Action<InstrumentSlotViewModel, string> _replaceSoundFontWith;          // (target, sfPath)
 
         private readonly DispatcherTimer _previewTimer;
         private readonly List<ParameterViewModel> _subscribedParams = new();
@@ -46,7 +48,8 @@ namespace Ongenet.Desktop.ViewModels.Instruments
             ITransportService transport, IHistoryService history, IEffectRegistry effects, IPlaybackClock clock,
             Action notifyChanged, Action<InstrumentSlotViewModel> remove, Action<InstrumentSlotViewModel, int> move,
             Action<InstrumentSlotViewModel, string, bool> insertRelative, Action<InstrumentSlotViewModel, string> replaceWith,
-            Action<InstrumentSlotViewModel, string, bool> insertPresetRelative, Action<InstrumentSlotViewModel, string> replacePresetWith)
+            Action<InstrumentSlotViewModel, string, bool> insertPresetRelative, Action<InstrumentSlotViewModel, string> replacePresetWith,
+            Action<InstrumentSlotViewModel, string, bool> insertSoundFontRelative, Action<InstrumentSlotViewModel, string> replaceSoundFontWith)
         {
             _slot = slot;
             _audioFiles = audioFiles;
@@ -59,6 +62,8 @@ namespace Ongenet.Desktop.ViewModels.Instruments
             _replaceWith = replaceWith;
             _insertPresetRelative = insertPresetRelative;
             _replacePresetWith = replacePresetWith;
+            _insertSoundFontRelative = insertSoundFontRelative;
+            _replaceSoundFontWith = replaceSoundFontWith;
 
             _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
             _previewTimer.Tick += OnPreviewTimerTick;
@@ -135,11 +140,20 @@ namespace Ongenet.Desktop.ViewModels.Instruments
             }
         }
 
-        /// <summary>Loads a dropped sound font into this card when it is a Sampler (else ignored).</summary>
-        public bool DropSoundFont(string path)
+        /// <summary>Applies a sound-font drop onto this card: insert a sampler above/below, or in the replace
+        /// zone load into this card when it is already a Sampler, else replace it with a sampler.</summary>
+        public bool DropSoundFont(string path, RackDropZone zone)
         {
-            if (SamplerInst is null || string.IsNullOrEmpty(path)) return false;
-            LoadSamplerFromPath(path);
+            if (string.IsNullOrEmpty(path)) return false;
+            switch (zone)
+            {
+                case RackDropZone.Above: _insertSoundFontRelative(this, path, false); break;
+                case RackDropZone.Below: _insertSoundFontRelative(this, path, true); break;
+                default:
+                    if (IsSoundFont) LoadSamplerFromPath(path);   // already a Sampler — just load
+                    else _replaceSoundFontWith(this, path);        // swap this instrument for a sampler + load
+                    break;
+            }
             return true;
         }
 

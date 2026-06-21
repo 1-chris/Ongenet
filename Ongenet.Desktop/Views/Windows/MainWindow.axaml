@@ -233,6 +233,7 @@
                                         <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
                                     </Style>
                                 </ListBox.Styles>
+                                <ListBoxItem Name="TabEverything"><controls:VerticalTabLabel Text="Everything" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabFiles"><controls:VerticalTabLabel Text="Files" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabSamples"><controls:VerticalTabLabel Text="Samples" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabSoundfonts"><controls:VerticalTabLabel Text="Soundfonts" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
@@ -248,10 +249,11 @@
                                    Background="{StaticResource CatppuccinMantle}">
                             <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
                             <Grid>
+                                <views:LibraryListView IsVisible="{Binding #TabEverything.IsSelected}" DataContext="{Binding Everything}"/>
                                 <views:FileBrowserView IsVisible="{Binding #TabFiles.IsSelected}" DataContext="{Binding FileBrowser}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabSamples.IsSelected}" DataContext="{Binding SampleLibrary}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabSoundfonts.IsSelected}" DataContext="{Binding SoundFontLibrary}"/>
-                                <views:InstrumentsView IsVisible="{Binding #TabInstruments.IsSelected}" DataContext="{Binding Instruments}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabInstruments.IsSelected}" DataContext="{Binding InstrumentLibrary}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabEffects.IsSelected}" DataContext="{Binding EffectsLibrary}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabInstPresets.IsSelected}" DataContext="{Binding InstrumentPresets}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabFxPresets.IsSelected}" DataContext="{Binding EffectPresets}"/>

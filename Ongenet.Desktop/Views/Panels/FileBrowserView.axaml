@@ -10,10 +10,6 @@
 
     <Border Background="{StaticResource CatppuccinMantle}">
         <DockPanel>
-            <TextBlock DockPanel.Dock="Top" Text="FILES" FontWeight="Bold" FontSize="11"
-                       Margin="12,12,12,6"
-                       Foreground="{StaticResource CatppuccinOverlay1}"/>
-
             <!-- Disable horizontal scrolling so deep nesting doesn't push a scrollbar; long names wrap to
                  the next line and stay within the sidebar width. -->
             <TreeView Name="FileTree" ItemsSource="{Binding Roots}" Background="Transparent" Margin="4,0,4,4"

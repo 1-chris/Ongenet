@@ -11,8 +11,9 @@ namespace Ongenet.Desktop.Services;
 /// <summary>One asset (sample or sound font) discovered on disk.</summary>
 public sealed record LibraryItem(string Name, string FullPath);
 
-/// <summary>A named group of library items (one per configured scan folder).</summary>
-public sealed record LibraryGroup(string Name, IReadOnlyList<LibraryItem> Items);
+/// <summary>A named group of library items (one per configured scan folder). <see cref="Root"/> is the
+/// scanned folder's full path, so callers can render items relative to it (e.g. as a folder tree).</summary>
+public sealed record LibraryGroup(string Name, string Root, IReadOnlyList<LibraryItem> Items);
 
 public interface ILibraryScanService
 {
@@ -91,6 +92,7 @@ public sealed class LibraryScanService : ILibraryScanService
         }
 
         items.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        return new LibraryGroup(Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } n ? n : root, items);
+        var name = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } n ? n : root;
+        return new LibraryGroup(name, root, items);
     }
 }

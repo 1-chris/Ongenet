@@ -109,7 +109,30 @@ namespace Ongenet.Desktop.ViewModels
         {
             if (Create(SamplerInstrument.TypeId) is not { } sampler) return;
             AddSlot(sampler, "Add instrument");
-            if (Slots.Count > 0) Slots[Slots.Count - 1].LoadSamplerFromPath(path);
+            LoadSoundFontInto(Slots.Count - 1, path);
+        }
+
+        /// <summary>Inserts a new Sampler at <paramref name="index"/> and loads the sound font into it.</summary>
+        public void InsertSoundFont(int index, string path)
+        {
+            if (Create(SamplerInstrument.TypeId) is not { } sampler) return;
+            index = Math.Clamp(index, 0, Slots.Count);
+            InsertSlot(index, sampler, "Add instrument");
+            LoadSoundFontInto(index, path);
+        }
+
+        /// <summary>Replaces the instrument at <paramref name="index"/> with a Sampler holding the sound font.</summary>
+        public void ReplaceWithSoundFont(int index, string path)
+        {
+            if (index < 0 || index >= Slots.Count || Create(SamplerInstrument.TypeId) is not { } sampler) return;
+            ReplaceSlotAt(index, sampler, "Replace instrument");
+            LoadSoundFontInto(index, path);
+        }
+
+        // Loads a sound font into the (rebuilt) slot at index, if present.
+        private void LoadSoundFontInto(int index, string path)
+        {
+            if (index >= 0 && index < Slots.Count) Slots[index].LoadSamplerFromPath(path);
         }
 
         private IInstrument? Create(string instrumentId)
@@ -193,6 +216,18 @@ namespace Ongenet.Desktop.ViewModels
             if (i >= 0 && LoadInstrumentPreset(presetPath) is { } inst) ReplaceSlotAt(i, inst, "Replace instrument");
         }
 
+        private void InsertSoundFontRelativeToSlot(InstrumentSlotViewModel target, string path, bool below)
+        {
+            var i = IndexOf(target);
+            if (i >= 0) InsertSoundFont(below ? i + 1 : i, path);
+        }
+
+        private void ReplaceSoundFontForSlot(InstrumentSlotViewModel target, string path)
+        {
+            var i = IndexOf(target);
+            if (i >= 0) ReplaceWithSoundFont(i, path);
+        }
+
         private void RemoveSlot(InstrumentSlotViewModel slot)
         {
             if (Track is not { } track) return;
@@ -255,7 +290,8 @@ namespace Ongenet.Desktop.ViewModels
                 foreach (var slot in track.Instruments)
                     Slots.Add(new InstrumentSlotViewModel(slot, _audioFiles, _transport, _history, _effects,
                         _clock, () => _events.Publish(new TracksChangedEvent()), RemoveSlot, MoveSlot,
-                        InsertRelativeToSlot, ReplaceSlotWith, InsertPresetRelativeToSlot, ReplacePresetForSlot));
+                        InsertRelativeToSlot, ReplaceSlotWith, InsertPresetRelativeToSlot, ReplacePresetForSlot,
+                        InsertSoundFontRelativeToSlot, ReplaceSoundFontForSlot));
             }
 
             for (var i = 0; i < Slots.Count; i++)

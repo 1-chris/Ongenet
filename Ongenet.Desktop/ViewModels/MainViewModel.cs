@@ -22,11 +22,12 @@ namespace Ongenet.Desktop.ViewModels
             TrackInspectorViewModel trackInspector,
             BottomPanelViewModel bottomPanel,
             FileBrowserViewModel fileBrowser,
-            InstrumentsViewModel instruments,
             AudioPreviewViewModel preview,
+            Library.EverythingLibraryViewModel everything,
             Library.EffectsLibraryViewModel effectsLibrary,
             Library.SampleLibraryViewModel sampleLibrary,
             Library.SoundFontLibraryViewModel soundFontLibrary,
+            Library.InstrumentLibraryViewModel instrumentLibrary,
             Library.InstrumentPresetLibraryViewModel instrumentPresets,
             Library.EffectPresetLibraryViewModel effectPresets,
             Library.EffectChainPresetLibraryViewModel chainPresets,
@@ -39,11 +40,12 @@ namespace Ongenet.Desktop.ViewModels
             TrackInspector = trackInspector;
             BottomPanel = bottomPanel;
             FileBrowser = fileBrowser;
-            Instruments = instruments;
             Preview = preview;
+            Everything = everything;
             EffectsLibrary = effectsLibrary;
             SampleLibrary = sampleLibrary;
             SoundFontLibrary = soundFontLibrary;
+            InstrumentLibrary = instrumentLibrary;
             InstrumentPresets = instrumentPresets;
             EffectPresets = effectPresets;
             EffectChainPresets = chainPresets;
@@ -97,16 +99,15 @@ namespace Ongenet.Desktop.ViewModels
         /// <summary>Right-hand file browser.</summary>
         public FileBrowserViewModel FileBrowser { get; }
 
-        /// <summary>Right-hand instruments list.</summary>
-        public InstrumentsViewModel Instruments { get; }
-
         /// <summary>Shared audio preview (waveform + stats + audition) docked under the library tabs.</summary>
         public AudioPreviewViewModel Preview { get; }
 
         /// <summary>Library tabs.</summary>
+        public Library.EverythingLibraryViewModel Everything { get; }
         public Library.EffectsLibraryViewModel EffectsLibrary { get; }
         public Library.SampleLibraryViewModel SampleLibrary { get; }
         public Library.SoundFontLibraryViewModel SoundFontLibrary { get; }
+        public Library.InstrumentLibraryViewModel InstrumentLibrary { get; }
         public Library.InstrumentPresetLibraryViewModel InstrumentPresets { get; }
         public Library.EffectPresetLibraryViewModel EffectPresets { get; }
         public Library.EffectChainPresetLibraryViewModel EffectChainPresets { get; }

@@ -59,7 +59,8 @@
                        Foreground="{StaticResource CatppuccinOverlay1}"/>
         </StackPanel>
 
-        <ItemsControl ItemsSource="{Binding Effects}">
+        <Panel>
+        <ItemsControl Name="EffectList" ItemsSource="{Binding Effects}">
             <ItemsControl.DataTemplates>
                 <!-- EQ: interactive parametric-EQ graph. -->
                 <DataTemplate DataType="fx:EqEffectViewModel">
@@ -312,5 +313,14 @@
                 </DataTemplate>
             </ItemsControl.DataTemplates>
         </ItemsControl>
+
+        <!-- Drag-drop indicators (positioned in code-behind): a replace highlight + an insertion line. -->
+        <Canvas Name="DropOverlay" IsHitTestVisible="False">
+            <Border Name="DropReplace" IsVisible="False" CornerRadius="4" BorderThickness="2"
+                    BorderBrush="{StaticResource CatppuccinMauve}" Background="#33CBA6F7"/>
+            <Border Name="DropLine" IsVisible="False" Height="2"
+                    Background="{StaticResource CatppuccinMauve}"/>
+        </Canvas>
+        </Panel>
     </DockPanel>
 </UserControl>
