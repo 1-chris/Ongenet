@@ -6,7 +6,7 @@
     UI reads it back at runtime (see Ongenet.Desktop/AppInfo.cs) to show it in the title bar.
   -->
   <PropertyGroup>
-    <Version>0.11.0</Version>
+    <Version>0.11.2</Version>
     <Product>Ongenet</Product>
     <Company>Ongenet</Company>
   </PropertyGroup>
