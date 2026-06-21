@@ -41,12 +41,33 @@
     </Window.Styles>
 
     <Panel>
-    <Border Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+    <Border Name="RootBorder" Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
     <Panel>
         <Grid RowDefinitions="Auto, *">
             <!-- Custom Title Bar (exact port of the original MainWindow chrome) -->
             <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto" PointerPressed="TitleBar_PointerPressed">
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" Spacing="12">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- macOS "traffic light" buttons live on the left; hidden on other platforms (toggled in code-behind).
+                     macOS left-to-right order: close (red) / minimise (yellow) / maximise (green). -->
+                <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
+                            VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
+                    <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
+                            Click="CloseButton_Click" ToolTip.Tip="Close">
+                        <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Button Classes="MacButton" Background="{StaticResource CatppuccinYellow}"
+                            Click="MinimizeButton_Click" ToolTip.Tip="Minimize">
+                        <Path Data="M0,3 L7,3" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Button Classes="MacButton" Background="{StaticResource CatppuccinGreen}"
+                            Click="MaximizeButton_Click" ToolTip.Tip="Maximize">
+                        <Path Data="M0,3 L7,3 M3.5,0 L3.5,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Button>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" Spacing="12">
                     <TextBlock Text="Ongenet" FontSize="12" Foreground="{StaticResource CatppuccinMauve}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
                                VerticalAlignment="Center" Margin="-6,1,0,0"/>
@@ -86,7 +107,8 @@
                                    Foreground="{StaticResource CatppuccinGreen}"/>
                     </StackPanel>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                </StackPanel>
+                <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
                     <Button Name="MinimizeButton" Classes="TitleBarButton" Click="MinimizeButton_Click">
                         <Path Margin="0,5,0,0" VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,0" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
                     </Button>
@@ -174,24 +196,24 @@
                                   Background="{StaticResource CatppuccinCrust}"/>
 
                     <!-- Right: tabbed Files / Instruments with sideways tabs (collapsible to just the tabs) -->
-                    <Grid Grid.Column="4" RowDefinitions="Auto,*,Auto" Background="{StaticResource CatppuccinMantle}">
-                        <Border Grid.Row="0" Height="26" Background="{StaticResource CatppuccinSurface0}">
-                            <!-- Square sized to ~the sideways tab-strip width, left-aligned so the centred
-                                 chevron sits directly above the tabs (and keeps the collapsed strip tight). -->
-                            <Button Name="RightToggle" Content="▸" Click="ToggleRightPanel"
-                                    HorizontalAlignment="Left" VerticalAlignment="Center"
-                                    Width="24" Padding="0" FontSize="11"
-                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                    Background="Transparent"
-                                    Foreground="{StaticResource CatppuccinSubtext0}"
-                                    ToolTip.Tip="Collapse / expand panel"/>
-                        </Border>
-                        <!-- Custom vertical tab strip: a fully-templated ListBox of rotated labels (so we
-                             control centring ourselves) on the left, and the selected panel on the right.
-                             Each panel's visibility is bound to its tab item's IsSelected. -->
-                        <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
-                            <ListBox Grid.Column="0" Name="RightTabStrip" SelectedIndex="0" FontSize="12"
-                                     Background="{StaticResource CatppuccinSurface0}" BorderThickness="0" Padding="0"
+                    <!-- Right sidebar: [collapse toggle + sideways tab strip] | [selected panel + preview].
+                         Collapsing hides the whole RightContent column so the Auto-sized outer column
+                         shrinks to just the strip. -->
+                    <Grid Grid.Column="4" ColumnDefinitions="Auto,*" Background="{StaticResource CatppuccinMantle}">
+                        <DockPanel Grid.Column="0" Background="{StaticResource CatppuccinSurface0}">
+                            <Border DockPanel.Dock="Top" Height="26">
+                                <Button Name="RightToggle" Content="▸" Click="ToggleRightPanel"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Width="24" Padding="0" FontSize="11"
+                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                        Background="Transparent"
+                                        Foreground="{StaticResource CatppuccinSubtext0}"
+                                        ToolTip.Tip="Collapse / expand panel"/>
+                            </Border>
+                            <!-- Custom vertical tab strip: a fully-templated ListBox of rotated labels so we
+                                 control the centring ourselves. -->
+                            <ListBox Name="RightTabStrip" SelectedIndex="0" FontSize="12"
+                                     Background="Transparent" BorderThickness="0" Padding="0"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListBox.Styles>
                                     <Style Selector="ListBoxItem">
@@ -220,9 +242,12 @@
                                 <ListBoxItem Name="TabFxPresets"><controls:VerticalTabLabel Text="FX Presets" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabFxChains"><controls:VerticalTabLabel Text="FX Chains" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                             </ListBox>
+                        </DockPanel>
 
-                            <Grid Grid.Column="1" Name="RightContent" MinWidth="180"
-                                  Background="{StaticResource CatppuccinMantle}">
+                        <DockPanel Grid.Column="1" Name="RightContent" MinWidth="180"
+                                   Background="{StaticResource CatppuccinMantle}">
+                            <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
+                            <Grid>
                                 <views:FileBrowserView IsVisible="{Binding #TabFiles.IsSelected}" DataContext="{Binding FileBrowser}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabSamples.IsSelected}" DataContext="{Binding SampleLibrary}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabSoundfonts.IsSelected}" DataContext="{Binding SoundFontLibrary}"/>
@@ -232,9 +257,7 @@
                                 <views:LibraryListView IsVisible="{Binding #TabFxPresets.IsSelected}" DataContext="{Binding EffectPresets}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabFxChains.IsSelected}" DataContext="{Binding EffectChainPresets}"/>
                             </Grid>
-                        </Grid>
-
-                        <views:PreviewPanelView Grid.Row="2" DataContext="{Binding Preview}"/>
+                        </DockPanel>
                     </Grid>
                 </Grid>
             </Grid>

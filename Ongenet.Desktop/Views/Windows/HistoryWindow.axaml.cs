@@ -9,7 +9,7 @@ namespace Ongenet.Desktop.Views.Windows;
 /// Lists the undo/redo timeline; selecting an entry jumps the project to that point (bulk undo/redo).
 /// Uses the same custom chrome as the log and theme windows.
 /// </summary>
-public partial class HistoryWindow : Window
+public partial class HistoryWindow : ChromedWindow
 {
     public HistoryWindow()
     {

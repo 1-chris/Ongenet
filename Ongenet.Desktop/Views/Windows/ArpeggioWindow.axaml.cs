@@ -9,7 +9,7 @@ namespace Ongenet.Desktop.Views.Windows;
 /// Window for "Convert to arpeggio": arpeggiates the piano-roll's selected notes. Uses the same
 /// custom chrome as the other tool windows; Apply delegates to <see cref="ArpeggiatorViewModel"/>.
 /// </summary>
-public partial class ArpeggioWindow : Window
+public partial class ArpeggioWindow : ChromedWindow
 {
     public ArpeggioWindow()
     {

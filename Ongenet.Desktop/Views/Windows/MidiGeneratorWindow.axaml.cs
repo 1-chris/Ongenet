@@ -9,7 +9,7 @@ namespace Ongenet.Desktop.Views.Windows;
 /// Window for generating randomized chord progressions into the piano-roll clip. Uses the same
 /// custom chrome as the history/theme windows; button clicks delegate to <see cref="MidiGeneratorViewModel"/>.
 /// </summary>
-public partial class MidiGeneratorWindow : Window
+public partial class MidiGeneratorWindow : ChromedWindow
 {
     public MidiGeneratorWindow()
     {

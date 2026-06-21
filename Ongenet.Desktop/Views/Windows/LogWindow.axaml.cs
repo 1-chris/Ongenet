@@ -18,7 +18,7 @@ namespace Ongenet.Desktop.Views.Windows;
 /// <summary>
 /// Window for displaying application logs with filtering by log level.
 /// </summary>
-public partial class LogWindow : Window
+public partial class LogWindow : ChromedWindow
 {
     private MainViewModel? _viewModel;
     private ObservableCollection<LogEntry> _debugLogs = new ObservableCollection<LogEntry>();

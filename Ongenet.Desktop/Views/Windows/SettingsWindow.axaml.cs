@@ -9,7 +9,7 @@ namespace Ongenet.Desktop.Views.Windows;
 /// Unified preferences window with Audio, MIDI and Theme tabs. Uses the same custom chrome as the
 /// other secondary windows. Hosts existing view-models, so it's purely a container.
 /// </summary>
-public partial class SettingsWindow : Window
+public partial class SettingsWindow : ChromedWindow
 {
     public SettingsWindow()
     {

@@ -109,5 +109,31 @@
             <Setter Property="Background" Value="{StaticResource CatppuccinRed}"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
+
+        <!-- macOS-style "traffic light" window buttons: small solid colour blobs whose glyphs
+             only appear when the pointer is over the button group. -->
+        <Style Selector="Button.MacButton">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <!-- Keep the blob's own colour on hover/press (the Fluent theme would otherwise recolour it). -->
+        <Style Selector="Button.MacButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+        </Style>
+        <Style Selector="Button.MacButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+        </Style>
+        <!-- Reveal the glyphs while hovering anywhere over the traffic-light group, macOS-style. -->
+        <Style Selector="StackPanel#MacWindowButtons:pointerover Path">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
     </Application.Styles>
 </Application>

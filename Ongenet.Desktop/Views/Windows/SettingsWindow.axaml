@@ -31,16 +31,25 @@
     </Window.Styles>
 
     <Panel>
-        <Border Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}"
+        <Border Name="RootBorder" Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}"
                 BorderThickness="1" CornerRadius="8" ClipToBounds="True">
             <Grid RowDefinitions="Auto, *">
                 <!-- Custom title bar -->
                 <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto"
                       PointerPressed="TitleBar_PointerPressed">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
-                        <TextBlock Text="Settings" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- macOS "traffic light" close button (left); hidden off-Mac (toggled in ChromedWindow). -->
+                        <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
+                                    VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
+                            <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
+                                    Click="CloseButton_Click" ToolTip.Tip="Close">
+                                <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Text="Settings" Margin="10,0" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
                         <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
                             <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10"
                                   Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>

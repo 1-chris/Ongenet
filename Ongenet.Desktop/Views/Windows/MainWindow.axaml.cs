@@ -15,7 +15,7 @@ namespace Ongenet.Desktop.Views.Windows
     /// <summary>
     /// The application's main window. Blank-slate content with the original custom Catppuccin title bar.
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : ChromedWindow
     {
         private LogWindow? _logWindow;
         private SettingsWindow? _settingsWindow;
