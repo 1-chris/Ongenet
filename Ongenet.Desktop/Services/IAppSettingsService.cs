@@ -18,4 +18,11 @@ public interface IAppSettingsService
 
     /// <summary>Reads the current service state into <see cref="Current"/> and writes it to disk.</summary>
     void CaptureAndSave();
+
+    /// <summary>Persists <see cref="Current"/> after the UI edits library settings (scan paths, auto-play)
+    /// and raises <see cref="LibraryChanged"/> so the library/scan services refresh.</summary>
+    void SaveLibrary();
+
+    /// <summary>Raised after library settings (scan paths / auto-play) are saved.</summary>
+    event System.Action? LibraryChanged;
 }

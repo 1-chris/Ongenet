@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
@@ -91,14 +92,80 @@ namespace Ongenet.Desktop.ViewModels.Effects
             OnPropertyChanged(nameof(AddableCategories));
         }
 
-        private void AddEffect(string id)
+        /// <summary>Adds an effect of the given type to the end of the chain (used by the menu + drag-drop).</summary>
+        public void AddEffect(string id)
         {
             if (string.IsNullOrEmpty(id)) return;
+            IAudioEffect fx;
+            try { fx = _registry.Create(id); }
+            catch { return; }
             _history.Capture("Add effect");
-            _effects.Add(_registry.Create(id));
+            _effects.Add(fx);
             _commit();
             _changed();
             Rebuild();
+        }
+
+        /// <summary>Adds an effect loaded from a dropped <c>.ongenpreset</c> to the end of the chain.</summary>
+        public void AddEffectPreset(string presetPath)
+        {
+            var instruments = App.ServiceProvider?.GetService<IInstrumentRegistry>();
+            if (instruments is null) return;
+
+            IAudioEffect? fx;
+            try
+            {
+                using var fs = System.IO.File.OpenRead(presetPath);
+                fx = Ongenet.Core.Persistence.PresetFile.Load(fs, instruments, _registry)?.Effect;
+            }
+            catch { return; }
+            if (fx is null) return;
+
+            _history.Capture("Add effect preset");
+            _effects.Add(fx);
+            _commit();
+            _changed();
+            Rebuild();
+        }
+
+        /// <summary>Appends every effect from a dropped FX-chain preset to the end of this chain.</summary>
+        public void AddEffectChainPreset(string presetPath)
+        {
+            var instruments = App.ServiceProvider?.GetService<IInstrumentRegistry>();
+            if (instruments is null) return;
+
+            IReadOnlyList<IAudioEffect>? chain;
+            try
+            {
+                using var fs = System.IO.File.OpenRead(presetPath);
+                chain = Ongenet.Core.Persistence.PresetFile.Load(fs, instruments, _registry)?.Effects;
+            }
+            catch { return; }
+            if (chain is null || chain.Count == 0) return;
+
+            _history.Capture("Add FX chain preset");
+            foreach (var fx in chain) _effects.Add(fx);
+            _commit();
+            _changed();
+            Rebuild();
+        }
+
+        private string _chainPresetName = string.Empty;
+
+        /// <summary>The name typed into the "Save chain" flyout.</summary>
+        public string ChainPresetName
+        {
+            get => _chainPresetName;
+            set => SetField(ref _chainPresetName, value);
+        }
+
+        /// <summary>Saves the current chain (all its effects, in order) as an FX-chain preset.</summary>
+        public void SaveChainAsPreset()
+        {
+            if (_effects.Count == 0) return;
+            var name = string.IsNullOrWhiteSpace(_chainPresetName) ? "FX Chain" : _chainPresetName.Trim();
+            App.ServiceProvider?.GetService<IPresetLibrary>()?.SaveChain(_effects, name);
+            ChainPresetName = string.Empty;
         }
 
         private void RemoveEffect(EffectViewModel vm)

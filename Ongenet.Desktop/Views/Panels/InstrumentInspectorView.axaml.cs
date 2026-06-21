@@ -45,7 +45,9 @@ namespace Ongenet.Desktop.Views.Panels
         private void OnDragOver(object? sender, DragEventArgs e)
         {
             var ok = DataContext is InstrumentInspectorViewModel { HasInstrumentTrack: true }
-                     && e.DataTransfer.Contains(DragFormats.Instrument);
+                     && (e.DataTransfer.Contains(DragFormats.Instrument)
+                         || e.DataTransfer.Contains(DragFormats.Preset)
+                         || e.DataTransfer.Contains(DragFormats.SoundFont));
             e.DragEffects = ok ? DragDropEffects.Copy : DragDropEffects.None;
             e.Handled = true;
         }
@@ -56,6 +58,16 @@ namespace Ongenet.Desktop.Views.Panels
             if (e.DataTransfer.TryGetValue(DragFormats.Instrument) is { } id)
             {
                 vm.AddInstrument(id);
+                e.Handled = true;
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.Preset) is { } presetPath)
+            {
+                vm.AddInstrumentPreset(presetPath);
+                e.Handled = true;
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.SoundFont) is { } soundFontPath)
+            {
+                vm.AddSoundFont(soundFontPath);
                 e.Handled = true;
             }
         }

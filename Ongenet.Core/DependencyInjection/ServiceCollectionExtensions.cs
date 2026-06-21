@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
 
         // Audio engine. The concrete IAudioOutput device is registered by the host app
         // (Ongenet.Desktop references the PortAudio backend); the engine depends only on the seam.
+        services.AddSingleton<IAuditionPlayer, AuditionPlayer>();
         services.AddSingleton<IAudioEngine, AudioEngine>();
 
         // Audio file decoding. One IAudioFileDecoder per strategy: native WAV first, then ffmpeg for
@@ -48,7 +49,7 @@ public static class ServiceCollectionExtensions
 
         // SFZ instrument loading (parse + decode referenced samples). Used by the inspector and to
         // rebuild "Sampler" instruments on project load.
-        services.AddSingleton<Audio.Instruments.Sfz.ISfzLoadService, Audio.Instruments.Sfz.SfzLoadService>();
+        services.AddSingleton<Audio.Instruments.Sampler.ISamplerLoadService, Audio.Instruments.Sampler.SamplerLoadService>();
 
         // Offline render (export to WAV).
         services.AddSingleton<OfflineRenderer>();

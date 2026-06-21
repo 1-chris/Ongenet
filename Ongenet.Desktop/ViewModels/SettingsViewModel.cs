@@ -6,14 +6,17 @@ namespace Ongenet.Desktop.ViewModels;
 /// </summary>
 public sealed class SettingsViewModel : ViewModelBase
 {
-    public SettingsViewModel(AudioDevicesViewModel audio, MidiSettingsViewModel midi, ThemeEditorViewModel theme)
+    public SettingsViewModel(AudioDevicesViewModel audio, MidiSettingsViewModel midi, ThemeEditorViewModel theme,
+        LibrarySettingsViewModel library)
     {
         Audio = audio;
         Midi = midi;
         Theme = theme;
+        Library = library;
     }
 
     public AudioDevicesViewModel Audio { get; }
     public MidiSettingsViewModel Midi { get; }
     public ThemeEditorViewModel Theme { get; }
+    public LibrarySettingsViewModel Library { get; }
 }

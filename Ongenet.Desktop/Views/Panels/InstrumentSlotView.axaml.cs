@@ -17,6 +17,93 @@ namespace Ongenet.Desktop.Views.Panels
         public InstrumentSlotView()
         {
             InitializeComponent();
+
+            // Dropping a library instrument onto this card inserts above/below it or replaces it,
+            // depending on where in the card the pointer is released.
+            AddHandler(DragDrop.DragOverEvent, OnCardDragOver);
+            AddHandler(DragDrop.DropEvent, OnCardDrop);
+            AddHandler(DragDrop.DragLeaveEvent, OnCardDragLeave);
+        }
+
+        // An instrument or instrument-preset drop uses the vertical zone (above / replace / below); a
+        // sound-font drop loads into the card (only when it is a Sampler).
+        private static bool IsZoned(DragEventArgs e)
+            => e.DataTransfer.Contains(DragFormats.Instrument) || e.DataTransfer.Contains(DragFormats.Preset);
+
+        // Maps the pointer's vertical position within the card to a rack edit: top/bottom thirds insert
+        // above/below, the middle replaces.
+        private InstrumentSlotViewModel.RackDropZone ZoneAt(DragEventArgs e)
+        {
+            var height = CardRoot.Bounds.Height;
+            if (height <= 0) return InstrumentSlotViewModel.RackDropZone.Replace;
+            var t = e.GetPosition(CardRoot).Y / height;
+            return t < 0.30 ? InstrumentSlotViewModel.RackDropZone.Above
+                 : t > 0.70 ? InstrumentSlotViewModel.RackDropZone.Below
+                 : InstrumentSlotViewModel.RackDropZone.Replace;
+        }
+
+        private void OnCardDragOver(object? sender, DragEventArgs e)
+        {
+            if (IsZoned(e))
+            {
+                e.DragEffects = DragDropEffects.Copy;
+                ShowDropIndicator(ZoneAt(e));
+                e.Handled = true; // don't let the rack's empty-area "append" handler also fire
+            }
+            else if (e.DataTransfer.Contains(DragFormats.SoundFont) && DataContext is InstrumentSlotViewModel { IsSoundFont: true })
+            {
+                e.DragEffects = DragDropEffects.Copy;
+                ShowDropIndicator(InstrumentSlotViewModel.RackDropZone.Replace); // loads into this Sampler
+                e.Handled = true;
+            }
+            else
+            {
+                e.DragEffects = DragDropEffects.None;
+                ClearDropIndicators();
+            }
+        }
+
+        private void OnCardDrop(object? sender, DragEventArgs e)
+        {
+            ClearDropIndicators();
+            if (DataContext is not InstrumentSlotViewModel vm) return;
+
+            if (e.DataTransfer.TryGetValue(DragFormats.Instrument) is { } id)
+            {
+                vm.DropInstrument(id, ZoneAt(e));
+                e.Handled = true;
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.Preset) is { } presetPath)
+            {
+                vm.DropPreset(presetPath, ZoneAt(e));
+                e.Handled = true;
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.SoundFont) is { } sfPath)
+            {
+                if (vm.DropSoundFont(sfPath)) e.Handled = true;
+            }
+        }
+
+        private void OnCardDragLeave(object? sender, DragEventArgs e) => ClearDropIndicators();
+
+        private void OnSavePreset(object? sender, RoutedEventArgs e)
+        {
+            (DataContext as InstrumentSlotViewModel)?.SaveAsPreset();
+            SavePresetButton.Flyout?.Hide();
+        }
+
+        private void ShowDropIndicator(InstrumentSlotViewModel.RackDropZone zone)
+        {
+            DropReplace.IsVisible = zone == InstrumentSlotViewModel.RackDropZone.Replace;
+            DropLineTop.IsVisible = zone == InstrumentSlotViewModel.RackDropZone.Above;
+            DropLineBottom.IsVisible = zone == InstrumentSlotViewModel.RackDropZone.Below;
+        }
+
+        private void ClearDropIndicators()
+        {
+            DropReplace.IsVisible = false;
+            DropLineTop.IsVisible = false;
+            DropLineBottom.IsVisible = false;
         }
 
         private void OnTogglePluginUi(object? sender, RoutedEventArgs e)
@@ -45,7 +132,7 @@ namespace Ongenet.Desktop.Views.Panels
             if (!string.IsNullOrEmpty(path)) vm.LoadSampleFromPath(path);
         }
 
-        private async void OnLoadSfz(object? sender, RoutedEventArgs e)
+        private async void OnLoadSampler(object? sender, RoutedEventArgs e)
         {
             if (DataContext is not InstrumentSlotViewModel vm) return;
             var top = TopLevel.GetTopLevel(this);
@@ -53,16 +140,18 @@ namespace Ongenet.Desktop.Views.Panels
 
             var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Load SFZ instrument",
+                Title = "Load sound-font instrument",
                 AllowMultiple = false,
                 FileTypeFilter = new List<FilePickerFileType>
                 {
-                    new("SFZ instrument") { Patterns = new[] { "*.sfz" } }
+                    new("Sound fonts") { Patterns = new[] { "*.sfz", "*.sf2" } },
+                    new("SFZ instrument") { Patterns = new[] { "*.sfz" } },
+                    new("SF2 SoundFont") { Patterns = new[] { "*.sf2" } }
                 }
             });
 
             var path = files.FirstOrDefault()?.TryGetLocalPath();
-            if (!string.IsNullOrEmpty(path)) vm.LoadSfzFromPath(path);
+            if (!string.IsNullOrEmpty(path)) vm.LoadSamplerFromPath(path);
         }
 
         private void OnBendReleased(object? sender, PointerReleasedEventArgs e)

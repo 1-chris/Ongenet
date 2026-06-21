@@ -1,4 +1,5 @@
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
+using Ongenet.Core.Audio.Instruments.Sampler.Sfz;
 
 namespace Ongenet.Core.Tests.Sfz;
 

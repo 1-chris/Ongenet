@@ -36,5 +36,11 @@ namespace Ongenet.Desktop.Views.Panels
                 () => fx.IsEnabled = true);
             e.Handled = true;
         }
+
+        private void OnSaveEffectPreset(object? sender, RoutedEventArgs e)
+        {
+            (DataContext as EffectViewModel)?.SaveAsPreset();
+            SaveEffectPresetButton.Flyout?.Hide();
+        }
     }
 }

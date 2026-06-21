@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.Desktop.Theming;
 
 namespace Ongenet.Desktop.Controls
@@ -14,8 +14,8 @@ namespace Ongenet.Desktop.Controls
     /// </summary>
     public sealed class ZoneMapControl : ThemedControl
     {
-        public static readonly StyledProperty<IReadOnlyList<SfzRegionRuntime>?> ZonesProperty =
-            AvaloniaProperty.Register<ZoneMapControl, IReadOnlyList<SfzRegionRuntime>?>(nameof(Zones));
+        public static readonly StyledProperty<IReadOnlyList<SamplerRegion>?> ZonesProperty =
+            AvaloniaProperty.Register<ZoneMapControl, IReadOnlyList<SamplerRegion>?>(nameof(Zones));
 
         /// <summary>Bumped to force a repaint when a new patch loads (the list reference may not change).</summary>
         public static readonly StyledProperty<int> RevisionProperty =
@@ -36,7 +36,7 @@ namespace Ongenet.Desktop.Controls
             AffectsRender<ZoneMapControl>(ZonesProperty, RevisionProperty);
         }
 
-        public IReadOnlyList<SfzRegionRuntime>? Zones
+        public IReadOnlyList<SamplerRegion>? Zones
         {
             get => GetValue(ZonesProperty);
             set => SetValue(ZonesProperty, value);

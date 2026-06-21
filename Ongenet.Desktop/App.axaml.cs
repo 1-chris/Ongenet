@@ -67,6 +67,10 @@ namespace Ongenet.Desktop
             // App-wide settings persisted to the per-user config file (device/theme/quantize/transport).
             services.AddSingleton<Services.IAppSettingsService, Services.AppSettingsService>();
 
+            // Library: filesystem scan (samples/soundfonts) + preset aggregation (factory + user presets).
+            services.AddSingleton<Services.ILibraryScanService, Services.LibraryScanService>();
+            services.AddSingleton<Services.IPresetLibrary, Services.PresetLibrary>();
+
             // Parameter automation: creates lanes from the "Create automation track" right-click.
             services.AddSingleton<Services.IAutomationService, Services.AutomationService>();
 
@@ -108,6 +112,16 @@ namespace Ongenet.Desktop
             services.AddSingleton<BottomPanelViewModel>();
             services.AddSingleton<FileBrowserViewModel>();
             services.AddSingleton<InstrumentsViewModel>();
+
+            // Library tabs + shared audio preview.
+            services.AddSingleton<AudioPreviewViewModel>();
+            services.AddSingleton<ViewModels.Library.EffectsLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.SampleLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.SoundFontLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.InstrumentPresetLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.EffectPresetLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.EffectChainPresetLibraryViewModel>();
+
             services.AddSingleton<MainViewModel>();
 
             // Live theming (Catppuccin variants + custom themes).
@@ -117,14 +131,15 @@ namespace Ongenet.Desktop
 
             // Unified settings window (Audio / MIDI / Theme tabs).
             services.AddSingleton<MidiSettingsViewModel>();
+            services.AddSingleton<LibrarySettingsViewModel>();
             services.AddSingleton<SettingsViewModel>();
 
             ServiceProvider = services.BuildServiceProvider();
 
-            // The SFZ "Sampler" rebuilds itself from persisted state on project load; give it the
-            // loader (persistence runs without DI, so it needs a static handle to the decoders).
-            Core.Audio.Instruments.Sfz.SfzInstrument.Loader =
-                ServiceProvider.GetService<Core.Audio.Instruments.Sfz.ISfzLoadService>();
+            // The "Sampler" rebuilds itself from persisted state on project load; give it the loader
+            // (persistence runs without DI, so it needs a static handle to the decoders).
+            Core.Audio.Instruments.Sampler.SamplerInstrument.Loader =
+                ServiceProvider.GetService<Core.Audio.Instruments.Sampler.ISamplerLoadService>();
 
             // Establish the font-size resources used across the app.
             ApplyFontScale(1.0);

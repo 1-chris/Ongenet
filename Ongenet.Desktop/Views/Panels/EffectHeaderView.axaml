@@ -47,10 +47,24 @@
                        Foreground="{StaticResource CatppuccinText}"/>
         </Border>
 
-        <!-- Right-aligned controls: move up / down / remove -->
+        <!-- Right-aligned controls: save-preset / move up / down / remove -->
         <Button DockPanel.Dock="Right" Content="✕" Padding="6,2" Background="Transparent"
                 Foreground="{StaticResource CatppuccinRed}"
                 Command="{Binding RemoveCommand}" ToolTip.Tip="Remove effect" VerticalAlignment="Center"/>
+        <Button DockPanel.Dock="Right" Name="SaveEffectPresetButton" Content="💾" Classes="ord" Margin="0,0,4,0"
+                ToolTip.Tip="Save this effect's settings as a preset">
+            <Button.Flyout>
+                <Flyout>
+                    <StackPanel Width="200" Spacing="6">
+                        <TextBlock Text="Preset name" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <TextBox Text="{Binding PresetName, Mode=TwoWay}" Watermark="{Binding Name}"/>
+                        <Button Content="Save" Click="OnSaveEffectPreset" HorizontalAlignment="Right"
+                                Background="{StaticResource CatppuccinSurface1}"/>
+                    </StackPanel>
+                </Flyout>
+            </Button.Flyout>
+        </Button>
         <Button DockPanel.Dock="Right" Classes="ord" Content="▼" Margin="0,0,4,0"
                 Command="{Binding MoveDownCommand}" IsEnabled="{Binding !IsLast}"
                 ToolTip.Tip="Move later in the chain"/>

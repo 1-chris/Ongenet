@@ -27,6 +27,7 @@ public sealed class AudioEngine : IAudioEngine
     private readonly IAudioOutput _output;
     private readonly IProjectService _project;
     private readonly ITransportService _transport;
+    private readonly IAuditionPlayer _audition;
 
     private volatile Track[] _tracks = Array.Empty<Track>();
 
@@ -68,11 +69,13 @@ public sealed class AudioEngine : IAudioEngine
     private readonly Effects.EffectContext _effectCtx = new();
     private bool _disposed;
 
-    public AudioEngine(IAudioOutput output, IProjectService project, ITransportService transport, IEventAggregator events)
+    public AudioEngine(IAudioOutput output, IProjectService project, ITransportService transport,
+        IEventAggregator events, IAuditionPlayer audition)
     {
         _output = output;
         _project = project;
         _transport = transport;
+        _audition = audition;
         _project.ProjectChanged += RebuildTracks;
         _transport.StateChanged += OnTransportStateChanged;
         _output.FormatChanged += RebuildTracks; // re-prepare DSP when the device's sample rate changes
@@ -495,6 +498,9 @@ public sealed class AudioEngine : IAudioEngine
 
         // Metronome clicks (triggered during the count-in) are added to the master bus.
         RenderMetronome(buffer, frames, channels);
+
+        // Library/file audition preview (independent of the transport) mixes into the master.
+        _audition.Mix(buffer, _output.Format);
 
         // Limit and measure the master output.
         float masterPeakL = 0, masterPeakR = 0;

@@ -58,6 +58,9 @@
                     <TabItem Header="Theme">
                         <settings:ThemeEditorView DataContext="{Binding Theme}"/>
                     </TabItem>
+                    <TabItem Header="Library">
+                        <settings:LibrarySettingsView DataContext="{Binding Library}"/>
+                    </TabItem>
                 </TabControl>
             </Grid>
         </Border>

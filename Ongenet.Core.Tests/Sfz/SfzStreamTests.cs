@@ -1,7 +1,8 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
+using Ongenet.Core.Audio.Instruments.Sampler.Sfz;
 
 namespace Ongenet.Core.Tests.Sfz;
 
@@ -33,10 +34,10 @@ public class SfzStreamTests : IDisposable
         var preload = new float[preloadFrames];
         for (var i = 0; i < preloadFrames; i++) preload[i] = i;
 
-        var sample = SfzSample.FromStream(_path, dataOffset: 0, channels: 1, sampleRate: 44100,
+        var sample = SamplerSample.FromStream(_path, dataOffset: 0, channels: 1, sampleRate: 44100,
             bits: 32, isFloat: true, frameCount: 5000, preload, preloadFrames);
 
-        var stream = new SfzStream();
+        var stream = new SamplerStream();
         stream.Request(sample, startFrame: 0);
         for (var k = 0; k < 4; k++) stream.Service(); // stand in for the engine thread (open + fill)
 
@@ -62,9 +63,9 @@ public class SfzStreamTests : IDisposable
 
         try
         {
-            var sample = SfzSample.FromStream(path, dataOffset: 0, channels: 2, sampleRate: 44100,
+            var sample = SamplerSample.FromStream(path, dataOffset: 0, channels: 2, sampleRate: 44100,
                 bits: 32, isFloat: true, frameCount: frames, new float[0], 0);
-            var stream = new SfzStream();
+            var stream = new SamplerStream();
             stream.Request(sample, 0);
             for (var k = 0; k < 4; k++) stream.Service();
 

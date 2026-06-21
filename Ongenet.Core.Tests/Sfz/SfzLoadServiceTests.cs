@@ -3,20 +3,21 @@ using System.IO;
 using System.Linq;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Files;
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
+using Ongenet.Core.Audio.Instruments.Sampler.Sfz;
 
 namespace Ongenet.Core.Tests.Sfz;
 
 public class SfzLoadServiceTests : IDisposable
 {
     private readonly string _dir;
-    private readonly ISfzLoadService _service;
+    private readonly ISamplerLoadService _service;
 
     public SfzLoadServiceTests()
     {
         _dir = Path.Combine(Path.GetTempPath(), "ongen_sfz_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
-        _service = new SfzLoadService(new IAudioFileDecoder[] { new WavFileDecoder() });
+        _service = new SamplerLoadService(new IAudioFileDecoder[] { new WavFileDecoder() });
     }
 
     public void Dispose()
@@ -48,12 +49,12 @@ public class SfzLoadServiceTests : IDisposable
         var result = _service.Load(sfzPath);
 
         Assert.NotNull(result);
-        Assert.Single(result!.Document.Regions);
+        Assert.Single(result!.Regions);
         Assert.Equal(1, result.Library.Count);
         Assert.Empty(result.MissingSamples);
 
         // Drive it through the instrument end-to-end.
-        var inst = new SfzInstrument();
+        var inst = new SamplerInstrument();
         inst.Prepare(new AudioFormat(44100, 1));
         inst.ApplyLoad(result);
         inst.NoteOn(60, 1f);

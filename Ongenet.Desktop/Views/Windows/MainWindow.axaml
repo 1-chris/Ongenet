@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Ongenet.Desktop.ViewModels"
         xmlns:views="using:Ongenet.Desktop.Views.Panels"
+        xmlns:controls="using:Ongenet.Desktop.Controls"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Ongenet.Desktop.Views.Windows.MainWindow"
         x:DataType="vm:MainViewModel"
@@ -36,12 +37,6 @@
         <Style Selector="TabItem:selected">
             <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
             <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
-        </Style>
-        <!-- Right-sidebar sideways tabs: trim the horizontal padding (which becomes the strip width once the
-             header is rotated) so the strip is only as wide as the text is tall. -->
-        <Style Selector="TabControl#RightTabs TabItem">
-            <Setter Property="Padding" Value="2,10"/>
-            <Setter Property="MinWidth" Value="0"/>
         </Style>
     </Window.Styles>
 
@@ -179,7 +174,7 @@
                                   Background="{StaticResource CatppuccinCrust}"/>
 
                     <!-- Right: tabbed Files / Instruments with sideways tabs (collapsible to just the tabs) -->
-                    <Grid Grid.Column="4" RowDefinitions="Auto,*" Background="{StaticResource CatppuccinMantle}">
+                    <Grid Grid.Column="4" RowDefinitions="Auto,*,Auto" Background="{StaticResource CatppuccinMantle}">
                         <Border Grid.Row="0" Height="26" Background="{StaticResource CatppuccinSurface0}">
                             <!-- Square sized to ~the sideways tab-strip width, left-aligned so the centred
                                  chevron sits directly above the tabs (and keeps the collapsed strip tight). -->
@@ -191,33 +186,55 @@
                                     Foreground="{StaticResource CatppuccinSubtext0}"
                                     ToolTip.Tip="Collapse / expand panel"/>
                         </Border>
-                        <TabControl Grid.Row="1" Name="RightTabs" TabStripPlacement="Left" Padding="0"
-                                    Background="{StaticResource CatppuccinMantle}">
-                            <TabItem>
-                                <TabItem.Header>
-                                    <LayoutTransformControl>
-                                        <LayoutTransformControl.LayoutTransform>
-                                            <RotateTransform Angle="90"/>
-                                        </LayoutTransformControl.LayoutTransform>
-                                        <TextBlock Text="Files"/>
-                                    </LayoutTransformControl>
-                                </TabItem.Header>
-                                <views:FileBrowserView Name="RightFilesContent" MinWidth="180"
-                                                       DataContext="{Binding FileBrowser}"/>
-                            </TabItem>
-                            <TabItem>
-                                <TabItem.Header>
-                                    <LayoutTransformControl>
-                                        <LayoutTransformControl.LayoutTransform>
-                                            <RotateTransform Angle="90"/>
-                                        </LayoutTransformControl.LayoutTransform>
-                                        <TextBlock Text="Instruments"/>
-                                    </LayoutTransformControl>
-                                </TabItem.Header>
-                                <views:InstrumentsView Name="RightInstrContent" MinWidth="180"
-                                                       DataContext="{Binding Instruments}"/>
-                            </TabItem>
-                        </TabControl>
+                        <!-- Custom vertical tab strip: a fully-templated ListBox of rotated labels (so we
+                             control centring ourselves) on the left, and the selected panel on the right.
+                             Each panel's visibility is bound to its tab item's IsSelected. -->
+                        <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+                            <ListBox Grid.Column="0" Name="RightTabStrip" SelectedIndex="0" FontSize="12"
+                                     Background="{StaticResource CatppuccinSurface0}" BorderThickness="0" Padding="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.Styles>
+                                    <Style Selector="ListBoxItem">
+                                        <Setter Property="Padding" Value="3,10"/>
+                                        <Setter Property="MinHeight" Value="0"/>
+                                        <Setter Property="CornerRadius" Value="0"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem:selected">
+                                        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+                                    </Style>
+                                </ListBox.Styles>
+                                <ListBoxItem Name="TabFiles"><controls:VerticalTabLabel Text="Files" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabSamples"><controls:VerticalTabLabel Text="Samples" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabSoundfonts"><controls:VerticalTabLabel Text="Soundfonts" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabInstruments"><controls:VerticalTabLabel Text="Instruments" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabEffects"><controls:VerticalTabLabel Text="Effects" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabInstPresets"><controls:VerticalTabLabel Text="Inst Presets" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabFxPresets"><controls:VerticalTabLabel Text="FX Presets" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabFxChains"><controls:VerticalTabLabel Text="FX Chains" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                            </ListBox>
+
+                            <Grid Grid.Column="1" Name="RightContent" MinWidth="180"
+                                  Background="{StaticResource CatppuccinMantle}">
+                                <views:FileBrowserView IsVisible="{Binding #TabFiles.IsSelected}" DataContext="{Binding FileBrowser}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabSamples.IsSelected}" DataContext="{Binding SampleLibrary}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabSoundfonts.IsSelected}" DataContext="{Binding SoundFontLibrary}"/>
+                                <views:InstrumentsView IsVisible="{Binding #TabInstruments.IsSelected}" DataContext="{Binding Instruments}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabEffects.IsSelected}" DataContext="{Binding EffectsLibrary}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabInstPresets.IsSelected}" DataContext="{Binding InstrumentPresets}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabFxPresets.IsSelected}" DataContext="{Binding EffectPresets}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabFxChains.IsSelected}" DataContext="{Binding EffectChainPresets}"/>
+                            </Grid>
+                        </Grid>
+
+                        <views:PreviewPanelView Grid.Row="2" DataContext="{Binding Preview}"/>
                     </Grid>
                 </Grid>
             </Grid>

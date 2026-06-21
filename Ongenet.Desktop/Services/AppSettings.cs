@@ -16,6 +16,15 @@ public sealed class AppSettings
     public bool ThemeIsLight { get; set; }
     public double InputQuantizeBeats { get; set; }
     public List<TransportMappingDto> TransportMappings { get; set; } = new();
+
+    /// <summary>Folders scanned for the Samples library tab.</summary>
+    public List<string> SampleScanPaths { get; set; } = new();
+
+    /// <summary>Folders scanned for the Soundfonts library tab (.sf2/.sfz).</summary>
+    public List<string> SoundFontScanPaths { get; set; } = new();
+
+    /// <summary>Whether selecting a file in the library/files browser auto-plays it.</summary>
+    public bool LibraryAutoPlay { get; set; } = true;
 }
 
 /// <summary>Serializable form of a <see cref="Core.Audio.Midi.TransportMapping"/>.</summary>

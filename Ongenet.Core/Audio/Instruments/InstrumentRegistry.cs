@@ -23,7 +23,7 @@ public sealed class InstrumentRegistry : IInstrumentRegistry
         new InstrumentInfo(FmSynthInstrument.TypeId, "FM Synth", () => new FmSynthInstrument(), CatSynth),
         new InstrumentInfo(PaddaInstrument.TypeId, "Padda", () => new PaddaInstrument(), CatSynth),
         new InstrumentInfo(BasicSamplerInstrument.TypeId, "Basic Sampler", () => new BasicSamplerInstrument(), CatSampler),
-        new InstrumentInfo(Sfz.SfzInstrument.TypeId, "Sampler", () => new Sfz.SfzInstrument(), CatSampler),
+        new InstrumentInfo(Sampler.SamplerInstrument.TypeId, "Sampler", () => new Sampler.SamplerInstrument(), CatSampler),
         new InstrumentInfo(GranularInstrument.TypeId, "Granular", () => new GranularInstrument(), CatSampler),
         new InstrumentInfo(KickaInstrument.TypeId, "Kicka", () => new KickaInstrument(), CatDrum)
     };

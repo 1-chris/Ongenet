@@ -19,6 +19,22 @@ public static class AppPaths
         return Path.Combine(dir, "settings.json");
     }
 
+    /// <summary>User-saved presets directory (<c>&lt;config&gt;/Presets</c>); created on demand.</summary>
+    public static string PresetsDirectory()
+    {
+        var dir = Path.Combine(ConfigDirectory(), "Presets");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    /// <summary>Factory (built-in) presets directory (<c>&lt;config&gt;/Presets/Factory</c>), materialized once.</summary>
+    public static string FactoryPresetsDirectory()
+    {
+        var dir = Path.Combine(PresetsDirectory(), "Factory");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
     public static string ConfigDirectory()
     {
         if (OperatingSystem.IsWindows())

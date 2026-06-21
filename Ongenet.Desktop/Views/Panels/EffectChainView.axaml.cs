@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Desktop.ViewModels.Effects;
@@ -8,7 +9,8 @@ namespace Ongenet.Desktop.Views.Panels
 {
     /// <summary>
     /// Reusable editor for one insert-effect chain (track-level or per-instrument). Hosts CLAP effect
-    /// GUIs in their own windows. DataContext is an <see cref="EffectChainViewModel"/>.
+    /// GUIs in their own windows, and accepts effects / effect presets dragged from the library.
+    /// DataContext is an <see cref="EffectChainViewModel"/>.
     /// </summary>
     public partial class EffectChainView : UserControl
     {
@@ -16,6 +18,47 @@ namespace Ongenet.Desktop.Views.Panels
         {
             InitializeComponent();
             PluginEditorHost.EditorStateChanged += OnEditorStateChanged;
+
+            DragDrop.SetAllowDrop(this, true);
+            AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            AddHandler(DragDrop.DropEvent, OnDrop);
+        }
+
+        private static bool Accepts(DragEventArgs e)
+            => e.DataTransfer.Contains(DragFormats.Effect)
+               || e.DataTransfer.Contains(DragFormats.Preset)
+               || e.DataTransfer.Contains(DragFormats.EffectChain);
+
+        private void OnDragOver(object? sender, DragEventArgs e)
+        {
+            e.DragEffects = DataContext is EffectChainViewModel && Accepts(e) ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private void OnDrop(object? sender, DragEventArgs e)
+        {
+            if (DataContext is not EffectChainViewModel vm) return;
+            if (e.DataTransfer.TryGetValue(DragFormats.Effect) is { } id)
+            {
+                vm.AddEffect(id);
+                e.Handled = true;
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.Preset) is { } presetPath)
+            {
+                vm.AddEffectPreset(presetPath);
+                e.Handled = true;
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.EffectChain) is { } chainPath)
+            {
+                vm.AddEffectChainPreset(chainPath);
+                e.Handled = true;
+            }
+        }
+
+        private void OnSaveChain(object? sender, RoutedEventArgs e)
+        {
+            (DataContext as EffectChainViewModel)?.SaveChainAsPreset();
+            SaveChainButton.Flyout?.Hide();
         }
 
         private void OnToggleEffectPluginUi(object? sender, RoutedEventArgs e)

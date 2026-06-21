@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Files;
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
+using Ongenet.Core.Audio.Instruments.Sampler.Sfz;
 
 namespace Ongenet.Core.Tests.Sfz;
 
@@ -11,26 +12,28 @@ public class SfzEngineTests
     private static AudioSampleBuffer Const(float v, int frames)
         => new(Enumerable.Repeat(v, frames).ToArray(), 1, 44100);
 
-    private static SfzInstrument Make(string sfz, params (string name, AudioSampleBuffer buf)[] samples)
+    private static SamplerInstrument Make(string sfz, params (string name, AudioSampleBuffer buf)[] samples)
     {
         var doc = SfzParser.Parse(sfz);
-        var dict = new Dictionary<string, SfzSample>();
-        foreach (var (name, buf) in samples) dict[name] = SfzSample.FromResident(buf);
+        var dict = new Dictionary<string, SamplerSample>();
+        foreach (var (name, buf) in samples) dict[name] = SamplerSample.FromResident(buf);
 
-        var inst = new SfzInstrument();
+        var inst = new SamplerInstrument();
         inst.Prepare(new AudioFormat(44100, 1)); // mono keeps pan gain = 1
-        inst.ApplyLoad(new SfzLoadResult
+        var lib = new SamplerSampleLibrary(dict);
+        inst.ApplyLoad(new SamplerLoadResult
         {
-            Document = doc,
-            Library = new SfzSampleLibrary(dict),
-            SfzPath = "t.sfz",
-            SfzText = sfz,
-            DisplayName = "t"
+            Regions = SfzLoader.BuildRegions(doc, lib),
+            Library = lib,
+            Path = "t.sfz",
+            DisplayName = "t",
+            Format = SamplerFormat.Sfz,
+            SourceText = sfz
         });
         return inst;
     }
 
-    private static float[] Render(SfzInstrument inst, int frames)
+    private static float[] Render(SamplerInstrument inst, int frames)
     {
         var buffer = new float[frames];
         inst.Render(buffer);

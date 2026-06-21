@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Effects;
@@ -161,13 +160,13 @@ public static class ProjectFile
             foreach (var slot in t.Instruments)
             {
                 var inst = slot.Instrument;
-                WriteComponent(c, inst.TypeId, inst, inst.Parameters, store, slot.Enabled, inst as ISampleHost);
+                ComponentSerializer.WriteComponent(c, inst.TypeId, inst, inst.Parameters, store, slot.Enabled, inst as ISampleHost);
                 c.WriteInt(slot.Effects.Count);
-                foreach (var e in slot.Effects) WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
+                foreach (var e in slot.Effects) ComponentSerializer.WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
             }
 
             c.WriteInt(t.Effects.Count);
-            foreach (var e in t.Effects) WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
+            foreach (var e in t.Effects) ComponentSerializer.WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
 
             c.WriteInt(t.AutoLanes.Count);
             foreach (var lane in t.AutoLanes) WriteAutoLane(c, lane);
@@ -175,50 +174,6 @@ public static class ProjectFile
             c.WriteInt(t.Clips.Count);
             foreach (var clip in t.Clips) WriteClip(c, clip, store);
         });
-    }
-
-    // Shared instrument/effect writer: type id, optional sample, generic parameter map, custom-state blob.
-    private static void WriteComponent(OngenWriter w, string typeId, object component,
-        IReadOnlyList<Parameter> parameters, SampleStore store, bool enabled, ISampleHost? host)
-    {
-        w.WriteChunk(c =>
-        {
-            c.WriteString(typeId);
-            c.WriteBool(enabled);
-
-            var sampleRef = host?.CurrentSample is { } buf ? store.Add(buf) : "";
-            c.WriteString(sampleRef);
-            c.WriteString(host?.SampleName ?? "");
-
-            WriteParameters(c, parameters);
-
-            // Custom state for anything not captured by parameters (e.g. the EQ's band list).
-            if (component is IProjectStatefulComponent stateful)
-            {
-                c.WriteBool(true);
-                c.WriteChunk(stateful.WriteProjectState);
-            }
-            else
-            {
-                c.WriteBool(false);
-            }
-        });
-    }
-
-    private static void WriteParameters(OngenWriter w, IReadOnlyList<Parameter> parameters)
-    {
-        w.WriteInt(parameters.Count);
-        foreach (var p in parameters)
-        {
-            w.WriteString(p.Name);
-            switch (p)
-            {
-                case FloatParameter f: w.WriteInt(0); w.WriteDouble(f.Value); break;
-                case BoolParameter b: w.WriteInt(1); w.WriteBool(b.Value); break;
-                case ChoiceParameter ch: w.WriteInt(2); w.WriteInt(ch.SelectedIndex); break;
-                default: w.WriteInt(-1); break;
-            }
-        }
     }
 
     private static void WriteAutoLane(OngenWriter w, AutomationLane lane)
@@ -349,7 +304,7 @@ public static class ProjectFile
             // count-prefixed list of slots, each an instrument followed by its own effect chain.
             if (fileVersion < 2)
             {
-                if (c.ReadBool() && ReadInstrument(c, instruments, samples, warnings) is { } legacy)
+                if (c.ReadBool() && ComponentSerializer.ReadInstrument(c, instruments, samples.Get, warnings).Instrument is { } legacy)
                     track.Instruments.Add(new InstrumentSlot(legacy) { Enabled = true });
             }
             else
@@ -357,11 +312,11 @@ public static class ProjectFile
                 var slotCount = c.ReadInt();
                 for (var i = 0; i < slotCount; i++)
                 {
-                    var (inst, enabled) = ReadInstrumentSlot(c, instruments, samples, warnings);
+                    var (inst, enabled) = ComponentSerializer.ReadInstrument(c, instruments, samples.Get, warnings);
                     var fxCountSlot = c.ReadInt();
                     var slotFx = new List<IAudioEffect>();
                     for (var j = 0; j < fxCountSlot; j++)
-                        if (ReadEffect(c, effects, warnings) is { } sfx) slotFx.Add(sfx);
+                        if (ComponentSerializer.ReadEffect(c, effects, warnings) is { } sfx) slotFx.Add(sfx);
 
                     if (inst is null) continue; // instrument type unavailable; its effects are dropped
                     var slot = new InstrumentSlot(inst) { Enabled = enabled };
@@ -375,7 +330,7 @@ public static class ProjectFile
             var fxCount = c.ReadInt();
             for (var i = 0; i < fxCount; i++)
             {
-                var fx = ReadEffect(c, effects, warnings);
+                var fx = ComponentSerializer.ReadEffect(c, effects, warnings);
                 if (fx is not null) track.Effects.Add(fx);
             }
 
@@ -398,129 +353,6 @@ public static class ProjectFile
         track.CommitEffects();
         track.CommitAutoLanes();
         return track;
-    }
-
-    // Reads one rack slot's instrument (v2+), returning the instrument (null if its type is unavailable)
-    // and its persisted enabled flag.
-    private static (IInstrument? Instrument, bool Enabled) ReadInstrumentSlot(OngenReader r,
-        IInstrumentRegistry instruments, SampleLoader samples, List<string> warnings)
-    {
-        IInstrument? inst = null;
-        var enabled = true;
-        r.ReadChunk(c =>
-        {
-            var typeId = c.ReadString();
-            enabled = c.ReadBool();
-            var sampleRef = c.ReadString();
-            var sampleName = c.ReadString();
-
-            try { inst = instruments.Create(typeId); }
-            catch { warnings.Add($"Instrument '{typeId}' is unavailable; it was skipped."); inst = null; }
-
-            var persisted = ReadParameters(c);
-            if (inst is not null) ApplyParameters(inst.Parameters, persisted);
-
-            if (inst is ISampleHost host && sampleRef.Length > 0 && samples.Get(sampleRef) is { } buf)
-                host.LoadSample(buf, sampleName);
-
-            ReadCustomState(c, inst);
-        });
-        return (inst, enabled);
-    }
-
-    private static IInstrument? ReadInstrument(OngenReader r, IInstrumentRegistry instruments,
-        SampleLoader samples, List<string> warnings)
-    {
-        IInstrument? inst = null;
-        r.ReadChunk(c =>
-        {
-            var typeId = c.ReadString();
-            c.ReadBool(); // enabled (unused for instruments)
-            var sampleRef = c.ReadString();
-            var sampleName = c.ReadString();
-
-            try { inst = instruments.Create(typeId); }
-            catch { warnings.Add($"Instrument '{typeId}' is unavailable; the track was loaded without it."); inst = null; }
-
-            var persisted = ReadParameters(c);
-            if (inst is not null) ApplyParameters(inst.Parameters, persisted);
-
-            if (inst is ISampleHost host && sampleRef.Length > 0 && samples.Get(sampleRef) is { } buf)
-                host.LoadSample(buf, sampleName);
-
-            ReadCustomState(c, inst);
-        });
-        return inst;
-    }
-
-    private static IAudioEffect? ReadEffect(OngenReader r, IEffectRegistry effects, List<string> warnings)
-    {
-        IAudioEffect? fx = null;
-        r.ReadChunk(c =>
-        {
-            var typeId = c.ReadString();
-            var enabled = c.ReadBool();
-            c.ReadString(); // sampleRef (effects don't host samples today)
-            c.ReadString(); // sampleName
-
-            try { fx = effects.Create(typeId); }
-            catch { warnings.Add($"Effect '{typeId}' is unavailable; it was skipped."); fx = null; }
-
-            var persisted = ReadParameters(c);
-            if (fx is not null)
-            {
-                fx.Enabled = enabled;
-                ApplyParameters(fx.Parameters, persisted);
-            }
-
-            ReadCustomState(c, fx);
-        });
-        return fx;
-    }
-
-    private static void ReadCustomState(OngenReader r, object? component)
-    {
-        if (!r.ReadBool()) return;
-        r.ReadChunk(c => (component as IProjectStatefulComponent)?.ReadProjectState(c));
-    }
-
-    private readonly record struct PersistedParam(int Kind, double Number, bool Flag);
-
-    private static List<PersistedParam> ReadParameters(OngenReader r)
-    {
-        var count = r.ReadInt();
-        var list = new List<PersistedParam>(count);
-        for (var i = 0; i < count; i++)
-        {
-            r.ReadString(); // name (matched by index; kept for debugging/future use)
-            var kind = r.ReadInt();
-            switch (kind)
-            {
-                case 0: list.Add(new PersistedParam(0, r.ReadDouble(), false)); break;
-                case 1: list.Add(new PersistedParam(1, 0, r.ReadBool())); break;
-                case 2: list.Add(new PersistedParam(2, r.ReadInt(), false)); break;
-                default: list.Add(new PersistedParam(-1, 0, false)); break;
-            }
-        }
-
-        return list;
-    }
-
-    // Applies persisted values to live parameters by index (so duplicate names stay distinct). Mismatched
-    // kinds or out-of-range indices are skipped, so added/removed parameters across versions degrade safely.
-    private static void ApplyParameters(IReadOnlyList<Parameter> live, List<PersistedParam> persisted)
-    {
-        var n = Math.Min(live.Count, persisted.Count);
-        for (var i = 0; i < n; i++)
-        {
-            var p = persisted[i];
-            switch (live[i])
-            {
-                case FloatParameter f when p.Kind == 0: f.Value = p.Number; break;
-                case BoolParameter b when p.Kind == 1: b.Value = p.Flag; break;
-                case ChoiceParameter ch when p.Kind == 2: ch.SelectedIndex = (int)p.Number; break;
-            }
-        }
     }
 
     private static AutomationLane? ReadAutoLane(OngenReader r, Track track, List<string> warnings)
@@ -658,33 +490,6 @@ public static class ProjectFile
     }
 
     // ----------------------------------------------------------------- sample helpers
-
-    // Collects unique samples for save, keyed by a content hash (incl. channels + rate), so identical buffers
-    // are stored once and clips/instruments reference them by hash.
-    private sealed class SampleStore
-    {
-        private readonly Dictionary<string, AudioSampleBuffer> _byHash = new();
-
-        public IEnumerable<KeyValuePair<string, AudioSampleBuffer>> Entries => _byHash;
-
-        public string Add(AudioSampleBuffer buffer)
-        {
-            var hash = Hash(buffer);
-            _byHash.TryAdd(hash, buffer);
-            return hash;
-        }
-
-        private static string Hash(AudioSampleBuffer b)
-        {
-            using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            Span<byte> header = stackalloc byte[8];
-            BitConverter.TryWriteBytes(header, b.Channels);
-            BitConverter.TryWriteBytes(header[4..], b.SampleRate);
-            hasher.AppendData(header);
-            hasher.AppendData(System.Runtime.InteropServices.MemoryMarshal.AsBytes(b.Samples.AsSpan()));
-            return Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
-        }
-    }
 
     // Parses embedded sample WAVs on demand, caching by hash so a shared sample becomes one in-memory buffer.
     private sealed class SampleLoader

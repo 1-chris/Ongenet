@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
@@ -82,16 +83,114 @@ namespace Ongenet.Desktop.ViewModels
         /// <summary>Adds an instrument of the given type to the selected track's rack.</summary>
         public void AddInstrument(string instrumentId)
         {
-            if (Track is not { } track || string.IsNullOrEmpty(instrumentId)) return;
-            IInstrument instrument;
-            try { instrument = _instruments.Create(instrumentId); }
-            catch { return; }
+            if (Create(instrumentId) is { } instrument) AddSlot(instrument, "Add instrument");
+        }
 
-            _history.Capture("Add instrument");
+        /// <summary>Inserts a new instrument at <paramref name="index"/> in the rack (clamped).</summary>
+        public void InsertInstrument(int index, string instrumentId)
+        {
+            if (Create(instrumentId) is { } instrument) InsertSlot(index, instrument, "Add instrument");
+        }
+
+        /// <summary>Replaces the instrument at <paramref name="index"/> with a new one of the given type.</summary>
+        public void ReplaceInstrument(int index, string instrumentId)
+        {
+            if (Create(instrumentId) is { } instrument) ReplaceSlotAt(index, instrument, "Replace instrument");
+        }
+
+        /// <summary>Adds an instrument loaded from a dropped <c>.ongenpreset</c> to the rack.</summary>
+        public void AddInstrumentPreset(string presetPath)
+        {
+            if (LoadInstrumentPreset(presetPath) is { } instrument) AddSlot(instrument, "Add preset");
+        }
+
+        /// <summary>Loads a dropped sound font (.sf2/.sfz) into a new Sampler instrument at the end of the rack.</summary>
+        public void AddSoundFont(string path)
+        {
+            if (Create(SamplerInstrument.TypeId) is not { } sampler) return;
+            AddSlot(sampler, "Add instrument");
+            if (Slots.Count > 0) Slots[Slots.Count - 1].LoadSamplerFromPath(path);
+        }
+
+        private IInstrument? Create(string instrumentId)
+        {
+            if (string.IsNullOrEmpty(instrumentId)) return null;
+            try { return _instruments.Create(instrumentId); }
+            catch { return null; }
+        }
+
+        private IInstrument? LoadInstrumentPreset(string path)
+        {
+            try
+            {
+                using var fs = System.IO.File.OpenRead(path);
+                return Ongenet.Core.Persistence.PresetFile.Load(fs, _instruments, _effects)?.Instrument;
+            }
+            catch { return null; }
+        }
+
+        // --- Shared slot mutators (commit + notify the engine + rebuild the cards) ---
+
+        private void AddSlot(IInstrument instrument, string label)
+        {
+            if (Track is not { } track) return;
+            _history.Capture(label);
             track.Instruments.Add(new InstrumentSlot(instrument));
             track.CommitInstruments();
-            _events.Publish(new TracksChangedEvent()); // engine prepares the new instrument
+            _events.Publish(new TracksChangedEvent());
             Rebuild();
+        }
+
+        private void InsertSlot(int index, IInstrument instrument, string label)
+        {
+            if (Track is not { } track) return;
+            _history.Capture(label);
+            track.Instruments.Insert(Math.Clamp(index, 0, track.Instruments.Count), new InstrumentSlot(instrument));
+            track.CommitInstruments();
+            _events.Publish(new TracksChangedEvent());
+            Rebuild();
+        }
+
+        private void ReplaceSlotAt(int index, IInstrument instrument, string label)
+        {
+            if (Track is not { } track || index < 0 || index >= track.Instruments.Count) return;
+            _history.Capture(label);
+            var old = track.Instruments[index];
+            old.Instrument.AllNotesOff();
+            // Preserve the slot's pre-effect chain + enabled state; only the instrument changes.
+            track.Instruments[index] = new InstrumentSlot(instrument) { Enabled = old.Enabled };
+            track.CommitInstruments();
+            _events.Publish(new TracksChangedEvent());
+            Rebuild();
+        }
+
+        private int IndexOf(InstrumentSlotViewModel target)
+            => Track is { } track ? track.Instruments.IndexOf(target.Slot) : -1;
+
+        // --- Relative-to-card helpers used by the per-card drop zones (above / below / replace) ---
+
+        private void InsertRelativeToSlot(InstrumentSlotViewModel target, string instrumentId, bool below)
+        {
+            var i = IndexOf(target);
+            if (i >= 0) InsertInstrument(below ? i + 1 : i, instrumentId);
+        }
+
+        private void ReplaceSlotWith(InstrumentSlotViewModel target, string instrumentId)
+        {
+            var i = IndexOf(target);
+            if (i >= 0) ReplaceInstrument(i, instrumentId);
+        }
+
+        private void InsertPresetRelativeToSlot(InstrumentSlotViewModel target, string presetPath, bool below)
+        {
+            var i = IndexOf(target);
+            if (i >= 0 && LoadInstrumentPreset(presetPath) is { } inst) InsertSlot(below ? i + 1 : i, inst, "Add preset");
+        }
+
+        private void ReplacePresetForSlot(InstrumentSlotViewModel target, string presetPath)
+        {
+            var i = IndexOf(target);
+            if (i >= 0 && LoadInstrumentPreset(presetPath) is { } inst) ReplaceSlotAt(i, inst, "Replace instrument");
         }
 
         private void RemoveSlot(InstrumentSlotViewModel slot)
@@ -155,7 +254,8 @@ namespace Ongenet.Desktop.ViewModels
             {
                 foreach (var slot in track.Instruments)
                     Slots.Add(new InstrumentSlotViewModel(slot, _audioFiles, _transport, _history, _effects,
-                        _clock, () => _events.Publish(new TracksChangedEvent()), RemoveSlot, MoveSlot));
+                        _clock, () => _events.Publish(new TracksChangedEvent()), RemoveSlot, MoveSlot,
+                        InsertRelativeToSlot, ReplaceSlotWith, InsertPresetRelativeToSlot, ReplacePresetForSlot));
             }
 
             for (var i = 0; i < Slots.Count; i++)

@@ -2,24 +2,27 @@ using System;
 using System.Collections.Generic;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Files;
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
+using Ongenet.Core.Audio.Instruments.Sampler.Sfz;
 
 namespace Ongenet.Core.Tests.Sfz;
 
 public class SfzToneTests
 {
-    private static SfzInstrument Make(string sfz, string name, AudioSampleBuffer buf)
+    private static SamplerInstrument Make(string sfz, string name, AudioSampleBuffer buf)
     {
         var doc = SfzParser.Parse(sfz);
-        var inst = new SfzInstrument();
+        var lib = new SamplerSampleLibrary(new Dictionary<string, SamplerSample> { [name] = SamplerSample.FromResident(buf) });
+        var inst = new SamplerInstrument();
         inst.Prepare(new AudioFormat(44100, 1));
-        inst.ApplyLoad(new SfzLoadResult
+        inst.ApplyLoad(new SamplerLoadResult
         {
-            Document = doc,
-            Library = new SfzSampleLibrary(new Dictionary<string, SfzSample> { [name] = SfzSample.FromResident(buf) }),
-            SfzPath = "t.sfz",
-            SfzText = sfz,
-            DisplayName = "t"
+            Regions = SfzLoader.BuildRegions(doc, lib),
+            Library = lib,
+            Path = "t.sfz",
+            DisplayName = "t",
+            Format = SamplerFormat.Sfz,
+            SourceText = sfz
         });
         return inst;
     }

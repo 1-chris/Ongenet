@@ -23,6 +23,13 @@ namespace Ongenet.Desktop.ViewModels
             BottomPanelViewModel bottomPanel,
             FileBrowserViewModel fileBrowser,
             InstrumentsViewModel instruments,
+            AudioPreviewViewModel preview,
+            Library.EffectsLibraryViewModel effectsLibrary,
+            Library.SampleLibraryViewModel sampleLibrary,
+            Library.SoundFontLibraryViewModel soundFontLibrary,
+            Library.InstrumentPresetLibraryViewModel instrumentPresets,
+            Library.EffectPresetLibraryViewModel effectPresets,
+            Library.EffectChainPresetLibraryViewModel chainPresets,
             IProjectFileService projectFile,
             Services.IHistoryService history,
             ObservableCollectionLoggerProvider? logProvider = null)
@@ -33,6 +40,13 @@ namespace Ongenet.Desktop.ViewModels
             BottomPanel = bottomPanel;
             FileBrowser = fileBrowser;
             Instruments = instruments;
+            Preview = preview;
+            EffectsLibrary = effectsLibrary;
+            SampleLibrary = sampleLibrary;
+            SoundFontLibrary = soundFontLibrary;
+            InstrumentPresets = instrumentPresets;
+            EffectPresets = effectPresets;
+            EffectChainPresets = chainPresets;
             _projectFile = projectFile;
             _history = history;
             _history.Changed += () =>
@@ -85,6 +99,17 @@ namespace Ongenet.Desktop.ViewModels
 
         /// <summary>Right-hand instruments list.</summary>
         public InstrumentsViewModel Instruments { get; }
+
+        /// <summary>Shared audio preview (waveform + stats + audition) docked under the library tabs.</summary>
+        public AudioPreviewViewModel Preview { get; }
+
+        /// <summary>Library tabs.</summary>
+        public Library.EffectsLibraryViewModel EffectsLibrary { get; }
+        public Library.SampleLibraryViewModel SampleLibrary { get; }
+        public Library.SoundFontLibraryViewModel SoundFontLibrary { get; }
+        public Library.InstrumentPresetLibraryViewModel InstrumentPresets { get; }
+        public Library.EffectPresetLibraryViewModel EffectPresets { get; }
+        public Library.EffectChainPresetLibraryViewModel EffectChainPresets { get; }
 
         /// <summary>Log entries captured by the in-app logger; surfaced by the Log window.</summary>
         public ObservableCollection<LogEntry> LogEntries => _logEntries;

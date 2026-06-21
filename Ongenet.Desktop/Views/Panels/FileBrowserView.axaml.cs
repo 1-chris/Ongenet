@@ -27,6 +27,16 @@ namespace Ongenet.Desktop.Views.Panels
             // Tunnel so we see the press before the TreeView consumes it for selection.
             FileTree.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
             FileTree.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel);
+            FileTree.SelectionChanged += OnSelectionChanged;
+        }
+
+        // Previewing a selected audio file (waveform + stats + optional auto-play) is handled by the
+        // shared AudioPreviewViewModel docked under the library tabs.
+        private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (FileTree.SelectedItem is not FileNodeViewModel { IsDirectory: false } node) return;
+            if (App.ServiceProvider?.GetService(typeof(AudioPreviewViewModel)) is AudioPreviewViewModel preview)
+                preview.Select(node.FullPath);
         }
 
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)

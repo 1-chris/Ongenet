@@ -1,0 +1,44 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.Desktop.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="520" d:DesignHeight="560"
+             x:Class="Ongenet.Desktop.Views.Settings.LibrarySettingsView"
+             x:DataType="vm:LibrarySettingsViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="14" Spacing="14">
+            <TextBlock Text="Sample folders" FontWeight="Bold" FontSize="13"
+                       Foreground="{StaticResource CatppuccinText}"/>
+            <TextBlock Text="Folders scanned for the Samples library tab." FontSize="11"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+            <Border Height="130" CornerRadius="4" Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                <ListBox ItemsSource="{Binding SamplePaths}" SelectedItem="{Binding SelectedSamplePath, Mode=TwoWay}"
+                         Background="Transparent"/>
+            </Border>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Add folder…" Click="OnAddSample" Background="{StaticResource CatppuccinSurface1}"/>
+                <Button Content="Remove" Click="OnRemoveSample" Background="{StaticResource CatppuccinSurface1}"/>
+            </StackPanel>
+
+            <TextBlock Text="Sound-font folders" FontWeight="Bold" FontSize="13" Margin="0,8,0,0"
+                       Foreground="{StaticResource CatppuccinText}"/>
+            <TextBlock Text="Folders scanned for .sf2 / .sfz in the Soundfonts library tab." FontSize="11"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+            <Border Height="130" CornerRadius="4" Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                <ListBox ItemsSource="{Binding SoundFontPaths}" SelectedItem="{Binding SelectedSoundFontPath, Mode=TwoWay}"
+                         Background="Transparent"/>
+            </Border>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Add folder…" Click="OnAddSoundFont" Background="{StaticResource CatppuccinSurface1}"/>
+                <Button Content="Remove" Click="OnRemoveSoundFont" Background="{StaticResource CatppuccinSurface1}"/>
+            </StackPanel>
+
+            <CheckBox Content="Auto-play files when selected" Margin="0,8,0,0"
+                      IsChecked="{Binding AutoPlay, Mode=TwoWay}"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

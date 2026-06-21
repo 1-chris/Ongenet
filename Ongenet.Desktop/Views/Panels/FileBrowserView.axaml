@@ -14,20 +14,30 @@
                        Margin="12,12,12,6"
                        Foreground="{StaticResource CatppuccinOverlay1}"/>
 
-            <TreeView Name="FileTree" ItemsSource="{Binding Roots}" Background="Transparent" Margin="4,0,4,4">
+            <!-- Disable horizontal scrolling so deep nesting doesn't push a scrollbar; long names wrap to
+                 the next line and stay within the sidebar width. -->
+            <TreeView Name="FileTree" ItemsSource="{Binding Roots}" Background="Transparent" Margin="4,0,4,4"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <TreeView.Styles>
-                    <!-- Bind each item's expansion back to the VM so children load lazily. -->
+                    <!-- Bind each item's expansion back to the VM so children load lazily; tighten the
+                         per-row vertical space (default TreeViewItem padding wastes a lot). -->
                     <Style Selector="TreeViewItem" x:DataType="fs:FileNodeViewModel">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        <Setter Property="MinHeight" Value="0"/>
+                        <Setter Property="Padding" Value="2,0"/>
                     </Style>
                 </TreeView.Styles>
                 <TreeView.ItemTemplate>
                     <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="fs:FileNodeViewModel">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="📁" IsVisible="{Binding IsDirectory}"/>
-                            <TextBlock Text="🎵" IsVisible="{Binding !IsDirectory}"/>
-                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <!-- DockPanel (not a horizontal StackPanel) so the name fills the remaining width
+                             and wraps; the icon stays pinned at the top-left. -->
+                        <DockPanel Margin="0,1">
+                            <TextBlock DockPanel.Dock="Left" Text="📁" IsVisible="{Binding IsDirectory}"
+                                       VerticalAlignment="Top" Margin="0,0,6,0"/>
+                            <TextBlock DockPanel.Dock="Left" Text="🎵" IsVisible="{Binding !IsDirectory}"
+                                       VerticalAlignment="Top" Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </DockPanel>
                     </TreeDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>

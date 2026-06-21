@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.Desktop.Services;
@@ -32,6 +33,10 @@ namespace Ongenet.Desktop.ViewModels.Instruments
         private readonly Action _notifyChanged;            // publish TracksChangedEvent (engine re-prepare)
         private readonly Action<InstrumentSlotViewModel> _remove;
         private readonly Action<InstrumentSlotViewModel, int> _move;
+        private readonly Action<InstrumentSlotViewModel, string, bool> _insertRelative; // (target, instrumentId, below)
+        private readonly Action<InstrumentSlotViewModel, string> _replaceWith;          // (target, instrumentId)
+        private readonly Action<InstrumentSlotViewModel, string, bool> _insertPresetRelative; // (target, presetPath, below)
+        private readonly Action<InstrumentSlotViewModel, string> _replacePresetWith;          // (target, presetPath)
 
         private readonly DispatcherTimer _previewTimer;
         private readonly List<ParameterViewModel> _subscribedParams = new();
@@ -39,7 +44,9 @@ namespace Ongenet.Desktop.ViewModels.Instruments
 
         public InstrumentSlotViewModel(InstrumentSlot slot, IAudioFileService audioFiles,
             ITransportService transport, IHistoryService history, IEffectRegistry effects, IPlaybackClock clock,
-            Action notifyChanged, Action<InstrumentSlotViewModel> remove, Action<InstrumentSlotViewModel, int> move)
+            Action notifyChanged, Action<InstrumentSlotViewModel> remove, Action<InstrumentSlotViewModel, int> move,
+            Action<InstrumentSlotViewModel, string, bool> insertRelative, Action<InstrumentSlotViewModel, string> replaceWith,
+            Action<InstrumentSlotViewModel, string, bool> insertPresetRelative, Action<InstrumentSlotViewModel, string> replacePresetWith)
         {
             _slot = slot;
             _audioFiles = audioFiles;
@@ -48,6 +55,10 @@ namespace Ongenet.Desktop.ViewModels.Instruments
             _notifyChanged = notifyChanged;
             _remove = remove;
             _move = move;
+            _insertRelative = insertRelative;
+            _replaceWith = replaceWith;
+            _insertPresetRelative = insertPresetRelative;
+            _replacePresetWith = replacePresetWith;
 
             _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
             _previewTimer.Tick += OnPreviewTimerTick;
@@ -79,6 +90,58 @@ namespace Ongenet.Desktop.ViewModels.Instruments
 
         public bool IsFirst { get; set; }
         public bool IsLast { get; set; }
+
+        /// <summary>Which edit a drag dropped onto this card performs, by the pointer's vertical zone.</summary>
+        public enum RackDropZone { Above, Replace, Below }
+
+        private string _presetName = string.Empty;
+
+        /// <summary>The name typed into the "Save preset" flyout.</summary>
+        public string PresetName
+        {
+            get => _presetName;
+            set => SetField(ref _presetName, value);
+        }
+
+        /// <summary>Saves this instrument's current settings as a user <c>.ongenpreset</c>.</summary>
+        public void SaveAsPreset()
+        {
+            var name = string.IsNullOrWhiteSpace(_presetName) ? Instrument.Name : _presetName.Trim();
+            App.ServiceProvider?.GetService<IPresetLibrary>()?.SaveInstrument(Instrument, name);
+            PresetName = string.Empty;
+        }
+
+        /// <summary>Applies a library instrument drop onto this card (insert above/below or replace).</summary>
+        public void DropInstrument(string instrumentId, RackDropZone zone)
+        {
+            if (string.IsNullOrEmpty(instrumentId)) return;
+            switch (zone)
+            {
+                case RackDropZone.Above: _insertRelative(this, instrumentId, false); break;
+                case RackDropZone.Below: _insertRelative(this, instrumentId, true); break;
+                default: _replaceWith(this, instrumentId); break;
+            }
+        }
+
+        /// <summary>Applies an instrument-preset drop onto this card (insert above/below or replace).</summary>
+        public void DropPreset(string presetPath, RackDropZone zone)
+        {
+            if (string.IsNullOrEmpty(presetPath)) return;
+            switch (zone)
+            {
+                case RackDropZone.Above: _insertPresetRelative(this, presetPath, false); break;
+                case RackDropZone.Below: _insertPresetRelative(this, presetPath, true); break;
+                default: _replacePresetWith(this, presetPath); break;
+            }
+        }
+
+        /// <summary>Loads a dropped sound font into this card when it is a Sampler (else ignored).</summary>
+        public bool DropSoundFont(string path)
+        {
+            if (SamplerInst is null || string.IsNullOrEmpty(path)) return false;
+            LoadSamplerFromPath(path);
+            return true;
+        }
 
         /// <summary>Whether this instrument sounds; when false the engine skips it (matches the effect bypass dot).</summary>
         public bool IsEnabled
@@ -137,63 +200,87 @@ namespace Ongenet.Desktop.ViewModels.Instruments
         public bool IsSampler => SampleHost is not null;
         public string SampleName => SampleHost?.SampleName ?? "(no sample loaded)";
 
-        // --- SFZ "Sampler" support ---
+        // --- "Sampler" support (SFZ + SF2 sound fonts) ---
 
-        private SfzInstrument? Sfz => Instrument as SfzInstrument;
-        public bool IsSfz => Sfz is not null;
+        private SamplerInstrument? SamplerInst => Instrument as SamplerInstrument;
+        public bool IsSoundFont => SamplerInst is not null;
 
-        private bool _sfzLoading;
-        private double _sfzLoadProgress;
+        private bool _samplerLoading;
+        private double _samplerLoadProgress;
 
-        public string SfzStatus => _sfzLoading
-            ? $"Loading… {_sfzLoadProgress * 100:0}%"
-            : Sfz is { SfzPath.Length: > 0 } s
-                ? $"{System.IO.Path.GetFileName(s.SfzPath)} — {s.Regions.Count} region(s)"
-                : "(no SFZ loaded)";
+        public string SamplerStatus => _samplerLoading
+            ? $"Loading… {_samplerLoadProgress * 100:0}%"
+            : SamplerInst is { SourcePath.Length: > 0 } s
+                ? $"{System.IO.Path.GetFileName(s.SourcePath)} — {s.Regions.Count} region(s)"
+                : "(no instrument loaded)";
 
-        public bool IsSfzLoading => _sfzLoading;
-        public double SfzLoadProgress => _sfzLoadProgress;
+        public bool IsSamplerLoading => _samplerLoading;
+        public double SamplerLoadProgress => _samplerLoadProgress;
 
-        public async void LoadSfzFromPath(string path)
+        /// <summary>Loads an <c>.sfz</c> or <c>.sf2</c> file (the loader picks the format by extension).</summary>
+        public void LoadSamplerFromPath(string path) => _ = RunSamplerLoad(path, -1, "Load instrument");
+
+        // --- SF2 preset selection ---
+
+        public IReadOnlyList<string> SamplerPresetNames =>
+            SamplerInst?.Presets.Select(p => $"{p.Bank}:{p.Program}  {p.Name}").ToList() ?? (IReadOnlyList<string>)Array.Empty<string>();
+
+        public bool HasSamplerPresets => SamplerPresetNames.Count > 0;
+
+        public int SelectedSamplerPreset
         {
-            if (Sfz is not { } sfz || _sfzLoading) return;
-            var loader = App.ServiceProvider?.GetService<ISfzLoadService>();
+            get => SamplerInst?.PresetIndex ?? -1;
+            set
+            {
+                if (SamplerInst is not { } s || _samplerLoading) return;
+                if (value < 0 || value == s.PresetIndex || s.SourcePath.Length == 0) return;
+                _ = RunSamplerLoad(s.SourcePath, value, "Change preset");
+            }
+        }
+
+        private async Task RunSamplerLoad(string path, int presetIndex, string historyLabel)
+        {
+            if (SamplerInst is not { } sampler || _samplerLoading) return;
+            var loader = App.ServiceProvider?.GetService<ISamplerLoadService>();
             if (loader is null) return;
 
-            _sfzLoading = true;
-            _sfzLoadProgress = 0;
-            OnPropertyChanged(nameof(SfzStatus));
-            OnPropertyChanged(nameof(IsSfzLoading));
-            OnPropertyChanged(nameof(SfzLoadProgress));
+            _samplerLoading = true;
+            _samplerLoadProgress = 0;
+            OnPropertyChanged(nameof(SamplerStatus));
+            OnPropertyChanged(nameof(IsSamplerLoading));
+            OnPropertyChanged(nameof(SamplerLoadProgress));
 
             var progress = new Progress<double>(p =>
             {
-                _sfzLoadProgress = p;
-                OnPropertyChanged(nameof(SfzLoadProgress));
-                OnPropertyChanged(nameof(SfzStatus));
+                _samplerLoadProgress = p;
+                OnPropertyChanged(nameof(SamplerLoadProgress));
+                OnPropertyChanged(nameof(SamplerStatus));
             });
-            var result = await Task.Run(() => loader.Load(path, progress));
+            var result = await Task.Run(() => loader.Load(path, presetIndex, progress));
 
-            _sfzLoading = false;
-            OnPropertyChanged(nameof(IsSfzLoading));
-            if (result is null) { OnPropertyChanged(nameof(SfzStatus)); return; }
+            _samplerLoading = false;
+            OnPropertyChanged(nameof(IsSamplerLoading));
+            if (result is null) { OnPropertyChanged(nameof(SamplerStatus)); return; }
 
-            _history.Capture("Load SFZ");
-            sfz.ApplyLoad(result);
+            _history.Capture(historyLabel);
+            sampler.ApplyLoad(result);
             _notifyChanged(); // a fresh patch needs the engine to (re)prepare the instrument
             RebuildParameters();
-            OnPropertyChanged(nameof(SfzStatus));
+            OnPropertyChanged(nameof(SamplerStatus));
             OnPropertyChanged(nameof(InstrumentName));
-            NotifySfzVisuals();
+            OnPropertyChanged(nameof(SamplerPresetNames));
+            OnPropertyChanged(nameof(HasSamplerPresets));
+            OnPropertyChanged(nameof(SelectedSamplerPreset));
+            NotifySamplerVisuals();
         }
 
-        public IReadOnlyList<SfzRegionRuntime> SfzZones => Sfz?.Regions ?? Array.Empty<SfzRegionRuntime>();
-        public bool HasZones => SfzZones.Count > 0;
+        public IReadOnlyList<SamplerRegion> SamplerZones => SamplerInst?.Regions ?? Array.Empty<SamplerRegion>();
+        public bool HasZones => SamplerZones.Count > 0;
 
-        private int _sfzRevision;
-        public int SfzRevision => _sfzRevision;
+        private int _samplerRevision;
+        public int SamplerRevision => _samplerRevision;
 
-        private SfzRegionRuntime? FirstZone => Sfz is { Regions.Count: > 0 } s ? s.Regions[0] : null;
+        private SamplerRegion? FirstZone => SamplerInst is { Regions.Count: > 0 } s ? s.Regions[0] : null;
         public double EnvDelay => FirstZone?.AmpEg.Delay ?? 0;
         public double EnvAttack => FirstZone?.AmpEg.Attack ?? 0;
         public double EnvHold => FirstZone?.AmpEg.Hold ?? 0;
@@ -201,12 +288,12 @@ namespace Ongenet.Desktop.ViewModels.Instruments
         public double EnvSustain => FirstZone?.AmpEg.Sustain ?? 1.0;
         public double EnvRelease => FirstZone?.AmpEg.Release ?? 0;
 
-        private void NotifySfzVisuals()
+        private void NotifySamplerVisuals()
         {
-            _sfzRevision++;
-            OnPropertyChanged(nameof(SfzZones));
+            _samplerRevision++;
+            OnPropertyChanged(nameof(SamplerZones));
             OnPropertyChanged(nameof(HasZones));
-            OnPropertyChanged(nameof(SfzRevision));
+            OnPropertyChanged(nameof(SamplerRevision));
             OnPropertyChanged(nameof(EnvDelay));
             OnPropertyChanged(nameof(EnvAttack));
             OnPropertyChanged(nameof(EnvHold));

@@ -7,6 +7,7 @@
              xmlns:instc="using:Ongenet.Core.Audio.Instruments"
              xmlns:panels="using:Ongenet.Desktop.Views.Panels"
              mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="280"
+             DragDrop.AllowDrop="True"
              x:Class="Ongenet.Desktop.Views.Panels.InstrumentInspectorView"
              x:DataType="vm:InstrumentInspectorViewModel">
 

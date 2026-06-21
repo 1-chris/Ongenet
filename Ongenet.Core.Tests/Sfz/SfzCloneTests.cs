@@ -5,37 +5,41 @@ using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
-using Ongenet.Core.Audio.Instruments.Sfz;
+using Ongenet.Core.Audio.Instruments.Sampler;
+using Ongenet.Core.Audio.Instruments.Sampler.Sfz;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Persistence;
 
 namespace Ongenet.Core.Tests.Sfz;
 
+[Collection("SamplerStaticLoader")]
 public class SfzCloneTests
 {
     // A loader that fails the test if it's ever called (clone must NOT re-decode from disk).
-    private sealed class CountingLoader : ISfzLoadService
+    private sealed class CountingLoader : ISamplerLoadService
     {
         public int Calls;
-        public SfzLoadResult? Load(string sfzPath, IProgress<double>? progress = null) { Calls++; return null; }
-        public SfzLoadResult LoadFromText(string sfzText, string sfzPath, IProgress<double>? progress = null) { Calls++; throw new InvalidOperationException(); }
+        public SamplerLoadResult? Load(string path, int presetIndex = -1, IProgress<double>? progress = null) { Calls++; return null; }
+        public SamplerLoadResult? LoadFromText(string sourceText, string path, IProgress<double>? progress = null) { Calls++; throw new InvalidOperationException(); }
     }
 
-    private static SfzInstrument LoadedInstrument()
+    private static SamplerInstrument LoadedInstrument()
     {
         const string sfz = "<region> sample=a.wav key=60";
-        var inst = new SfzInstrument();
-        inst.Prepare(new AudioFormat(44100, 1));
-        inst.ApplyLoad(new SfzLoadResult
+        var lib = new SamplerSampleLibrary(new Dictionary<string, SamplerSample>
         {
-            Document = SfzParser.Parse(sfz),
-            Library = new SfzSampleLibrary(new Dictionary<string, SfzSample>
-            {
-                ["a.wav"] = SfzSample.FromResident(new AudioSampleBuffer(Enumerable.Repeat(0.5f, 100).ToArray(), 1, 44100))
-            }),
-            SfzPath = "/tmp/a.sfz",
-            SfzText = sfz,
-            DisplayName = "a"
+            ["a.wav"] = SamplerSample.FromResident(new AudioSampleBuffer(Enumerable.Repeat(0.5f, 100).ToArray(), 1, 44100))
+        });
+        var inst = new SamplerInstrument();
+        inst.Prepare(new AudioFormat(44100, 1));
+        inst.ApplyLoad(new SamplerLoadResult
+        {
+            Regions = SfzLoader.BuildRegions(SfzParser.Parse(sfz), lib),
+            Library = lib,
+            Path = "/tmp/a.sfz",
+            DisplayName = "a",
+            Format = SamplerFormat.Sfz,
+            SourceText = sfz
         });
         return inst;
     }
@@ -44,26 +48,26 @@ public class SfzCloneTests
     public void CopyRuntimeStateSharesRegionsWithoutReloading()
     {
         var loader = new CountingLoader();
-        var previous = SfzInstrument.Loader;
-        SfzInstrument.Loader = loader;
+        var previous = SamplerInstrument.Loader;
+        SamplerInstrument.Loader = loader;
         try
         {
             var src = LoadedInstrument();
-            var dst = new SfzInstrument();
+            var dst = new SamplerInstrument();
             dst.CopyRuntimeStateFrom(src);
 
             Assert.Equal(src.Regions.Count, dst.Regions.Count);
             Assert.Equal(0, loader.Calls); // never touched disk
         }
-        finally { SfzInstrument.Loader = previous; }
+        finally { SamplerInstrument.Loader = previous; }
     }
 
     [Fact]
     public void ProjectClonerDoesNotReDecodeSfzLibrary()
     {
         var loader = new CountingLoader();
-        var previous = SfzInstrument.Loader;
-        SfzInstrument.Loader = loader;
+        var previous = SamplerInstrument.Loader;
+        SamplerInstrument.Loader = loader;
         try
         {
             var project = new Project();
@@ -73,10 +77,10 @@ public class SfzCloneTests
 
             var clone = ProjectCloner.Clone(project, new InstrumentRegistry(), new EffectRegistry());
 
-            var cloned = Assert.IsType<SfzInstrument>(clone.Tracks[0].Instruments[0].Instrument);
+            var cloned = Assert.IsType<SamplerInstrument>(clone.Tracks[0].Instruments[0].Instrument);
             Assert.Single(cloned.Regions);
             Assert.Equal(0, loader.Calls); // the history clone must not re-read the library from disk
         }
-        finally { SfzInstrument.Loader = previous; }
+        finally { SamplerInstrument.Loader = previous; }
     }
 }

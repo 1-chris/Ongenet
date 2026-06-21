@@ -33,7 +33,7 @@ namespace Ongenet.Desktop.Views.Windows
             // Clicking a tab on a collapsed panel expands it (and selects that tab). Tunnel + handledEventsToo
             // so we run before the TabItem consumes the press.
             BottomTabs.AddHandler(PointerPressedEvent, OnBottomTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
-            RightTabs.AddHandler(PointerPressedEvent, OnRightTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+            RightTabStrip.AddHandler(PointerPressedEvent, OnRightTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
             // Start with the Files/Instruments sidebar collapsed to its sideways tab strip.
             SetRightCollapsed(true);
             Closing += OnClosing;
@@ -138,8 +138,8 @@ namespace Ongenet.Desktop.Views.Windows
         {
             if (collapsed == _rightCollapsed) return;
             _rightCollapsed = collapsed;
-            // Hide the tab contents so the Auto-sized column shrinks to just the sideways tab strip.
-            RightFilesContent.IsVisible = RightInstrContent.IsVisible = !collapsed;
+            // Hide the content panel so the Auto-sized column shrinks to just the sideways tab strip.
+            RightContent.IsVisible = !collapsed;
             RightSplitter.IsVisible = !collapsed;
             RightSplitterCol.Width = new GridLength(collapsed ? 0 : 4);
             if (collapsed)

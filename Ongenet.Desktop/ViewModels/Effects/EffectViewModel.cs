@@ -32,6 +32,23 @@ namespace Ongenet.Desktop.ViewModels.Effects
         public IReadOnlyList<ParameterViewModel> Parameters { get; }
         public RelayCommand RemoveCommand { get; }
 
+        private string _presetName = string.Empty;
+
+        /// <summary>The name typed into the "Save preset" flyout.</summary>
+        public string PresetName
+        {
+            get => _presetName;
+            set => SetField(ref _presetName, value);
+        }
+
+        /// <summary>Saves this effect's current settings as a user <c>.ongenpreset</c>.</summary>
+        public void SaveAsPreset()
+        {
+            var name = string.IsNullOrWhiteSpace(_presetName) ? Name : _presetName.Trim();
+            App.ServiceProvider?.GetService<IPresetLibrary>()?.SaveEffect(Effect, name);
+            PresetName = string.Empty;
+        }
+
         /// <summary>Re-reads the enabled state and parameters (so automation shows live during playback).</summary>
         public void Refresh()
         {

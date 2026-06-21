@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:lib="using:Ongenet.Desktop.ViewModels.Library"
+             mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="600"
+             x:Class="Ongenet.Desktop.Views.Panels.LibraryListView"
+             x:DataType="lib:LibraryListViewModel">
+
+    <Border Background="{StaticResource CatppuccinMantle}">
+        <Panel>
+            <TextBlock Text="{Binding EmptyHint}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
+                       Margin="12" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl Name="SectionList" ItemsSource="{Binding Sections}" Margin="6,4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="lib:LibrarySection">
+                            <StackPanel Margin="0,0,0,6">
+                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Bold"
+                                           Margin="4,8,4,2" TextTrimming="CharacterEllipsis"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <ItemsControl ItemsSource="{Binding Entries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="lib:LibraryEntry">
+                                            <Border Margin="2" Padding="8,5" CornerRadius="4"
+                                                    Background="{StaticResource CatppuccinSurface0}"
+                                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="10"
+                                                               IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Panel>
+    </Border>
+</UserControl>

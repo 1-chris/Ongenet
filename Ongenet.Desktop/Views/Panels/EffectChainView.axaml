@@ -39,6 +39,21 @@
                     </Flyout>
                 </Button.Flyout>
             </Button>
+            <Button Name="SaveChainButton" Content="Save chain…" IsVisible="{Binding HasEffects}"
+                    Background="{StaticResource CatppuccinSurface0}"
+                    ToolTip.Tip="Save this whole effect chain as a preset">
+                <Button.Flyout>
+                    <Flyout>
+                        <StackPanel Width="200" Spacing="6">
+                            <TextBlock Text="FX chain name" FontSize="11"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <TextBox Text="{Binding ChainPresetName, Mode=TwoWay}" Watermark="FX Chain"/>
+                            <Button Content="Save" Click="OnSaveChain" HorizontalAlignment="Right"
+                                    Background="{StaticResource CatppuccinSurface1}"/>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
             <TextBlock Text="signal chain: top = first → bottom = last" VerticalAlignment="Center"
                        FontSize="11" FontStyle="Italic" IsVisible="{Binding HasEffects}"
                        Foreground="{StaticResource CatppuccinOverlay1}"/>

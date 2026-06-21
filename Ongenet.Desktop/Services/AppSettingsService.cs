@@ -128,6 +128,14 @@ public sealed class AppSettingsService : IAppSettingsService
             ? new TransportMapping { Action = action, IsNote = d.IsNote, Channel = d.Channel, Number = d.Number }
             : null;
 
+    public event Action? LibraryChanged;
+
+    public void SaveLibrary()
+    {
+        Save();
+        LibraryChanged?.Invoke();
+    }
+
     private void Save()
     {
         try
