@@ -5,8 +5,8 @@ namespace Ongenet.Audio.Native;
 
 /// <summary>
 /// <see cref="IAudioOutput"/> for the native backend. Opens a playback stream on the selected output
-/// device through that device's subsystem driver, and reopens it when the selection changes (mirrors
-/// <c>PortAudioOutput</c>). The render callback is handed straight to the driver's audio thread.
+/// device through that device's subsystem driver, and reopens it when the selection changes.
+/// The render callback is handed straight to the driver's audio thread.
 /// </summary>
 internal sealed class NativeAudioOutput : IAudioOutput
 {

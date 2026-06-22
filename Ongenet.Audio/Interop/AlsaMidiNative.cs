@@ -7,8 +7,7 @@ namespace Ongenet.Audio.Interop;
 /// Thin P/Invoke surface over ALSA's rawmidi + control API (libasound) and the libc <c>poll</c> used
 /// to wait for input. Only the handful of functions <see cref="AlsaMidiInput"/> needs are bound.
 ///
-/// Unlike <see cref="PortAudioNative"/>, no custom <c>SetDllImportResolver</c> is registered here:
-/// only one resolver may be set per assembly (PortAudio owns it), and <c>libasound.so.2</c> is a
+/// No custom <c>SetDllImportResolver</c> is registered for this assembly: <c>libasound.so.2</c> is a
 /// ubiquitous system library that the runtime's default resolution finds by its versioned soname.
 /// This type is only ever touched on Linux (the factory guards by OS), so these imports are never
 /// resolved on Windows/macOS.

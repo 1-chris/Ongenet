@@ -99,6 +99,5 @@ logs/
 SharpSignal/
 I2PSharp/
 
-# Ongenet packaging output + locally-built native libs (build-portaudio.sh / publish-desktop.sh)
+# Ongenet packaging output (publish-desktop.sh)
 /dist/
-/native/

@@ -10,7 +10,7 @@ namespace Ongenet.App.ViewModels
     /// Backs the audio device pickers in the Settings window. Surfaces the machine's input/output
     /// devices from <see cref="IAudioDeviceService"/> and round-trips the user's selection back to it —
     /// which reopens the affected stream on the chosen device — and persists the choice. Also exposes the
-    /// low-level backend toggle (PortAudio ⇄ Native) via <see cref="IAudioBackendManager"/>.
+    /// low-level audio backend selection via <see cref="IAudioBackendManager"/>.
     /// </summary>
     public class AudioDevicesViewModel : ViewModelBase
     {

@@ -6,9 +6,9 @@ namespace Ongenet.Audio.Interop;
 /// <summary>
 /// Thin P/Invoke surface over ALSA's PCM API (libasound) for raw audio playback/capture. Only the
 /// functions the native backend needs are bound. Like <see cref="AlsaMidiNative"/>, no custom
-/// <c>SetDllImportResolver</c> is registered (PortAudio owns the single per-assembly resolver, and
-/// <c>libasound.so.2</c> resolves by its versioned soname); these imports are only ever touched on
-/// Linux, where <see cref="snd_pcm_uframes_t"/> (<c>unsigned long</c>) is 8 bytes — modelled as
+/// <c>SetDllImportResolver</c> is needed — <c>libasound.so.2</c> resolves by its versioned soname
+/// through the runtime's default resolution; these imports are only ever touched on
+/// Linux, where <c>snd_pcm_uframes_t</c> (<c>unsigned long</c>) is 8 bytes — modelled as
 /// <see cref="ulong"/>, and <c>snd_pcm_sframes_t</c> as <see cref="long"/>.
 /// </summary>
 internal static class AlsaPcmNative

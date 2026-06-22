@@ -5,8 +5,8 @@ namespace Ongenet.Audio.Native;
 
 /// <summary>
 /// <see cref="IAudioInput"/> for the native backend. Opens an independent capture stream on the selected
-/// input device through that device's subsystem driver when recording starts (mirrors
-/// <c>PortAudioInput</c>: the chosen device applies at the next <see cref="Start"/>).
+/// input device through that device's subsystem driver when recording starts (the chosen device
+/// applies at the next <see cref="Start"/>).
 /// </summary>
 internal sealed class NativeAudioInput : IAudioInput
 {

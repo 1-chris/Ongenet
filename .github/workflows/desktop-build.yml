@@ -1,16 +1,15 @@
 name: Desktop Build
 
-# Builds self-contained Ongenet desktop packages for every platform, bundling the native PortAudio
-# library into each one, and (on a v* tag) publishes them to a GitHub Release.
+# Builds self-contained Ongenet desktop packages for every platform and (on a v* tag) publishes them
+# to a GitHub Release.
 #
-# Strategy — reuse the repo's own scripts so CI and local builds stay identical:
-#   * linux-x64 / win-x64 : built on an x86_64 Ubuntu runner. build-portaudio.sh cross-compiles the
-#                           Windows PortAudio DLL via MinGW, so one x86 Linux runner covers both.
-#   * linux-arm64          : built on an arm64 Ubuntu runner. PortAudio's .so is built natively (ALSA +
-#                           JACK can't be cross-built across archs here), so it needs an aarch64 host.
-#   * osx-arm64 / osx-x64 : built on macOS runners. PortAudio can't be cross-built from Linux (needs
-#                           Apple's SDK), so each macOS job compiles libportaudio.2.dylib from source
-#                           for its arch, drops it in native/<rid>/, then publishes with --no-native.
+# Audio uses each OS's native backend (ALSA/PipeWire/JACK/Pulse on Linux, CoreAudio on macOS, WASAPI on
+# Windows) via P/Invoke to the platform's own libraries, so there are no native libraries to compile or
+# bundle — every target is a plain `dotnet publish`:
+#   * linux-x64           : built on an x86_64 Ubuntu runner.
+#   * linux-arm64         : built on an arm64 Ubuntu runner.
+#   * win-x64             : cross-published from the x86_64 Ubuntu runner (pure .NET, no native build).
+#   * osx-arm64 / osx-x64 : built on macOS runners (osx-x64 cross-published from the Apple Silicon runner).
 #
 # Each job ends with dist/Ongenet-<rid>.zip (produced by publish-desktop.sh) uploaded as an artifact.
 
@@ -33,7 +32,6 @@ permissions:
 
 env:
   DOTNET_VERSION: "10.0.x"
-  PORTAUDIO_TAG: "v19.7.0"  # keep in sync with build-portaudio.sh
 
 jobs:
   build:
@@ -44,13 +42,13 @@ jobs:
       matrix:
         include:
           - { rid: linux-x64,   os: ubuntu-latest }
-          - { rid: linux-arm64, os: ubuntu-24.04-arm }       # native build on an arm64 runner
-          - { rid: win-x64,     os: ubuntu-latest }          # cross-compiled via MinGW
+          - { rid: linux-arm64, os: ubuntu-24.04-arm }
+          - { rid: win-x64,     os: ubuntu-latest }          # cross-published (pure .NET)
           # Both macOS targets build on the Apple Silicon runner. Intel (macos-13) runners are being
-          # retired, so osx-x64 is cross-compiled: clang targets x86_64 via CMAKE_OSX_ARCHITECTURES and
-          # `dotnet publish -r osx-x64` cross-publishes fine from an arm64 host.
-          - { rid: osx-arm64, os: macos-14, osx_arch: arm64 }
-          - { rid: osx-x64,   os: macos-14, osx_arch: x86_64 }
+          # retired, so osx-x64 is cross-published: `dotnet publish -r osx-x64` cross-publishes fine
+          # from an arm64 host.
+          - { rid: osx-arm64, os: macos-14 }
+          - { rid: osx-x64,   os: macos-14 }
 
     steps:
       - name: Checkout
@@ -61,95 +59,18 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      # --- Linux (x86_64 and arm64 runners) ---------------------------------------------------------
-      # Common toolchain for build-portaudio.sh's native .so build: cmake + ALSA/JACK dev headers. zip
-      # for packaging. Needed by linux-x64, linux-arm64 and the win-x64 (cross) job alike.
-      - name: Install Linux build toolchain
+      # `zip` for packaging (publish-desktop.sh falls back to tar.gz if it's missing, but zip is the
+      # expected artifact). macOS runners ship zip already.
+      - name: Install zip (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            cmake make zip \
-            libasound2-dev libjack-jackd2-dev
+          sudo apt-get install -y --no-install-recommends zip
 
-      # The Windows DLL is cross-compiled from x86_64, so the full MinGW-w64 toolchain (incl. C++, which
-      # PortAudio's CMake enables) is only installed for the win-x64 job — these packages aren't needed
-      # (and may be unavailable) on the arm64 runner.
-      - name: Install MinGW cross toolchain (Windows target)
-        if: matrix.rid == 'win-x64'
-        run: |
-          sudo apt-get install -y --no-install-recommends \
-            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64
-
-      - name: Build native PortAudio + publish (Linux/Windows)
-        if: runner.os == 'Linux'
-        env:
-          # Only build the native lib for THIS job's RID (publish-desktop.sh invokes build-portaudio.sh,
-          # which honours RIDS). The win-x64 job builds only the DLL; linux-x64 only the .so.
-          RIDS: ${{ matrix.rid }}
-        run: |
-          chmod +x publish-desktop.sh build-portaudio.sh
-          ./publish-desktop.sh "${{ matrix.rid }}"
-
-      # --- macOS (build PortAudio from source for the runner's arch) --------------------------------
-      - name: Build native PortAudio dylib (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          set -euo pipefail
-          rm -rf pa-src pa-build
-          git clone --depth 1 --branch "${PORTAUDIO_TAG}" https://github.com/PortAudio/portaudio pa-src
-          cmake -S pa-src -B pa-build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=ON \
-            -DPA_BUILD_TESTS=OFF \
-            -DPA_BUILD_EXAMPLES=OFF \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.osx_arch }}
-          cmake --build pa-build -j"$(sysctl -n hw.ncpu)"
-
-          mkdir -p "native/${{ matrix.rid }}"
-          # CMake emits libportaudio.dylib -> libportaudio.<v>.dylib; copy the real versioned file.
-          real="$(ls pa-build/libportaudio.2.dylib 2>/dev/null || ls pa-build/libportaudio*.dylib | head -n1)"
-          cp -L "$real" "native/${{ matrix.rid }}/libportaudio.2.dylib"
-          # We dlopen by absolute path, but set a sane install id anyway for cleanliness.
-          install_name_tool -id @loader_path/libportaudio.2.dylib "native/${{ matrix.rid }}/libportaudio.2.dylib"
-          # Ad-hoc re-sign: install_name_tool invalidated the linker's signature, and arm64 macOS
-          # refuses to load a mach-O with a broken/absent signature ("killed: 9"). `-s -` signs with
-          # no certificate — enough to RUN locally (this is what Homebrew does for arm64), but NOT
-          # notarization: a downloaded app still hits Gatekeeper until we add a Developer ID + notarize.
-          codesign --force --sign - "native/${{ matrix.rid }}/libportaudio.2.dylib"
-          codesign --verify --verbose "native/${{ matrix.rid }}/libportaudio.2.dylib"
-          echo "Bundled dylib dependencies (should be system frameworks only):"
-          otool -L "native/${{ matrix.rid }}/libportaudio.2.dylib"
-          lipo -info "native/${{ matrix.rid }}/libportaudio.2.dylib"
-
-      - name: Publish (macOS)
-        if: runner.os == 'macOS'
+      - name: Publish
         run: |
           chmod +x publish-desktop.sh
-          ./publish-desktop.sh --no-native "${{ matrix.rid }}"
-
-      # --- Guard against silently shipping an audio-less package ------------------------------------
-      # build-portaudio.sh is deliberately non-fatal (it skips on a missing toolchain), so a failed
-      # native build would otherwise produce a zip with no PortAudio and a green check. Fail loudly if
-      # the platform's native lib didn't make it into the package.
-      - name: Verify PortAudio is bundled
-        shell: bash
-        run: |
-          set -euo pipefail
-          case "${{ matrix.rid }}" in
-            linux-*) nf="libportaudio.so.2" ;;
-            win-x64) nf="portaudio.dll" ;;
-            osx-*)   nf="libportaudio.2.dylib" ;;
-          esac
-          zip="dist/Ongenet-${{ matrix.rid }}.zip"
-          echo "Checking $zip for $nf ..."
-          if ! unzip -l "$zip" | grep -q -- "$nf"; then
-            echo "::error::$nf is missing from $zip — the native PortAudio build did not succeed."
-            unzip -l "$zip"
-            exit 1
-          fi
-          echo "OK: $nf is bundled."
+          ./publish-desktop.sh "${{ matrix.rid }}"
 
       # --- Package artifact -------------------------------------------------------------------------
       - name: Upload package artifact

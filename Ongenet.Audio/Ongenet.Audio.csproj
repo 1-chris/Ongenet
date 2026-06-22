@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Description>Ongenet.Audio - native audio backend (PortAudio) for the Ongenet DAW</Description>
+    <Description>Ongenet.Audio - OS-native audio + MIDI backend for the Ongenet DAW</Description>
     <Authors>Ongenet</Authors>
     <Company>Ongenet</Company>
     <Product>Ongenet.Audio</Product>

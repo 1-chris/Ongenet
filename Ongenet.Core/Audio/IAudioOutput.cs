@@ -10,8 +10,8 @@ namespace Ongenet.Core.Audio;
 public delegate void AudioRenderCallback(Span<float> buffer);
 
 /// <summary>
-/// Abstraction over the platform audio device. The concrete implementation (PortAudio) lives
-/// in the Ongenet.Audio project; the engine depends only on this seam, so the device layer is
+/// Abstraction over the platform audio device. The concrete implementation (the OS-native backend)
+/// lives in the Ongenet.Audio project; the engine depends only on this seam, so the device layer is
 /// swappable without touching any DSP.
 /// </summary>
 public interface IAudioOutput : IDisposable

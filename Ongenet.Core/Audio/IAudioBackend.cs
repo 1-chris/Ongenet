@@ -3,7 +3,8 @@ using System;
 namespace Ongenet.Core.Audio;
 
 /// <summary>
-/// One low-level audio system (e.g. PortAudio, or a platform-native stack). Bundles the three device
+/// One low-level audio system (the OS-native stack: ALSA/PipeWire/JACK/Pulse, CoreAudio or WASAPI).
+/// Bundles the three device
 /// seams — enumeration/selection, output, input — that belong to the same underlying library so they
 /// share its lifetime and device-identity scheme. <see cref="AudioBackendManager"/> holds a set of
 /// these and forwards the engine's seams to whichever one is active, so a backend can be swapped at
@@ -11,10 +12,10 @@ namespace Ongenet.Core.Audio;
 /// </summary>
 public interface IAudioBackend : IDisposable
 {
-    /// <summary>Stable identifier persisted in settings and used to switch backends, e.g. "portaudio".</summary>
+    /// <summary>Stable identifier persisted in settings and used to switch backends, e.g. "native".</summary>
     string Id { get; }
 
-    /// <summary>Human-readable name shown in the audio-system picker, e.g. "PortAudio".</summary>
+    /// <summary>Human-readable name shown in the audio-system picker, e.g. "Native".</summary>
     string DisplayName { get; }
 
     /// <summary>

@@ -13,7 +13,7 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // Plug the native desktop stack (PortAudio / OS-native audio + MIDI, CLAP + LV2 hosting) into the
+        // Plug the native desktop stack (OS-native audio + MIDI, CLAP + LV2 hosting) into the
         // shared App, then run the classic multi-window desktop lifetime.
         SharedApp.Platform = new DesktopPlatform();
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

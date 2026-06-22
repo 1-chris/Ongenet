@@ -13,7 +13,7 @@ The UI used to live in the desktop exe. It is now a shared library that both hea
 | --- | --- | --- |
 | `Ongenet.Core` | Engine, DSP, instruments, effects, persistence (portable, no UI) | `net10.0` |
 | `Ongenet.App` | **Shared Avalonia UI library** — `App`, all views/view-models, controls, theming, assets (CLR + XAML namespaces: `Ongenet.App.*`). | `net10.0` |
-| `Ongenet.Desktop` | Desktop **exe head** — native audio (PortAudio/OS), MIDI, CLAP/LV2. Publishes as `Ongenet`. | `net10.0` |
+| `Ongenet.Desktop` | Desktop **exe head** — OS-native audio, MIDI, CLAP/LV2. Publishes as `Ongenet`. | `net10.0` |
 | `Ongenet.Web` | Browser **exe head** — Web Audio backend, browser-safe service stubs, single-view shell. | `net10.0-browser` |
 | `Ongenet.Audio` / `Ongenet.Clap` / `Ongenet.Lv2` | Native audio + plugin hosting (desktop only). | `net10.0` |
 

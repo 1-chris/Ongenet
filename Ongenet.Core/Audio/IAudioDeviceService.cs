@@ -5,8 +5,8 @@ namespace Ongenet.Core.Audio;
 
 /// <summary>
 /// Enumerates the machine's audio devices and holds the user's input/output selection. The concrete
-/// implementation (PortAudio) lives in Ongenet.Audio; the output and input streams read the current
-/// selection from here, so picking a device in the UI reopens the affected stream on it.
+/// implementation (the OS-native backend) lives in Ongenet.Audio; the output and input streams read the
+/// current selection from here, so picking a device in the UI reopens the affected stream on it.
 /// </summary>
 public interface IAudioDeviceService
 {

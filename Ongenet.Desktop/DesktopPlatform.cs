@@ -16,17 +16,16 @@ using Ongenet.Lv2;
 namespace Ongenet.Desktop;
 
 /// <summary>
-/// Desktop host integration: contributes the native audio backends (PortAudio + the OS-native stack),
-/// the platform MIDI input service, and CLAP/LV2 plugin hosting, and shows the classic
-/// <see cref="MainWindow"/>. This is the only place the shared UI is tied to the native projects
-/// (Ongenet.Audio / Ongenet.Clap / Ongenet.Lv2).
+/// Desktop host integration: contributes the OS-native audio backend, the platform MIDI input service,
+/// and CLAP/LV2 plugin hosting, and shows the classic <see cref="MainWindow"/>. This is the only place
+/// the shared UI is tied to the native projects (Ongenet.Audio / Ongenet.Clap / Ongenet.Lv2).
 /// </summary>
 public sealed class DesktopPlatform : IPlatformServices
 {
     public void RegisterServices(IServiceCollection services)
     {
-        // Audio backends: PortAudio everywhere, plus the OS-native backend where one exists.
-        services.AddSingleton<IAudioBackend, PortAudioBackend>();
+        // Audio backend: the OS-native stack for this platform (ALSA/PipeWire/JACK/Pulse on Linux,
+        // CoreAudio on macOS, WASAPI on Windows).
         if (OperatingSystem.IsLinux())
             services.AddSingleton<IAudioBackend, Ongenet.Audio.Native.LinuxNativeBackend>();
         else if (OperatingSystem.IsMacOS())

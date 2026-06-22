@@ -2,7 +2,7 @@ namespace Ongenet.Core.Audio;
 
 /// <summary>
 /// A selectable audio device reported by the backend. <see cref="Index"/> is a backend's integer
-/// device handle (e.g. a PortAudio device index); <see cref="Id"/> is a backend-opaque string handle
+/// device handle; <see cref="Id"/> is a backend-opaque string handle
 /// (e.g. an ALSA PCM name like <c>"alsa:hw:0,0"</c>, a PulseAudio sink name, a PipeWire node id) for
 /// backends that don't key devices by integer. A backend uses whichever of the two it needs to open
 /// the device; the rest of the fields are for display and capability filtering.

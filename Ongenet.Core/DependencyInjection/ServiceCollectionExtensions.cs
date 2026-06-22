@@ -37,7 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRecordingService, RecordingService>();
 
         // Audio engine. The concrete IAudioOutput device is registered by the host app
-        // (Ongenet.Desktop references the PortAudio backend); the engine depends only on the seam.
+        // (Ongenet.Desktop references the OS-native backend); the engine depends only on the seam.
         services.AddSingleton<IAuditionPlayer, AuditionPlayer>();
         services.AddSingleton<IAudioEngine, AudioEngine>();
 

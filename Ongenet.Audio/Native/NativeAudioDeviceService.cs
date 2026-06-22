@@ -7,8 +7,8 @@ namespace Ongenet.Audio.Native;
 /// <summary>
 /// <see cref="IAudioDeviceService"/> for the native Linux backend. Aggregates devices from every
 /// available subsystem driver into one list (each already tagged with its host API), and holds the
-/// user's selection. Mirrors <c>PortAudioDeviceService</c>'s behaviour: the output/input streams read
-/// the current selection from here, so changing a device reopens its stream.
+/// user's selection. The output/input streams read the current selection from here, so changing a
+/// device reopens its stream.
 /// </summary>
 internal sealed class NativeAudioDeviceService : IAudioDeviceService
 {

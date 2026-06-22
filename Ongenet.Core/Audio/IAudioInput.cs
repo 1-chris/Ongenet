@@ -13,7 +13,7 @@ public delegate void AudioCaptureCallback(ReadOnlySpan<float> input, int channel
 /// <summary>
 /// Abstraction over the platform audio capture device. Distinct from <see cref="IAudioOutput"/> so
 /// input and output can run as independent streams on independently chosen devices. The concrete
-/// implementation (PortAudio) opens the device selected in <see cref="IAudioDeviceService"/>.
+/// implementation (the OS-native backend) opens the device selected in <see cref="IAudioDeviceService"/>.
 /// </summary>
 public interface IAudioInput : IDisposable
 {

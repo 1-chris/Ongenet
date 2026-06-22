@@ -5,9 +5,8 @@ namespace Ongenet.Audio.Interop;
 
 /// <summary>
 /// P/Invoke surface over the Windows Multimedia MIDI input API (winmm.dll). Only touched on Windows
-/// (the factory guards by OS), so the imports are never resolved elsewhere. The PortAudio resolver
-/// already registered on this assembly returns IntPtr.Zero for "winmm.dll", so default resolution
-/// loads the system library.
+/// (the factory guards by OS), so the imports are never resolved elsewhere. No custom resolver is
+/// registered on this assembly, so the runtime's default resolution loads the system "winmm.dll".
 /// </summary>
 internal static class WinMmMidiNative
 {

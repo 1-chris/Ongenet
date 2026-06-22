@@ -4,10 +4,10 @@ using Ongenet.Core.Audio;
 namespace Ongenet.Audio.Native;
 
 /// <summary>
-/// The native Linux <see cref="IAudioBackend"/>: talks to the OS audio stack directly (no PortAudio).
+/// The native Linux <see cref="IAudioBackend"/>: talks to the OS audio stack directly.
 /// Aggregates whichever subsystems are present — ALSA today, with PipeWire/PulseAudio/JACK scaffolded —
 /// behind one device service and one output/input pair. Supported only on Linux; if no subsystem is
-/// usable it simply exposes no devices (the app stays alive and silent, like the PortAudio backend).
+/// usable it simply exposes no devices (the app stays alive and silent).
 /// </summary>
 public sealed class LinuxNativeBackend : IAudioBackend
 {

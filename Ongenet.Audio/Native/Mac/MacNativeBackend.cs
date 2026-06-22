@@ -4,8 +4,8 @@ using Ongenet.Core.Audio;
 namespace Ongenet.Audio.Native.Mac;
 
 /// <summary>
-/// The macOS native <see cref="IAudioBackend"/>: talks to CoreAudio directly (no PortAudio) via the HAL
-/// output AudioUnit. Shares the id "native" with the Linux backend, so the Settings toggle is the same
+/// The macOS native <see cref="IAudioBackend"/>: talks to CoreAudio directly via the HAL
+/// output AudioUnit. Shares the id "native" with the Linux backend, so the audio backend is the same
 /// "Native" option on every OS; the composition root registers whichever one matches the running OS.
 /// Build-verified on Linux (the CoreAudio frameworks bind lazily and are only ever touched on macOS).
 /// </summary>

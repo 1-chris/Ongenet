@@ -11,8 +11,8 @@ namespace Ongenet.Audio.Native;
 /// ALSA PCM driver for the native Linux backend. Enumerates the machine's PCM devices via ALSA's hint
 /// API (tagging each "ALSA" with an "alsa:" id) and opens float32-interleaved streams on them through
 /// <see cref="AlsaStream"/>. On a PipeWire/PulseAudio desktop the <c>default</c>/<c>pipewire</c>/
-/// <c>pulse</c> PCMs route through those servers, so this one driver already replaces PortAudio on the
-/// large majority of Linux systems.
+/// <c>pulse</c> PCMs route through those servers, so this one driver already covers the large majority
+/// of Linux systems.
 /// </summary>
 internal sealed class AlsaAudioDriver : INativeAudioDriver
 {

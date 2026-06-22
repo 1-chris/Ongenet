@@ -5,8 +5,8 @@ using Ongenet.Core.Audio;
 namespace Ongenet.Audio.Native.Win;
 
 /// <summary>
-/// The Windows native <see cref="IAudioBackend"/>: talks to WASAPI directly (no PortAudio) in shared,
-/// event-driven mode. Shares the id "native" with the Linux/macOS backends so the Settings toggle is the
+/// The Windows native <see cref="IAudioBackend"/>: talks to WASAPI directly in shared,
+/// event-driven mode. Shares the id "native" with the Linux/macOS backends so the audio backend is the
 /// same "Native" option on every OS; the composition root registers whichever matches the running OS.
 /// Build-verified on Linux (the COM interop binds only on Windows); needs on-device shakeout.
 /// </summary>

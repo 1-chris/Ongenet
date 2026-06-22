@@ -9,8 +9,8 @@ namespace Ongenet.App.Services;
 public sealed class AppSettings
 {
     /// <summary>
-    /// Which low-level audio backend to use: "native" or "portaudio". Empty = unset → use the OS default
-    /// (Native on Linux/macOS, PortAudio on Windows), chosen by <see cref="Core.Audio.AudioBackendManager"/>.
+    /// Which low-level audio backend to use, e.g. "native". Empty = unset → use the default chosen by
+    /// <see cref="Core.Audio.AudioBackendManager"/> (the OS-native backend).
     /// </summary>
     public string AudioBackend { get; set; } = "";
     public string? AudioOutputDevice { get; set; }

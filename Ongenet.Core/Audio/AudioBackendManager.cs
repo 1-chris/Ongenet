@@ -34,12 +34,9 @@ public sealed class AudioBackendManager : IAudioBackendManager, IAudioOutput, IA
         if (_backends.Count == 0)
             throw new InvalidOperationException("No supported audio backend is available.");
 
-        // Prefer the OS-native backend on Linux and macOS (proven on Linux: PipeWire/PulseAudio/ALSA);
-        // fall back to PortAudio elsewhere (e.g. Windows, until a native backend lands there).
-        var preferNative = OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
-        _active = (preferNative ? _backends.FirstOrDefault(b => b.Id == "native") : null)
-                  ?? _backends.FirstOrDefault(b => b.Id == "portaudio")
-                  ?? _backends[0];
+        // Prefer the OS-native backend (ALSA/PipeWire/JACK/Pulse on Linux, CoreAudio on macOS, WASAPI on
+        // Windows); fall back to the first available one if it isn't present for some reason.
+        _active = _backends.FirstOrDefault(b => b.Id == "native") ?? _backends[0];
         Subscribe(_active);
     }
 
