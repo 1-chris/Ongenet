@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <!-- Relative base so the app works when served from a sub-path (onge.net/app/). -->
+    <base href="./" />
+    <title>Ongenet — web demo</title>
+    <style>
+        html, body { margin: 0; height: 100%; background: #1e1e2e; overflow: hidden; }
+        #out { position: absolute; inset: 0; }
+        #loading {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 14px;
+            color: #cdd6f4; font-family: system-ui, sans-serif;
+        }
+        #loading .title { color: #cba6f7; font-weight: 600; font-size: 20px; }
+        #loading .sub { color: #7f849c; font-size: 13px; }
+        .spinner {
+            width: 28px; height: 28px; border: 3px solid #313244; border-top-color: #cba6f7;
+            border-radius: 50%; animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="out"></div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div class="title">Ongenet</div>
+        <div class="sub">Loading the web demo… (first load downloads the .NET runtime)</div>
+    </div>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

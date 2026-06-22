@@ -1,0 +1,89 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:settings="using:Ongenet.App.Views.Settings"
+        mc:Ignorable="d" d:DesignWidth="540" d:DesignHeight="660"
+        x:Class="Ongenet.App.Views.Windows.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Width="540" Height="660" MinWidth="420" MinHeight="380"
+        Title="Settings"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True">
+    <Window.Styles>
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        </Style>
+        <Style Selector="TabItem:pointerover">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="TabItem:selected">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        </Style>
+    </Window.Styles>
+
+    <Panel>
+        <Border Name="RootBorder" Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}"
+                BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+            <Grid RowDefinitions="Auto, *">
+                <!-- Custom title bar -->
+                <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto"
+                      PointerPressed="TitleBar_PointerPressed">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- macOS "traffic light" close button (left); hidden off-Mac (toggled in ChromedWindow). -->
+                        <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
+                                    VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
+                            <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
+                                    Click="CloseButton_Click" ToolTip.Tip="Close">
+                                <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Text="Settings" Margin="10,0" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
+                        <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
+                            <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10"
+                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <TabControl Grid.Row="1" Margin="8" Background="{StaticResource CatppuccinMantle}">
+                    <TabItem Header="Audio">
+                        <settings:AudioSettingsView DataContext="{Binding Audio}"/>
+                    </TabItem>
+                    <TabItem Header="MIDI">
+                        <settings:MidiSettingsView DataContext="{Binding Midi}"/>
+                    </TabItem>
+                    <TabItem Header="Theme">
+                        <settings:ThemeEditorView DataContext="{Binding Theme}"/>
+                    </TabItem>
+                    <TabItem Header="Library">
+                        <settings:LibrarySettingsView DataContext="{Binding Library}"/>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+        </Border>
+
+        <!-- Resize handles -->
+        <Grid IsHitTestVisible="True">
+            <Border Width="4" HorizontalAlignment="Left" Cursor="LeftSide" PointerPressed="OnResizeHandlePressed" Tag="Left" Background="Transparent"/>
+            <Border Width="4" HorizontalAlignment="Right" Cursor="RightSide" PointerPressed="OnResizeHandlePressed" Tag="Right" Background="Transparent"/>
+            <Border Height="4" VerticalAlignment="Top" Cursor="TopSide" PointerPressed="OnResizeHandlePressed" Tag="Top" Background="Transparent"/>
+            <Border Height="4" VerticalAlignment="Bottom" Cursor="BottomSide" PointerPressed="OnResizeHandlePressed" Tag="Bottom" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="TopLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="TopLeft" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="TopRightCorner" PointerPressed="OnResizeHandlePressed" Tag="TopRight" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="BottomLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomLeft" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="BottomRightCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomRight" Background="Transparent"/>
+        </Grid>
+    </Panel>
+</Window>

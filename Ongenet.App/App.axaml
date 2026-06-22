@@ -1,0 +1,139 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="using:Ongenet.App.Converters"
+             x:Class="Ongenet.App.App"
+             RequestedThemeVariant="Dark">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.Resources>
+        <!-- Resolves a track ColorKey (palette key or hex) to a brush. -->
+        <converters:CoreColorToBrushConverter x:Key="ColorKeyToBrush"/>
+
+        <!-- Text families only. Emoji is NOT listed here: it lives in FontManagerOptions.FontFallbacks
+             (Program.cs) so it is consulted only after a real text font fails. Putting an emoji font in
+             this chain made Win/Mac font matchers bind the ASCII digits 0-9 to the emoji keycap glyphs. -->
+        <FontFamily x:Key="AppFontFamily">Inter, Noto Sans, DejaVu Sans, sans-serif</FontFamily>
+        <FontFamily x:Key="ContentControlThemeFontFamily">Inter, Noto Sans, DejaVu Sans, sans-serif</FontFamily>
+
+        <!-- Catppuccin Mocha Palette Colors -->
+        <Color x:Key="CatppuccinRosewaterColor">#f5e0dc</Color>
+        <Color x:Key="CatppuccinFlamingoColor">#f2cdcd</Color>
+        <Color x:Key="CatppuccinPinkColor">#f5c2e7</Color>
+        <Color x:Key="CatppuccinMauveColor">#cba6f7</Color>
+        <Color x:Key="CatppuccinRedColor">#f38ba8</Color>
+        <Color x:Key="CatppuccinMaroonColor">#eba0ac</Color>
+        <Color x:Key="CatppuccinPeachColor">#fab387</Color>
+        <Color x:Key="CatppuccinYellowColor">#f9e2af</Color>
+        <Color x:Key="CatppuccinGreenColor">#a6e3a1</Color>
+        <Color x:Key="CatppuccinTealColor">#94e2d5</Color>
+        <Color x:Key="CatppuccinSkyColor">#89dceb</Color>
+        <Color x:Key="CatppuccinSapphireColor">#74c7ec</Color>
+        <Color x:Key="CatppuccinBlueColor">#89b4fa</Color>
+        <Color x:Key="CatppuccinLavenderColor">#b4befe</Color>
+        <Color x:Key="CatppuccinTextColor">#cdd6f4</Color>
+        <Color x:Key="CatppuccinSubtext1Color">#bac2de</Color>
+        <Color x:Key="CatppuccinSubtext0Color">#a6adc8</Color>
+        <Color x:Key="CatppuccinOverlay2Color">#9399b2</Color>
+        <Color x:Key="CatppuccinOverlay1Color">#7f849c</Color>
+        <Color x:Key="CatppuccinOverlay0Color">#6c7086</Color>
+        <Color x:Key="CatppuccinSurface2Color">#585b70</Color>
+        <Color x:Key="CatppuccinSurface1Color">#45475a</Color>
+        <Color x:Key="CatppuccinSurface0Color">#313244</Color>
+        <Color x:Key="CatppuccinBaseColor">#1e1e2e</Color>
+        <Color x:Key="CatppuccinMantleColor">#181825</Color>
+        <Color x:Key="CatppuccinCrustColor">#11111b</Color>
+
+        <!-- Catppuccin Mocha Palette Brushes -->
+        <SolidColorBrush x:Key="CatppuccinRosewater" Color="{StaticResource CatppuccinRosewaterColor}"/>
+        <SolidColorBrush x:Key="CatppuccinFlamingo" Color="{StaticResource CatppuccinFlamingoColor}"/>
+        <SolidColorBrush x:Key="CatppuccinPink" Color="{StaticResource CatppuccinPinkColor}"/>
+        <SolidColorBrush x:Key="CatppuccinMauve" Color="{StaticResource CatppuccinMauveColor}"/>
+        <SolidColorBrush x:Key="CatppuccinRed" Color="{StaticResource CatppuccinRedColor}"/>
+        <SolidColorBrush x:Key="CatppuccinMaroon" Color="{StaticResource CatppuccinMaroonColor}"/>
+        <SolidColorBrush x:Key="CatppuccinPeach" Color="{StaticResource CatppuccinPeachColor}"/>
+        <SolidColorBrush x:Key="CatppuccinYellow" Color="{StaticResource CatppuccinYellowColor}"/>
+        <SolidColorBrush x:Key="CatppuccinGreen" Color="{StaticResource CatppuccinGreenColor}"/>
+        <SolidColorBrush x:Key="CatppuccinTeal" Color="{StaticResource CatppuccinTealColor}"/>
+        <SolidColorBrush x:Key="CatppuccinSky" Color="{StaticResource CatppuccinSkyColor}"/>
+        <SolidColorBrush x:Key="CatppuccinSapphire" Color="{StaticResource CatppuccinSapphireColor}"/>
+        <SolidColorBrush x:Key="CatppuccinBlue" Color="{StaticResource CatppuccinBlueColor}"/>
+        <SolidColorBrush x:Key="CatppuccinLavender" Color="{StaticResource CatppuccinLavenderColor}"/>
+        <SolidColorBrush x:Key="CatppuccinText" Color="{StaticResource CatppuccinTextColor}"/>
+        <SolidColorBrush x:Key="CatppuccinSubtext1" Color="{StaticResource CatppuccinSubtext1Color}"/>
+        <SolidColorBrush x:Key="CatppuccinSubtext0" Color="{StaticResource CatppuccinSubtext0Color}"/>
+        <SolidColorBrush x:Key="CatppuccinOverlay2" Color="{StaticResource CatppuccinOverlay2Color}"/>
+        <SolidColorBrush x:Key="CatppuccinOverlay1" Color="{StaticResource CatppuccinOverlay1Color}"/>
+        <SolidColorBrush x:Key="CatppuccinOverlay0" Color="{StaticResource CatppuccinOverlay0Color}"/>
+        <SolidColorBrush x:Key="CatppuccinSurface2" Color="{StaticResource CatppuccinSurface2Color}"/>
+        <SolidColorBrush x:Key="CatppuccinSurface1" Color="{StaticResource CatppuccinSurface1Color}"/>
+        <SolidColorBrush x:Key="CatppuccinSurface0" Color="{StaticResource CatppuccinSurface0Color}"/>
+        <SolidColorBrush x:Key="CatppuccinBase" Color="{StaticResource CatppuccinBaseColor}"/>
+        <SolidColorBrush x:Key="CatppuccinMantle" Color="{StaticResource CatppuccinMantleColor}"/>
+        <SolidColorBrush x:Key="CatppuccinCrust" Color="{StaticResource CatppuccinCrustColor}"/>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Dark" 
+                                       Accent="{StaticResource CatppuccinMauveColor}" 
+                                       RegionColor="{StaticResource CatppuccinBaseColor}" 
+                                       ErrorText="{StaticResource CatppuccinRedColor}" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <Style Selector="Window, TextBlock, SelectableTextBlock, TextBox, Button, Label, AccessText, MenuItem">
+            <Setter Property="TextElement.FontFamily" Value="{StaticResource AppFontFamily}" />
+            <Setter Property="TextElement.Foreground" Value="{StaticResource CatppuccinText}" />
+        </Style>
+
+        <!-- Custom Title Bar Styles -->
+        <Style Selector="Grid.TitleBar">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMantle}"/>
+            <Setter Property="Height" Value="32"/>
+        </Style>
+        <Style Selector="Button.TitleBarButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinMauve}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Button.TitleBarButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.TitleBarButton.Close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinRed}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <!-- macOS-style "traffic light" window buttons: small solid colour blobs whose glyphs
+             only appear when the pointer is over the button group. -->
+        <Style Selector="Button.MacButton">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <!-- Keep the blob's own colour on hover/press (the Fluent theme would otherwise recolour it). -->
+        <Style Selector="Button.MacButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+        </Style>
+        <Style Selector="Button.MacButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+        </Style>
+        <!-- Reveal the glyphs while hovering anywhere over the traffic-light group, macOS-style. -->
+        <Style Selector="StackPanel#MacWindowButtons:pointerover Path">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+    </Application.Styles>
+</Application>

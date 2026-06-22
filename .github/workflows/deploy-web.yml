@@ -1,0 +1,79 @@
+name: Deploy web demo to GitHub Pages
+
+# Builds the WebAssembly head (Ongenet.Web) and publishes it to GitHub Pages so the full app runs at
+# onge.net/app/. The existing homepage in ./docs (index.html, CNAME, assets) is served at the site root
+# unchanged; the freshly-built app bundle is injected at /app/. No server is involved — Pages just serves
+# the static assets.
+#
+# IMPORTANT: this requires the repo's Pages source to be set to "GitHub Actions" (Settings -> Pages).
+# The older "Deploy from a branch -> /docs" mode does NOT build the WASM app (GitHub never runs dotnet for
+# branch-based Pages); it would only serve files you committed. This workflow replaces that mode and builds
+# everything, sourcing the homepage from ./docs.
+#
+# The app uses <base href="./"> and a ScriptProcessorNode for audio, so it needs NO cross-origin isolation
+# (no COOP/COEP headers, which Pages can't set) and works from the /app/ sub-path as-is.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow this workflow to publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One in-flight deployment at a time; don't cancel a running one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install WebAssembly tools
+        run: dotnet workload install wasm-tools
+
+      - name: Publish Ongenet.Web (Release)
+        run: dotnet publish Ongenet.Web/Ongenet.Web.csproj -c Release
+
+      - name: Assemble Pages site (homepage at /, app at /app/)
+        run: |
+          set -e
+          BUNDLE="Ongenet.Web/bin/Release/net10.0-browser/browser-wasm/AppBundle"
+          rm -rf _site
+          mkdir -p _site/app
+          # Site root: the existing homepage + CNAME + assets from docs/.
+          cp -r docs/. _site/
+          # Dev-only docs shouldn't be published.
+          rm -f _site/web-demo.md
+          # .nojekyll so Pages serves _framework/ (leading underscore) and skips the Jekyll build.
+          touch _site/.nojekyll
+          # The web app under /app/.
+          cp -r "$BUNDLE/." _site/app/
+          echo "Assembled site:"; find _site -maxdepth 2 -mindepth 1 | sort
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

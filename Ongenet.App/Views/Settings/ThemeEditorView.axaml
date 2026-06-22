@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:th="using:Ongenet.App.Theming"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="600"
+             x:Class="Ongenet.App.Views.Settings.ThemeEditorView"
+             x:DataType="vm:ThemeEditorViewModel">
+    <UserControl.Styles>
+        <Style Selector="Button.Action">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="Button.Action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, Auto, *" Margin="18">
+        <!-- Built-in flavour + variant -->
+        <StackPanel Grid.Row="0" Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="Preset" VerticalAlignment="Center" Width="60"
+                           Foreground="{StaticResource CatppuccinSubtext1}"/>
+                <ComboBox Width="220" ItemsSource="{Binding BuiltIns}"
+                          SelectedItem="{Binding SelectedBuiltIn, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="th:ThemeDefinition">
+                            <TextBlock Text="{Binding Name}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="Variant" VerticalAlignment="Center" Width="60"
+                           Foreground="{StaticResource CatppuccinSubtext1}"/>
+                <ToggleSwitch IsChecked="{Binding IsLight, Mode=TwoWay}" OnContent="Light" OffContent="Dark"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
+                <Button Content="Import JSON…" Classes="Action" Click="Import_Click"/>
+                <Button Content="Export JSON…" Classes="Action" Click="Export_Click"/>
+            </StackPanel>
+        </StackPanel>
+
+        <Border Grid.Row="1" Height="1" Background="{StaticResource CatppuccinSurface0}" Margin="0,12"/>
+
+        <!-- Per-token colour editor -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Tokens}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ThemeTokenRow">
+                        <Grid ColumnDefinitions="Auto, *, 110" Margin="0,3">
+                            <Border Grid.Column="0" Width="22" Height="22" CornerRadius="4"
+                                    Background="{Binding Swatch}"
+                                    BorderBrush="{StaticResource CatppuccinSurface2}" BorderThickness="1"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Token}" VerticalAlignment="Center"
+                                       Margin="10,0" Foreground="{StaticResource CatppuccinText}"/>
+                            <TextBox Grid.Column="2" Text="{Binding Hex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     FontFamily="Consolas, Menlo, DejaVu Sans Mono, Monospace" FontSize="12"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

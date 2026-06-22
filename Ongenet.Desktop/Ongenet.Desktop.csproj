@@ -1,4 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Desktop application head. Thin: it brings the native stack (Avalonia.Desktop platform backends,
+        Ongenet.Audio, Ongenet.Clap, Ongenet.Lv2) and plugs it into the shared Ongenet.App UI library via
+        DesktopPlatform. The runnable artifact stays named "Ongenet" for users.
+    -->
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
@@ -6,6 +11,8 @@
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+        <AssemblyName>Ongenet</AssemblyName>
+        <RootNamespace>Ongenet.Desktop</RootNamespace>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
@@ -15,14 +22,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <AvaloniaResource Include="Assets\**" />
-    </ItemGroup>
-
-    <ItemGroup>
         <PackageReference Include="Avalonia" Version="12.0.4" />
         <PackageReference Include="Avalonia.Desktop" Version="12.0.4" />
-        <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
         <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
         <PackageReference Include="Avalonia.Diagnostics" Version="11.3.17">
@@ -31,10 +32,10 @@
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
-        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Ongenet.App\Ongenet.App.csproj" />
         <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
         <ProjectReference Include="..\Ongenet.Audio\Ongenet.Audio.csproj" />
         <ProjectReference Include="..\Ongenet.Clap\Ongenet.Clap.csproj" />

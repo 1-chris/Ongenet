@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:views="using:Ongenet.App.Views.Panels"
+             xmlns:controls="using:Ongenet.App.Controls"
+             mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
+             x:Class="Ongenet.Web.Views.MainView"
+             x:DataType="vm:MainViewModel"
+             Focusable="True">
+
+    <UserControl.Styles>
+        <!-- Compact tab headers, matching the desktop main window. -->
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        </Style>
+        <Style Selector="TabItem:selected">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="{StaticResource CatppuccinBase}">
+        <Grid RowDefinitions="Auto,Auto,*,4,300">
+
+            <!-- Header strip (no OS window chrome in the browser) -->
+            <Grid Grid.Row="0" Classes="TitleBar" ColumnDefinitions="Auto,*,Auto" Height="32"
+                  Background="{StaticResource CatppuccinMantle}">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                            Margin="12,0" Spacing="10">
+                    <TextBlock Text="Ongenet" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{StaticResource CatppuccinMauve}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Version}" FontSize="10"
+                               Foreground="{StaticResource CatppuccinOverlay1}" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource CatppuccinSurface0}" CornerRadius="3" Padding="6,1">
+                        <TextBlock Text="web demo" FontSize="10"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    </Border>
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="11" Margin="12,0"
+                           Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- Transport bar -->
+            <views:TransportView Grid.Row="1" DataContext="{Binding Transport}"/>
+
+            <!-- Workspace: track inspector | timeline | library -->
+            <Grid Grid.Row="2" ColumnDefinitions="240,4,*,4,300">
+                <views:TrackInspectorView Grid.Column="0" MinWidth="180"
+                                          DataContext="{Binding TrackInspector}"
+                                          Background="{StaticResource CatppuccinMantle}"/>
+                <GridSplitter Grid.Column="1" ResizeDirection="Columns"
+                              Background="{StaticResource CatppuccinCrust}"/>
+
+                <views:TimelineView Grid.Column="2" DataContext="{Binding Timeline}"/>
+
+                <GridSplitter Grid.Column="3" ResizeDirection="Columns"
+                              Background="{StaticResource CatppuccinCrust}"/>
+
+                <!-- Library: instruments + effects come from the in-process registries (work in the browser);
+                     samples/soundfonts/presets tabs are empty here (no filesystem). -->
+                <DockPanel Grid.Column="4" Background="{StaticResource CatppuccinMantle}" MinWidth="220">
+                    <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
+                    <TabControl Background="{StaticResource CatppuccinMantle}">
+                        <TabItem Header="Instruments">
+                            <views:LibraryListView DataContext="{Binding InstrumentLibrary}"/>
+                        </TabItem>
+                        <TabItem Header="Effects">
+                            <views:LibraryListView DataContext="{Binding EffectsLibrary}"/>
+                        </TabItem>
+                        <TabItem Header="Everything">
+                            <views:LibraryListView DataContext="{Binding Everything}"/>
+                        </TabItem>
+                        <TabItem Header="Files">
+                            <views:FileBrowserView DataContext="{Binding FileBrowser}"/>
+                        </TabItem>
+                    </TabControl>
+                </DockPanel>
+            </Grid>
+
+            <GridSplitter Grid.Row="3" Grid.ColumnSpan="5" ResizeDirection="Rows"
+                          HorizontalAlignment="Stretch" Background="{StaticResource CatppuccinCrust}"/>
+
+            <!-- Bottom panel: Instrument / Piano Roll / Effects -->
+            <TabControl Grid.Row="4" MinHeight="0" DataContext="{Binding BottomPanel}"
+                        SelectedIndex="{Binding SelectedTabIndex}"
+                        Background="{StaticResource CatppuccinMantle}">
+                <TabItem Header="{Binding FirstTabHeader}" IsVisible="{Binding ShowFirstTab}">
+                    <Panel>
+                        <ContentControl IsVisible="{Binding IsInstrumentMode}">
+                            <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
+                        </ContentControl>
+                        <ContentControl IsVisible="{Binding IsSampleSelected}">
+                            <views:SampleInspectorView DataContext="{Binding Sample}"/>
+                        </ContentControl>
+                    </Panel>
+                </TabItem>
+                <TabItem Header="Piano Roll" IsVisible="{Binding ShowPianoRollTab}">
+                    <views:PianoRollView DataContext="{Binding PianoRoll}"/>
+                </TabItem>
+                <TabItem Header="Effects">
+                    <views:EffectsView DataContext="{Binding Effects}"/>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Border>
+</UserControl>

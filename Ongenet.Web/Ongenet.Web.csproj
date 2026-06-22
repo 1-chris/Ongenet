@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Browser (WebAssembly) application head. Single-view Avalonia app that reuses the shared
+        Ongenet.App UI library and the portable Ongenet.Core engine, plugging in a Web Audio backend
+        and browser-safe service stubs through WebPlatform. Deployed as static assets to GitHub Pages
+        (onge.net/app/). No native audio/plugin projects are referenced — they cannot run in the browser.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0-browser</TargetFramework>
+        <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+        <OutputType>Exe</OutputType>
+        <Nullable>enable</Nullable>
+        <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <WasmMainJSPath>wwwroot/main.js</WasmMainJSPath>
+        <!-- Demo build: keep it simple and robust. Trimming is hostile to reflection-based bindings
+             (this app uses them), so leave it off for the demo. -->
+        <PublishTrimmed>false</PublishTrimmed>
+        <InvariantGlobalization>true</InvariantGlobalization>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="12.0.4" />
+        <PackageReference Include="Avalonia.Browser" Version="12.0.4" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
+        <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+    </ItemGroup>
+
+    <!-- Deploy the page + WebAudio glue into the AppBundle root alongside main.js. -->
+    <ItemGroup>
+        <WasmExtraFilesToDeploy Include="wwwroot/index.html" />
+        <WasmExtraFilesToDeploy Include="wwwroot/ongen-audio.js" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Ongenet.App\Ongenet.App.csproj" />
+        <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+    </ItemGroup>
+</Project>

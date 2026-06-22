@@ -1,0 +1,173 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:logging="using:Ongenet.Core.Models.Logging"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+        x:Class="Ongenet.App.Views.Windows.LogWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Debug Logs"
+        TransparencyLevelHint="Blur, AcrylicBlur, Transparent"
+        Background="Transparent"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True">
+    <Window.Styles>
+        <Style Selector="ListBox">
+            <Setter Property="Background" Value="{StaticResource CatppuccinBase}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinCrust}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="5"/>
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="2,1"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+        <Style Selector="ListBox TextBlock">
+             <Setter Property="FontFamily" Value="Consolas, Menlo, DejaVu Sans Mono, Monospace, avares://Ongenet.App/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji, Noto Color Emoji, Noto Emoji, Twitter Color Emoji, EmojiOne Color, JoyPixels, Symbola, Segoe UI Emoji, Apple Color Emoji, Courier New" />
+        </Style>
+        <Style Selector="Button.Action">
+            <Setter Property="Background" Value="{StaticResource CatppuccinBase}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="FontSize" Value="{DynamicResource FontSize12}"/>
+        </Style>
+        <Style Selector="Button.Action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="{DynamicResource FontSize12}"/>
+            <Setter Property="Padding" Value="15,8"/>
+        </Style>
+        <!-- Log level color styles -->
+        <Style Selector="TextBlock.LogTrace">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinOverlay1}"/>
+        </Style>
+        <Style Selector="TextBlock.LogDebug">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinOverlay2}"/>
+        </Style>
+        <Style Selector="TextBlock.LogInfo">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinPink}"/>
+        </Style>
+        <Style Selector="TextBlock.LogWarning">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinYellow}"/>
+        </Style>
+        <Style Selector="TextBlock.LogError">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinRed}"/>
+        </Style>
+        <Style Selector="TextBlock.LogCritical">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinRed}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+    </Window.Styles>
+
+    <Panel>
+    <Border Name="RootBorder" Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+    <Panel>
+        <Grid RowDefinitions="Auto, *">
+            <!-- Custom Title Bar -->
+            <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto" PointerPressed="TitleBar_PointerPressed">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- macOS "traffic light" close button (left); hidden off-Mac (toggled in ChromedWindow). -->
+                    <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
+                                VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
+                        <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
+                                Click="CloseButton_Click" ToolTip.Tip="Close">
+                            <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                                  VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Text="Debug Logs" Margin="10,0" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
+                </StackPanel>
+                <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
+                    <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
+                        <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1" RowDefinitions="Auto, *, Auto" Margin="15">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+            <Viewbox Width="20" Height="20">
+                <Path Data="M3,5H21V7H3M3,11H21V13H3M3,17H21V19H3" Fill="{StaticResource CatppuccinMauve}"/>
+            </Viewbox>
+            <TextBlock Text="DEBUG LOGS" FontSize="{DynamicResource FontSize14}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinText}"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="1" Name="LogTabs" SelectionChanged="LogTabs_SelectionChanged">
+            <TabItem Header="All">
+                <ListBox ItemsSource="{Binding LogEntries}" Name="LogListBoxAll"
+                         FontSize="{DynamicResource FontSize11}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding FormattedMessage}" TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+            <TabItem Header="Debug">
+                <ListBox Name="LogListBoxDebug"
+                         FontSize="{DynamicResource FontSize11}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="logging:LogEntry">
+                            <TextBlock Text="{Binding FormattedMessage}" TextWrapping="Wrap" Classes="LogDebug"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+            <TabItem Header="Info">
+                <ListBox Name="LogListBoxInfo"
+                         FontSize="{DynamicResource FontSize11}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="logging:LogEntry">
+                            <TextBlock Text="{Binding FormattedMessage}" TextWrapping="Wrap" Classes="LogInfo"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+            <TabItem Header="Warning">
+                <ListBox Name="LogListBoxWarning"
+                         FontSize="{DynamicResource FontSize11}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="logging:LogEntry">
+                            <TextBlock Text="{Binding FormattedMessage}" TextWrapping="Wrap" Classes="LogWarning"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+            <TabItem Header="Error">
+                <ListBox Name="LogListBoxError"
+                         FontSize="{DynamicResource FontSize11}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="logging:LogEntry">
+                            <TextBlock Text="{Binding FormattedMessage}" TextWrapping="Wrap" Classes="LogError"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0" Spacing="10">
+            <Button Content="Copy to Clipboard" Classes="Action" Click="CopyLogs_Click"/>
+            <Button Content="Clear Logs" Classes="Action" Click="ClearLogs_Click"/>
+        </StackPanel>
+    </Grid>
+        </Grid>
+    </Panel>
+    </Border>
+
+    <!-- Resize Handles -->
+    <Grid IsHitTestVisible="True">
+        <Border Width="4" HorizontalAlignment="Left" Cursor="LeftSide" PointerPressed="OnResizeHandlePressed" Tag="Left" Background="Transparent"/>
+        <Border Width="4" HorizontalAlignment="Right" Cursor="RightSide" PointerPressed="OnResizeHandlePressed" Tag="Right" Background="Transparent"/>
+        <Border Height="4" VerticalAlignment="Top" Cursor="TopSide" PointerPressed="OnResizeHandlePressed" Tag="Top" Background="Transparent"/>
+        <Border Height="4" VerticalAlignment="Bottom" Cursor="BottomSide" PointerPressed="OnResizeHandlePressed" Tag="Bottom" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="TopLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="TopLeft" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="TopRightCorner" PointerPressed="OnResizeHandlePressed" Tag="TopRight" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="BottomLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomLeft" Background="Transparent"/>
+        <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="BottomRightCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomRight" Background="Transparent"/>
+    </Grid>
+    </Panel>
+</Window>

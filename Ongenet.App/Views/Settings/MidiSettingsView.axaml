@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:midi="using:Ongenet.Core.Audio.Midi"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="560"
+             x:Class="Ongenet.App.Views.Settings.MidiSettingsView"
+             x:DataType="vm:MidiSettingsViewModel">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.Section">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+        <Style Selector="Button.Small">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="18" Spacing="10">
+
+            <!-- Input device -->
+            <TextBlock Classes="Section" Text="MIDI input" Margin="0"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ComboBox Width="280" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}"
+                          ToolTip.Tip="MIDI input device">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="midi:MidiDeviceInfo">
+                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Classes="Small" Content="Refresh" Click="RefreshDevices_Click"/>
+            </StackPanel>
+            <TextBlock Text="{Binding BackendNote}" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="Activity:" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Text="{Binding Activity}" FontSize="11"
+                           FontFamily="Consolas, Menlo, DejaVu Sans Mono, Monospace"
+                           Foreground="{StaticResource CatppuccinGreen}"/>
+            </StackPanel>
+
+            <!-- Recording -->
+            <TextBlock Classes="Section" Text="Recording"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Input quantize" VerticalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinSubtext1}"/>
+                <ComboBox Width="140" ItemsSource="{Binding QuantizeOptions}" SelectedItem="{Binding SelectedQuantize}"
+                          ToolTip.Tip="Snap recorded note starts to this grid">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:QuantizeOption">
+                            <TextBlock Text="{Binding Label}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Transport control mapping -->
+            <TextBlock Classes="Section" Text="Transport control"/>
+            <ItemsControl ItemsSource="{Binding TransportRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TransportMapRow">
+                        <Grid ColumnDefinitions="120,70,Auto,Auto" Margin="0,3" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0" Text="{Binding ActionName}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinText}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Binding}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <Button Grid.Column="2" Classes="Small" Content="{Binding LearnText}" Click="LearnTransport_Click"/>
+                            <Button Grid.Column="3" Classes="Small" Content="Clear" Click="ClearTransport_Click"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- CC → parameter mappings -->
+            <TextBlock Classes="Section" Text="Parameter mappings"/>
+            <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource CatppuccinOverlay1}"
+                       Text="Right-click any knob or parameter and choose “MIDI learn”, then move a control on your device to bind it. Mappings are saved with the project."/>
+            <ItemsControl ItemsSource="{Binding Mappings}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MidiMappingRow">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,3" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" Foreground="{StaticResource CatppuccinText}"/>
+                            <Button Grid.Column="1" Classes="Small" Content="Remove" Click="RemoveMapping_Click"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

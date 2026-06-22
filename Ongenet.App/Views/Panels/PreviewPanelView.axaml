@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:controls="using:Ongenet.App.Controls"
+             mc:Ignorable="d" d:DesignWidth="260" d:DesignHeight="150"
+             x:Class="Ongenet.App.Views.Panels.PreviewPanelView"
+             x:DataType="vm:AudioPreviewViewModel">
+
+    <UserControl.Styles>
+        <!-- Mirror the main transport buttons (square, surface background, hover highlight). -->
+        <Style Selector="Button.Transport">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        </Style>
+        <Style Selector="Button.Transport:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="{StaticResource CatppuccinMantle}"
+            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="0,1,0,0"
+            Padding="8,6" IsVisible="{Binding HasSelection}">
+        <DockPanel LastChildFill="True">
+            <TextBlock DockPanel.Dock="Top" Text="{Binding FileName}" FontSize="11" FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis" Foreground="{StaticResource CatppuccinSubtext0}"/>
+
+            <!-- Transport + stats row -->
+            <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,6,0,0">
+                <Button Grid.Column="0" Click="OnPlay" Classes="Transport" Margin="0,0,4,0" ToolTip.Tip="Play">
+                    <Path Width="12" Height="12" Stretch="Uniform" Data="M0,0 L10,5 L0,10 Z"
+                          Fill="{StaticResource CatppuccinGreen}"/>
+                </Button>
+                <Button Grid.Column="1" Click="OnStop" Classes="Transport" IsEnabled="{Binding IsPlaying}"
+                        ToolTip.Tip="Stop">
+                    <Path Width="11" Height="11" Stretch="Uniform" Data="M0,0 L10,0 L10,10 L0,10 Z"
+                          Fill="{StaticResource CatppuccinRed}"/>
+                </Button>
+                <CheckBox Grid.Column="3" Content="Auto" FontSize="11" VerticalAlignment="Center"
+                          IsChecked="{Binding AutoPlay, Mode=TwoWay}" ToolTip.Tip="Auto-play on select"/>
+            </Grid>
+
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+                <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}">
+                    <Run Text="BPM " Foreground="{StaticResource CatppuccinOverlay1}"/><Run Text="{Binding Bpm}"/>
+                </TextBlock>
+                <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}">
+                    <Run Text="Len " Foreground="{StaticResource CatppuccinOverlay1}"/><Run Text="{Binding Length}"/>
+                </TextBlock>
+                <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}">
+                    <Run Text="Key " Foreground="{StaticResource CatppuccinOverlay1}"/><Run Text="{Binding Key}"/>
+                </TextBlock>
+            </StackPanel>
+
+            <Border Height="56" CornerRadius="3" ClipToBounds="True" Margin="0,6,0,0"
+                    Background="{StaticResource CatppuccinCrust}">
+                <controls:WaveformControl Waveform="{Binding Waveform}" Revision="{Binding WaveRevision}"
+                                          Fill="{StaticResource CatppuccinMauve}"/>
+            </Border>
+        </DockPanel>
+    </Border>
+</UserControl>

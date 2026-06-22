@@ -91,13 +91,13 @@ for rid in $RIDS; do
         SUMMARY="$SUMMARY\n  $rid : *** NO PortAudio ***"
     fi
 
-    # Linux: the apphost is named 'Ongenet.Desktop', which many desktop environments mistake for a
-    # .desktop launcher. Rename it to a clear executable name (the managed dll name is embedded in the
-    # apphost, so this rename is safe).
+    # Linux: the apphost is named 'Ongenet', which some desktop environments mistake for a .desktop
+    # launcher. Rename it to a clear executable name (the managed dll name is embedded in the apphost,
+    # so this rename is safe).
     case "$rid" in linux-*)
-        if [ -f "$out/Ongenet.Desktop" ]; then
-            mv -f "$out/Ongenet.Desktop" "$out/Ongenet.bin"
-            echo "  renamed Ongenet.Desktop -> Ongenet.bin"
+        if [ -f "$out/Ongenet" ]; then
+            mv -f "$out/Ongenet" "$out/Ongenet.bin"
+            echo "  renamed Ongenet -> Ongenet.bin"
         fi ;;
     esac
 
@@ -124,5 +124,5 @@ echo "PortAudio bundling summary:"
 printf "%b\n" "$SUMMARY"
 echo "Run targets inside each package:"
 echo "  Linux:   ./Ongenet.bin"
-echo "  Windows: Ongenet.Desktop.exe"
-echo "  macOS:   ./Ongenet.Desktop"
+echo "  Windows: Ongenet.exe"
+echo "  macOS:   ./Ongenet"

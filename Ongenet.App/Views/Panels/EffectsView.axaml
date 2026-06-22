@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:panels="using:Ongenet.App.Views.Panels"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="200"
+             x:Class="Ongenet.App.Views.Panels.EffectsView"
+             x:DataType="vm:EffectsViewModel">
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+        <Grid>
+            <TextBlock Text="Select a track to add effects." IsVisible="{Binding !HasTrack}"
+                       Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
+
+            <DockPanel IsVisible="{Binding HasTrack}">
+                <TextBlock DockPanel.Dock="Top" Text="{Binding TrackName, StringFormat='{}{0} — effects on the whole rack (post)'}"
+                           Margin="0,0,0,8" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ScrollViewer>
+                    <panels:EffectChainView DataContext="{Binding Chain}"/>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </Border>
+</UserControl>

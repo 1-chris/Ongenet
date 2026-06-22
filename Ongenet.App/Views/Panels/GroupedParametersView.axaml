@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:panels="using:Ongenet.App.Views.Panels"
+             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="200"
+             x:Class="Ongenet.App.Views.Panels.GroupedParametersView">
+    <!-- DataContext is an IEnumerable<ParameterGroupViewModel>. Each group is a faint fieldset whose
+         title sits on its top edge (a label with the panel-colour background masking the border line).
+         Groups flow left-to-right and wrap; the host ScrollViewer handles vertical overflow. -->
+    <ItemsControl ItemsSource="{Binding}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ParameterGroupViewModel">
+                <Grid Margin="0,0,12,12" MaxWidth="260">
+                    <!-- Bordered box (top inset leaves room for the title to straddle the line) -->
+                    <Border Margin="0,7,0,0" CornerRadius="6" Padding="8,12,8,6"
+                            BorderThickness="1"
+                            BorderBrush="{StaticResource CatppuccinSurface1}">
+                        <panels:ParametersView DataContext="{Binding Parameters}"/>
+                    </Border>
+
+                    <!-- Title sitting on the top edge -->
+                    <Border HorizontalAlignment="Center" VerticalAlignment="Top" Padding="6,0"
+                            Background="{StaticResource CatppuccinMantle}"
+                            IsVisible="{Binding HasTitle}">
+                        <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    </Border>
+                </Grid>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

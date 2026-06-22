@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:lib="using:Ongenet.App.ViewModels.Library"
+             mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="600"
+             x:Class="Ongenet.App.Views.Panels.LibraryListView"
+             x:DataType="lib:LibraryListViewModel">
+
+    <Border Background="{StaticResource CatppuccinMantle}">
+        <DockPanel>
+            <!-- Instant search box (filters the tree below as you type). -->
+            <TextBox DockPanel.Dock="Top" Text="{Binding SearchText, Mode=TwoWay}"
+                     Watermark="Search…" FontSize="12" Margin="6,6,6,2" Padding="6,4"
+                     MinHeight="0"
+                     Background="{StaticResource CatppuccinSurface0}"
+                     BorderBrush="{StaticResource CatppuccinSurface1}"/>
+
+            <Panel>
+                <TextBlock Text="{Binding EmptyHint}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
+                           Margin="12" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+                <TreeView Name="NodeTree" ItemsSource="{Binding Roots}" Background="Transparent"
+                          Margin="2,2,2,4"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <TreeView.Styles>
+                        <!-- Bind expansion back to the node so search can force-expand; tighten row spacing. -->
+                        <Style Selector="TreeViewItem" x:DataType="lib:LibraryNode">
+                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                            <Setter Property="MinHeight" Value="0"/>
+                            <Setter Property="Padding" Value="2,0"/>
+                        </Style>
+                    </TreeView.Styles>
+                    <TreeView.ItemTemplate>
+                        <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="lib:LibraryNode">
+                            <Panel>
+                                <!-- Folder row: a bold group header. -->
+                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,2"
+                                            IsVisible="{Binding IsFolder}">
+                                    <StackPanel.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Expand recursively" Click="OnExpandRecursive"/>
+                                            <MenuItem Header="Collapse recursively" Click="OnCollapseRecursive"/>
+                                        </ContextMenu>
+                                    </StackPanel.ContextMenu>
+                                    <TextBlock Text="{Binding Icon}" IsVisible="{Binding HasIcon}"
+                                               FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="Bold"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                </StackPanel>
+
+                                <!-- Leaf row: a draggable item card. -->
+                                <Border Margin="0,2" Padding="8,5" CornerRadius="4"
+                                        IsVisible="{Binding !IsFolder}"
+                                        Background="{StaticResource CatppuccinSurface0}"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Icon}" IsVisible="{Binding HasIcon}"
+                                                   VerticalAlignment="Center"/>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Subtitle}" FontSize="10"
+                                                       IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Panel>
+                        </TreeDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </Panel>
+        </DockPanel>
+    </Border>
+</UserControl>
