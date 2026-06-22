@@ -122,7 +122,7 @@ public sealed class PortAudioDeviceService : IAudioDeviceService, IDisposable
             var device = new AudioDevice(
                 i, name, HostApiName(info.hostApi),
                 info.maxInputChannels, info.maxOutputChannels,
-                i == defIn, i == defOut);
+                i == defIn, i == defOut, Id: $"pa:{i}");
 
             if (device.SupportsInput) inputs.Add(device);
             if (device.SupportsOutput) outputs.Add(device);

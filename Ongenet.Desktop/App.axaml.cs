@@ -51,11 +51,22 @@ namespace Ongenet.Desktop
             // Core services.
             services.AddOngenetCore();
 
-            // Audio device backend (PortAudio). The engine in Core depends only on the IAudioOutput /
-            // IAudioInput / IAudioDeviceService seams; the concrete devices live in Ongenet.Audio.
-            services.AddSingleton<IAudioDeviceService, PortAudioDeviceService>();
-            services.AddSingleton<IAudioOutput, PortAudioOutput>();
-            services.AddSingleton<IAudioInput, PortAudioInput>();
+            // Audio backends. The engine in Core depends only on the IAudioOutput / IAudioInput /
+            // IAudioDeviceService seams; concrete backends live in Ongenet.Audio. AudioBackendManager
+            // holds every backend and presents the active one through those three seams, so the backend
+            // can be swapped live (PortAudio ⇄ native) without touching the engine, recording or DSP.
+            services.AddSingleton<IAudioBackend, PortAudioBackend>();
+            if (OperatingSystem.IsLinux())
+                services.AddSingleton<IAudioBackend, Ongenet.Audio.Native.LinuxNativeBackend>();
+            else if (OperatingSystem.IsMacOS())
+                services.AddSingleton<IAudioBackend, Ongenet.Audio.Native.Mac.MacNativeBackend>();
+            else if (OperatingSystem.IsWindows())
+                services.AddSingleton<IAudioBackend, Ongenet.Audio.Native.Win.WinNativeBackend>();
+            services.AddSingleton<AudioBackendManager>();
+            services.AddSingleton<IAudioBackendManager>(sp => sp.GetRequiredService<AudioBackendManager>());
+            services.AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<AudioBackendManager>());
+            services.AddSingleton<IAudioInput>(sp => sp.GetRequiredService<AudioBackendManager>());
+            services.AddSingleton<IAudioDeviceService>(sp => sp.GetRequiredService<AudioBackendManager>());
 
             // UI-thread marshalling seam (lets Core services hand UI notifications back safely) and
             // external MIDI controller input (routes to the live-preview path on the selected track).

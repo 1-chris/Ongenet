@@ -21,17 +21,19 @@ public sealed class AppSettingsService : IAppSettingsService
 
     private readonly IThemeService _theme;
     private readonly IAudioDeviceService _audio;
+    private readonly IAudioBackendManager _audioBackend;
     private readonly IMidiInputService _midi;
     private readonly IRecordingService _recording;
     private readonly ITransportMapService _transport;
 
     private bool _suppress;
 
-    public AppSettingsService(IThemeService theme, IAudioDeviceService audio, IMidiInputService midi,
-        IRecordingService recording, ITransportMapService transport)
+    public AppSettingsService(IThemeService theme, IAudioDeviceService audio, IAudioBackendManager audioBackend,
+        IMidiInputService midi, IRecordingService recording, ITransportMapService transport)
     {
         _theme = theme;
         _audio = audio;
+        _audioBackend = audioBackend;
         _midi = midi;
         _recording = recording;
         _transport = transport;
@@ -41,6 +43,8 @@ public sealed class AppSettingsService : IAppSettingsService
 
         _audio.OutputChanged += CaptureAndSave;
         _audio.InputChanged += CaptureAndSave;
+        // Switching backend swaps the device list, so re-apply the saved device selection on the new one.
+        _audioBackend.BackendChanged += OnBackendChanged;
         _theme.ThemeChanged += CaptureAndSave;
         _midi.SelectedDeviceChanged += CaptureAndSave;
         _transport.MappingsChanged += CaptureAndSave;
@@ -56,6 +60,9 @@ public sealed class AppSettingsService : IAppSettingsService
         try
         {
             ApplyTheme();
+            // Select the backend first so the device list ApplyAudio matches against is the right one.
+            // Empty = unset → leave the manager's OS-aware default (Native on Linux/macOS) in place.
+            if (!string.IsNullOrEmpty(Current.AudioBackend)) _audioBackend.Switch(Current.AudioBackend);
             ApplyAudio();
             ApplyMidi();
             _recording.InputQuantizeBeats = Current.InputQuantizeBeats;
@@ -71,6 +78,7 @@ public sealed class AppSettingsService : IAppSettingsService
     {
         if (_suppress) return;
 
+        Current.AudioBackend = _audioBackend.ActiveId;
         Current.AudioOutputDevice = _audio.SelectedOutput?.Name;
         Current.AudioInputDevice = _audio.SelectedInput?.Name;
         Current.InputChannelMode = _audio.InputChannelMode.ToString();
@@ -87,6 +95,18 @@ public sealed class AppSettingsService : IAppSettingsService
         }).ToList();
 
         Save();
+    }
+
+    // A runtime backend switch (from the settings toggle) lands here: re-point the device selection to
+    // the saved device on the new backend's list, then persist the new backend id. Skipped during the
+    // startup apply pass (ApplyToServices sequences the switch + ApplyAudio itself).
+    private void OnBackendChanged()
+    {
+        if (_suppress) return;
+        _suppress = true;
+        try { ApplyAudio(); }
+        finally { _suppress = false; }
+        CaptureAndSave();
     }
 
     private void ApplyTheme()
