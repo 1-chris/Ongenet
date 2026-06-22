@@ -114,6 +114,60 @@ namespace Ongenet.Desktop.ViewModels.Timeline
             set => SetField(ref _isSelected, value);
         }
 
+        private double _fadeInBeats;
+        private double _fadeOutBeats;
+        private int _fadeRevision;
+        private AudioWaveform? _fadeInWaveform;
+        private AudioWaveform? _fadeOutWaveform;
+
+        /// <summary>Crossfade-in length in beats (set by the timeline from clip overlaps). 0 = no fade-in.</summary>
+        public double FadeInBeats => _fadeInBeats;
+
+        /// <summary>Crossfade-out length in beats (set by the timeline from clip overlaps). 0 = no fade-out.</summary>
+        public double FadeOutBeats => _fadeOutBeats;
+
+        /// <summary>Crossfade-in width in pixels, for the fade visual.</summary>
+        public double FadeInWidth => _metrics.BeatsToPixels(_fadeInBeats);
+
+        /// <summary>Crossfade-out width in pixels, for the fade visual.</summary>
+        public double FadeOutWidth => _metrics.BeatsToPixels(_fadeOutBeats);
+
+        /// <summary>Crossfaded waveform for the fade-in (left) overlap region, or null.</summary>
+        public AudioWaveform? FadeInWaveform => _fadeInWaveform;
+
+        /// <summary>Crossfaded waveform for the fade-out (right) overlap region, or null.</summary>
+        public AudioWaveform? FadeOutWaveform => _fadeOutWaveform;
+
+        /// <summary>Bumped whenever the fade lengths or crossfaded waveforms change, to repaint the fade visual.</summary>
+        public int FadeRevision => _fadeRevision;
+
+        /// <summary>Sets the crossfaded overlap waveforms (left/right) and repaints the fade visual.</summary>
+        public void SetFadeWaveforms(AudioWaveform? fadeIn, AudioWaveform? fadeOut)
+        {
+            if (ReferenceEquals(fadeIn, _fadeInWaveform) && ReferenceEquals(fadeOut, _fadeOutWaveform)) return;
+            _fadeInWaveform = fadeIn;
+            _fadeOutWaveform = fadeOut;
+            OnPropertyChanged(nameof(FadeInWaveform));
+            OnPropertyChanged(nameof(FadeOutWaveform));
+            _fadeRevision++;
+            OnPropertyChanged(nameof(FadeRevision));
+        }
+
+        /// <summary>Sets the clip's crossfade lengths (in beats) and refreshes the fade visual if they changed.</summary>
+        public void SetFades(double fadeInBeats, double fadeOutBeats)
+        {
+            if (System.Math.Abs(fadeInBeats - _fadeInBeats) < 1e-9 &&
+                System.Math.Abs(fadeOutBeats - _fadeOutBeats) < 1e-9) return;
+            _fadeInBeats = fadeInBeats;
+            _fadeOutBeats = fadeOutBeats;
+            OnPropertyChanged(nameof(FadeInBeats));
+            OnPropertyChanged(nameof(FadeOutBeats));
+            OnPropertyChanged(nameof(FadeInWidth));
+            OnPropertyChanged(nameof(FadeOutWidth));
+            _fadeRevision++;
+            OnPropertyChanged(nameof(FadeRevision));
+        }
+
         /// <summary>Re-reads name/start/length/waveform after the model changes (edit or decode).</summary>
         public void RefreshFromModel()
         {
@@ -137,6 +191,8 @@ namespace Ongenet.Desktop.ViewModels.Timeline
             {
                 OnPropertyChanged(nameof(Left));
                 OnPropertyChanged(nameof(Width));
+                OnPropertyChanged(nameof(FadeInWidth));
+                OnPropertyChanged(nameof(FadeOutWidth));
             }
         }
     }

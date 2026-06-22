@@ -80,6 +80,18 @@ namespace Ongenet.Desktop.ViewModels
             }
         }
 
+        /// <summary>Whether this stretched clip preserves pitch (time-stretch) instead of resampling.</summary>
+        public bool PitchCorrected
+        {
+            get => Clip?.PitchCorrected ?? false;
+            set
+            {
+                if (Clip is not { } clip) return;
+                clip.PitchCorrected = value;
+                Publish(clip); // engine rebuilds the clip's pitch shifters on the next play
+            }
+        }
+
         /// <summary>Whether the BPM / length readouts apply (only when a natural tempo is known).</summary>
         public bool HasTempo => Clip is { SourceTempo: > 0 };
 
@@ -145,6 +157,7 @@ namespace Ongenet.Desktop.ViewModels
             OnPropertyChanged(nameof(SampleName));
             OnPropertyChanged(nameof(NaturalBpm));
             OnPropertyChanged(nameof(StretchEnabled));
+            OnPropertyChanged(nameof(PitchCorrected));
             OnPropertyChanged(nameof(HasTempo));
             OnPropertyChanged(nameof(StretchInfo));
             OnPropertyChanged(nameof(LengthInfo));

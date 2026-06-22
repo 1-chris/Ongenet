@@ -53,6 +53,12 @@ public sealed class Clip
     public bool StretchToTempo { get; set; }
 
     /// <summary>
+    /// When true (and <see cref="StretchToTempo"/> is on) the engine preserves the sample's pitch while
+    /// time-stretching it to the grid, instead of the default resample that lets pitch track tempo.
+    /// </summary>
+    public bool PitchCorrected { get; set; }
+
+    /// <summary>
     /// True when this clip is audio (a loaded file or a recorded take) rather than MIDI. Set
     /// explicitly so a recorded, in-memory clip with no <see cref="AudioFilePath"/> still counts as audio.
     /// </summary>

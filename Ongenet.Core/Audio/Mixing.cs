@@ -1,4 +1,5 @@
 using System;
+using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Files;
 
 namespace Ongenet.Core.Audio;
@@ -43,17 +44,29 @@ public static class Mixing
     /// it so a tempo-synced clip's whole sample spans its beat-length at the project tempo.
     /// <paramref name="sourceOffsetSeconds"/> shifts the read position into the buffer (non-zero for a
     /// sliced clip's right-hand piece, which starts partway through the source).
+    /// <paramref name="fadeInBeats"/>/<paramref name="fadeOutBeats"/> apply a per-clip crossfade gain
+    /// (independent of any track strip volume). When <paramref name="pitchShifters"/> is supplied (one
+    /// per channel) and the clip is stretched, the resampled stream is shifted by <c>1/stretch</c> so the
+    /// time-stretch preserves pitch; pass null for the plain (pitch-tracks-tempo) resample.
     /// </summary>
     public static void RenderAudioClip(Span<float> temp, AudioSampleBuffer samples,
         double clipStartBeat, double clipLengthBeats, double blockStartBeat,
         double samplesPerBeat, int deviceSampleRate, int channels, double stretch = 1.0,
-        double sourceOffsetSeconds = 0.0)
+        double sourceOffsetSeconds = 0.0, double fadeInBeats = 0.0, double fadeOutBeats = 0.0,
+        PitchShifter[]? pitchShifters = null)
     {
         if (stretch <= 0) stretch = 1.0;
         var ratio = (double)samples.SampleRate / deviceSampleRate * stretch;
         var frameCount = samples.FrameCount;
         var frames = temp.Length / channels;
         var offsetFrames = sourceOffsetSeconds * samples.SampleRate;
+
+        var usePitch = pitchShifters is not null && Math.Abs(stretch - 1.0) > 1e-6;
+        if (usePitch)
+        {
+            var pitchRatio = 1.0 / stretch; // undo only the stretch's pitch shift, not the SR conversion
+            foreach (var sh in pitchShifters!) sh.SetRatio(pitchRatio);
+        }
 
         for (var frame = 0; frame < frames; frame++)
         {
@@ -66,13 +79,16 @@ public static class Mixing
             if (f0 >= frameCount) break;
 
             var frac = (float)(filePos - f0);
+            var gain = Crossfade.Gain(localBeat, clipLengthBeats, fadeInBeats, fadeOutBeats);
             var baseIndex = frame * channels;
             for (var c = 0; c < channels; c++)
             {
                 var fileChannel = c < samples.Channels ? c : samples.Channels - 1;
                 var s0 = samples.Sample(f0, fileChannel);
                 var s1 = samples.Sample(f0 + 1, fileChannel);
-                temp[baseIndex + c] += s0 + (s1 - s0) * frac;
+                var sample = s0 + (s1 - s0) * frac;
+                if (usePitch) sample = pitchShifters![c].Process(sample);
+                temp[baseIndex + c] += sample * gain;
             }
         }
     }

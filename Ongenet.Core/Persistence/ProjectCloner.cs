@@ -109,6 +109,7 @@ public static class ProjectCloner
             Samples = s.Samples,   // immutable PCM — shared by reference (keeps snapshots cheap)
             SourceTempo = s.SourceTempo,
             StretchToTempo = s.StretchToTempo,
+            PitchCorrected = s.PitchCorrected,
             IsAudio = s.IsAudio,
             SourceOffsetSeconds = s.SourceOffsetSeconds,
             SourceLengthSeconds = s.SourceLengthSeconds

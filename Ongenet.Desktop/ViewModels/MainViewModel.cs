@@ -23,6 +23,7 @@ namespace Ongenet.Desktop.ViewModels
             BottomPanelViewModel bottomPanel,
             FileBrowserViewModel fileBrowser,
             AudioPreviewViewModel preview,
+            LibraryOptionsViewModel libraryOptions,
             Library.EverythingLibraryViewModel everything,
             Library.EffectsLibraryViewModel effectsLibrary,
             Library.SampleLibraryViewModel sampleLibrary,
@@ -41,6 +42,7 @@ namespace Ongenet.Desktop.ViewModels
             BottomPanel = bottomPanel;
             FileBrowser = fileBrowser;
             Preview = preview;
+            LibraryOptions = libraryOptions;
             Everything = everything;
             EffectsLibrary = effectsLibrary;
             SampleLibrary = sampleLibrary;
@@ -101,6 +103,9 @@ namespace Ongenet.Desktop.ViewModels
 
         /// <summary>Shared audio preview (waveform + stats + audition) docked under the library tabs.</summary>
         public AudioPreviewViewModel Preview { get; }
+
+        /// <summary>Sample-tab options (auto-stretch + pitch correction) docked under the library tabs.</summary>
+        public LibraryOptionsViewModel LibraryOptions { get; }
 
         /// <summary>Library tabs.</summary>
         public Library.EverythingLibraryViewModel Everything { get; }

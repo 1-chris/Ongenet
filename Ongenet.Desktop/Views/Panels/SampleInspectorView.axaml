@@ -38,6 +38,11 @@
                           Foreground="{StaticResource CatppuccinText}"
                           ToolTip.Tip="When on, the sample is time-stretched so it spans a whole number of beats at the project tempo."/>
 
+                <CheckBox IsChecked="{Binding PitchCorrected}" IsEnabled="{Binding StretchEnabled}" Margin="20,0,0,0"
+                          Content="Preserve pitch when stretching"
+                          Foreground="{StaticResource CatppuccinText}"
+                          ToolTip.Tip="Time-stretch without changing pitch (instead of resampling, which lets pitch track tempo)."/>
+
                 <!-- Read-outs -->
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" >
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Stretch" Margin="0,0,12,2"

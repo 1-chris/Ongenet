@@ -76,8 +76,8 @@ namespace Ongenet.Desktop.Views.Windows
         private bool _bottomCollapsed, _leftCollapsed, _rightCollapsed;
 
         // Named ColumnDefinition/RowDefinition don't generate code-behind fields, so reach them via the grid.
-        private RowDefinition BottomSplitterRow => CenterColumn.RowDefinitions[1];
-        private RowDefinition BottomRow => CenterColumn.RowDefinitions[2];
+        private RowDefinition BottomSplitterRow => WorkspaceGrid.RowDefinitions[1];
+        private RowDefinition BottomRow => WorkspaceGrid.RowDefinitions[2];
         private ColumnDefinition LeftCol => WorkspaceGrid.ColumnDefinitions[0];
         private ColumnDefinition LeftSplitterCol => WorkspaceGrid.ColumnDefinitions[1];
         private ColumnDefinition RightSplitterCol => WorkspaceGrid.ColumnDefinitions[3];

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
@@ -79,6 +80,7 @@ public sealed class OfflineRenderer
 
             if (track.Kind == TrackKind.Audio)
             {
+                var fades = Crossfade.Compute(track.Clips);
                 foreach (var clip in track.Clips)
                 {
                     if (clip.Samples is not { } samples) continue;
@@ -89,7 +91,16 @@ public sealed class OfflineRenderer
                     var stretch = clip.StretchToTempo
                         ? TempoSync.Stretch(sourceDur, bpm, clip.LengthBeats)
                         : 1.0;
-                    rt.AudioClips.Add((clip.StartBeat, clip.LengthBeats, samples, stretch, clip.SourceOffsetSeconds));
+                    var fade = fades.TryGetValue(clip, out var f) ? f : (FadeInBeats: 0.0, FadeOutBeats: 0.0);
+                    PitchShifter[]? shifters = null;
+                    if (clip is { PitchCorrected: true, StretchToTempo: true })
+                    {
+                        shifters = new PitchShifter[channels];
+                        for (var i = 0; i < channels; i++) { shifters[i] = new PitchShifter(); shifters[i].Configure(sampleRate); }
+                    }
+
+                    rt.AudioClips.Add((clip.StartBeat, clip.LengthBeats, samples, stretch, clip.SourceOffsetSeconds,
+                        fade.FadeInBeats, fade.FadeOutBeats, shifters));
                 }
             }
 
@@ -219,9 +230,10 @@ public sealed class OfflineRenderer
                 }
                 else
                 {
-                    foreach (var (start, length, samples, stretch, sourceOffset) in rt.AudioClips)
+                    foreach (var (start, length, samples, stretch, sourceOffset, fadeIn, fadeOut, shifters) in rt.AudioClips)
                     {
-                        Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat, sampleRate, channels, stretch, sourceOffset);
+                        Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat, sampleRate, channels,
+                            stretch, sourceOffset, fadeIn, fadeOut, shifters);
                         hasContent = true;
                     }
                 }
@@ -296,7 +308,7 @@ public sealed class OfflineRenderer
         public Track Source { get; }
         public List<RenderSlot> Slots { get; } = new();
         public IAudioEffect[] Effects { get; set; } = Array.Empty<IAudioEffect>();
-        public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch, double SourceOffset)> AudioClips { get; } = new();
+        public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch, double SourceOffset, double FadeInBeats, double FadeOutBeats, Dsp.PitchShifter[]? PitchShifters)> AudioClips { get; } = new();
     }
 
     // A cloned instrument-rack slot for offline render: the instrument, its bypass flag, and its own

@@ -49,6 +49,8 @@ namespace Ongenet.Desktop.Views.Panels
         private double _zoomAnchorBeat;
         private double _zoomStartY;
         private Point _bandStart;
+        private bool _bandMoved;     // whether the rubber band actually dragged (vs. a plain empty-space click)
+        private int _bandPressRow;   // row under the press, used to select the track on a no-drag click
 
         public TimelineView()
         {
@@ -560,8 +562,8 @@ namespace Ongenet.Desktop.Views.Panels
 
             Focus(); // so the Delete key targets the selected clips
 
-            // Slice mode: click a clip to cut it in two at the grid-snapped pointer beat.
-            if (vm.IsSliceMode)
+            // Slice is armed by the Slice tool OR by holding CTRL: click a clip to cut it at the snapped beat.
+            if (vm.IsSliceMode || e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 var sliceHit = ResolveClip(e);
                 if (sliceHit is not null)
@@ -569,21 +571,11 @@ namespace Ongenet.Desktop.Views.Panels
                     var (_, sliceBeat) = LocatePoint(pos, vm);
                     vm.SliceClip(sliceHit.Value.Clip, vm.Metrics.Snap(sliceBeat));
                     e.Handled = true;
+                    return;
                 }
 
-                return;
-            }
-
-            // Select mode: click-drag draws a rubber band over the lanes.
-            if (vm.IsSelectMode)
-            {
-                _gesture = Gesture.Band;
-                _bandStart = pos;
-                BandSelect(pos, pos, vm);
-                ShowBand(pos, pos);
-                e.Pointer.Capture(LanesList);
-                e.Handled = true;
-                return;
+                // CTRL held over empty space: fall through to normal empty-space handling (rubber band).
+                if (vm.IsSliceMode) return;
             }
 
             var (rowIndex, beat) = LocatePoint(pos, vm);
@@ -595,24 +587,25 @@ namespace Ongenet.Desktop.Views.Panels
 
             if (hit is null)
             {
-                // Empty lane space: double-click on an instrument lane creates a clip; a single
-                // click clears any selected clip and selects the track (so blank-space clicks
-                // and track clicks deselect the clip and show the track's settings).
+                // Empty lane space: double-click on an instrument lane creates a clip. Otherwise arm a
+                // rubber-band drag — if the pointer doesn't move it's treated as a plain click that selects
+                // the track (deselecting any clip and showing the track's settings).
                 var trackLane = vm.TrackLaneAtRow(rowIndex);
-                if (trackLane is not null)
+                if (e.ClickCount == 2 && trackLane is { Model.Kind: Core.Models.Audio.TrackKind.Instrument })
                 {
-                    if (e.ClickCount == 2 && trackLane.Model.Kind == Core.Models.Audio.TrackKind.Instrument)
-                    {
-                        vm.CreateMidiClip(rowIndex, beat);
-                    }
-                    else
-                    {
-                        vm.SelectTrackAtRow(rowIndex);
-                    }
-
+                    vm.CreateMidiClip(rowIndex, beat);
                     e.Handled = true;
+                    return;
                 }
 
+                _gesture = Gesture.Band;
+                _bandStart = pos;
+                _bandMoved = false;
+                _bandPressRow = rowIndex;
+                BandSelect(pos, pos, vm); // clears any existing clip selection
+                ShowBand(pos, pos);
+                e.Pointer.Capture(LanesList);
+                e.Handled = true;
                 return;
             }
 
@@ -665,6 +658,8 @@ namespace Ongenet.Desktop.Views.Panels
 
             if (_gesture == Gesture.Band)
             {
+                if (System.Math.Abs(pos.X - _bandStart.X) > 3 || System.Math.Abs(pos.Y - _bandStart.Y) > 3)
+                    _bandMoved = true;
                 BandSelect(_bandStart, pos, vm);
                 ShowBand(_bandStart, pos);
                 e.Handled = true;
@@ -751,7 +746,12 @@ namespace Ongenet.Desktop.Views.Panels
                 }
             }
 
-            if (_gesture == Gesture.Band) Band.IsVisible = false;
+            if (_gesture == Gesture.Band)
+            {
+                Band.IsVisible = false;
+                // A press with no drag is a plain click on empty space: select that row's track.
+                if (!_bandMoved && DataContext is TimelineViewModel bvm) bvm.SelectTrackAtRow(_bandPressRow);
+            }
 
             _gesture = Gesture.None;
             _dragClip = null;

@@ -25,6 +25,12 @@ public sealed class AppSettings
 
     /// <summary>Whether selecting a file in the library/files browser auto-plays it.</summary>
     public bool LibraryAutoPlay { get; set; } = true;
+
+    /// <summary>Whether dragging an audio clip into the timeline auto-stretches it to the project tempo.</summary>
+    public bool AutoStretchToTempo { get; set; } = true;
+
+    /// <summary>Whether auto-stretch preserves pitch (time-stretch) instead of resampling (pitch tracks tempo).</summary>
+    public bool AutoStretchPitchCorrection { get; set; }
 }
 
 /// <summary>Serializable form of a <see cref="Core.Audio.Midi.TransportMapping"/>.</summary>

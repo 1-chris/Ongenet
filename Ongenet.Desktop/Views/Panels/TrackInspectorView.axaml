@@ -7,7 +7,16 @@
              x:Class="Ongenet.Desktop.Views.Panels.TrackInspectorView"
              x:DataType="vm:TrackInspectorViewModel">
 
-    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+    <UserControl.Resources>
+        <!-- Fluent reserves 15px above/below the slider thumb for tick bars we don't use,
+             which both wastes space and clips the thumb when the control is made compact.
+             Zero the reservations so sliders collapse to the thumb's natural 20px height. -->
+        <GridLength x:Key="SliderPreContentMargin">0</GridLength>
+        <GridLength x:Key="SliderPostContentMargin">0</GridLength>
+        <x:Double x:Key="SliderHorizontalHeight">20</x:Double>
+    </UserControl.Resources>
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="10,8">
         <Grid>
             <!-- Empty state -->
             <TextBlock Text="Select a track to edit its settings."
@@ -19,11 +28,11 @@
             <ScrollViewer IsVisible="{Binding HasTrack}"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="14">
+                <StackPanel Spacing="4">
                     <TextBlock Text="TRACK" FontWeight="Bold" FontSize="11"
                                Foreground="{StaticResource CatppuccinOverlay1}"/>
 
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="1">
                         <TextBlock Text="Name" Foreground="{StaticResource CatppuccinSubtext0}"/>
                         <TextBox Text="{Binding Name}"/>
                     </StackPanel>
@@ -33,7 +42,7 @@
                         <ToggleButton Content="Solo" IsChecked="{Binding IsSoloed}" Width="80"/>
                     </StackPanel>
 
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="1">
                         <DockPanel>
                             <TextBlock Text="Volume" Foreground="{StaticResource CatppuccinSubtext0}"/>
                             <TextBlock Text="{Binding Volume, StringFormat='{}{0:P0}'}"
@@ -43,7 +52,7 @@
                         <Slider Name="VolumeSlider" Value="{Binding Volume}" Minimum="0" Maximum="1"/>
                     </StackPanel>
 
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="1">
                         <DockPanel>
                             <TextBlock Text="Pan" Foreground="{StaticResource CatppuccinSubtext0}"/>
                             <TextBlock Text="{Binding Pan, StringFormat='{}{0:0.00}'}"
@@ -53,7 +62,7 @@
                         <Slider Name="PanSlider" Value="{Binding Pan}" Minimum="-1" Maximum="1"/>
                     </StackPanel>
 
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="1">
                         <TextBlock Text="Colour" Foreground="{StaticResource CatppuccinSubtext0}"/>
                         <ComboBox ItemsSource="{Binding ColorKeys}"
                                   SelectedItem="{Binding ColorKey}"

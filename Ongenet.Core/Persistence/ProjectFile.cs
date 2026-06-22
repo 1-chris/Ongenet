@@ -219,6 +219,10 @@ public static class ProjectFile
                 c.WriteDouble(n.LengthBeats);
                 c.WriteFloat(n.Velocity);
             }
+
+            // Appended after the notes so older readers (which stop here) load fine; newer readers pick it
+            // up via ChunkHasMore.
+            c.WriteBool(clip.PitchCorrected);
         });
     }
 
@@ -469,6 +473,9 @@ public static class ProjectFile
                 clip.Samples = buf;
                 clip.Waveform = AudioWaveform.Build(buf);
             }
+
+            // Trailing field added in a later format revision; absent in older files.
+            if (c.ChunkHasMore) clip.PitchCorrected = c.ReadBool();
         });
         return clip;
     }

@@ -114,6 +114,7 @@ namespace Ongenet.Desktop
 
             // Library tabs + shared audio preview.
             services.AddSingleton<AudioPreviewViewModel>();
+            services.AddSingleton<LibraryOptionsViewModel>();
             services.AddSingleton<ViewModels.Library.EverythingLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectsLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.SampleLibraryViewModel>();

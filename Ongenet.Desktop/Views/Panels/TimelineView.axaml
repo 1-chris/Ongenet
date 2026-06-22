@@ -311,6 +311,16 @@
                                                                                   IsHitTestVisible="False"
                                                                                   Fill="{StaticResource CatppuccinCrust}"
                                                                                   Opacity="0.6" Margin="2,16,2,4"/>
+                                                    <controls:ClipFadeControl FadeInWidth="{Binding FadeInWidth}"
+                                                                              FadeOutWidth="{Binding FadeOutWidth}"
+                                                                              FadeInWaveform="{Binding FadeInWaveform}"
+                                                                              FadeOutWaveform="{Binding FadeOutWaveform}"
+                                                                              Revision="{Binding FadeRevision}"
+                                                                              IsVisible="{Binding IsAudio}"
+                                                                              IsHitTestVisible="False"
+                                                                              ClipBackground="{Binding Owner.ColorKey, Converter={StaticResource ColorKeyToBrush}}"
+                                                                              WaveFill="{StaticResource CatppuccinCrust}"
+                                                                              Stroke="Black"/>
                                                     <TextBlock Text="{Binding Name}" Margin="6,3" FontSize="11"
                                                                TextTrimming="CharacterEllipsis"
                                                                IsHitTestVisible="False"

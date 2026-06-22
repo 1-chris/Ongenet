@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
@@ -201,6 +202,7 @@ public sealed class AudioEngine : IAudioEngine
     private void BeginPlayback()
     {
         var sampleRate = _output.Format.SampleRate;
+        var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
         var bpm = _transport.Tempo.BeatsPerMinute;
         _samplesPerBeat = bpm > 0 ? sampleRate * 60.0 / bpm : sampleRate;
         var startBeat = _transport.StartBeat;
@@ -245,6 +247,8 @@ public sealed class AudioEngine : IAudioEngine
 
             if (track.Kind == TrackKind.Audio)
             {
+                // Crossfades for overlapping clips on this track (per-clip fade gains, independent of the strip).
+                var fades = Crossfade.Compute(track.Clips);
                 foreach (var clip in track.Clips)
                 {
                     if (clip.Samples is { } samples && clip.EndBeat > startBeat)
@@ -257,7 +261,13 @@ public sealed class AudioEngine : IAudioEngine
                         var stretch = clip.StretchToTempo
                             ? TempoSync.Stretch(sourceDur, bpm, clip.LengthBeats)
                             : 1.0;
-                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples, stretch, clip.SourceOffsetSeconds));
+                        var fade = fades.TryGetValue(clip, out var f) ? f : (FadeInBeats: 0.0, FadeOutBeats: 0.0);
+                        // Pitch-preserving stretch: one PSOLA shifter per channel, configured at the device rate.
+                        var shifters = clip is { PitchCorrected: true, StretchToTempo: true }
+                            ? BuildPitchShifters(channels, sampleRate)
+                            : null;
+                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples, stretch,
+                            clip.SourceOffsetSeconds, fade.FadeInBeats, fade.FadeOutBeats, shifters));
                     }
                 }
             }
@@ -422,7 +432,8 @@ public sealed class AudioEngine : IAudioEngine
                     if (ReferenceEquals(acp.Track, track))
                     {
                         Mixing.RenderAudioClip(temp, acp.Samples, acp.StartBeat, acp.LengthBeats,
-                            prevBeat, _samplesPerBeat, _output.Format.SampleRate, channels, acp.Stretch, acp.SourceOffsetSeconds);
+                            prevBeat, _samplesPerBeat, _output.Format.SampleRate, channels, acp.Stretch,
+                            acp.SourceOffsetSeconds, acp.FadeInBeats, acp.FadeOutBeats, acp.PitchShifters);
                         hasContent = true;
                     }
                 }
@@ -560,6 +571,11 @@ public sealed class AudioEngine : IAudioEngine
         for (var i = 0; i < _active.Count; i++) _active[i].Fire(on: false);
         _active.Clear();
         AllNotesOff();
+
+        // Clear pitch-shifter delay lines so a looped clip restarts cleanly rather than reading stale tail.
+        foreach (var acp in _audioClips)
+            if (acp.PitchShifters is { } shifters)
+                foreach (var sh in shifters) sh.Reset();
 
         _currentBeat = target;
         _nextEvent = 0;
@@ -709,7 +725,20 @@ public sealed class AudioEngine : IAudioEngine
         }
     }
 
-    private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch, double SourceOffsetSeconds);
+    private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch, double SourceOffsetSeconds, double FadeInBeats, double FadeOutBeats, PitchShifter[]? PitchShifters);
+
+    // One PSOLA pitch shifter per channel, configured at the device rate, for pitch-preserving stretch.
+    private static PitchShifter[] BuildPitchShifters(int channels, int sampleRate)
+    {
+        var shifters = new PitchShifter[channels];
+        for (var i = 0; i < channels; i++)
+        {
+            shifters[i] = new PitchShifter();
+            shifters[i].Configure(sampleRate);
+        }
+
+        return shifters;
+    }
 
     // A group/master mixing bus: an accumulation buffer that its children sum into, plus a link to the
     // parent bus it strips into (null for the master, which strips into the device output).

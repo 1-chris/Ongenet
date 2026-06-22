@@ -38,11 +38,7 @@ namespace Ongenet.Desktop.ViewModels
 
             _transport.StateChanged += _ => OnStateChanged();
             _transport.TempoChanged += _ => OnTempoChanged();
-            _editMode.ModeChanged += () =>
-            {
-                OnPropertyChanged(nameof(IsSelectMode));
-                OnPropertyChanged(nameof(IsSliceMode));
-            };
+            _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSliceMode));
             // Recording state may flip from the audio thread (count-in finishing) — marshal to UI.
             _recording.StateChanged += () =>
                 Avalonia.Threading.Dispatcher.UIThread.Post(OnRecordingStateChanged);
@@ -75,14 +71,7 @@ namespace Ongenet.Desktop.ViewModels
             else _transport.Stop();
         }
 
-        /// <summary>Toggles between Edit and Select (rubber-band multi-select) mode.</summary>
-        public bool IsSelectMode
-        {
-            get => _editMode.Mode == EditMode.Select;
-            set => _editMode.Mode = value ? EditMode.Select : EditMode.Edit;
-        }
-
-        /// <summary>Toggles Slice mode (click a clip to cut it in two); mutually exclusive with Select.</summary>
+        /// <summary>Toggles Slice mode (click a clip to cut it in two). Slice can also be armed by holding CTRL.</summary>
         public bool IsSliceMode
         {
             get => _editMode.Mode == EditMode.Slice;

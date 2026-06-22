@@ -32,6 +32,7 @@ namespace Ongenet.Desktop.ViewModels
         private readonly IEditModeService _editMode;
         private readonly IRecordingService _recording;
         private readonly Services.IHistoryService _history;
+        private readonly Services.IAppSettingsService _settings;
 
         // Canonical per-track lanes (one per track). The rendered <see cref="Lanes"/> collection
         // interleaves these with their (expanded) automation rows; both reference the same track lane
@@ -43,7 +44,7 @@ namespace Ongenet.Desktop.ViewModels
         public TimelineViewModel(IProjectService project, ISelectionService selection,
             IEventAggregator events, IAudioFileService audioFiles, ITransportService transport,
             IInstrumentRegistry instruments, IEditModeService editMode, IRecordingService recording,
-            Services.IHistoryService history)
+            Services.IHistoryService history, Services.IAppSettingsService settings)
         {
             _project = project;
             _selection = selection;
@@ -54,6 +55,7 @@ namespace Ongenet.Desktop.ViewModels
             _editMode = editMode;
             _recording = recording;
             _history = history;
+            _settings = settings;
 
             SelectClipCommand = new RelayCommand<ClipViewModel>(OnClipClicked);
             AddInstrumentTrackCommand = new RelayCommand(AddInstrumentTrack);
@@ -71,17 +73,10 @@ namespace Ongenet.Desktop.ViewModels
             _transport.StartBeatChanged += () => OnPropertyChanged(nameof(StartBeat));
             // Re-fit tempo-synced audio clips to the grid whenever the project tempo changes.
             _transport.TempoChanged += _ => OnProjectTempoChanged();
-            _editMode.ModeChanged += () =>
-            {
-                OnPropertyChanged(nameof(IsSelectMode));
-                OnPropertyChanged(nameof(IsSliceMode));
-            };
+            _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSliceMode));
 
             Rebuild();
         }
-
-        /// <summary>True when Select (rubber-band multi-select) mode is active.</summary>
-        public bool IsSelectMode => _editMode.Mode == EditMode.Select;
 
         /// <summary>True when Slice mode (click a clip to cut it) is active.</summary>
         public bool IsSliceMode => _editMode.Mode == EditMode.Slice;
@@ -193,6 +188,7 @@ namespace Ongenet.Desktop.ViewModels
         {
             clip.RefreshFromModel();
             ExtendTimeline(clip.Model.EndBeat);
+            // Crossfades refresh via the ClipChangedEvent → RefreshClip path below (avoids doing it twice).
             _events.Publish(new ClipChangedEvent(clip.Model));
         }
 
@@ -224,6 +220,7 @@ namespace Ongenet.Desktop.ViewModels
                 LengthBeats = rightLen,
                 IsAudio = model.IsAudio,
                 StretchToTempo = model.StretchToTempo,
+                PitchCorrected = model.PitchCorrected,
                 SourceTempo = model.SourceTempo,
                 AudioFilePath = model.AudioFilePath,
                 Waveform = model.Waveform,
@@ -295,6 +292,7 @@ namespace Ongenet.Desktop.ViewModels
             lane.Clips.Add(new ClipViewModel(right, lane.Model, Metrics, this));
 
             clipVm.RefreshFromModel();
+            if (model.IsAudio) UpdateCrossfades(lane);
             _events.Publish(new ClipChangedEvent(model));
             _selection.SelectClip(model, lane.Model);
         }
@@ -302,22 +300,51 @@ namespace Ongenet.Desktop.ViewModels
         // --- IClipActions (context menu) ---
 
         /// <summary>
-        /// Duplicates the currently selected clip (Ctrl+D). The copy lands one clip-length to the right and
-        /// becomes the new selection, so repeated presses lay copies end-to-end down the timeline.
+        /// Duplicates the selected clip(s) (Ctrl+D). A single clip's copy lands one clip-length to the right.
+        /// A multi-clip selection (rubber band) is copied as a block laid end-to-end immediately after itself,
+        /// preserving each clip's relative position and lane; the copies become the new selection so repeated
+        /// presses keep stamping the block down the timeline.
         /// </summary>
         public void DuplicateSelectedClip()
         {
-            var selected = _selection.SelectedClip;
-            if (selected is null) return;
+            var selected = new List<ClipViewModel>();
             foreach (var lane in _trackLanes)
+                foreach (var clip in lane.Clips)
+                    if (clip.IsSelected) selected.Add(clip);
+
+            // Nothing flagged: fall back to the selection service's single selection.
+            if (selected.Count == 0)
             {
-                var clipVm = lane.Clips.FirstOrDefault(c => ReferenceEquals(c.Model, selected));
-                if (clipVm is not null)
-                {
-                    DuplicateClip(clipVm);
-                    return;
-                }
+                if (_selection.SelectedClip is not { } single) return;
+                var vm = _trackLanes.SelectMany(l => l.Clips).FirstOrDefault(c => ReferenceEquals(c.Model, single));
+                if (vm is not null) DuplicateClip(vm);
+                return;
             }
+
+            if (selected.Count == 1) { DuplicateClip(selected[0]); return; }
+
+            var minStart = selected.Min(c => c.Model.StartBeat);
+            var maxEnd = selected.Max(c => c.Model.EndBeat);
+            var offset = maxEnd - minStart;
+            if (offset <= 0) return;
+
+            _history.Capture("Duplicate clips");
+            _selection.SelectTrack(null); // clears the single selection + every clip's IsSelected flag
+
+            var affected = new HashSet<TrackLaneViewModel>();
+            foreach (var clipVm in selected)
+            {
+                var lane = FindLaneOf(clipVm);
+                if (lane is null) continue;
+                var copy = CloneClip(clipVm.Model);
+                copy.StartBeat = clipVm.Model.StartBeat + offset;
+                lane.Model.Clips.Add(copy);
+                lane.Clips.Add(new ClipViewModel(copy, lane.Model, Metrics, this) { IsSelected = true });
+                ExtendTimeline(copy.EndBeat);
+                affected.Add(lane);
+            }
+
+            foreach (var lane in affected) UpdateCrossfades(lane);
         }
 
         public void DuplicateClip(ClipViewModel clip)
@@ -330,7 +357,45 @@ namespace Ongenet.Desktop.ViewModels
             lane.Model.Clips.Add(copy);
             lane.Clips.Add(new ClipViewModel(copy, lane.Model, Metrics, this));
             ExtendTimeline(copy.EndBeat);
+            UpdateCrossfades(lane);
             _selection.SelectClip(copy, lane.Model);
+        }
+
+        /// <summary>
+        /// Recomputes crossfades for a lane's overlapping audio clips and pushes the resulting fade lengths
+        /// onto each clip view model so the fade visual updates. Cheap — a handful of clips per lane. The
+        /// audio engine recomputes the same fades from the clip geometry on the next playback start.
+        /// </summary>
+        public void UpdateCrossfades(TrackLaneViewModel lane)
+        {
+            // Fade lengths come from the same Core helper the engine uses, so visual and audio agree.
+            var fades = Core.Audio.Crossfade.Compute(lane.Model.Clips);
+            foreach (var clipVm in lane.Clips)
+            {
+                if (fades.TryGetValue(clipVm.Model, out var f)) clipVm.SetFades(f.FadeInBeats, f.FadeOutBeats);
+                else clipVm.SetFades(0, 0);
+                clipVm.SetFadeWaveforms(null, null);
+            }
+
+            // For each overlapping pair, render the actual crossfaded waveform and show it in both clips'
+            // overlap regions (the earlier clip's fade-out, the later clip's fade-in) so it reads cleanly
+            // whichever clip is stacked on top.
+            var bpm = _transport.Tempo.BeatsPerMinute;
+            var audio = lane.Clips.Where(c => c.Model.IsAudio).OrderBy(c => c.Model.StartBeat).ToList();
+            for (var i = 1; i < audio.Count; i++)
+            {
+                var prevVm = audio[i - 1];
+                var curVm = audio[i];
+                var overlap = prevVm.Model.EndBeat - curVm.Model.StartBeat;
+                if (overlap <= 0) continue;
+                var len = Math.Min(overlap, Math.Min(prevVm.Model.LengthBeats, curVm.Model.LengthBeats));
+                if (len <= 0) continue;
+
+                var mix = Core.Audio.Crossfade.OverlapWaveform(prevVm.Model, curVm.Model, len, bpm);
+                if (mix is null) continue;
+                prevVm.SetFadeWaveforms(prevVm.FadeInWaveform, mix);
+                curVm.SetFadeWaveforms(mix, curVm.FadeOutWaveform);
+            }
         }
 
         /// <summary>
@@ -388,6 +453,7 @@ namespace Ongenet.Desktop.ViewModels
             _history.Capture("Delete clip");
             lane.Model.Clips.Remove(clip.Model);
             lane.Clips.Remove(clip);
+            UpdateCrossfades(lane);
             if (ReferenceEquals(_selection.SelectedClip, clip.Model)) _selection.SelectTrack(lane.Model);
         }
 
@@ -432,6 +498,8 @@ namespace Ongenet.Desktop.ViewModels
                     lane.Clips.Remove(clip);
                     if (ReferenceEquals(_selection.SelectedClip, clip.Model)) _selection.SelectTrack(null);
                 }
+
+                if (selected.Count > 0) UpdateCrossfades(lane);
             }
         }
 
@@ -458,6 +526,8 @@ namespace Ongenet.Desktop.ViewModels
             var moved = new ClipViewModel(clip.Model, target.Model, Metrics, this);
             target.Clips.Add(moved);
 
+            UpdateCrossfades(origin);
+            UpdateCrossfades(target);
             _selection.SelectClip(clip.Model, target.Model);
             return moved;
         }
@@ -630,10 +700,12 @@ namespace Ongenet.Desktop.ViewModels
             var stretchToTempo = false;
             double? sourceTempo = null;
 
-            // If we know the sample's natural tempo, fit it to the grid and time-stretch to match.
-            // Tagged (name-based) tempos always sync; estimated tempos only for loop-length material
-            // (≥ ~2 beats) so we don't warp one-shots on a shaky estimate.
-            if (duration > 0 && loaded?.Tempo is { } naturalBpm && naturalBpm > 0)
+            // If we know the sample's natural tempo, fit it to the grid and time-stretch to match — but only
+            // when the user has auto-stretch enabled in the library options. Tagged (name-based) tempos always
+            // sync; estimated tempos only for loop-length material (≥ ~2 beats) so we don't warp one-shots on a
+            // shaky estimate.
+            if (_settings.Current.AutoStretchToTempo &&
+                duration > 0 && loaded?.Tempo is { } naturalBpm && naturalBpm > 0)
             {
                 var naturalBeats = duration * naturalBpm / 60.0;
                 if (loaded.TempoFromName || naturalBeats >= 2.0)
@@ -655,6 +727,8 @@ namespace Ongenet.Desktop.ViewModels
                 LengthBeats = lengthBeats,
                 IsAudio = true,
                 StretchToTempo = stretchToTempo,
+                // Preserve pitch while stretching only when both the stretch and its pitch-correction option are on.
+                PitchCorrected = stretchToTempo && _settings.Current.AutoStretchPitchCorrection,
                 SourceTempo = sourceTempo,
                 AudioFilePath = path,
                 Waveform = loaded?.Waveform,
@@ -696,6 +770,7 @@ namespace Ongenet.Desktop.ViewModels
             }
 
             ExtendTimeline(clip.EndBeat);
+            UpdateCrossfades(lane);
             _selection.SelectClip(clip, lane.Model);
         }
 
@@ -728,6 +803,7 @@ namespace Ongenet.Desktop.ViewModels
             RecomputeIndents();
             RebuildRows();
             ResizeArrangement();
+            foreach (var lane in _trackLanes) UpdateCrossfades(lane);
         }
 
         // Sets each lane's nesting depth and colour rails from its parent chain so headers indent under
@@ -1334,6 +1410,7 @@ namespace Ongenet.Desktop.ViewModels
                 LengthBeats = src.LengthBeats,
                 IsAudio = src.IsAudio,
                 StretchToTempo = src.StretchToTempo,
+                PitchCorrected = src.PitchCorrected,
                 SourceTempo = src.SourceTempo,
                 AudioFilePath = src.AudioFilePath,
                 Waveform = src.Waveform,
@@ -1376,6 +1453,7 @@ namespace Ongenet.Desktop.ViewModels
                 var clipVm = lane.Clips.FirstOrDefault(c => ReferenceEquals(c.Model, clip));
                 if (clipVm is null) continue;
                 clipVm.RefreshFromModel();
+                if (clip.IsAudio) UpdateCrossfades(lane);
                 return;
             }
         }
@@ -1388,6 +1466,7 @@ namespace Ongenet.Desktop.ViewModels
             if (lane.Clips.Any(c => ReferenceEquals(c.Model, clip))) return;
             lane.Clips.Add(new ClipViewModel(clip, lane.Model, Metrics, this));
             ExtendTimeline(clip.EndBeat);
+            if (clip.IsAudio) UpdateCrossfades(lane);
         }
 
         private void RefreshClipNotes(Core.Models.Audio.Clip clip)

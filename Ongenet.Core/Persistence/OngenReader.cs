@@ -13,6 +13,7 @@ public sealed class OngenReader : IDisposable
 {
     private readonly BinaryReader _reader;
     private readonly Stream _stream;
+    private long _chunkEnd = long.MaxValue;
 
     public OngenReader(Stream stream)
     {
@@ -22,6 +23,12 @@ public sealed class OngenReader : IDisposable
 
     /// <summary>True while there is more data to read (for optional trailing sections in older files).</summary>
     public bool HasMore => _stream.Position < _stream.Length;
+
+    /// <summary>
+    /// True while the current <see cref="ReadChunk"/> body still has unconsumed bytes — lets a chunk read
+    /// trailing fields only when present, so a newer reader can add fields without breaking older files.
+    /// </summary>
+    public bool ChunkHasMore => _stream.Position < _chunkEnd;
 
     public int ReadInt() => _reader.ReadInt32();
     public long ReadLong() => _reader.ReadInt64();
@@ -41,8 +48,10 @@ public sealed class OngenReader : IDisposable
     {
         var len = _reader.ReadInt32();
         var end = _stream.Position + len;
+        var prevEnd = _chunkEnd;
+        _chunkEnd = end;
         try { body(this); }
-        finally { _stream.Position = end; }
+        finally { _stream.Position = end; _chunkEnd = prevEnd; }
     }
 
     public void Dispose() => _reader.Dispose();

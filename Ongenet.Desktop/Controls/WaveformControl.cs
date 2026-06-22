@@ -83,39 +83,51 @@ namespace Ongenet.Desktop.Controls
             if (width < 1 || height < 1) return;
 
             var brush = Fill ?? Brushes.Black;
+            context.DrawGeometry(brush, null,
+                BuildGeometry(waveform, 0, width, height, StartFraction, EndFraction));
+        }
+
+        /// <summary>
+        /// Builds the filled min/max waveform silhouette for <paramref name="waveform"/> across
+        /// <paramref name="regionWidth"/> px starting at <paramref name="x0"/>, vertically centred in
+        /// <paramref name="height"/>. Shared by the clip waveform and the crossfade overlap preview so they
+        /// look identical. <paramref name="startFraction"/>/<paramref name="endFraction"/> window the source.
+        /// </summary>
+        public static StreamGeometry BuildGeometry(AudioWaveform waveform, double x0, double regionWidth,
+            double height, double startFraction, double endFraction)
+        {
             var mid = height / 2.0;
             var scale = mid * 0.92; // small margin so peaks don't touch the edges
-            var columns = (int)Math.Ceiling(width);
+            var columns = (int)Math.Ceiling(regionWidth);
 
-            // The window of the source this clip draws: [start, start+span] as fractions of the source.
-            // For an un-sliced clip this is the whole buffer (0..1).
-            var start = Math.Clamp(StartFraction, 0.0, 1.0);
-            var span = Math.Clamp(EndFraction, 0.0, 1.0) - start;
+            // The window of the source drawn: [start, start+span] as fractions of the source (whole buffer = 0..1).
+            var start = Math.Clamp(startFraction, 0.0, 1.0);
+            var span = Math.Clamp(endFraction, 0.0, 1.0) - start;
             if (span <= 0) span = 1.0 - start;
 
             var geometry = new StreamGeometry();
             using (var ctx = geometry.Open())
             {
-                ctx.BeginFigure(new Point(0, mid), isFilled: true);
+                ctx.BeginFigure(new Point(x0, mid), isFilled: true);
 
                 // Top contour, left to right.
                 for (var x = 0; x < columns; x++)
                 {
-                    PeakAt(waveform, x, width, start, span, out _, out var max);
-                    ctx.LineTo(new Point(x, mid - max * scale));
+                    PeakAt(waveform, x, regionWidth, start, span, out _, out var max);
+                    ctx.LineTo(new Point(x0 + x, mid - max * scale));
                 }
 
                 // Bottom contour, right to left, closing the filled shape.
                 for (var x = columns - 1; x >= 0; x--)
                 {
-                    PeakAt(waveform, x, width, start, span, out var min, out _);
-                    ctx.LineTo(new Point(x, mid - min * scale));
+                    PeakAt(waveform, x, regionWidth, start, span, out var min, out _);
+                    ctx.LineTo(new Point(x0 + x, mid - min * scale));
                 }
 
                 ctx.EndFigure(true);
             }
 
-            context.DrawGeometry(brush, null, geometry);
+            return geometry;
         }
 
         private static void PeakAt(AudioWaveform waveform, int column, double width,
