@@ -44,13 +44,13 @@ public sealed class ClapPluginProvider
 
                 if (d.IsInstrument)
                 {
-                    _instruments.Register(new InstrumentInfo(id, name, () => new ClapInstrument(path, pluginId, name), "Plugins"));
+                    _instruments.Register(new InstrumentInfo(id, name, () => new ClapInstrument(path, pluginId, name), "CLAP"));
                     instruments++;
                 }
 
                 if (d.IsEffect)
                 {
-                    _effects.Register(new EffectInfo(id, name, () => new ClapEffect(path, pluginId, name), "Plugins"));
+                    _effects.Register(new EffectInfo(id, name, () => new ClapEffect(path, pluginId, name), "CLAP"));
                     effects++;
                 }
             }

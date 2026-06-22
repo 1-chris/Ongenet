@@ -121,7 +121,8 @@ public sealed class SoundFontLibraryViewModel : LibraryListViewModel
 public sealed class InstrumentLibraryViewModel : LibraryListViewModel
 {
     // Preferred display order for the instrument-library categories (mirrors the rack's add menu).
-    private static readonly string[] CategoryOrder = { "Synth", "Sampler", "Drum", "Plugins" };
+    // Plugin formats each get their own group so it's clear what each instrument is.
+    private static readonly string[] CategoryOrder = { "Synth", "Sampler", "Drum", "CLAP", "LV2", "VST2", "VST3" };
 
     private readonly IInstrumentRegistry _registry;
 

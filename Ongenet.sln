@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Desktop", "Ongenet.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Web", "Ongenet.Web\Ongenet.Web.csproj", "{5C2BE84E-0D7C-4CA0-8CD2-D757226D674B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Vst", "Ongenet.Vst\Ongenet.Vst.csproj", "{1633C058-35CB-4CB3-83F1-2B4CFC450C25}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,18 @@ Global
 		{5C2BE84E-0D7C-4CA0-8CD2-D757226D674B}.Release|x64.Build.0 = Release|Any CPU
 		{5C2BE84E-0D7C-4CA0-8CD2-D757226D674B}.Release|x86.ActiveCfg = Release|Any CPU
 		{5C2BE84E-0D7C-4CA0-8CD2-D757226D674B}.Release|x86.Build.0 = Release|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Debug|x64.Build.0 = Debug|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Debug|x86.Build.0 = Debug|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Release|x64.ActiveCfg = Release|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Release|x64.Build.0 = Release|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Release|x86.ActiveCfg = Release|Any CPU
+		{1633C058-35CB-4CB3-83F1-2B4CFC450C25}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

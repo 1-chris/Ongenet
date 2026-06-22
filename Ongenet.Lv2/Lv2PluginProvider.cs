@@ -49,13 +49,13 @@ public sealed class Lv2PluginProvider
 
                 if (d.IsInstrument)
                 {
-                    _instruments.Register(new InstrumentInfo(id, d.Name, () => new Lv2Instrument(descriptor), "Plugins"));
+                    _instruments.Register(new InstrumentInfo(id, d.Name, () => new Lv2Instrument(descriptor), "LV2"));
                     instruments++;
                 }
 
                 if (d.IsEffect)
                 {
-                    _effects.Register(new EffectInfo(id, d.Name, () => new Lv2Effect(descriptor), "Plugins"));
+                    _effects.Register(new EffectInfo(id, d.Name, () => new Lv2Effect(descriptor), "LV2"));
                     effects++;
                 }
             }

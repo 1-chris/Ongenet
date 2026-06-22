@@ -11,6 +11,7 @@ swappable device/UI layer around it.
 | `Ongenet.Audio` | OS audio + MIDI | The audio **and MIDI** device backend. P/Invoke layers over each platform's native **audio** API — ALSA (with PipeWire/JACK/PulseAudio routing) on Linux, **CoreAudio** on macOS, **WASAPI** on Windows — and each platform's native **MIDI** API — the **ALSA sequencer** on Linux (works with PipeWire/JACK), **WinMM** on Windows and **CoreMIDI** on macOS, behind single `IAudioBackend` / `IMidiInputBackend` seams. This is the only project that touches native audio/MIDI libraries; Core depends solely on the device seams, so the backend is swappable. |
 | `Ongenet.Clap` | CLAP plugins | CLAP plugin hosting: a direct interop over the [CLAP](https://cleveraudio.org/) ABI that scans for, loads, and bridges third-party `.clap` instruments and effects (incl. their plugin GUIs) into Core's instrument/effect registries. Plugins are discovered at runtime; none are required to run the app. |
 | `Ongenet.Lv2` | LV2 plugins | LV2 plugin hosting, written from scratch over the [LV2](https://lv2plug.in/) ABI — no `lilv`/`suil`. A hand-written **Turtle/RDF** parser discovers `.lv2` bundles; audio runs through the port-based `connect_port`/`run` model (control ports become automatable parameters, MIDI is delivered via an LV2 Atom sequence), with the **URID-map**, **Options** and **Worker** host features and native **X11 plugin-UI** embedding. Instruments and effects are bridged into Core's registries; discovered at runtime, none required. |
+| `Ongenet.Vst` | VST2 + VST3 plugins | VST2 **and** VST3 plugin hosting, both written from scratch over the public ABIs — no Steinberg SDK or wrapper libraries. **VST2** drives the flat `AEffect` dispatcher (params, `processReplacing`, `effProcessEvents` MIDI, `effEditOpen` GUI) with a full `audioMaster` host callback. **VST3** implements the COM-style `IPluginFactory` → `IComponent`/`IAudioProcessor`/`IEditController` model with host-side `IComponentHandler`/`IHostApplication`/`IPlugFrame`, `process()` over `ProcessData`, note/parameter input via `IEventList`/`IParameterChanges`, and the `IPlugView` editor. Cross-platform (Windows/macOS/Linux, x64 + arm64), with native X11 GUI embedding on Linux. Discovered at runtime; none required. |
 | `Ongenet.Desktop` | Avalonia | The Avalonia desktop UI. Hand-rolled MVVM (`ViewModelBase` / `RelayCommand`), DI bootstrap in `App.axaml.cs`, a Catppuccin Mocha theme, the arrange/timeline view, piano roll, instrument & effect inspectors, mixer/meters, the editable automation lanes, a unified **Settings** window (audio / MIDI / theme), app-settings persistence, and a debug Log window. References all of the above. |
 
 All projects target **.NET 10**.
@@ -18,8 +19,8 @@ All projects target **.NET 10**.
 ## Instruments
 
 Eight built-in instruments ship in `Ongenet.Core` (`Audio/Instruments`), all registered in the
-`InstrumentRegistry`. Any CLAP or LV2 instrument you have installed is discovered at runtime and
-appears alongside them.
+`InstrumentRegistry`. Any CLAP, LV2, VST2 or VST3 instrument you have installed is discovered at
+runtime and appears alongside them.
 
 | Instrument | Description |
 | --- | --- |
@@ -35,7 +36,7 @@ appears alongside them.
 ## Effects
 
 Nineteen built-in effects ship in `Ongenet.Core` (`Audio/Effects`), registered in the `EffectRegistry`
-and grouped by category. CLAP and LV2 effects are likewise discovered at runtime and slot into the
+and grouped by category. CLAP, LV2, VST2 and VST3 effects are likewise discovered at runtime and slot into the
 same chain.
 
 | Category | Effects |
@@ -57,22 +58,26 @@ mode), with a hold-to-freeze buffer.
 
 ## Plugins
 
-Beyond the built-ins, Ongenet hosts third-party **CLAP** and **LV2** plugins. Both are implemented
-from scratch — direct ABI interop, **no wrapper libraries** (no `lilv`, `suil` or CLAP helper libs) —
-and discovered at startup from the standard per-OS locations (plus `CLAP_PATH` / `LV2_PATH`). Instrument
-plugins appear in the Instruments tab; audio-effect plugins appear under **Plugins** in the add-effect
-menu. Nothing is bundled and none are required — with no plugins installed, the app runs exactly as before.
+Beyond the built-ins, Ongenet hosts third-party **CLAP**, **LV2**, **VST2** and **VST3** plugins. Every
+format is implemented from scratch — direct ABI interop, **no wrapper libraries** (no `lilv`, `suil`,
+CLAP helper libs or the Steinberg VST SDK) — and discovered at startup from the standard per-OS locations
+(plus `CLAP_PATH` / `LV2_PATH` / `VST_PATH` / `VST3_PATH`). Instrument plugins appear in the Instruments
+tab; audio-effect plugins appear under **Plugins** in the add-effect menu. Nothing is bundled and none
+are required — with no plugins installed, the app runs exactly as before.
 
 | Format | Notes |
 | --- | --- |
 | **CLAP** | Direct [CLAP](https://cleveraudio.org/) ABI interop: scans `.clap` modules, exposes their parameters, and bridges note/audio/parameter flow. |
 | **LV2** | `.lv2` bundle discovery via a hand-written **Turtle/RDF** parser; the port-based `connect_port`/`run` model (control ports → automatable parameters, MIDI via an LV2 Atom sequence); the **URID-map**, **Options** and **Worker** host features, so sampler- and engine-class plugins (e.g. Cardinal / VCV Rack) load too. |
+| **VST2** | The flat `AEffect` ABI: scans `.dll`/`.so`/`.vst` modules, drives `processReplacing`, sends notes via `effProcessEvents`, exposes normalised parameters, and opens the native editor via `effEditOpen` — backed by a full `audioMaster` host callback (time info, sample rate, can-do, size-window). |
+| **VST3** | The COM-style ABI: `.vst3` bundle discovery via `IPluginFactory`, the `IComponent`/`IAudioProcessor`/`IEditController` model with component↔controller connection and state transfer, `process()` over `ProcessData`, notes via `IEventList` and parameter changes via `IParameterChanges`, and the `IPlugView` editor — with host-side `IComponentHandler`/`IHostApplication`/`IPlugFrame`. Cross-platform TUID byte layout and arch-specific bundle resolution (x64 / arm64). |
 
 - **Native plugin GUIs** open in their own window (*Open plugin UI*). On Linux the UI is embedded into a
   GL-compatible X11 surface, so even heavyweight OpenGL UIs (Cardinal, Surge XT) render correctly.
 - Plugin parameters are first-class: shown in the inspector, automatable, and bindable via **MIDI learn**.
-- Plugins survive save/reload — a `.ongen` project re-creates them by stable id (the CLAP module/id, or
-  the LV2 plugin URI) as long as the plugin is still installed.
+- Plugins survive save/reload — a `.ongen` project re-creates them by stable id (the CLAP module/id, the
+  LV2 plugin URI, the VST2 module + unique id, or the VST3 bundle + class id) as long as the plugin is
+  still installed.
 
 ## MIDI
 

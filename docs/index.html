@@ -287,8 +287,8 @@ footer a { color: var(--subtext0); }
     <div class="section-head">
       <div class="kicker">Sound sources</div>
       <h2>Instruments</h2>
-      <p>Eight built-in instruments ship in the core. Any CLAP or LV2 instrument you have installed is
-         discovered at runtime and appears right alongside them.</p>
+      <p>Eight built-in instruments ship in the core. Any CLAP, LV2, VST2 or VST3 instrument you have
+         installed is discovered at runtime and appears right alongside them.</p>
     </div>
     <div class="grid grid-3">
       <div class="card">
@@ -333,9 +333,9 @@ footer a { color: var(--subtext0); }
            and filter.</p>
       </div>
       <div class="card">
-        <h3><span class="bullet" style="background:var(--pink)"></span>CLAP &amp; LV2 Plugins</h3>
-        <p>Third-party <code>.clap</code> and <code>.lv2</code> instruments are scanned at startup and
-           hosted directly — including their native plugin GUIs — with no extra setup.</p>
+        <h3><span class="bullet" style="background:var(--pink)"></span>CLAP, LV2, VST2 &amp; VST3 Plugins</h3>
+        <p>Third-party <code>.clap</code>, <code>.lv2</code>, VST2 and <code>.vst3</code> instruments are
+           scanned at startup and hosted directly — including their native plugin GUIs — with no extra setup.</p>
       </div>
     </div>
   </section>
@@ -346,7 +346,7 @@ footer a { color: var(--subtext0); }
       <div class="kicker">Processing</div>
       <h2>Effects</h2>
       <p>Nineteen built-in effects, organised by category and chainable per track in any order.
-         CLAP and LV2 audio effects slot into the same chain.</p>
+         CLAP, LV2, VST2 and VST3 audio effects slot into the same chain.</p>
     </div>
     <div class="grid grid-2">
       <div class="fxgroup">
@@ -408,6 +408,8 @@ footer a { color: var(--subtext0); }
         <div class="tags">
           <span class="tag-chip">CLAP audio effects</span>
           <span class="tag-chip">LV2 audio effects</span>
+          <span class="tag-chip">VST2 audio effects</span>
+          <span class="tag-chip">VST3 audio effects</span>
         </div>
       </div>
     </div>
@@ -525,14 +527,16 @@ footer a { color: var(--subtext0); }
     </div>
 
     <div class="feature" style="border-left-color:var(--sky)">
-      <h3>Plugins — CLAP &amp; LV2 <span class="pill">new</span></h3>
-      <p>Host your existing plugin collection. Both formats are implemented from scratch — direct ABI
-         interop, no wrapper libraries — and discovered at startup from the standard per-OS locations.</p>
+      <h3>Plugins — CLAP, LV2, VST2 &amp; VST3 <span class="pill">new</span></h3>
+      <p>Host your existing plugin collection. Every format is implemented from scratch — direct ABI
+         interop, no wrapper libraries and no Steinberg SDK — and discovered at startup from the standard
+         per-OS locations.</p>
       <ul>
-        <li><strong>CLAP</strong> and <strong>LV2</strong> instruments appear in the Instruments tab; audio effects slot into any track's effect chain under <em>Plugins</em>.</li>
+        <li><strong>CLAP</strong>, <strong>LV2</strong>, <strong>VST2</strong> and <strong>VST3</strong> instruments appear in the Instruments tab; audio effects slot into any track's effect chain under <em>Plugins</em>.</li>
         <li>Plugin parameters are exposed as native, automatable controls — and respond to MIDI learn like everything else.</li>
         <li><strong>Native plugin GUIs</strong> open in their own window, embedded for you (on Linux the UI is hosted in a GL-compatible X11 surface so even heavyweight UIs like Cardinal / VCV Rack render correctly).</li>
         <li>The LV2 host ships a hand-written Turtle/RDF bundle scanner and supports the URID-map, Options and Worker extensions, so sampler- and engine-class plugins load too.</li>
+        <li>The <strong>VST3</strong> host speaks the COM-style factory/component/processor/controller model directly — process buses, note &amp; parameter event lists, state transfer and the <code>IPlugView</code> editor — cross-platform on x64 and arm64.</li>
         <li>Nothing is bundled or required — if you have no plugins installed, Ongenet runs exactly as before.</li>
       </ul>
     </div>

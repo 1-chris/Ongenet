@@ -32,8 +32,8 @@ namespace Ongenet.App.ViewModels
         private readonly IHistoryService _history;
         private readonly IEventAggregator _events;
 
-        // Preferred display order for the add-instrument menu categories.
-        private static readonly string[] CategoryOrder = { "Synth", "Sampler", "Drum", "Plugins" };
+        // Preferred display order for the add-instrument menu categories (plugin formats grouped separately).
+        private static readonly string[] CategoryOrder = { "Synth", "Sampler", "Drum", "CLAP", "LV2", "VST2", "VST3" };
 
         public InstrumentInspectorViewModel(ISelectionService selection, IAudioFileService audioFiles,
             IPreviewService preview, ITransportService transport, IPlaybackClock clock, IEffectRegistry effects,

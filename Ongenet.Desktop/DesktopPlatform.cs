@@ -12,13 +12,17 @@ using Ongenet.App.ViewModels;
 using Ongenet.App.Views.Windows;
 using Ongenet.Desktop.Services;
 using Ongenet.Lv2;
+using Ongenet.Vst;
+using Ongenet.Vst.Vst2;
+using Ongenet.Vst.Vst3;
 
 namespace Ongenet.Desktop;
 
 /// <summary>
 /// Desktop host integration: contributes the OS-native audio backend, the platform MIDI input service,
-/// and CLAP/LV2 plugin hosting, and shows the classic <see cref="MainWindow"/>. This is the only place
-/// the shared UI is tied to the native projects (Ongenet.Audio / Ongenet.Clap / Ongenet.Lv2).
+/// and CLAP/LV2/VST plugin hosting, and shows the classic <see cref="MainWindow"/>. This is the only
+/// place the shared UI is tied to the native projects (Ongenet.Audio / Ongenet.Clap / Ongenet.Lv2 /
+/// Ongenet.Vst).
 /// </summary>
 public sealed class DesktopPlatform : IPlatformServices
 {
@@ -53,6 +57,15 @@ public sealed class DesktopPlatform : IPlatformServices
             var logger = sp.GetService<ILoggerFactory>()?.CreateLogger("Lv2");
             return new Lv2PluginProvider(instruments, effects, msg => logger?.LogInformation("{Message}", msg));
         });
+
+        // VST2 + VST3 plugin hosting: scans installed plugins and registers them as instruments + effects.
+        services.AddSingleton(sp =>
+        {
+            var instruments = sp.GetRequiredService<IInstrumentRegistry>();
+            var effects = sp.GetRequiredService<IEffectRegistry>();
+            var logger = sp.GetService<ILoggerFactory>()?.CreateLogger("Vst");
+            return new VstPluginProvider(instruments, effects, msg => logger?.LogInformation("{Message}", msg));
+        });
     }
 
     public object CreateShell(IServiceProvider services) => new MainWindow
@@ -72,5 +85,13 @@ public sealed class DesktopPlatform : IPlatformServices
         var lv2Logger = services.GetService<ILoggerFactory>()?.CreateLogger("Lv2");
         Lv2PluginBase.Log = msg => lv2Logger?.LogInformation("{Message}", msg);
         services.GetRequiredService<Lv2PluginProvider>().ScanAsync();
+
+        // Same for VST2 + VST3 (each format has its own static log sink). VST logs are also mirrored to
+        // stderr so plugin-editor open steps interleave with the bridge's own console output (yabridge),
+        // which makes diagnosing GUI-open hangs possible from a single terminal.
+        var vstLogger = services.GetService<ILoggerFactory>()?.CreateLogger("Vst");
+        Vst2PluginBase.Log = msg => { vstLogger?.LogInformation("{Message}", msg); Console.Error.WriteLine($"[Vst] {msg}"); };
+        Vst3PluginBase.Log = msg => { vstLogger?.LogInformation("{Message}", msg); Console.Error.WriteLine($"[Vst] {msg}"); };
+        services.GetRequiredService<VstPluginProvider>().ScanAsync();
     }
 }

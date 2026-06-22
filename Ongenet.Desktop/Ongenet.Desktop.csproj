@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         Desktop application head. Thin: it brings the native stack (Avalonia.Desktop platform backends,
-        Ongenet.Audio, Ongenet.Clap, Ongenet.Lv2) and plugs it into the shared Ongenet.App UI library via
+        Ongenet.Audio, Ongenet.Clap, Ongenet.Lv2, Ongenet.Vst) and plugs it into the shared Ongenet.App UI library via
         DesktopPlatform. The runnable artifact stays named "Ongenet" for users.
     -->
     <PropertyGroup>
@@ -40,5 +40,6 @@
         <ProjectReference Include="..\Ongenet.Audio\Ongenet.Audio.csproj" />
         <ProjectReference Include="..\Ongenet.Clap\Ongenet.Clap.csproj" />
         <ProjectReference Include="..\Ongenet.Lv2\Ongenet.Lv2.csproj" />
+        <ProjectReference Include="..\Ongenet.Vst\Ongenet.Vst.csproj" />
     </ItemGroup>
 </Project>
