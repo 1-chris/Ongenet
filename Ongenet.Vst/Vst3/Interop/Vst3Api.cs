@@ -64,6 +64,8 @@ public static unsafe class Vst3Api
     public static readonly byte[] IidAudioProcessor = Tuid(0x42043F99, 0xB7DA453C, 0xA569E79D, 0x9AAEC33D);
     public static readonly byte[] IidEditController = Tuid(0xDCD7BBE3, 0x7742448D, 0xA874AACC, 0x979C759E);
     public static readonly byte[] IidConnectionPoint = Tuid(0x70A4156F, 0x6E6E4026, 0x989148BF, 0xAA60D8D1);
+    public static readonly byte[] IidMessage = Tuid(0x936F033B, 0xC6C047DB, 0xBB0882F8, 0x13C1E613);
+    public static readonly byte[] IidAttributeList = Tuid(0x1E5F0AEB, 0xCC7F4533, 0xA2544011, 0x38AD5EE4);
     public static readonly byte[] IidPlugView = Tuid(0x5BC32507, 0xD06049EA, 0xA6151B52, 0x2B755B29);
     public static readonly byte[] IidPlugFrame = Tuid(0x367FAF01, 0xAFA94693, 0x8D4DA2A0, 0xED0882A3);
     public static readonly byte[] IidComponentHandler = Tuid(0x93A0BEA3, 0x0BD045DB, 0x8E890B0C, 0xC1E46AC6);

@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace Ongenet.Vst.Vst3.Interop;
 
@@ -24,7 +26,7 @@ public static unsafe class Vst3Host
     private struct ConnObj { public void* Vtbl; public nint Gc; public nint Peer; }
 
     private static readonly object Lock = new();
-    private static void* _hostAppVtbl, _handlerVtbl, _frameVtbl, _eventListVtbl, _paramChangesVtbl, _paramQueueVtbl, _streamVtbl, _runLoopVtbl, _connVtbl;
+    private static void* _hostAppVtbl, _handlerVtbl, _frameVtbl, _eventListVtbl, _paramChangesVtbl, _paramQueueVtbl, _streamVtbl, _runLoopVtbl, _connVtbl, _messageVtbl, _attrListVtbl;
 
     private static Vst3PluginBase? Plugin(void* self)
     {
@@ -89,7 +91,24 @@ public static unsafe class Vst3Host
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
     private static int HostAppCreateInstance(void* self, byte* cid, byte* iid, void** obj)
     {
-        *obj = null; return Vst3Api.NoInterface; // we don't vend host message/attribute objects
+        // Plugins ask the host to create an IMessage (carrying an IAttributeList) so a component and its
+        // separate controller can talk over IConnectionPoint::notify. Vending a real, refcounted message —
+        // rather than failing with kNoInterface — is what lets us keep the component<->controller connection
+        // wired without plugins like Philharmonik 2 dereferencing a null message, and is required for
+        // separate-controller plugins such as Sylenth1 to finish initializing their editor.
+        if (iid != null && Vst3Api.IidEquals(iid, Vst3Api.IidMessage))
+        {
+            *obj = NewMessage();
+            return Vst3Api.ResultOk;
+        }
+
+        if (iid != null && Vst3Api.IidEquals(iid, Vst3Api.IidAttributeList))
+        {
+            *obj = NewAttributeList();
+            return Vst3Api.ResultOk;
+        }
+
+        *obj = null; return Vst3Api.NoInterface;
     }
 
     // ---------------- IComponentHandler ----------------
@@ -228,6 +247,229 @@ public static unsafe class Vst3Host
             return v->Notify != null ? v->Notify(peer, message) : Vst3Api.ResultOk;
         }
         finally { Vst3PluginBase.EndNotify(); }
+    }
+
+    // ---------------- IMessage + IAttributeList ----------------
+    // A message (and the attribute list it owns) is created on demand by a plugin, filled in, handed to the
+    // peer connection point via notify(), then released. Unlike the host's long-lived singletons these are
+    // genuinely owned by the plugin, so they carry a real refcount (RcObj.RefCount) and free themselves —
+    // native block, GCHandle, and any binary buffers — when the last reference is released.
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RcObj { public void* Vtbl; public nint Gc; public int RefCount; }
+
+    private sealed class Message { public nint IdNative; public nint Attr; }
+
+    private sealed class AttrList
+    {
+        // Boxed long / double / string, or Bin for binary. Binary is copied into a native buffer so the
+        // pointer handed back from getBinary stays valid until the attribute is overwritten or freed.
+        public readonly Dictionary<string, object> Map = new();
+        public sealed class Bin { public nint Ptr; public uint Len; }
+    }
+
+    private static T? Rc<T>(void* self) where T : class
+        => GCHandle.FromIntPtr(((RcObj*)self)->Gc).Target as T;
+
+    private static void* NewRcObj(void* vtbl, object managed)
+    {
+        var o = (RcObj*)Marshal.AllocHGlobal(sizeof(RcObj));
+        o->Vtbl = vtbl;
+        o->Gc = GCHandle.ToIntPtr(GCHandle.Alloc(managed));
+        o->RefCount = 1;
+        return o;
+    }
+
+    // Managed cores (callable directly); the [UnmanagedCallersOnly] thunks below just forward to them.
+    private static uint RcAddRefImpl(void* self) => (uint)Interlocked.Increment(ref ((RcObj*)self)->RefCount);
+
+    private static uint RcReleaseImpl(void* self)
+    {
+        var c = Interlocked.Decrement(ref ((RcObj*)self)->RefCount);
+        if (c > 0) return (uint)c;
+        FreeRcObj(self);
+        return 0;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static uint RcAddRef(void* self) => RcAddRefImpl(self);
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static uint RcRelease(void* self) => RcReleaseImpl(self);
+
+    private static void FreeRcObj(void* self)
+    {
+        var handle = GCHandle.FromIntPtr(((RcObj*)self)->Gc);
+        switch (handle.Target)
+        {
+            case Message m:
+                if (m.IdNative != 0) Marshal.FreeHGlobal(m.IdNative);
+                if (m.Attr != 0) RcReleaseImpl((void*)m.Attr); // drop the message's ref on its attribute list
+                break;
+            case AttrList a:
+                foreach (var v in a.Map.Values)
+                    if (v is AttrList.Bin b && b.Ptr != 0) Marshal.FreeHGlobal(b.Ptr);
+                break;
+        }
+
+        handle.Free();
+        Marshal.FreeHGlobal((nint)self);
+    }
+
+    private static void* MessageVtbl()
+    {
+        lock (Lock)
+            if (_messageVtbl == null) _messageVtbl = MakeVtbl(stackalloc nint[]
+            {
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, void**, int>)&MsgQuery,
+                (nint)(delegate* unmanaged[Cdecl]<void*, uint>)&RcAddRef,
+                (nint)(delegate* unmanaged[Cdecl]<void*, uint>)&RcRelease,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*>)&MsgGetId,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, void>)&MsgSetId,
+                (nint)(delegate* unmanaged[Cdecl]<void*, void*>)&MsgGetAttributes,
+            });
+        return _messageVtbl;
+    }
+
+    private static void* AttrListVtbl()
+    {
+        lock (Lock)
+            if (_attrListVtbl == null) _attrListVtbl = MakeVtbl(stackalloc nint[]
+            {
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, void**, int>)&AttrQuery,
+                (nint)(delegate* unmanaged[Cdecl]<void*, uint>)&RcAddRef,
+                (nint)(delegate* unmanaged[Cdecl]<void*, uint>)&RcRelease,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, long, int>)&AttrSetInt,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, long*, int>)&AttrGetInt,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, double, int>)&AttrSetFloat,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, double*, int>)&AttrGetFloat,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, byte*, int>)&AttrSetString,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, byte*, uint, int>)&AttrGetString,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, void*, uint, int>)&AttrSetBinary,
+                (nint)(delegate* unmanaged[Cdecl]<void*, byte*, void**, uint*, int>)&AttrGetBinary,
+            });
+        return _attrListVtbl;
+    }
+
+    private static void* NewAttributeList() => NewRcObj(AttrListVtbl(), new AttrList());
+
+    private static void* NewMessage()
+    {
+        var attr = NewAttributeList();
+        // Start with a valid (empty) ID buffer so getMessageID never returns null — a plugin or yabridge
+        // that strlen()s the ID before setMessageID is called would otherwise crash.
+        return NewRcObj(MessageVtbl(), new Message { Attr = (nint)attr, IdNative = Marshal.StringToHGlobalAnsi("") });
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int MsgQuery(void* self, byte* iid, void** obj)
+    {
+        if (Vst3Api.IidEquals(iid, Vst3Api.IidMessage) || Vst3Api.IidEquals(iid, Vst3Api.IidFUnknown))
+        {
+            RcAddRefImpl(self); *obj = self; return Vst3Api.ResultOk;
+        }
+
+        *obj = null; return Vst3Api.NoInterface;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static byte* MsgGetId(void* self) => (byte*)(Rc<Message>(self)?.IdNative ?? 0);
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static void MsgSetId(void* self, byte* id)
+    {
+        if (Rc<Message>(self) is not { } m) return;
+        if (m.IdNative != 0) { Marshal.FreeHGlobal(m.IdNative); m.IdNative = 0; }
+        if (id != null) m.IdNative = Marshal.StringToHGlobalAnsi(Vst3Api.ReadAscii(id, 1024));
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static void* MsgGetAttributes(void* self) => (void*)(Rc<Message>(self)?.Attr ?? 0);
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrQuery(void* self, byte* iid, void** obj)
+    {
+        if (Vst3Api.IidEquals(iid, Vst3Api.IidAttributeList) || Vst3Api.IidEquals(iid, Vst3Api.IidFUnknown))
+        {
+            RcAddRefImpl(self); *obj = self; return Vst3Api.ResultOk;
+        }
+
+        *obj = null; return Vst3Api.NoInterface;
+    }
+
+    // 'id' is an ASCII AttrID (const char*). On overwrite, release any binary buffer the key previously held.
+    private static void AttrPut(void* self, byte* id, object value)
+    {
+        if (Rc<AttrList>(self) is not { } a) return;
+        var key = Vst3Api.ReadAscii(id, 256);
+        if (a.Map.TryGetValue(key, out var old) && old is AttrList.Bin b && b.Ptr != 0) Marshal.FreeHGlobal(b.Ptr);
+        a.Map[key] = value;
+    }
+
+    private static bool AttrTryGet(void* self, byte* id, out object? value)
+    {
+        value = null;
+        return Rc<AttrList>(self) is { } a && a.Map.TryGetValue(Vst3Api.ReadAscii(id, 256), out value);
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrSetInt(void* self, byte* id, long value) { AttrPut(self, id, value); return Vst3Api.ResultOk; }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrGetInt(void* self, byte* id, long* value)
+    {
+        if (AttrTryGet(self, id, out var v) && v is long l) { *value = l; return Vst3Api.ResultOk; }
+        *value = 0; return Vst3Api.ResultFalse;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrSetFloat(void* self, byte* id, double value) { AttrPut(self, id, value); return Vst3Api.ResultOk; }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrGetFloat(void* self, byte* id, double* value)
+    {
+        if (AttrTryGet(self, id, out var v) && v is double d) { *value = d; return Vst3Api.ResultOk; }
+        *value = 0; return Vst3Api.ResultFalse;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrSetString(void* self, byte* id, byte* str)
+    {
+        AttrPut(self, id, Vst3Api.ReadUtf16(str, 1 << 16));
+        return Vst3Api.ResultOk;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrGetString(void* self, byte* id, byte* str, uint sizeInBytes)
+    {
+        if (AttrTryGet(self, id, out var v) && v is string s)
+        {
+            Vst3Api.WriteUtf16(str, s, (int)sizeInBytes);
+            return Vst3Api.ResultOk;
+        }
+
+        if (str != null && sizeInBytes >= 2) { str[0] = 0; str[1] = 0; }
+        return Vst3Api.ResultFalse;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrSetBinary(void* self, byte* id, void* data, uint sizeInBytes)
+    {
+        var bin = new AttrList.Bin { Len = sizeInBytes, Ptr = Marshal.AllocHGlobal((int)Math.Max(1, sizeInBytes)) };
+        if (data != null && sizeInBytes > 0) Buffer.MemoryCopy(data, (void*)bin.Ptr, sizeInBytes, sizeInBytes);
+        AttrPut(self, id, bin);
+        return Vst3Api.ResultOk;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+    private static int AttrGetBinary(void* self, byte* id, void** data, uint* sizeInBytes)
+    {
+        if (AttrTryGet(self, id, out var v) && v is AttrList.Bin b)
+        {
+            *data = (void*)b.Ptr; *sizeInBytes = b.Len; return Vst3Api.ResultOk;
+        }
+
+        *data = null; *sizeInBytes = 0; return Vst3Api.ResultFalse;
     }
 
     // ---------------- IRunLoop (Steinberg::Linux) ----------------

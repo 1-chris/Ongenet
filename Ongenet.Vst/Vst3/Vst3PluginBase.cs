@@ -150,12 +150,14 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
 
             Log?.Invoke($"VST3 '{Name}': resolve controller...");
             ResolveController();
-            // NOTE: we intentionally do NOT connect the component<->controller IConnectionPoints. The
-            // connection is optional (state is synced via getState/setComponentState in TransferState), and
-            // connecting it makes some plugins (e.g. Philharmonik 2) try to create an IMessage via
-            // IHostApplication::createInstance — which we don't vend yet — and crash. Proper connection
-            // support needs host IMessage/IAttributeList objects; until then, staying unconnected is safe.
-            Log?.Invoke($"VST3 '{Name}': connect components (skipped, separate={_controllerSeparate}).");
+            // Connect the component<->controller IConnectionPoints through our host proxies. This is what
+            // separate-controller plugins (e.g. Sylenth1) rely on to fully initialize their editor — without
+            // it createView returns null. Two things keep it safe: the proxy drops re-entrant notify() so a
+            // plugin that answers a notify with another notify (Philharmonik 2) can't overflow the stack, and
+            // the host now vends a real IMessage/IAttributeList from createInstance so those same plugins
+            // don't deref a null message. State is still also synced via getState/setComponentState below.
+            Log?.Invoke($"VST3 '{Name}': connect components (separate={_controllerSeparate})...");
+            ConnectComponents();
             Log?.Invoke($"VST3 '{Name}': transfer state...");
             TransferState();
             Log?.Invoke($"VST3 '{Name}': setComponentHandler...");
@@ -204,17 +206,16 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
         _cpController = Vst3Api.QueryInterface(_controller, Vst3Api.IidConnectionPoint);
         if (_cpComponent == null || _cpController == null) return;
 
-        // Connect each side to a host proxy (not directly to the other side). The proxy forwards notify()
-        // to the real peer but drops a re-entrant notify, so a plugin that replies to a notify with
-        // another notify can't recurse the two sides into a stack overflow (Philharmonik 2 does this).
-        var gc = GCHandle.ToIntPtr(_selfHandle);
-        _connToController = Vst3Host.BuildConnectionProxy(gc, (nint)_cpController);
-        _connToComponent = Vst3Host.BuildConnectionProxy(gc, (nint)_cpComponent);
-
+        // Connect the two connection points directly to each other, exactly as VST3PluginTestHost and JUCE's
+        // AudioPluginHost do. Both points are real plugin objects (under yabridge, two Wine-side objects), so
+        // notify() is routed peer-to-peer without a host object in the middle — interposing one of our own
+        // proxies instead makes yabridge marshal every message across the Wine boundary and crashes. Messages
+        // the plugin creates for these notifications come from our IHostApplication::createInstance, which now
+        // vends a real IMessage/IAttributeList (see Vst3Host) so plugins like Philharmonik 2 don't null-deref.
         var a = *(Vst3Api.ConnectionPointVtbl**)_cpComponent;
         var b = *(Vst3Api.ConnectionPointVtbl**)_cpController;
-        if (a->Connect != null) a->Connect(_cpComponent, _connToController);
-        if (b->Connect != null) b->Connect(_cpController, _connToComponent);
+        if (a->Connect != null) a->Connect(_cpComponent, _cpController);
+        if (b->Connect != null) b->Connect(_cpController, _cpComponent);
     }
 
     // Re-entrancy guard for IConnectionPoint notify forwarding (per thread). BeginNotify returns false if
@@ -612,6 +613,13 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
                 }
 
                 _editorOpen = true;
+
+                // Tell the view its actual frame size via IPlugView::onSize. setFrame/getSize alone don't
+                // hand the plugin a rect, so some plugins (e.g. KORG M1 Le) lay their content out into a
+                // default sub-region and render into a corner until they're told. We queue it rather than
+                // calling onSize here because onSize can bounce back as resizeView — applied from PumpEditor
+                // it runs on the UI thread outside the plugin's call stack, so the bounce can't recurse.
+                QueueViewSize(_editorW, _editorH);
                 Log?.Invoke($"VST3 '{Name}': editor opened {_editorW}x{_editorH}.");
             }
             finally { Marshal.FreeCoTaskMem(typeUtf8); }
@@ -796,16 +804,12 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
             if (_view != null) { Vst3Api.Release(_view); _view = null; }
             if (_active) Suspend();
 
-            if (_cpComponent != null && _connToController != null)
+            if (_cpComponent != null && _cpController != null)
             {
                 var a = *(Vst3Api.ConnectionPointVtbl**)_cpComponent;
-                if (a->Disconnect != null) a->Disconnect(_cpComponent, _connToController);
-            }
-
-            if (_cpController != null && _connToComponent != null)
-            {
+                if (a->Disconnect != null) a->Disconnect(_cpComponent, _cpController);
                 var b = *(Vst3Api.ConnectionPointVtbl**)_cpController;
-                if (b->Disconnect != null) b->Disconnect(_cpController, _connToComponent);
+                if (b->Disconnect != null) b->Disconnect(_cpController, _cpComponent);
             }
 
             if (_controller != null && Ctrl->SetComponentHandler != null) Ctrl->SetComponentHandler(_controller, null);
