@@ -10,7 +10,6 @@
         Title="MIDI Generator"
         TransparencyLevelHint="Transparent"
         Background="Transparent"
-        SystemDecorations="None"
         ExtendClientAreaToDecorationsHint="True">
     <Panel>
     <Border Name="RootBorder" Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}"

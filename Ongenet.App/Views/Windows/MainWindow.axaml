@@ -12,7 +12,6 @@
         Width="1670" Height="900"
         TransparencyLevelHint="Blur, AcrylicBlur, Transparent"
         Background="Transparent"
-        SystemDecorations="None"
         ExtendClientAreaToDecorationsHint="True"
         Title="{Binding Title}">
 
@@ -279,8 +278,8 @@
     </Panel>
     </Border>
 
-    <!-- Resize Handles -->
-    <Grid IsHitTestVisible="True">
+    <!-- Resize Handles (custom; hidden on macOS where the native frame resizes the window) -->
+    <Grid Name="ResizeHandles" IsHitTestVisible="True">
         <Border Width="4" HorizontalAlignment="Left" Cursor="LeftSide" PointerPressed="OnResizeHandlePressed" Tag="Left" Background="Transparent"/>
         <Border Width="4" HorizontalAlignment="Right" Cursor="RightSide" PointerPressed="OnResizeHandlePressed" Tag="Right" Background="Transparent"/>
         <Border Height="4" VerticalAlignment="Top" Cursor="TopSide" PointerPressed="OnResizeHandlePressed" Tag="Top" Background="Transparent"/>
