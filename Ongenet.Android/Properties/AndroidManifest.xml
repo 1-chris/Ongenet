@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="1" android:versionName="1.0">
+    <!--
+        Tablet-first manifest. minSdk 26 (Android 8.0) matches the AAudio requirement of the audio
+        backend. Hardware acceleration is on for smooth Avalonia rendering. No audio-output permission
+        is required; RECORD_AUDIO would only be added once microphone capture is implemented.
+    -->
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
+
+    <!-- Designed for large screens; allow all so phones still install, but the layout targets tablets. -->
+    <supports-screens
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:normalScreens="true"
+        android:smallScreens="false"
+        android:anyDensity="true" />
+
+    <application
+        android:label="Ongenet"
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:supportsRtl="true" />
+</manifest>

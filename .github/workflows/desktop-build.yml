@@ -1,17 +1,20 @@
-name: Desktop Build
+name: Build & Release
 
-# Builds self-contained Ongenet desktop packages for every platform and (on a v* tag) publishes them
-# to a GitHub Release.
+# Builds the distributable Ongenet packages — self-contained desktop builds for every platform plus a
+# sideloadable Android APK — and (on a v* tag) publishes them all to a single GitHub Release.
 #
-# Audio uses each OS's native backend (ALSA/PipeWire/JACK/Pulse on Linux, CoreAudio on macOS, WASAPI on
-# Windows) via P/Invoke to the platform's own libraries, so there are no native libraries to compile or
-# bundle — every target is a plain `dotnet publish`:
+# Desktop: audio uses each OS's native backend (ALSA/PipeWire/JACK/Pulse on Linux, CoreAudio on macOS,
+# WASAPI on Windows) via P/Invoke to the platform's own libraries, so there are no native libraries to
+# compile or bundle — every target is a plain `dotnet publish`:
 #   * linux-x64           : built on an x86_64 Ubuntu runner.
 #   * linux-arm64         : built on an arm64 Ubuntu runner.
 #   * win-x64             : cross-published from the x86_64 Ubuntu runner (pure .NET, no native build).
 #   * osx-arm64 / osx-x64 : built on macOS runners (osx-x64 cross-published from the Apple Silicon runner).
+# Each desktop job ends with dist/Ongenet-<rid>.zip (produced by publish-desktop.sh) uploaded as an artifact.
 #
-# Each job ends with dist/Ongenet-<rid>.zip (produced by publish-desktop.sh) uploaded as an artifact.
+# Android: the `android` job sets up JDK 21 + the .NET android workload, provisions the Android SDK, and
+# runs publish-android.sh to emit dist/Ongenet-<version>.apk (debug-signed, for sideloading). No emulator
+# or Android Studio is involved.
 
 on:
   push:
@@ -24,7 +27,7 @@ on:
 # Don't pile up redundant runs for the same ref; cancel the in-progress one when a new push lands.
 # (Tag runs get their own group so a release build is never cancelled by a later branch push.)
 concurrency:
-  group: desktop-build-${{ github.ref }}
+  group: build-release-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -83,14 +86,64 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Attach every platform's package to a GitHub Release, but only when a v* tag is pushed.
+  # Build the sideloadable Android APK. Kept on its own Linux job because it needs the Android toolchain
+  # (JDK 21 + the .NET android workload + SDK) that the desktop jobs don't.
+  android:
+    name: Build android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # The .NET Android tooling requires exactly JDK 21 (with javac/jar). Temurin 21 provides it and
+      # setup-java points JAVA_HOME at it.
+      - name: Install JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      # The ubuntu runner ships an Android SDK ($ANDROID_SDK_ROOT); provision the specific platform +
+      # build-tools this project needs into it (and accept the licenses) before building.
+      - name: Provision Android SDK components
+        run: |
+          dotnet build Ongenet.Android/Ongenet.Android.csproj -t:InstallAndroidDependencies \
+            -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" \
+            -p:JavaSdkDirectory="$JAVA_HOME" \
+            -p:AcceptAndroidSDKLicenses=True
+
+      - name: Publish APK
+        run: |
+          chmod +x publish-android.sh
+          # setup-java exports JAVA_HOME (Temurin 21) and the runner sets ANDROID_SDK_ROOT; pass them to
+          # the script (its /usr/lib/jvm auto-detection won't find the hostedtoolcache JDK).
+          JAVA21_HOME="$JAVA_HOME" ANDROID_SDK="$ANDROID_SDK_ROOT" ./publish-android.sh
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ongenet-android
+          path: dist/Ongenet-*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  # Attach every desktop package and the Android APK to a single GitHub Release, but only when a v* tag
+  # is pushed.
   release:
     name: Publish Release
-    needs: build
+    needs: [ build, android ]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Download all packages
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts          # each artifact lands in artifacts/<name>/...
@@ -98,6 +151,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2   # third-party action; pinned to a major tag
         with:
-          files: artifacts/**/Ongenet-*.zip
+          files: |
+            artifacts/**/Ongenet-*.zip
+            artifacts/**/Ongenet-*.apk
           generate_release_notes: true
           fail_on_unmatched_files: true

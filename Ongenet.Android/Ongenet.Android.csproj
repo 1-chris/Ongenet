@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Android application head. Thin: it brings the Android platform backend (Avalonia.Android, an
+        AAudio audio backend) and plugs it into the shared Ongenet.App UI library via AndroidPlatform,
+        using the same single-view lifetime the browser head uses. No native plugin hosting
+        (CLAP/LV2/VST) — those formats don't exist on Android.
+
+        Targets Android 8.0 (API 26): the minimum for the AAudio low-latency audio API used by the
+        backend. The build produces a sideloadable .apk (AndroidPackageFormat=apk).
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0-android</TargetFramework>
+        <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+        <OutputType>Exe</OutputType>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+
+        <RootNamespace>Ongenet.Android</RootNamespace>
+        <AssemblyName>Ongenet.Android</AssemblyName>
+        <ApplicationId>net.onge.ongenet</ApplicationId>
+
+        <!-- Versioning: ApplicationVersion is the integer Android versionCode; the display name flows
+             from the solution-wide <Version> in Directory.Build.props. -->
+        <ApplicationVersion>1</ApplicationVersion>
+        <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+
+        <!-- Sideload-friendly: emit a plain .apk rather than an .aab (which is for Play Store upload). -->
+        <AndroidPackageFormat>apk</AndroidPackageFormat>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="12.0.4" />
+        <PackageReference Include="Avalonia.Android" Version="12.0.4" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Ongenet.App\Ongenet.App.csproj" />
+        <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+        <!-- The OS-native audio backend (AAudio on Android) lives in Ongenet.Audio alongside the
+             ALSA/CoreAudio/WASAPI backends, same as the desktop head. -->
+        <ProjectReference Include="..\Ongenet.Audio\Ongenet.Audio.csproj" />
+    </ItemGroup>
+</Project>

@@ -6,9 +6,16 @@
              xmlns:views="using:Ongenet.App.Views.Panels"
              xmlns:controls="using:Ongenet.App.Controls"
              mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
-             x:Class="Ongenet.Web.Views.MainView"
+             x:Class="Ongenet.App.Views.MainView"
              x:DataType="vm:MainViewModel"
              Focusable="True">
+
+    <!--
+        The shared single-view shell: the in-canvas counterpart of the desktop MainWindow, used by every
+        head that runs under a single-view lifetime (the browser and Android heads). It hosts the same
+        panel views bound to the same MainViewModel, minus the OS window chrome and the secondary tool
+        windows. It keeps the transport + typing-keyboard shortcuts (handy with a hardware keyboard).
+    -->
 
     <UserControl.Styles>
         <!-- Compact tab headers, matching the desktop main window. -->
@@ -29,7 +36,7 @@
     <Border Background="{StaticResource CatppuccinBase}">
         <Grid RowDefinitions="Auto,Auto,*,4,300">
 
-            <!-- Header strip (no OS window chrome in the browser) -->
+            <!-- Header strip (no OS window chrome under a single-view lifetime) -->
             <Grid Grid.Row="0" Classes="TitleBar" ColumnDefinitions="Auto,*,Auto" Height="32"
                   Background="{StaticResource CatppuccinMantle}">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
@@ -38,10 +45,6 @@
                                Foreground="{StaticResource CatppuccinMauve}" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Version}" FontSize="10"
                                Foreground="{StaticResource CatppuccinOverlay1}" VerticalAlignment="Center"/>
-                    <Border Background="{StaticResource CatppuccinSurface0}" CornerRadius="3" Padding="6,1">
-                        <TextBlock Text="web demo" FontSize="10"
-                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    </Border>
                 </StackPanel>
                 <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="11" Margin="12,0"
                            Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Center"/>
@@ -63,8 +66,8 @@
                 <GridSplitter Grid.Column="3" ResizeDirection="Columns"
                               Background="{StaticResource CatppuccinCrust}"/>
 
-                <!-- Library: instruments + effects come from the in-process registries (work in the browser);
-                     samples/soundfonts/presets tabs are empty here (no filesystem). -->
+                <!-- Library: instruments + effects come from the in-process registries; samples/soundfonts/
+                     presets tabs depend on the platform's filesystem services. -->
                 <DockPanel Grid.Column="4" Background="{StaticResource CatppuccinMantle}" MinWidth="220">
                     <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
                     <TabControl Background="{StaticResource CatppuccinMantle}">

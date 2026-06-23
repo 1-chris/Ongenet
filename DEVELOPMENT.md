@@ -27,8 +27,9 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 
 | Tool | Needed for | Notes |
 | --- | --- | --- |
-| **.NET 10 SDK** | Everything | The single hard requirement. Every project targets `net10.0` (the browser head targets `net10.0-browser`). |
+| **.NET 10 SDK** | Everything | The single hard requirement. Every project targets `net10.0` (the browser head targets `net10.0-browser`, the Android head `net10.0-android`). |
 | `wasm-tools` workload | Building/running `Ongenet.Web` | One-time `dotnet workload install wasm-tools`. Not needed for the desktop app. |
+| `android` workload + Android SDK + **JDK 21** | Building `Ongenet.Android` | One-time `dotnet workload install android`, then provision the SDK once and install a full JDK 21 — see [§6](#6-the-android-head-tablets). **Not** needed for the desktop or web heads. Android Studio is **not** required (we sideload an APK). |
 | `zip` | Packaging releases | Used by `publish-desktop.sh`; it falls back to `tar.gz` if absent. |
 | `ffmpeg` (runtime) | Importing non-WAV audio | The desktop app shells out to `ffmpeg` to transcode imported audio. Optional — WAV works without it. |
 
@@ -69,6 +70,19 @@ dotnet build Ongenet.sln       # restores NuGet packages and builds every projec
 ```
 
 The first build restores packages and may take a minute; subsequent builds are incremental.
+
+> **Building only the desktop/web heads:** the solution now includes `Ongenet.Android` (`net10.0-android`),
+> so a full `dotnet build Ongenet.sln` needs the Android toolchain from [§6](#6-the-android-head-tablets).
+> If you only work on the desktop or web heads, build those projects directly instead — they have **no**
+> Android dependency:
+>
+> ```bash
+> dotnet build Ongenet.Desktop      # desktop head only
+> dotnet build Ongenet.Web          # web head only (needs wasm-tools)
+> ```
+>
+> `publish-desktop.sh` likewise builds only `Ongenet.Desktop`, so producing desktop packages never
+> requires the Android SDK or JDK.
 
 ---
 
@@ -163,7 +177,87 @@ Deployment to GitHub Pages (`onge.net/app/`) is automated by `.github/workflows/
 
 ---
 
-## 6. Building distributable desktop packages
+## 6. The Android head (tablets)
+
+`Ongenet.Android` is the Android **head**: a thin `net10.0-android` app (Avalonia.Android) that reuses the
+shared `Ongenet.App` UI and the portable `Ongenet.Core` engine, exactly like the desktop and web heads. It
+runs under Avalonia's single-view lifetime and shows the **same shared `MainView`** the browser uses
+(`Ongenet.App/Views/MainView.axaml`), so there is no Android-specific UI to maintain. Audio goes through a
+native **AAudio** backend that lives in `Ongenet.Audio` alongside the ALSA/CoreAudio/WASAPI backends
+(`Ongenet.Audio/Native/Android/AndroidNativeBackend.cs`, P/Invoking `libaaudio.so`). It is built for
+**tablets** (sensor-landscape, large screens) and is designed to be **sideloaded** — no Android Studio or
+emulator needed.
+
+The platform pieces are wired in `Ongenet.Android`: `AndroidApp` (the `[Application]` class that boots
+Avalonia) and `AndroidPlatform : IPlatformServices` (registers the AAudio backend and Android-safe service
+stubs for settings/library/preset/MIDI). MIDI input, audio capture, and on-device file import are stubbed
+for now (the library/preset tabs start empty); the built-in instruments and effects work.
+
+### One-time setup
+
+1. **Install the Android workload:**
+
+   ```bash
+   dotnet workload install android
+   ```
+
+2. **Install a full JDK 21** (the .NET Android tooling requires *exactly* 21, and a real JDK with
+   `javac`/`jar`, not a JRE). On Fedora/Nobara:
+
+   ```bash
+   sudo dnf install java-21-openjdk-devel       # lands in /usr/lib/jvm/java-21-openjdk
+   ```
+
+   (The system's default JDK can be a newer version — the Android build is pointed at JDK 21 explicitly.)
+
+3. **Provision the Android SDK** once (downloads the platform, build-tools and platform-tools into
+   `~/Android/Sdk`; no Android Studio involved):
+
+   ```bash
+   dotnet build Ongenet.Android/Ongenet.Android.csproj -t:InstallAndroidDependencies \
+     -p:AndroidSdkDirectory=$HOME/Android/Sdk \
+     -p:JavaSdkDirectory=/usr/lib/jvm/java-21-openjdk \
+     -p:AcceptAndroidSDKLicenses=True
+   ```
+
+### Building the APK
+
+The helper script builds a sideloadable, debug-signed APK and copies it to `dist/Ongenet-<version>.apk`:
+
+```bash
+./publish-android.sh                 # Release APK  → dist/Ongenet-<version>.apk
+./publish-android.sh --debug         # Debug build instead
+./publish-android.sh --no-copy       # leave it in bin/, don't copy to dist/
+```
+
+It auto-detects the SDK (`$HOME/Android/Sdk`, or `$ANDROID_SDK`/`$ANDROID_HOME`) and a JDK 21 (or
+`$JAVA21_HOME`). To build by hand without the script:
+
+```bash
+dotnet build Ongenet.Android/Ongenet.Android.csproj -c Debug \
+  -p:AndroidSdkDirectory=$HOME/Android/Sdk \
+  -p:JavaSdkDirectory=/usr/lib/jvm/java-21-openjdk
+# APK: Ongenet.Android/bin/Debug/net10.0-android/net.onge.ongenet-Signed.apk
+```
+
+### Getting it onto a tablet
+
+No emulator required — sideload the APK:
+
+```bash
+adb install -r dist/Ongenet-<version>.apk      # over USB with debugging enabled
+```
+
+…or just copy the `.apk` to the device and open it with a file manager (allow "install from unknown
+sources" for that app). The APK is signed with the Android **debug** key, which is fine for sideloading; a
+Play Store upload would instead use a real signing keystore and an `.aab` (`AndroidPackageFormat=aab`).
+
+> **JDK version errors (`XA0030`)?** The tooling rejects anything other than JDK 21. Point the build at a
+> full JDK 21 with `-p:JavaSdkDirectory=…` (must contain `bin/javac` and `bin/jar`).
+
+---
+
+## 7. Building distributable desktop packages
 
 The repo includes a helper script at the solution root that produces **self-contained, single-file**
 executables (the .NET runtime is bundled, so target machines need no .NET install — that's why each
@@ -205,33 +299,34 @@ dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release --self-containe
 
 ---
 
-## 7. Continuous integration & releases
+## 8. Continuous integration & releases
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `.github/workflows/desktop-build.yml` | push/PR to `main`, `v*` tags, manual | Builds self-contained packages for every RID via `publish-desktop.sh`, uploads them as artifacts, and — on a `v*` tag — attaches them to a GitHub Release. |
+| `.github/workflows/desktop-build.yml` | push/PR to `main`, `v*` tags, manual | Builds self-contained desktop packages for every RID via `publish-desktop.sh` **and** a sideloadable Android APK via `publish-android.sh` (its own JDK 21 + android-workload job), uploads them as artifacts, and — on a `v*` tag — attaches them all to one GitHub Release. |
 | `.github/workflows/deploy-web.yml` | push to `main`, manual | Installs `wasm-tools`, publishes `Ongenet.Web`, assembles the Pages site (homepage from `docs/` at `/`, app at `/app/`), and deploys to GitHub Pages. |
 
 ### Cutting a release
 
 1. Bump `<Version>` in `Directory.Build.props` (the single source of truth — it flows into every
    assembly's version and is shown at runtime in the title bar).
-2. Commit, tag `vX.Y.Z`, and push the tag. The desktop-build workflow publishes the GitHub Release with
-   all platform packages attached.
+2. Commit, tag `vX.Y.Z`, and push the tag. The Build & Release workflow publishes the GitHub Release with
+   all desktop platform packages **and** the Android APK (`Ongenet-X.Y.Z.apk`) attached.
 
 ---
 
-## 8. Project layout (quick reference)
+## 9. Project layout (quick reference)
 
 | Project | Targets | Role |
 | --- | --- | --- |
 | `Ongenet.Core` | `net10.0` | Portable engine, DSP, instruments, effects, persistence — no UI, BCL only. |
-| `Ongenet.App` | `net10.0` | Shared Avalonia UI library used by both heads. |
+| `Ongenet.App` | `net10.0` | Shared Avalonia UI library used by every head. Owns the desktop `MainWindow` and the shared single-view `MainView` (used by the web + Android heads). |
 | `Ongenet.Desktop` | `net10.0` | Desktop exe head (native audio/MIDI + plugins). Publishes as `Ongenet`. |
 | `Ongenet.Web` | `net10.0-browser` | Browser exe head (Web Audio, browser-safe stubs). |
-| `Ongenet.Audio` | `net10.0` | Native audio + MIDI backends (ALSA/CoreAudio/WASAPI; ALSA seq/WinMM/CoreMIDI). |
+| `Ongenet.Android` | `net10.0-android` | Android (tablet) head (AAudio backend, Android-safe stubs, single-view shell). Sideloaded APK. |
+| `Ongenet.Audio` | `net10.0` | Native audio + MIDI backends (ALSA/CoreAudio/WASAPI/**AAudio**; ALSA seq/WinMM/CoreMIDI). |
 | `Ongenet.Clap` / `Ongenet.Lv2` / `Ongenet.Vst` | `net10.0` | Plugin hosting (CLAP / LV2 / VST2+VST3). |
 | `Ongenet.Core.Tests` | `net10.0` | xUnit tests for Core + LV2. |
 
 Each head plugs its platform pieces into the shared `App` through
-`Ongenet.App.Platform.IPlatformServices` (`DesktopPlatform` / `WebPlatform`).
+`Ongenet.App.Platform.IPlatformServices` (`DesktopPlatform` / `WebPlatform` / `AndroidPlatform`).

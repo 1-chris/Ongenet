@@ -10,13 +10,13 @@ using Ongenet.App.ViewModels;
 // Alias the shared Application type so the bare name `App` doesn't bind to the `Ongenet.App` namespace.
 using SharedApp = Ongenet.App.App;
 
-namespace Ongenet.Web.Views;
+namespace Ongenet.App.Views;
 
 /// <summary>
-/// The in-canvas root view for the browser build — the single-view counterpart of the desktop
-/// MainWindow. It hosts the same panel views bound to the same <see cref="MainViewModel"/>, minus the
-/// OS window chrome and the secondary tool windows (which the browser can't show). It keeps the handy
-/// transport + typing-keyboard shortcuts.
+/// The shared single-view root view — the in-canvas counterpart of the desktop MainWindow, used by the
+/// browser and Android heads. It hosts the same panel views bound to the same <see cref="MainViewModel"/>,
+/// minus the OS window chrome and the secondary tool windows (which a single-view host can't show). It
+/// keeps the transport + typing-keyboard shortcuts for when a hardware keyboard is attached.
 /// </summary>
 public partial class MainView : UserControl
 {

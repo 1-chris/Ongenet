@@ -6,9 +6,9 @@ using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Platform;
 using Ongenet.App.Services;
 using Ongenet.App.ViewModels;
+using Ongenet.App.Views;
 using Ongenet.Web.Audio;
 using Ongenet.Web.Services;
-using Ongenet.Web.Views;
 
 namespace Ongenet.Web;
 
