@@ -9,98 +9,77 @@
              x:Class="Ongenet.App.Views.Panels.TransportView"
              x:DataType="vm:TransportViewModel">
 
-    <UserControl.Styles>
-        <Style Selector="Button.Transport">
-            <Setter Property="Width" Value="34"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
-        </Style>
-        <Style Selector="Button.Transport:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
-        </Style>
-    </UserControl.Styles>
+    <Border Classes="panel" Padding="12,7">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
 
-    <Border Background="{StaticResource CatppuccinMantle}"
-            BorderBrush="{StaticResource CatppuccinCrust}"
-            BorderThickness="0,0,0,1"
-            Padding="10,6">
-        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-
-            <!-- Col 0: Render stacked above the transport buttons -->
-            <StackPanel Grid.Column="0" Spacing="5" VerticalAlignment="Center" Margin="0,0,14,0">
-                <Button Content="Render" Click="OnRender" IsEnabled="{Binding CanRender}"
-                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10,3"
-                        Background="{StaticResource CatppuccinSurface0}"
-                        ToolTip.Tip="Export the arrangement to a WAV file"/>
-                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                    <Button Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"
-                            Classes="Transport" ToolTip.Tip="Play (Space)">
-                        <Path Width="12" Height="12" Stretch="Uniform"
-                              Data="M0,0 L10,5 L0,10 Z"
-                              Fill="{StaticResource CatppuccinGreen}"/>
-                    </Button>
-                    <Button Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
-                            Classes="Transport" ToolTip.Tip="Stop (Space)">
-                        <Path Width="11" Height="11" Stretch="Uniform"
-                              Data="M0,0 L10,0 L10,10 L0,10 Z"
-                              Fill="{StaticResource CatppuccinRed}"/>
-                    </Button>
-                    <Button Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}"
-                            Classes="Transport" ToolTip.Tip="Record (one-bar count-in into armed tracks)">
-                        <Ellipse Width="13" Height="13" Fill="{StaticResource CatppuccinRed}"/>
-                    </Button>
-                </StackPanel>
+            <!-- Col 0: transport cluster -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
+                        VerticalAlignment="Center" Margin="0,0,12,0">
+                <controls:IconButton Classes="large success"
+                                     Icon="{StaticResource IconPlay}"
+                                     Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"
+                                     ToolTip.Tip="Play (Space)"/>
+                <controls:IconButton Classes="danger"
+                                     Icon="{StaticResource IconStop}"
+                                     Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
+                                     ToolTip.Tip="Stop (Space)"/>
+                <controls:IconButton Classes="record"
+                                     Classes.active="{Binding IsRecording}"
+                                     Icon="{StaticResource IconRecord}"
+                                     Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}"
+                                     ToolTip.Tip="Record (one-bar count-in into armed tracks)"/>
             </StackPanel>
 
-            <!-- Col 1: time readout + edit-mode/loop tools -->
-            <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center" Margin="0,0,14,0">
-                <StackPanel Orientation="Horizontal" Spacing="4">
+            <Border Grid.Column="1" Classes="divider vertical" Margin="0,4,12,4"/>
+
+            <!-- Col 2: time readout + edit-mode/loop tools -->
+            <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center" Margin="0,0,12,0">
+                <StackPanel Orientation="Horizontal" Spacing="5">
                     <!-- Render-only control (not a TextBlock): the playhead time changes ~30x/sec while
                          playing, and a bound TextBlock re-runs an expensive measure layout each frame. -->
-                    <controls:TimeReadoutControl Text="{Binding PlayheadTime}" FontSize="13"
+                    <controls:TimeReadoutControl Text="{Binding PlayheadTime}" FontSize="14"
                                                  VerticalAlignment="Center"/>
                     <TextBlock Text="/" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <TextBlock Text="{Binding TotalTime}" FontFamily="Consolas, Menlo, DejaVu Sans Mono, monospace" FontSize="13"
+                    <TextBlock Classes="mono" Text="{Binding TotalTime}" FontSize="14"
                                VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <ToggleButton Content="Slice" IsChecked="{Binding IsSliceMode}" FontSize="11" Padding="8,3"
-                                  ToolTip.Tip="Slice mode: click a clip to cut it at the grid — or hold CTRL"/>
-                    <Button Content="[" Command="{Binding SetLoopStartCommand}" FontSize="11" Padding="8,3"
-                            ToolTip.Tip="Set loop start to the cursor (Shift+[)"/>
-                    <Button Content="]" Command="{Binding SetLoopEndCommand}" FontSize="11" Padding="8,3"
-                            ToolTip.Tip="Set loop end to the cursor (Shift+])"/>
-                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                             IsVisible="{Binding IsLooping}"
-                             Fill="{StaticResource CatppuccinGreen}"
-                             ToolTip.Tip="Loop region active"/>
+                    <ToggleButton Classes="toggle" IsChecked="{Binding IsSliceMode}"
+                                  ToolTip.Tip="Slice mode: click a clip to cut it at the grid — or hold CTRL">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Classes="icon small" Data="{StaticResource IconScissors}"/>
+                            <TextBlock Text="Slice" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <controls:IconButton Classes="flat" Icon="{StaticResource IconChevronRight}"
+                                         Command="{Binding SetLoopStartCommand}"
+                                         ToolTip.Tip="Set loop start to the cursor (Shift+[)"/>
+                    <controls:IconButton Classes="flat" Icon="{StaticResource IconChevronLeft}"
+                                         Command="{Binding SetLoopEndCommand}"
+                                         ToolTip.Tip="Set loop end to the cursor (Shift+])"/>
+                    <controls:IconButton Classes="flat active" Icon="{StaticResource IconLoop}"
+                                         IsVisible="{Binding IsLooping}" IsHitTestVisible="False"
+                                         ToolTip.Tip="Loop region active"/>
                 </StackPanel>
             </StackPanel>
 
             <!-- Centre: tempo + bars + time signature -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8"
                         VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="Tempo" VerticalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Classes="caption" Text="Tempo" VerticalAlignment="Center"/>
                 <NumericUpDown Value="{Binding Bpm}"
                                Minimum="20" Maximum="300" Increment="1"
                                FormatString="0.#" Width="110"
                                VerticalAlignment="Center"/>
-                <TextBlock Text="BPM" VerticalAlignment="Center" Margin="0,0,8,0"
-                           Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <TextBlock Text="Bars" VerticalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Classes="caption" Text="BPM" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Classes="caption" Text="Bars" VerticalAlignment="Center"/>
                 <NumericUpDown Value="{Binding Bars}"
                                Minimum="1" Maximum="999" Increment="1"
                                FormatString="0" Width="120" MinWidth="120"
                                VerticalAlignment="Center"/>
 
-                <TextBlock Text="Time" VerticalAlignment="Center" Margin="8,0,0,0"
-                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Classes="caption" Text="Time" VerticalAlignment="Center" Margin="8,0,0,0"/>
                 <NumericUpDown Value="{Binding TimeSigNumerator}" Minimum="1" Maximum="32" Increment="1"
                                FormatString="0" Width="100" MinWidth="100" VerticalAlignment="Center"/>
                 <TextBlock Text="/" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
@@ -108,9 +87,17 @@
                           Width="70" VerticalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Col 3: master loudness meter (audio device selection now lives in the Settings window) -->
-            <StackPanel Grid.Column="3" Spacing="5" VerticalAlignment="Center" HorizontalAlignment="Right">
-                <controls:MasterMeterControl Height="20" MinWidth="200" HorizontalAlignment="Stretch"
+            <!-- Col 4: render + master loudness meter (device selection lives in the Settings window) -->
+            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="10"
+                        VerticalAlignment="Center" HorizontalAlignment="Right">
+                <Button Classes="accent compact" Click="OnRender" IsEnabled="{Binding CanRender}"
+                        ToolTip.Tip="Export the arrangement to a WAV file">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Path Classes="icon small" Data="{StaticResource IconExport}"/>
+                        <TextBlock Text="Render" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <controls:MasterMeterControl Height="20" MinWidth="200"
                                              LevelLeft="{Binding MasterLevelLeft}"
                                              LevelRight="{Binding MasterLevelRight}"/>
             </StackPanel>

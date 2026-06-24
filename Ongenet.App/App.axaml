@@ -7,6 +7,13 @@
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
     <Application.Resources>
+      <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <!-- Vector icon library + custom-control themes (IconButton, etc.). -->
+            <ResourceInclude Source="avares://Ongenet.App/Controls/Icons.axaml"/>
+            <ResourceInclude Source="avares://Ongenet.App/Theming/ControlThemes.axaml"/>
+        </ResourceDictionary.MergedDictionaries>
+
         <!-- Resolves a track ColorKey (palette key or hex) to a brush. -->
         <converters:CoreColorToBrushConverter x:Key="ColorKeyToBrush"/>
 
@@ -71,6 +78,7 @@
         <SolidColorBrush x:Key="CatppuccinBase" Color="{StaticResource CatppuccinBaseColor}"/>
         <SolidColorBrush x:Key="CatppuccinMantle" Color="{StaticResource CatppuccinMantleColor}"/>
         <SolidColorBrush x:Key="CatppuccinCrust" Color="{StaticResource CatppuccinCrustColor}"/>
+      </ResourceDictionary>
     </Application.Resources>
 
     <Application.Styles>
@@ -83,6 +91,7 @@
             </FluentTheme.Palettes>
         </FluentTheme>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <StyleInclude Source="avares://Ongenet.App/Theming/AppStyles.axaml"/>
         <Style Selector="Window, TextBlock, SelectableTextBlock, TextBox, Button, Label, AccessText, MenuItem">
             <Setter Property="TextElement.FontFamily" Value="{StaticResource AppFontFamily}" />
             <Setter Property="TextElement.Foreground" Value="{StaticResource CatppuccinText}" />

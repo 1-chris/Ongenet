@@ -1,0 +1,336 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- App-wide look for standard controls, layered on top of the Fluent theme. Custom controls have
+         their own ControlThemes (ControlThemes.axaml); these styles cover the framework controls the views
+         reuse: cards, typography, the button family, toggles, lists, fields, menus and tooltips. Everything
+         is painted with theme tokens ({StaticResource Catppuccin...}) so it re-themes live. -->
+
+    <!-- ── Typography ────────────────────────────────────────────────────────────────────────── -->
+    <Style Selector="TextBlock.h1">
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+    </Style>
+    <Style Selector="TextBlock.h2">
+        <Setter Property="FontSize" Value="19"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+    </Style>
+    <Style Selector="TextBlock.h3">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+    </Style>
+    <Style Selector="TextBlock.caption">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+    </Style>
+    <Style Selector="TextBlock.subtle">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+    </Style>
+    <Style Selector="TextBlock.accent">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinMauve}"/>
+    </Style>
+    <!-- Section label: an uppercase, tracked-out heading for inspector groups. -->
+    <Style Selector="TextBlock.section">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinOverlay1}"/>
+        <Setter Property="LetterSpacing" Value="1.2"/>
+    </Style>
+    <!-- Monospace readout (time, values). -->
+    <Style Selector="TextBlock.mono">
+        <Setter Property="FontFamily" Value="Consolas, Menlo, DejaVu Sans Mono, monospace"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext1}"/>
+    </Style>
+
+    <!-- ── Inline icons ──────────────────────────────────────────────────────────────────────── -->
+    <!-- A Path used directly in markup as an icon; pair with Data="{StaticResource Icon...}". -->
+    <Style Selector="Path.icon">
+        <Setter Property="Width" Value="18"/>
+        <Setter Property="Height" Value="18"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Fill" Value="{StaticResource CatppuccinSubtext1}"/>
+    </Style>
+    <Style Selector="Path.icon.small">
+        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+    </Style>
+    <Style Selector="Path.menuicon">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Fill" Value="{StaticResource CatppuccinSubtext1}"/>
+    </Style>
+
+    <!-- ── Cards / surfaces ──────────────────────────────────────────────────────────────────── -->
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{StaticResource CatppuccinMantle}"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="14"/>
+    </Style>
+    <Style Selector="Border.surface">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+    <Style Selector="Border.panel">
+        <Setter Property="Background" Value="{StaticResource CatppuccinMantle}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource CatppuccinCrust}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    </Style>
+    <!-- Hairline separators. -->
+    <Style Selector="Border.divider">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Border.divider.vertical">
+        <Setter Property="Width" Value="1"/>
+        <Setter Property="Height" Value="NaN"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- ── Buttons: pill (default surface) ───────────────────────────────────────────────────── -->
+    <Style Selector="Button.pill">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.pill /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+    </Style>
+    <Style Selector="Button.pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+    </Style>
+    <Style Selector="Button.pill:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.98)"/>
+    </Style>
+
+    <!-- accent: the primary call-to-action. -->
+    <Style Selector="Button.accent">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="16,9"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.accent /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+    </Style>
+    <Style Selector="Button.accent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinLavender}"/>
+    </Style>
+    <Style Selector="Button.accent:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.98)"/>
+    </Style>
+    <!-- Force readable on-accent content (the global TextBlock colour would otherwise win and wash out). -->
+    <Style Selector="Button.accent TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+    </Style>
+    <Style Selector="Button.accent Path">
+        <Setter Property="Fill" Value="{StaticResource CatppuccinCrust}"/>
+    </Style>
+
+    <!-- compact: smaller padding/font for dense action rows. -->
+    <Style Selector="Button.compact">
+        <Setter Property="Padding" Value="10,5"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+
+    <!-- ghost: subtle, fills only on hover. -->
+    <Style Selector="Button.ghost">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext1}"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+    </Style>
+
+    <!-- plain: a frameless click target (e.g. wrapping artwork) with no hover chrome. -->
+    <Style Selector="Button.plain">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.plain /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.plain:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- link: inline text that navigates; brightens + underlines on hover. -->
+    <Style Selector="Button.link">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.link TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+    <Style Selector="Button.link:pointerover TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="TextDecorations" Value="Underline"/>
+    </Style>
+
+    <!-- ── ToggleButton: pill toggle ─────────────────────────────────────────────────────────── -->
+    <Style Selector="ToggleButton.toggle">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="12,7"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="ToggleButton.toggle /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+    </Style>
+    <Style Selector="ToggleButton.toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+    </Style>
+    <Style Selector="ToggleButton.toggle:checked">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+    </Style>
+    <Style Selector="ToggleButton.toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+    </Style>
+    <Style Selector="ToggleButton.toggle:checked TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+    </Style>
+
+    <!-- Tab strip (ToggleButton.tab) -->
+    <Style Selector="ToggleButton.tab">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="ToggleButton.tab /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+    </Style>
+    <Style Selector="ToggleButton.tab:checked">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+    </Style>
+    <Style Selector="ToggleButton.tab:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+    </Style>
+
+    <!-- ── Nav rail (ListBox.nav) ────────────────────────────────────────────────────────────── -->
+    <Style Selector="ListBox.nav">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem">
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Margin" Value="0,2"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem:selected">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+    </Style>
+
+    <!-- ── Row lists (ListBox.rows) — library / track / clip lists ───────────────────────────── -->
+    <Style Selector="ListBox.rows">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.rows ListBoxItem">
+        <Setter Property="Padding" Value="8,5"/>
+        <Setter Property="Margin" Value="0,1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+    <Style Selector="ListBox.rows ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+    </Style>
+    <Style Selector="ListBox.rows ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+    </Style>
+
+    <!-- ── Text fields ───────────────────────────────────────────────────────────────────────── -->
+    <Style Selector="TextBox.search">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="TextBox.search /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="9"/>
+    </Style>
+
+    <Style Selector="TextBox.field">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="TextBox.field /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+
+    <!-- ── Menus ─────────────────────────────────────────────────────────────────────────────── -->
+    <Style Selector="ContextMenu">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource CatppuccinSurface2}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="6"/>
+    </Style>
+    <Style Selector="MenuItem">
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="Padding" Value="10,7"/>
+    </Style>
+
+    <!-- ── Tooltips ──────────────────────────────────────────────────────────────────────────── -->
+    <Style Selector="ToolTip">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="FontSize" Value="12"/>
+    </Style>
+</Styles>

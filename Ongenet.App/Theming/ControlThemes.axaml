@@ -1,0 +1,130 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="using:Ongenet.App.Controls">
+
+    <!-- ============================================================================================
+         IconButton — a vector-glyph button with hover/press feedback and emphasis variants. Every
+         brush is a theme token ({StaticResource Catppuccin...}), so the whole control re-themes live.
+         ============================================================================================ -->
+    <ControlTheme x:Key="{x:Type controls:IconButton}" TargetType="controls:IconButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext1}"/>
+        <Setter Property="Width" Value="36"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="IconSize" Value="20"/>
+        <Setter Property="CornerRadius" Value="18"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+            </Transitions>
+        </Setter>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Bg"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                    <!-- Render the glyph inside its full 24x24 design grid so asymmetric icons stay
+                         perfectly centred regardless of their own bounds. -->
+                    <Viewbox Width="{TemplateBinding IconSize}" Height="{TemplateBinding IconSize}"
+                             Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Canvas Width="24" Height="24">
+                            <Path Name="PART_Icon"
+                                  Data="{TemplateBinding Icon}"
+                                  Fill="{TemplateBinding Foreground}"/>
+                        </Canvas>
+                    </Viewbox>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+
+        <Style Selector="^:pointerover /template/ Border#PART_Bg">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:pointerover /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinText}"/>
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.92)"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.35"/>
+        </Style>
+
+        <!-- accent: the primary filled action. -->
+        <Style Selector="^.accent /template/ Border#PART_Bg">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+        <Style Selector="^.accent /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinCrust}"/>
+        </Style>
+        <Style Selector="^.accent:pointerover /template/ Border#PART_Bg">
+            <Setter Property="Background" Value="{StaticResource CatppuccinLavender}"/>
+        </Style>
+        <Style Selector="^.accent:pointerover /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinCrust}"/>
+        </Style>
+
+        <!-- success: a filled "go" action (play). -->
+        <Style Selector="^.success /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinGreen}"/>
+        </Style>
+        <Style Selector="^.success:pointerover /template/ Border#PART_Bg">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^.success:pointerover /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinGreen}"/>
+        </Style>
+
+        <!-- danger: a destructive / stop action. -->
+        <Style Selector="^.danger /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinRed}"/>
+        </Style>
+        <Style Selector="^.danger:pointerover /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinRed}"/>
+        </Style>
+
+        <!-- record: red glyph that fills solid when armed (use together with .active). -->
+        <Style Selector="^.record /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinRed}"/>
+        </Style>
+        <Style Selector="^.record:pointerover /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinRed}"/>
+        </Style>
+        <Style Selector="^.record.active /template/ Border#PART_Bg">
+            <Setter Property="Background" Value="{StaticResource CatppuccinRed}"/>
+        </Style>
+        <Style Selector="^.record.active /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinCrust}"/>
+        </Style>
+
+        <!-- active: an "on" toggle state (loop/snap/slice enabled). -->
+        <Style Selector="^.active /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+        <Style Selector="^.active:pointerover /template/ Path#PART_Icon">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinLavender}"/>
+        </Style>
+
+        <!-- flat: a rounded-square hit target for toolbars/rows. -->
+        <Style Selector="^.flat">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="IconSize" Value="18"/>
+        </Style>
+        <Style Selector="^.small">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="IconSize" Value="16"/>
+        </Style>
+        <Style Selector="^.large">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="IconSize" Value="24"/>
+        </Style>
+    </ControlTheme>
+
+</ResourceDictionary>
