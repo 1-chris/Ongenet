@@ -7,7 +7,13 @@ public enum AutomationTargetKind
     TrackPan,
     EffectEnabled,
     EffectParam,
-    InstrumentParam
+    InstrumentParam,
+
+    /// <summary>Project tempo (BPM). A project-level lane that lives on the master track.</summary>
+    Tempo,
+
+    /// <summary>Project time-signature numerator (beats per bar). A master-track project lane.</summary>
+    TimeSignature
 }
 
 /// <summary>

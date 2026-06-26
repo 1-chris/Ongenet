@@ -68,10 +68,11 @@
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8"
                         VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock Classes="caption" Text="Tempo" VerticalAlignment="Center"/>
-                <NumericUpDown Value="{Binding Bpm}"
-                               Minimum="20" Maximum="300" Increment="1"
+                <NumericUpDown x:Name="TempoEditor" Value="{Binding Bpm}"
+                               Minimum="1" Maximum="999" Increment="1"
                                FormatString="0.#" Width="110"
-                               VerticalAlignment="Center"/>
+                               VerticalAlignment="Center"
+                               ToolTip.Tip="Tempo (BPM). Right-click to automate on the master track."/>
                 <TextBlock Classes="caption" Text="BPM" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <TextBlock Classes="caption" Text="Bars" VerticalAlignment="Center"/>
                 <NumericUpDown Value="{Binding Bars}"
@@ -80,8 +81,9 @@
                                VerticalAlignment="Center"/>
 
                 <TextBlock Classes="caption" Text="Time" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                <NumericUpDown Value="{Binding TimeSigNumerator}" Minimum="1" Maximum="32" Increment="1"
-                               FormatString="0" Width="100" MinWidth="100" VerticalAlignment="Center"/>
+                <NumericUpDown x:Name="TimeSigEditor" Value="{Binding TimeSigNumerator}" Minimum="1" Maximum="32" Increment="1"
+                               FormatString="0" Width="100" MinWidth="100" VerticalAlignment="Center"
+                               ToolTip.Tip="Beats per bar. Right-click to automate on the master track."/>
                 <TextBlock Text="/" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 <ComboBox ItemsSource="{Binding Denominators}" SelectedItem="{Binding TimeSigDenominator}"
                           Width="70" VerticalAlignment="Center"/>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
@@ -258,16 +259,16 @@ public sealed class AudioEngine : IAudioEngine
                         // clip only spans part of the source (SourceLengthSeconds), so stretch off that.
                         var sourceDur = clip.SourceLengthSeconds
                             ?? Math.Max(0.0, samples.FrameCount / (double)samples.SampleRate - clip.SourceOffsetSeconds);
-                        var stretch = clip.StretchToTempo
-                            ? TempoSync.Stretch(sourceDur, bpm, clip.LengthBeats)
-                            : 1.0;
                         var fade = fades.TryGetValue(clip, out var f) ? f : (FadeInBeats: 0.0, FadeOutBeats: 0.0);
                         // Pitch-preserving stretch: one PSOLA shifter per channel, configured at the device rate.
                         var shifters = clip is { PitchCorrected: true, StretchToTempo: true }
                             ? BuildPitchShifters(channels, sampleRate)
                             : null;
-                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples, stretch,
-                            clip.SourceOffsetSeconds, fade.FadeInBeats, fade.FadeOutBeats, shifters));
+                        // Store the stretch *inputs* (source window + flag), not a fixed ratio: the block
+                        // renderer derives the read rate from the live tempo so speed follows tempo automation.
+                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples,
+                            clip.StretchToTempo, sourceDur, clip.SourceOffsetSeconds,
+                            fade.FadeInBeats, fade.FadeOutBeats, shifters));
                     }
                 }
             }
@@ -332,6 +333,17 @@ public sealed class AudioEngine : IAudioEngine
 
         var playing = _playing;
         var prevBeat = _currentBeat;
+
+        // Live tempo: re-evaluate the effective BPM at the start of this block and advance the playhead at
+        // that rate. The effective tempo is the master track's Tempo automation curve when present, else the
+        // manual transport tempo — so an automated tempo ramp (or a manual tempo nudge) takes effect
+        // immediately and continuously while playing, exactly like Bitwig. Tempo-synced clips and the MIDI
+        // sequencer follow automatically because they're positioned by beat, which now advances at the live rate.
+        var sampleRate = _output.Format.SampleRate;
+        var transportBpm = _transport.Tempo.BeatsPerMinute;
+        var effectiveBpm = playing ? EffectiveBpm(prevBeat, transportBpm) : (transportBpm > 0 ? transportBpm : 120.0);
+        if (playing && effectiveBpm > 0) _samplesPerBeat = sampleRate * 60.0 / effectiveBpm;
+
         var curBeat = prevBeat + frames / _samplesPerBeat;
 
         // Looping: wrap the playhead back when it reaches the loop end (an explicit "[ ]" region if set,
@@ -379,10 +391,9 @@ public sealed class AudioEngine : IAudioEngine
 
         // Per-block context for tempo-aware / sidechain effects (the bus's tap buffers persist across blocks).
         _effectCtx.Format = _output.Format;
-        // Use the transport tempo directly so it's valid even when stopped (_samplesPerBeat is only set on
-        // play); tempo-aware effects that run during live audition (e.g. Stuttero) need a real BPM.
-        var ctxBpm = _transport.Tempo.BeatsPerMinute;
-        _effectCtx.Bpm = ctxBpm > 0 ? ctxBpm : 120.0;
+        // Tempo-aware effects (e.g. Stuttero) see the same live, automation-driven tempo the playhead uses;
+        // when stopped this falls back to the manual transport tempo so live audition still has a real BPM.
+        _effectCtx.Bpm = effectiveBpm;
         _effectCtx.PlayheadBeats = prevBeat;
         _effectCtx.Playing = playing;
         _effectCtx.Sidechain = _sidechain;
@@ -431,9 +442,7 @@ public sealed class AudioEngine : IAudioEngine
                 {
                     if (ReferenceEquals(acp.Track, track))
                     {
-                        Mixing.RenderAudioClip(temp, acp.Samples, acp.StartBeat, acp.LengthBeats,
-                            prevBeat, _samplesPerBeat, _output.Format.SampleRate, channels, acp.Stretch,
-                            acp.SourceOffsetSeconds, acp.FadeInBeats, acp.FadeOutBeats, acp.PitchShifters);
+                        RenderClipBlock(temp, acp, prevBeat, _samplesPerBeat, sampleRate, channels, effectiveBpm);
                         hasContent = true;
                     }
                 }
@@ -572,10 +581,9 @@ public sealed class AudioEngine : IAudioEngine
         _active.Clear();
         AllNotesOff();
 
-        // Clear pitch-shifter delay lines so a looped clip restarts cleanly rather than reading stale tail.
-        foreach (var acp in _audioClips)
-            if (acp.PitchShifters is { } shifters)
-                foreach (var sh in shifters) sh.Reset();
+        // Restart each clip's read cursor (and pitch-shifter tail) so a looped clip reads cleanly from the
+        // wrap point rather than continuing from a stale position.
+        foreach (var acp in _audioClips) acp.Reset();
 
         _currentBeat = target;
         _nextEvent = 0;
@@ -659,6 +667,27 @@ public sealed class AudioEngine : IAudioEngine
         }
     }
 
+    // The tempo (BPM) in force at <paramref name="beat"/>: the master track's Tempo automation curve when
+    // one exists, otherwise <paramref name="fallback"/> (the manual transport tempo). An armed tempo lane is
+    // ignored while recording so the manual tempo being captured drives playback, not the old curve.
+    private double EffectiveBpm(double beat, double fallback)
+    {
+        var master = _routing.MasterTrack;
+        if (master is not null)
+        {
+            var recording = _transport.IsRecording;
+            foreach (var lane in master.ActiveAutoLanes)
+            {
+                if (lane.Binding?.Kind != AutomationTargetKind.Tempo) continue;
+                if (recording && lane.IsArmed) break;
+                return Math.Clamp(lane.Evaluate(beat),
+                    ProjectAutomationTargets.MinBpm, ProjectAutomationTargets.MaxBpm);
+            }
+        }
+
+        return fallback > 0 ? fallback : 120.0;
+    }
+
     // Drives each automation lane's target from its curve at the current beat. Armed lanes are
     // left alone while recording so the user's manual control moves are captured, not overwritten.
     private void ApplyAutomation(Track track, double beat)
@@ -725,7 +754,49 @@ public sealed class AudioEngine : IAudioEngine
         }
     }
 
-    private readonly record struct AudioClipPlayback(Track Track, double StartBeat, double LengthBeats, AudioSampleBuffer Samples, double Stretch, double SourceOffsetSeconds, double FadeInBeats, double FadeOutBeats, PitchShifter[]? PitchShifters);
+    // A scheduled audio clip, plus the running read state the block renderer keeps across blocks. The cursor
+    // (ReadPos) is advanced continuously so a changing tempo never jumps the source read position.
+    private sealed class AudioClipPlayback
+    {
+        public AudioClipPlayback(Track track, double startBeat, double lengthBeats, AudioSampleBuffer samples,
+            bool stretchToTempo, double sourceDurSeconds, double sourceOffsetSeconds,
+            double fadeInBeats, double fadeOutBeats, PitchShifter[]? pitchShifters)
+        {
+            Track = track;
+            StartBeat = startBeat;
+            LengthBeats = lengthBeats;
+            Samples = samples;
+            StretchToTempo = stretchToTempo;
+            SourceDurSeconds = sourceDurSeconds;
+            SourceOffsetSeconds = sourceOffsetSeconds;
+            FadeInBeats = fadeInBeats;
+            FadeOutBeats = fadeOutBeats;
+            PitchShifters = pitchShifters;
+        }
+
+        public readonly Track Track;
+        public readonly double StartBeat;
+        public readonly double LengthBeats;
+        public readonly AudioSampleBuffer Samples;
+        public readonly bool StretchToTempo;
+        public readonly double SourceDurSeconds; // source window length (s) a tempo-synced clip spans its beats
+        public readonly double SourceOffsetSeconds;
+        public readonly double FadeInBeats;
+        public readonly double FadeOutBeats;
+        public readonly PitchShifter[]? PitchShifters;
+
+        public double ReadPos;  // current read position in source frames
+        public bool Started;    // false until the playhead first enters the clip (then ReadPos tracks live)
+
+        // Restart from scratch — e.g. when the loop wraps the playhead back before the clip.
+        public void Reset()
+        {
+            Started = false;
+            ReadPos = 0;
+            if (PitchShifters is { } shifters)
+                foreach (var sh in shifters) sh.Reset();
+        }
+    }
 
     // One PSOLA pitch shifter per channel, configured at the device rate, for pitch-preserving stretch.
     private static PitchShifter[] BuildPitchShifters(int channels, int sampleRate)
@@ -738,6 +809,75 @@ public sealed class AudioEngine : IAudioEngine
         }
 
         return shifters;
+    }
+
+    // Renders one audio clip for this block from its persistent read cursor. Because the cursor is advanced
+    // continuously (rather than recomputed from the absolute beat each block), a changing tempo never jumps
+    // the read position — the audio stays click-free through a tempo ramp. Tempo-synced clips advance their
+    // source in lock-step with the playhead's (live) beat rate, so they speed up/slow down with tempo and
+    // stay on the grid; other clips advance at their native rate (tempo-independent). At a constant tempo
+    // this is sample-for-sample identical to <see cref="Mixing.RenderAudioClip"/>.
+    private static void RenderClipBlock(Span<float> temp, AudioClipPlayback acp, double blockStartBeat,
+        double samplesPerBeat, int deviceSampleRate, int channels, double bpm)
+    {
+        var samples = acp.Samples;
+        var frameCount = samples.FrameCount;
+        var frames = temp.Length / channels;
+        var fileSampleRate = samples.SampleRate;
+        var nativeRate = (double)fileSampleRate / deviceSampleRate;     // source frames per device frame, native speed
+        var offsetFrames = acp.SourceOffsetSeconds * fileSampleRate;
+
+        // Tempo-synced: the source window spans LengthBeats of the timeline, so the cursor moves
+        // SourceFramesPerBeat each beat (tempo enters only through how fast the playhead crosses beats).
+        var sourceFrames = acp.SourceDurSeconds * fileSampleRate;
+        var framesPerBeatSynced = acp.LengthBeats > 0 ? sourceFrames / acp.LengthBeats : 0.0;
+        var advanceSynced = samplesPerBeat > 0 ? framesPerBeatSynced / samplesPerBeat : 0.0;
+
+        // Pitch-preserving stretch: undo the (live) stretch ratio so pitch holds while the clip is time-stretched.
+        var shifters = acp.PitchShifters;
+        var usePitch = shifters is not null && acp.StretchToTempo;
+        if (usePitch)
+        {
+            var stretch = TempoSync.Stretch(acp.SourceDurSeconds, bpm, acp.LengthBeats);
+            var pitchRatio = stretch > 0 ? 1.0 / stretch : 1.0;
+            foreach (var sh in shifters!) sh.SetRatio(pitchRatio);
+        }
+
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var localBeat = blockStartBeat + frame / samplesPerBeat - acp.StartBeat;
+            if (localBeat < 0) continue;       // playhead hasn't reached the clip yet
+            if (localBeat >= acp.LengthBeats) break; // past the clip end
+
+            if (!acp.Started)
+            {
+                // First frame inside the clip: seat the cursor at the matching source position (≈ the clip's
+                // source offset when entering at the start; a real offset only when jumping in partway).
+                acp.Started = true;
+                acp.ReadPos = offsetFrames + (acp.StretchToTempo
+                    ? localBeat * framesPerBeatSynced
+                    : localBeat * samplesPerBeat * nativeRate);
+            }
+
+            var pos = acp.ReadPos;
+            var f0 = (long)pos;
+            if (f0 >= frameCount) break;
+
+            var frac = (float)(pos - f0);
+            var gain = Crossfade.Gain(localBeat, acp.LengthBeats, acp.FadeInBeats, acp.FadeOutBeats);
+            var baseIndex = frame * channels;
+            for (var c = 0; c < channels; c++)
+            {
+                var fileChannel = c < samples.Channels ? c : samples.Channels - 1;
+                var s0 = samples.Sample(f0, fileChannel);
+                var s1 = samples.Sample(f0 + 1, fileChannel);
+                var sample = s0 + (s1 - s0) * frac;
+                if (usePitch) sample = shifters![c].Process(sample);
+                temp[baseIndex + c] += sample * gain;
+            }
+
+            acp.ReadPos += acp.StretchToTempo ? advanceSynced : nativeRate;
+        }
     }
 
     // A group/master mixing bus: an accumulation buffer that its children sum into, plus a link to the

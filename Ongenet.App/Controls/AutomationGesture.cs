@@ -108,5 +108,13 @@ namespace Ongenet.App.Controls
             => new DelegateAutomationTarget($"{fx.Name} On/Off", 0, 1,
                 () => fx.Enabled ? 1 : 0, v => fx.Enabled = v >= 0.5, stepped: true)
             { BindKind = AutomationTargetKind.EffectEnabled, BindSource = fx };
+
+        /// <summary>Project tempo (BPM) — a master-track lane that drives playback speed live.</summary>
+        public static IAutomationTarget ForTempo(Project project)
+            => ProjectAutomationTargets.Tempo(project);
+
+        /// <summary>Project time-signature numerator (beats per bar) — a master-track lane.</summary>
+        public static IAutomationTarget ForTimeSignature(Project project)
+            => ProjectAutomationTargets.TimeSignature(project);
     }
 }

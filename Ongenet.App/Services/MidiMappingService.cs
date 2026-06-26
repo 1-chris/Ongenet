@@ -132,7 +132,7 @@ public sealed class MidiMappingService : IMidiMappingService
         var live = new List<MidiMapping>(mappings.Count);
         foreach (var m in mappings)
         {
-            m.Target ??= ProjectFile.BuildTarget(m.Owner, (int)m.Binding.Kind, m.Binding.EffectIndex, m.Binding.ParamIndex);
+            m.Target ??= ProjectFile.BuildTarget(m.Owner, (int)m.Binding.Kind, m.Binding.EffectIndex, m.Binding.ParamIndex, _project.Current);
             if (m.Target is not null) live.Add(m);
         }
 

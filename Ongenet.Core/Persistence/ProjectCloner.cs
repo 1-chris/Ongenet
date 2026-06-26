@@ -29,7 +29,7 @@ public static class ProjectCloner
         };
 
         foreach (var t in src.Tracks)
-            dst.Tracks.Add(CloneTrack(t, instruments, effects));
+            dst.Tracks.Add(CloneTrack(t, instruments, effects, dst));
 
         // MIDI mappings re-point to the cloned owner track (matched by preserved Id); the runtime target
         // is left null and rebuilt from the binding by the mapping service after the snapshot is restored.
@@ -56,7 +56,7 @@ public static class ProjectCloner
         return null;
     }
 
-    private static Track CloneTrack(Track s, IInstrumentRegistry instruments, IEffectRegistry effects)
+    private static Track CloneTrack(Track s, IInstrumentRegistry instruments, IEffectRegistry effects, Project dst)
     {
         var t = new Track
         {
@@ -87,7 +87,7 @@ public static class ProjectCloner
         foreach (var clip in s.Clips) t.Clips.Add(CloneClip(clip));
         foreach (var fx in s.Effects) t.Effects.Add((IAudioEffect)CloneComponent(fx, effects.Create(fx.TypeId)));
         foreach (var lane in s.AutoLanes)
-            if (CloneAutoLane(lane, t) is { } cloned)
+            if (CloneAutoLane(lane, t, dst) is { } cloned)
                 t.AutoLanes.Add(cloned);
 
         t.CommitInstruments();
@@ -123,10 +123,10 @@ public static class ProjectCloner
 
     // Rebuilds the automation lane against the cloned track, re-binding its delegate target from the
     // serializable Binding (same approach as project load). Lanes without a binding can't be re-bound.
-    private static AutomationLane? CloneAutoLane(AutomationLane s, Track clonedTrack)
+    private static AutomationLane? CloneAutoLane(AutomationLane s, Track clonedTrack, Project clonedProject)
     {
         if (s.Binding is not { } b) return null;
-        var target = ProjectFile.BuildTarget(clonedTrack, (int)b.Kind, b.EffectIndex, b.ParamIndex);
+        var target = ProjectFile.BuildTarget(clonedTrack, (int)b.Kind, b.EffectIndex, b.ParamIndex, clonedProject);
         if (target is null) return null;
 
         var lane = new AutomationLane(target) { IsArmed = s.IsArmed, Binding = b };

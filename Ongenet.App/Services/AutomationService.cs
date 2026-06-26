@@ -46,6 +46,8 @@ namespace Ongenet.App.Services
             {
                 case AutomationTargetKind.TrackVolume: return new(AutomationTargetKind.TrackVolume, -1, -1);
                 case AutomationTargetKind.TrackPan: return new(AutomationTargetKind.TrackPan, -1, -1);
+                case AutomationTargetKind.Tempo: return new(AutomationTargetKind.Tempo, -1, -1);
+                case AutomationTargetKind.TimeSignature: return new(AutomationTargetKind.TimeSignature, -1, -1);
                 case AutomationTargetKind.EffectEnabled:
                     var fxIndex = d.BindSource is IAudioEffect fx ? owner.Effects.IndexOf(fx) : -1;
                     return fxIndex >= 0 ? new(AutomationTargetKind.EffectEnabled, fxIndex, -1) : null;

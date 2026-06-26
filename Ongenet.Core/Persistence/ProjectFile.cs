@@ -277,7 +277,7 @@ public static class ProjectFile
 
             var trackCount = r.ReadInt();
             for (var i = 0; i < trackCount; i++)
-                project.Tracks.Add(ReadTrack(r, instruments, effects, samples, warnings, fileVersion));
+                project.Tracks.Add(ReadTrack(r, instruments, effects, samples, warnings, fileVersion, project));
 
             // Optional trailing MIDI-mappings chunk (absent in files saved before this feature).
             if (r.HasMore) r.ReadChunk(c => ReadMidiMappings(c, project));
@@ -287,7 +287,7 @@ public static class ProjectFile
     }
 
     private static Track ReadTrack(OngenReader r, IInstrumentRegistry instruments, IEffectRegistry effects,
-        SampleLoader samples, List<string> warnings, int fileVersion)
+        SampleLoader samples, List<string> warnings, int fileVersion, Project project)
     {
         Track track = null!;
         r.ReadChunk(c =>
@@ -342,7 +342,7 @@ public static class ProjectFile
             var laneCount = c.ReadInt();
             for (var i = 0; i < laneCount; i++)
             {
-                var lane = ReadAutoLane(c, track, warnings);
+                var lane = ReadAutoLane(c, track, warnings, project);
                 if (lane is not null) track.AutoLanes.Add(lane);
             }
 
@@ -359,7 +359,7 @@ public static class ProjectFile
         return track;
     }
 
-    private static AutomationLane? ReadAutoLane(OngenReader r, Track track, List<string> warnings)
+    private static AutomationLane? ReadAutoLane(OngenReader r, Track track, List<string> warnings, Project? project)
     {
         AutomationLane? lane = null;
         r.ReadChunk(c =>
@@ -374,7 +374,7 @@ public static class ProjectFile
             for (var i = 0; i < pointCount; i++)
                 points.Add(new AutomationPoint(c.ReadDouble(), c.ReadDouble(), c.ReadDouble()));
 
-            var target = BuildTarget(track, kind, effectIndex, paramIndex);
+            var target = BuildTarget(track, kind, effectIndex, paramIndex, project);
             if (target is null)
             {
                 warnings.Add($"Automation lane '{name}' could not be re-bound; it was skipped.");
@@ -397,7 +397,8 @@ public static class ProjectFile
     /// effect/param indices) against <paramref name="track"/>. Public so MIDI-controller mappings can
     /// resolve their targets the same way automation lanes do on load. Returns null if it can't bind.
     /// </summary>
-    public static IAutomationTarget? BuildTarget(Track track, int kind, int effectIndex, int paramIndex)
+    public static IAutomationTarget? BuildTarget(Track track, int kind, int effectIndex, int paramIndex,
+        Project? project = null)
     {
         switch ((AutomationTargetKind)kind)
         {
@@ -405,6 +406,10 @@ public static class ProjectFile
                 return new DelegateAutomationTarget("Volume", 0, 1, () => track.Volume, v => track.Volume = v);
             case AutomationTargetKind.TrackPan:
                 return new DelegateAutomationTarget("Pan", -1, 1, () => track.Pan, v => track.Pan = v);
+            case AutomationTargetKind.Tempo:
+                return project is null ? null : ProjectAutomationTargets.Tempo(project);
+            case AutomationTargetKind.TimeSignature:
+                return project is null ? null : ProjectAutomationTargets.TimeSignature(project);
             case AutomationTargetKind.EffectEnabled:
                 if (effectIndex < 0 || effectIndex >= track.Effects.Count) return null;
                 var fx = track.Effects[effectIndex];

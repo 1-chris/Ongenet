@@ -117,13 +117,14 @@ namespace Ongenet.App.ViewModels
         public bool CanStop => IsPlaying || IsRecording;
         public bool CanRecord => !IsPlaying && !IsRecording;
 
-        /// <summary>Tempo in beats per minute; two-way bound to the BPM editor.</summary>
+        /// <summary>Tempo in beats per minute; two-way bound to the BPM editor. Reads the project tempo so
+        /// the editor follows Tempo automation live during playback (it's the value the lane writes).</summary>
         public double Bpm
         {
-            get => _transport.Tempo.BeatsPerMinute;
+            get => _project.Current.Tempo.BeatsPerMinute;
             set
             {
-                if (value <= 0 || _transport.Tempo.BeatsPerMinute == value) return;
+                if (value <= 0 || _project.Current.Tempo.BeatsPerMinute == value) return;
                 App.ServiceProvider?.GetService<IHistoryService>()?.Capture("Change tempo");
                 _transport.Tempo = new Tempo(value);
                 _project.Current.Tempo = new Tempo(value); // keep the project model in sync
@@ -201,6 +202,15 @@ namespace Ongenet.App.ViewModels
             {
                 _lastTimeRefreshMs = now;
                 OnPropertyChanged(nameof(PlayheadTime));
+
+                // While playing, Tempo / Time-signature automation moves these underlying values on the audio
+                // thread — re-read them so the editors animate (the same way the inspector faders do).
+                if (IsPlaying)
+                {
+                    OnPropertyChanged(nameof(Bpm));
+                    OnPropertyChanged(nameof(TotalTime));
+                    OnPropertyChanged(nameof(TimeSigNumerator));
+                }
             }
         }
 
