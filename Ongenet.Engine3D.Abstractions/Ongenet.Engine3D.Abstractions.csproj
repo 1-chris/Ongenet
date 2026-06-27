@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Portable, dependency-free contracts and scene model for the 3D engine. Both the native renderer
+    (Ongenet.Engine3D) and the Avalonia control (Ongenet.App) reference this; it pulls in nothing but the
+    BCL (System.Numerics), so it is safe for every application head, including the Browser/Android heads
+    that cannot load native GPU code. The engine stays free of Avalonia; the UI stays free of the GPU API.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <Description>Ongenet.Engine3D.Abstractions - portable scene model and engine contracts for the GPU 3D engine</Description>
+    <Authors>Ongenet</Authors>
+    <Company>Ongenet</Company>
+    <Product>Ongenet.Engine3D.Abstractions</Product>
+  </PropertyGroup>
+
+</Project>

@@ -38,6 +38,8 @@
         <ProjectReference Include="..\Ongenet.App\Ongenet.App.csproj" />
         <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
         <ProjectReference Include="..\Ongenet.Audio\Ongenet.Audio.csproj" />
+        <!-- Native GPU 3D engine: referenced only by the desktop head and injected via DI. -->
+        <ProjectReference Include="..\Ongenet.Engine3D\Ongenet.Engine3D.csproj" />
         <ProjectReference Include="..\Ongenet.Clap\Ongenet.Clap.csproj" />
         <ProjectReference Include="..\Ongenet.Lv2\Ongenet.Lv2.csproj" />
         <ProjectReference Include="..\Ongenet.Vst\Ongenet.Vst.csproj" />

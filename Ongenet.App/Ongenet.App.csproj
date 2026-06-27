@@ -30,5 +30,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+        <!-- Portable 3D scene model + engine contracts only. The native GPU engine (Ongenet.Engine3D) is
+             referenced solely by the desktop head and injected via DI, so this stays clean for Web/Android. -->
+        <ProjectReference Include="..\Ongenet.Engine3D.Abstractions\Ongenet.Engine3D.Abstractions.csproj" />
     </ItemGroup>
 </Project>

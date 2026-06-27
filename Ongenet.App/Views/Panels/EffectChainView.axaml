@@ -297,6 +297,24 @@
                     </Border>
                 </DataTemplate>
 
+                <!-- 3D Scope: a pass-through effect whose card is a GPU 3D waveform visualization. -->
+                <DataTemplate DataType="fx:WaveformVisualizerEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <Border Height="240" CornerRadius="4" ClipToBounds="True"
+                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                <controls:Engine3DVisualHost VisualizationFactory="{Binding VisualizationFactory}"
+                                                             Title="{Binding Name}"/>
+                            </Border>
+                            <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       Text="Pass-through scope · drag to orbit · scroll to zoom · pop out for a resizable view"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
                 <!-- Default effect card (built-in effects + CLAP audio-effect plugins). -->
                 <DataTemplate DataType="fx:EffectViewModel">
                     <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"

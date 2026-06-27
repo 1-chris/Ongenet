@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The native, desktop-only GPU 3D engine. Hand-written Render Hardware Interface (Rhi/) over raw
+    Silk.NET, with a Vulkan backend that runs natively on Windows/Linux and on macOS via MoltenVK
+    (Vulkan-on-Metal). It renders scenes offscreen to a texture and hands the result back through the
+    portable Ongenet.Engine3D.Abstractions contracts. No Avalonia dependency: the UI layer references the
+    Abstractions only, and the desktop head wires this implementation in via DI.
+
+    Referenced only by the desktop head (Ongenet.Desktop), never by the shared UI library, so the
+    Browser/Android heads never pull native GPU code.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Description>Ongenet.Engine3D - native GPU 3D engine (Vulkan/MoltenVK) for embeddable 3D controls</Description>
+    <Authors>Ongenet</Authors>
+    <Company>Ongenet</Company>
+    <Product>Ongenet.Engine3D</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.Vulkan" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Shaderc" Version="2.23.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <!-- macOS: bundles libMoltenVK.dylib (Vulkan-on-Metal). Silk.NET.Vulkan's loader finds it, so no Vulkan
+         SDK install is needed. Native asset is a no-op on Windows/Linux (they use the system Vulkan loader). -->
+    <PackageReference Include="Silk.NET.MoltenVK.Native" Version="2.23.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ongenet.Engine3D.Abstractions\Ongenet.Engine3D.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

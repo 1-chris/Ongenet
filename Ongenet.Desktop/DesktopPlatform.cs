@@ -11,6 +11,8 @@ using Ongenet.App.Platform;
 using Ongenet.App.ViewModels;
 using Ongenet.App.Views.Windows;
 using Ongenet.Desktop.Services;
+using Ongenet.Engine3D;
+using Ongenet.Engine3D.Abstractions;
 using Ongenet.Lv2;
 using Ongenet.Vst;
 using Ongenet.Vst.Vst2;
@@ -39,6 +41,13 @@ public sealed class DesktopPlatform : IPlatformServices
 
         // External MIDI controller input (ALSA / winmm / CoreMIDI).
         services.AddSingleton<IMidiInputService, MidiInputService>();
+
+        // GPU 3D engine for the embeddable 3D controls (Vulkan, natively on Windows/Linux and via MoltenVK
+        // on macOS). It brings up the device lazily and reports IsAvailable=false instead of throwing if no
+        // usable GPU is present, so 3D controls simply show a placeholder. Desktop-only: the shared UI
+        // resolves it through the I3DEngineFactory seam and the Web/Android heads never register it.
+        services.AddSingleton<I3DEngineFactory>(sp =>
+            new VulkanEngineFactory(sp.GetService<ILoggerFactory>()?.CreateLogger("Engine3D")));
 
         // CLAP plugin hosting: scans for installed plugins and registers them as instruments + effects.
         services.AddSingleton(sp =>

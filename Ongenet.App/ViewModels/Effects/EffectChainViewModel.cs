@@ -30,7 +30,7 @@ namespace Ongenet.App.ViewModels.Effects
 
         // Preferred display order for the add-effect menu categories (plugin formats grouped separately).
         private static readonly string[] CategoryOrder =
-            { "Dynamics", "EQ & Filter", "Modulation", "Delay & Reverb", "Distortion", "Pitch", "Utility", "CLAP", "LV2", "VST2", "VST3" };
+            { "Dynamics", "EQ & Filter", "Modulation", "Delay & Reverb", "Distortion", "Pitch", "Utility", "Visualizer", "CLAP", "LV2", "VST2", "VST3" };
 
         public EffectChainViewModel(List<IAudioEffect> effects, Action commit, Action changed,
             IEffectRegistry registry, IHistoryService history, ITransportService transport, IPlaybackClock clock)
@@ -241,6 +241,7 @@ namespace Ongenet.App.ViewModels.Effects
                     SidechainEffect sc => new SidechainEffectViewModel(sc, RemoveEffect, MoveUp, MoveDown),
                     StutteroEffect st => new StutteroEffectViewModel(st, RemoveEffect, MoveUp, MoveDown),
                     VocoderEffect vc => new VocoderEffectViewModel(vc, RemoveEffect, MoveUp, MoveDown),
+                    WaveformVisualizerEffect wv => new WaveformVisualizerEffectViewModel(wv, RemoveEffect, MoveUp, MoveDown),
                     _ => new EffectViewModel(effect, RemoveEffect, MoveUp, MoveDown)
                 });
             }

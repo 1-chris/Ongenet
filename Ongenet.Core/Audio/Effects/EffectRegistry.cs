@@ -15,6 +15,7 @@ public sealed class EffectRegistry : IEffectRegistry
     private const string CatDistortion = "Distortion";
     private const string CatPitch = "Pitch";
     private const string CatUtility = "Utility";
+    private const string CatVisualizer = "Visualizer";
 
     private readonly List<EffectInfo> _builtIn = new()
     {
@@ -36,7 +37,8 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(VocoderEffect.TypeId, "Vocoder", () => new VocoderEffect(), CatPitch),
         new EffectInfo(AutoTuneEffect.TypeId, "Auto-Tune", () => new AutoTuneEffect(), CatPitch),
         new EffectInfo(StereoWidthEffect.TypeId, "Stereo Width", () => new StereoWidthEffect(), CatUtility),
-        new EffectInfo(UtilityEffect.TypeId, "Utility", () => new UtilityEffect(), CatUtility)
+        new EffectInfo(UtilityEffect.TypeId, "Utility", () => new UtilityEffect(), CatUtility),
+        new EffectInfo(WaveformVisualizerEffect.TypeId, "3D Scope", () => new WaveformVisualizerEffect(), CatVisualizer)
     };
 
     // Dynamically discovered effects (e.g. CLAP audio-effect plugins), added at runtime.
