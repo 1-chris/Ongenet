@@ -20,6 +20,7 @@ public sealed class InstrumentRegistry : IInstrumentRegistry
     {
         new InstrumentInfo(OscillatorInstrument.TypeId, "Oscillator", () => new OscillatorInstrument(), CatSynth),
         new InstrumentInfo(TripleOscInstrument.TypeId, "3x Osc", () => new TripleOscInstrument(), CatSynth),
+        new InstrumentInfo(WavetableInstrument.TypeId, "Wavetable", () => new WavetableInstrument(), CatSynth),
         new InstrumentInfo(FmSynthInstrument.TypeId, "FM Synth", () => new FmSynthInstrument(), CatSynth),
         new InstrumentInfo(PaddaInstrument.TypeId, "Padda", () => new PaddaInstrument(), CatSynth),
         new InstrumentInfo(BasicSamplerInstrument.TypeId, "Basic Sampler", () => new BasicSamplerInstrument(), CatSampler),

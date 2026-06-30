@@ -39,9 +39,13 @@ public sealed class DelayLine
     /// <summary>Reads a fractional delay back with linear interpolation.</summary>
     public float ReadFrac(double delaySamples)
     {
+        if (_size <= 0) return 0f;
+        // Wrap the read position into [0, _size) robustly — handles large or even negative delays without
+        // spinning or indexing out of bounds (a torn delay/size must never crash the audio thread).
         var rp = _write - delaySamples;
-        while (rp < 0) rp += _size;
+        rp -= Math.Floor(rp / _size) * _size;
         var i0 = (int)rp;
+        if (i0 < 0) i0 = 0; else if (i0 >= _size) i0 = _size - 1;
         var frac = (float)(rp - i0);
         var i1 = i0 + 1;
         if (i1 >= _size) i1 -= _size;

@@ -119,6 +119,39 @@
             <!-- Parameters -->
             <panels:GroupedParametersView DataContext="{Binding ParameterGroups}"/>
 
+            <!-- Wavetable synth: a fixed-width 3D table view next to its controls (not the full panel width). -->
+            <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding IsWavetable}" Height="220"
+                    Background="{StaticResource CatppuccinCrust}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                <Grid ColumnDefinitions="360,*">
+                    <Border Grid.Column="0" BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="0,0,1,0">
+                        <controls:Engine3DVisualHost VisualizationFactory="{Binding WavetableVisualizationFactory}"
+                                                     Title="Wavetable"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="14,12" Spacing="9" VerticalAlignment="Top">
+                        <TextBlock Text="WAVETABLE" FontSize="11" FontWeight="Bold"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"
+                                   Text="Sweep with Position; assign the LFO to it for movement. Load a sample (top of the card) to slice it into a table, or pick a built-in shape:"/>
+                        <Button Content="Basic morph" Command="{Binding WavetableBasicCommand}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,6"
+                                Background="{StaticResource CatppuccinSurface1}"
+                                ToolTip.Tip="Sine → triangle → saw → square across the scan"/>
+                        <Button Content="Harmonics" Command="{Binding WavetableHarmonicsCommand}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,6"
+                                Background="{StaticResource CatppuccinSurface1}"
+                                ToolTip.Tip="Sine gaining harmonics into a full sawtooth"/>
+                        <Button Content="Random" Command="{Binding WavetableRandomCommand}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,6"
+                                Background="{StaticResource CatppuccinSurface1}"
+                                ToolTip.Tip="A fresh evolving random-spectrum table"/>
+                        <TextBlock Text="{Binding SampleName, StringFormat='Table: {0}'}" FontSize="10"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <!-- Grain monitor (granular synth only) -->
             <Border Height="96" CornerRadius="4" ClipToBounds="True" IsVisible="{Binding IsGranular}"
                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">

@@ -406,62 +406,20 @@ public sealed class AudioEngine : IAudioEngine
             if (IsSilenced(track, soloActive, routing))
             {
                 track.MeterLevel *= MeterRelease;
-                // A muted/un-soloed source shouldn't keep ducking its consumers — publish silence.
-                if (_sidechain.IsRequested(track.Id)) { temp.Clear(); _sidechain.Publish(track.Id, temp, channels); }
+                // A muted / soloed-out track is still rendered when something taps it as a sidechain source
+                // (e.g. Live Difference for vocal isolation, or a ducking trigger): its real signal is
+                // published to the bus but NOT mixed into the output, so it can drive an effect while staying
+                // silent. When nothing requests it, RenderTrackContent leaves `temp` cleared (publishes silence).
+                if (_sidechain.IsRequested(track.Id))
+                {
+                    RenderTrackContent(track, temp, buffer.Length, channels, prevBeat, sampleRate, effectiveBpm, playing);
+                    _sidechain.Publish(track.Id, temp, channels);
+                }
+
                 continue;
             }
 
-            var hasContent = false;
-            temp.Clear();
-
-            // Instrument rack: render each enabled slot through its own (pre) effect chain, then sum into
-            // the track buffer. The track-level effects below then process the combined output (post chain).
-            var slots = track.ActiveInstruments;
-            if (slots.Length > 0)
-            {
-                var slotTemp = _slotTemp.AsSpan(0, buffer.Length);
-                foreach (var slot in slots)
-                {
-                    if (!slot.Enabled) continue;
-                    slotTemp.Clear();
-                    slot.Instrument.Render(slotTemp);
-                    foreach (var fx in slot.ActiveEffects)
-                    {
-                        if (!fx.Enabled) continue;
-                        if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
-                        fx.Process(slotTemp);
-                    }
-
-                    for (var i = 0; i < slotTemp.Length; i++) temp[i] += slotTemp[i];
-                    hasContent = true;
-                }
-            }
-            else if (playing && track.Kind == TrackKind.Audio)
-            {
-                foreach (var acp in _audioClips)
-                {
-                    if (ReferenceEquals(acp.Track, track))
-                    {
-                        RenderClipBlock(temp, acp, prevBeat, _samplesPerBeat, sampleRate, channels, effectiveBpm);
-                        hasContent = true;
-                    }
-                }
-            }
-
-            // Run the track's insert effects (e.g. reverb) before the strip. Effects run even on
-            // a near-silent block so tails ring out; only skip when the track has no effects.
-            var effects = track.ActiveEffects;
-            if (effects.Length > 0)
-            {
-                foreach (var fx in effects)
-                {
-                    if (!fx.Enabled) continue;
-                    if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
-                    fx.Process(temp);
-                }
-
-                hasContent = true;
-            }
+            var hasContent = RenderTrackContent(track, temp, buffer.Length, channels, prevBeat, sampleRate, effectiveBpm, playing);
 
             // Make this track's post-effect output available to any sidechain consumer that asked for it.
             if (_sidechain.IsRequested(track.Id)) _sidechain.Publish(track.Id, temp, channels);
@@ -550,6 +508,66 @@ public sealed class AudioEngine : IAudioEngine
     {
         var decayed = current * MeterRelease;
         return peak > decayed ? peak : decayed;
+    }
+
+    // Renders a content track's signal into <paramref name="temp"/>: its instrument rack (each enabled slot
+    // through its own pre-effect chain) or its audio clips, then the track's insert (post) effects. Returns
+    // whether anything was rendered. Shared by the normal path and the "render a silenced sidechain source"
+    // path, so a muted/soloed-out track can still feed an effect (Live Difference, ducking) without being heard.
+    private bool RenderTrackContent(Track track, Span<float> temp, int bufferLength, int channels,
+        double prevBeat, int sampleRate, double effectiveBpm, bool playing)
+    {
+        var hasContent = false;
+        temp.Clear();
+
+        var slots = track.ActiveInstruments;
+        if (slots.Length > 0)
+        {
+            var slotTemp = _slotTemp.AsSpan(0, bufferLength);
+            foreach (var slot in slots)
+            {
+                if (!slot.Enabled) continue;
+                slotTemp.Clear();
+                slot.Instrument.Render(slotTemp);
+                foreach (var fx in slot.ActiveEffects)
+                {
+                    if (!fx.Enabled) continue;
+                    if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
+                    fx.Process(slotTemp);
+                }
+
+                for (var i = 0; i < slotTemp.Length; i++) temp[i] += slotTemp[i];
+                hasContent = true;
+            }
+        }
+        else if (playing && track.Kind == TrackKind.Audio)
+        {
+            foreach (var acp in _audioClips)
+            {
+                if (ReferenceEquals(acp.Track, track))
+                {
+                    RenderClipBlock(temp, acp, prevBeat, _samplesPerBeat, sampleRate, channels, effectiveBpm);
+                    hasContent = true;
+                }
+            }
+        }
+
+        // Run the track's insert effects (e.g. reverb) before the strip. Effects run even on a near-silent
+        // block so tails ring out; only skip when the track has no effects.
+        var effects = track.ActiveEffects;
+        if (effects.Length > 0)
+        {
+            foreach (var fx in effects)
+            {
+                if (!fx.Enabled) continue;
+                if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
+                fx.Process(temp);
+            }
+
+            hasContent = true;
+        }
+
+        return hasContent;
     }
 
     // Mixes <paramref name="source"/> through per-channel gains additively into <paramref name="target"/>,

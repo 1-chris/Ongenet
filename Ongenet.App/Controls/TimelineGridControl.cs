@@ -1,6 +1,8 @@
 using System;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Ongenet.App.Theming;
 
 namespace Ongenet.App.Controls
@@ -20,6 +22,11 @@ namespace Ongenet.App.Controls
         public static readonly StyledProperty<int> BeatsPerBarProperty =
             AvaloniaProperty.Register<TimelineGridControl, int>(nameof(BeatsPerBar), 4);
 
+        // Bound to the timeline's scroll offset purely to trigger a repaint while scrolling; the actual
+        // visible window is read live from the ancestor ScrollViewer in Render (so it's always accurate).
+        public static readonly StyledProperty<double> HorizontalOffsetProperty =
+            AvaloniaProperty.Register<TimelineGridControl, double>(nameof(HorizontalOffset));
+
         // Subtle contrast lines from the foreground token (light on dark themes, dark on light themes).
         private IPen _barPen = new Pen(Brushes.Gray, 1);
         private IPen _beatPen = new Pen(Brushes.Gray, 1);
@@ -35,12 +42,14 @@ namespace Ongenet.App.Controls
 
         static TimelineGridControl()
         {
-            AffectsRender<TimelineGridControl>(PixelsPerBeatProperty, TotalBeatsProperty, BeatsPerBarProperty);
+            AffectsRender<TimelineGridControl>(PixelsPerBeatProperty, TotalBeatsProperty, BeatsPerBarProperty,
+                HorizontalOffsetProperty);
         }
 
         public double PixelsPerBeat { get => GetValue(PixelsPerBeatProperty); set => SetValue(PixelsPerBeatProperty, value); }
         public double TotalBeats { get => GetValue(TotalBeatsProperty); set => SetValue(TotalBeatsProperty, value); }
         public int BeatsPerBar { get => GetValue(BeatsPerBarProperty); set => SetValue(BeatsPerBarProperty, value); }
+        public double HorizontalOffset { get => GetValue(HorizontalOffsetProperty); set => SetValue(HorizontalOffsetProperty, value); }
 
         public override void Render(DrawingContext context)
         {
@@ -49,11 +58,25 @@ namespace Ongenet.App.Controls
 
             var bar = BeatsPerBar < 1 ? 1 : BeatsPerBar;
             var step = GridMath.SnapBeats(ppb, bar);
+            if (step <= 0) return;
             var height = Bounds.Height;
             var totalBeats = TotalBeats;
-
             var lineCount = (int)Math.Ceiling(totalBeats / step);
-            for (var i = 0; i <= lineCount; i++)
+
+            // Only draw the lines inside the visible viewport. The control's width spans the whole
+            // arrangement (and at deep zoom that can be 100k+ px), so without this we'd issue thousands of
+            // off-screen DrawLine calls per lane. Read the live scroll window from the ancestor ScrollViewer.
+            var firstIndex = 0;
+            var lastIndex = lineCount;
+            if (this.FindAncestorOfType<ScrollViewer>() is { } sv && sv.Viewport.Width > 0)
+            {
+                var left = sv.Offset.X;
+                var right = left + sv.Viewport.Width;
+                firstIndex = Math.Max(0, (int)Math.Floor(left / (step * ppb)) - 1);
+                lastIndex = Math.Min(lineCount, (int)Math.Ceiling(right / (step * ppb)) + 1);
+            }
+
+            for (var i = firstIndex; i <= lastIndex; i++)
             {
                 var beat = i * step;
                 var x = beat * ppb;

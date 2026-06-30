@@ -239,6 +239,7 @@ namespace Ongenet.App.ViewModels.Effects
                     EqEffect eq => new EqEffectViewModel(eq, RemoveEffect, MoveUp, MoveDown),
                     FilterEffect filter => new FilterEffectViewModel(filter, RemoveEffect, MoveUp, MoveDown),
                     SidechainEffect sc => new SidechainEffectViewModel(sc, RemoveEffect, MoveUp, MoveDown),
+                    LiveDifferenceEffect ld => new LiveDifferenceEffectViewModel(ld, RemoveEffect, MoveUp, MoveDown),
                     StutteroEffect st => new StutteroEffectViewModel(st, RemoveEffect, MoveUp, MoveDown),
                     VocoderEffect vc => new VocoderEffectViewModel(vc, RemoveEffect, MoveUp, MoveDown),
                     WaveformVisualizerEffect wv => new WaveformVisualizerEffectViewModel(wv, RemoveEffect, MoveUp, MoveDown),

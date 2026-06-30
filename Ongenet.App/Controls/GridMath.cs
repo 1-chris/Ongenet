@@ -9,8 +9,10 @@ namespace Ongenet.App.Controls
     {
         private const double MinPixels = 10.0;
 
-        // Beat subdivisions, finest first.
-        private static readonly double[] Subdivisions = { 0.125, 0.25, 0.5, 1.0 };
+        // Beat subdivisions, finest first. The finer entries only kick in at deep zoom (each still has to
+        // clear MinPixels), giving sample-accurate snapping/grid down to 1/64 of a beat when zoomed right in.
+        private static readonly double[] Subdivisions =
+            { 1.0 / 256, 1.0 / 128, 1.0 / 64, 1.0 / 32, 1.0 / 16, 0.125, 0.25, 0.5, 1.0 };
 
         /// <summary>The grid/snap size in beats for the given zoom and bar length.</summary>
         public static double SnapBeats(double pixelsPerBeat, int beatsPerBar)

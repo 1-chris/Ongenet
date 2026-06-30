@@ -17,6 +17,7 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 | --- | --- |
 | [Creating new instruments](docs/creating-instruments.md) | Build a synth or sampler from scratch — the voice model, audio buffers, reusing the DSP toolkit, parameters, and how it wires into the app. Written for DSP newcomers. |
 | [Creating new effects](docs/creating-effects.md) | Build an audio effect — in-place processing, the DSP building blocks (filters, delay lines, envelope followers), parameters, and the advanced seams (tempo, sidechain, MIDI). Written for DSP newcomers. |
+| [Creating 3D visual effects](docs/creating-3d-visual-effects.md) | Embed a GPU-rendered, audio-modulated 3D visual in an effect — the 3D engine architecture, the portable scene model, tapping audio for the UI, building a reusable visualization, theme-awareness, and the pop-out window. Builds on the effects guide. |
 | [Main window layout & controls](docs/main-window-layout.md) | A tour of the UI: every region of the main window, the transport, timeline, piano roll, mixer, library and inspectors, plus the full keyboard-shortcut list. |
 | [The theming system](docs/theming.md) | How live theming works: the semantic colour tokens, in-place brush mutation, `ThemedControl`, JSON import/export, and how to add tokens, themes and theme-aware controls. |
 | [The audio engine & OS audio APIs](docs/audio-engine.md) | How the engine renders a block, the signal flow (instruments → effects → buses → master), real-time safety, and how the device layer hooks into PipeWire/PulseAudio/JACK/ALSA, CoreAudio and WASAPI. |
@@ -315,13 +316,55 @@ dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release --self-containe
 
 ---
 
-## 9. Project layout (quick reference)
+## 9. GPU 3D engine & embeddable visuals
+
+Ongenet has a small, GPU-accelerated **3D engine** used for rich custom controls (the **3D Scope** effect
+is the first consumer). It is **desktop-only** and split into two projects so the shared UI and the
+web/Android heads never pull native GPU code:
+
+- **`Ongenet.Engine3D.Abstractions`** — a portable, dependency-free **scene model** (`Scene`, `SceneNode`,
+  `MeshData`, `Material`, orbit `Camera`, `Light`, the immutable per-frame `SceneSnapshot`) plus the engine
+  **contracts** (`I3DEngineFactory`, `I3DRenderSession`, `FrameResult`). BCL only — referenced by both the
+  UI and the native engine.
+- **`Ongenet.Engine3D`** — the native renderer. A hand-written **Render Hardware Interface** (RHI, in
+  `Rhi/`) over **Silk.NET**, with a **Vulkan** backend (`Vulkan/`) that renders a scene offscreen and reads
+  it back to a BGRA buffer. The RHI seam leaves room for D3D12/native-Metal backends later without touching
+  the UI or scene model.
+
+**How it embeds in Avalonia.** The shared UI (`Ongenet.App`) resolves an `I3DEngineFactory` from DI at
+runtime and degrades to a placeholder when it's absent (web/Android) or reports no GPU. The pieces:
+
+- `Controls/Engine3DView` — an Avalonia `Control` that owns a session, runs the GPU render on a background
+  thread (triple-buffered), and presents finished frames. Exposes a mutable `Scene` + an `OnUpdate` hook,
+  with drag-to-orbit / scroll-to-zoom. Driven at display refresh rate via the `FrameTicker`.
+- `Controls/Engine3D/ReadbackPresenter` — Phase-1 bridge: copies the engine's BGRA pixels into a
+  `WriteableBitmap`. Universal and composes perfectly with the UI (no native child surface / airspace).
+  `CompositionInteropPresenter` + `Engine3DInterop` are the zero-copy seam for a future shared-texture path.
+- `Controls/Engine3DVisualHost` + `IEngine3DVisualization` — the **reusable** layer: drop the host anywhere,
+  give it a visualization factory, and it builds/animates the visual, tracks the **theme** live, and offers
+  a generic *"Open in window"* button that re-hosts the same visual in a resizable `Engine3DVisualWindow`.
+
+**macOS / MoltenVK.** `Ongenet.Engine3D` references **`Silk.NET.MoltenVK.Native`**, which bundles
+`libMoltenVK.dylib` (Vulkan-on-Metal). Silk.NET's loader finds it automatically, so **no Vulkan SDK install
+is required** on macOS — `dotnet run` just works. Windows and Linux use the system Vulkan loader
+(`vulkan-1.dll` / `libvulkan.so.1`); if it's missing, the factory reports unavailable and 3D controls show
+their placeholder (the rest of the app is unaffected). Shaders are GLSL compiled to SPIR-V at runtime via
+`Silk.NET.Shaderc` (its native lib is bundled too), so there is no build-time `glslang`/`glslc` step.
+
+To build an audio-modulated 3D visual of your own, follow
+[docs/creating-3d-visual-effects.md](docs/creating-3d-visual-effects.md).
+
+---
+
+## 10. Project layout (quick reference)
 
 | Project | Targets | Role |
 | --- | --- | --- |
 | `Ongenet.Core` | `net10.0` | Portable engine, DSP, instruments, effects, persistence — no UI, BCL only. |
-| `Ongenet.App` | `net10.0` | Shared Avalonia UI library used by every head. Owns the desktop `MainWindow` and the shared single-view `MainView` (used by the web + Android heads). |
-| `Ongenet.Desktop` | `net10.0` | Desktop exe head (native audio/MIDI + plugins). Publishes as `Ongenet`. |
+| `Ongenet.App` | `net10.0` | Shared Avalonia UI library used by every head. Owns the desktop `MainWindow` and the shared single-view `MainView` (used by the web + Android heads), plus the embeddable 3D controls. |
+| `Ongenet.Engine3D.Abstractions` | `net10.0` | Portable 3D scene model + engine contracts (no Avalonia, no GPU, BCL only). |
+| `Ongenet.Engine3D` | `net10.0` | Native GPU 3D engine (hand-written Vulkan RHI; MoltenVK on macOS). Desktop-only; injected via DI. |
+| `Ongenet.Desktop` | `net10.0` | Desktop exe head (native audio/MIDI + plugins + the GPU 3D engine). Publishes as `Ongenet`. |
 | `Ongenet.Web` | `net10.0-browser` | Browser exe head (Web Audio, browser-safe stubs). |
 | `Ongenet.Android` | `net10.0-android` | Android (tablet) head (AAudio backend, Android-safe stubs, single-view shell). Sideloaded APK. |
 | `Ongenet.Audio` | `net10.0` | Native audio + MIDI backends (ALSA/CoreAudio/WASAPI/**AAudio**; ALSA seq/WinMM/CoreMIDI). |

@@ -266,7 +266,8 @@
                             <controls:TimelineGridControl IsHitTestVisible="False"
                                                           PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
                                                           TotalBeats="{Binding Metrics.TotalBeats}"
-                                                          BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
+                                                          BeatsPerBar="{Binding Metrics.BeatsPerBar}"
+                                                          HorizontalOffset="{Binding Metrics.HorizontalOffset}"/>
                             <ItemsControl ItemsSource="{Binding Clips}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
@@ -348,7 +349,8 @@
                                 <controls:TimelineGridControl IsHitTestVisible="False" Opacity="0.5"
                                                               PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
                                                               TotalBeats="{Binding Metrics.TotalBeats}"
-                                                              BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
+                                                              BeatsPerBar="{Binding Metrics.BeatsPerBar}"
+                                                              HorizontalOffset="{Binding Metrics.HorizontalOffset}"/>
                                 <controls:AutomationLaneControl Revision="{Binding Revision}"/>
                             </Grid>
                         </Border>

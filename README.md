@@ -8,13 +8,18 @@ swappable device/UI layer around it.
 | Project | Native deps | Description |
 | --- | --- | --- |
 | `Ongenet.Core` | none | The heart of the app, fully platform-agnostic. Audio models (project / tracks / clips / MIDI notes), the lock-free audio **engine** (sequencer, per-track mixing, metering, automation), the **instrument** framework (Oscillator, 3x Osc, FM, Basic Sampler, Granular, Padda, Kicka, SFZ Sampler) and **effects** chain (filter, EQ, dynamics, modulation, delay/reverb…), the shared DSP toolkit (`Audio/Dsp`), the parameter framework, WAV decode/encode, a cross-platform **MIDI** model (running-status parser, learn/transport mappings), and the app services (project, transport, selection, recording, edit-mode, MIDI input/mapping) plus DI registration, an in-process event aggregator, and logging. Depends only on the BCL. |
+| `Ongenet.App` | Avalonia | The **shared UI library** used by every head (desktop / web / Android): the `App` composition root + DI, all views & view-models, custom controls, the Catppuccin **theming** system, arrange/timeline, piano roll, inspectors, mixer/meters, editable automation lanes, the unified **Settings** window, a debug Log window, and the embeddable **3D controls**. Each head injects its platform pieces (audio backend, MIDI, plugins, GPU engine, shell) through `IPlatformServices`. |
+| `Ongenet.Engine3D.Abstractions` | none | Portable, dependency-free **3D scene model** (meshes, materials, orbit camera, lights, the immutable per-frame `SceneSnapshot`) plus the engine contracts (`I3DEngineFactory` / `I3DRenderSession`). Referenced by both the UI and the native engine, so the UI never touches GPU code and the engine never touches Avalonia. BCL only. |
+| `Ongenet.Engine3D` | Vulkan / MoltenVK | The **native GPU 3D engine** behind Ongenet's embeddable 3D controls. A hand-written Render Hardware Interface (RHI) over **Silk.NET**, with a **Vulkan** backend that renders scenes offscreen — native on Windows/Linux and on macOS via **MoltenVK** (bundled; no Vulkan SDK needed). Desktop-only; injected into the shared UI via DI, so the web/Android heads never pull native GPU code. |
 | `Ongenet.Audio` | OS audio + MIDI | The audio **and MIDI** device backend. P/Invoke layers over each platform's native **audio** API — ALSA (with PipeWire/JACK/PulseAudio routing) on Linux, **CoreAudio** on macOS, **WASAPI** on Windows — and each platform's native **MIDI** API — the **ALSA sequencer** on Linux (works with PipeWire/JACK), **WinMM** on Windows and **CoreMIDI** on macOS, behind single `IAudioBackend` / `IMidiInputBackend` seams. This is the only project that touches native audio/MIDI libraries; Core depends solely on the device seams, so the backend is swappable. |
 | `Ongenet.Clap` | CLAP plugins | CLAP plugin hosting: a direct interop over the [CLAP](https://cleveraudio.org/) ABI that scans for, loads, and bridges third-party `.clap` instruments and effects (incl. their plugin GUIs) into Core's instrument/effect registries. Plugins are discovered at runtime; none are required to run the app. |
 | `Ongenet.Lv2` | LV2 plugins | LV2 plugin hosting, written from scratch over the [LV2](https://lv2plug.in/) ABI — no `lilv`/`suil`. A hand-written **Turtle/RDF** parser discovers `.lv2` bundles; audio runs through the port-based `connect_port`/`run` model (control ports become automatable parameters, MIDI is delivered via an LV2 Atom sequence), with the **URID-map**, **Options** and **Worker** host features and native **X11 plugin-UI** embedding. Instruments and effects are bridged into Core's registries; discovered at runtime, none required. |
 | `Ongenet.Vst` | VST2 + VST3 plugins | VST2 **and** VST3 plugin hosting, both written from scratch over the public ABIs — no Steinberg SDK or wrapper libraries. **VST2** drives the flat `AEffect` dispatcher (params, `processReplacing`, `effProcessEvents` MIDI, `effEditOpen` GUI) with a full `audioMaster` host callback. **VST3** implements the COM-style `IPluginFactory` → `IComponent`/`IAudioProcessor`/`IEditController` model with host-side `IComponentHandler`/`IHostApplication`/`IPlugFrame`, `process()` over `ProcessData`, note/parameter input via `IEventList`/`IParameterChanges`, and the `IPlugView` editor. Cross-platform (Windows/macOS/Linux, x64 + arm64), with native X11 GUI embedding on Linux. Discovered at runtime; none required. |
-| `Ongenet.Desktop` | Avalonia | The Avalonia desktop UI. Hand-rolled MVVM (`ViewModelBase` / `RelayCommand`), DI bootstrap in `App.axaml.cs`, a Catppuccin Mocha theme, the arrange/timeline view, piano roll, instrument & effect inspectors, mixer/meters, the editable automation lanes, a unified **Settings** window (audio / MIDI / theme), app-settings persistence, and a debug Log window. References all of the above. |
+| `Ongenet.Desktop` | Avalonia (+ all native) | The **desktop head**: a thin exe that wires the native stack — Avalonia desktop backends, `Ongenet.Audio`, the CLAP/LV2/VST plugin hosts, and the `Ongenet.Engine3D` GPU engine — into the shared `Ongenet.App` UI via `DesktopPlatform`. Hand-rolled MVVM, DI bootstrap, the classic `MainWindow`. Publishes as `Ongenet`. |
+| `Ongenet.Web` | none (browser) | The **browser / WebAssembly head** (`net10.0-browser`): reuses `Ongenet.App` + `Ongenet.Core` with a Web Audio backend and browser-safe stubs. A demo build deployed to GitHub Pages (no native audio/plugin/GPU projects). |
+| `Ongenet.Android` | AAudio | The **Android (tablet) head** (`net10.0-android`): reuses the shared UI + portable engine with a native **AAudio** backend, shown in the same single-view shell as the web head. Sideloaded APK. |
 
-All projects target **.NET 10**.
+All projects target **.NET 10** (the browser head `net10.0-browser`, the Android head `net10.0-android`).
 
 ## Instruments
 
@@ -35,7 +40,7 @@ runtime and appears alongside them.
 
 ## Effects
 
-Nineteen built-in effects ship in `Ongenet.Core` (`Audio/Effects`), registered in the `EffectRegistry`
+Twenty built-in effects ship in `Ongenet.Core` (`Audio/Effects`), registered in the `EffectRegistry`
 and grouped by category. CLAP, LV2, VST2 and VST3 effects are likewise discovered at runtime and slot into the
 same chain.
 
@@ -48,6 +53,7 @@ same chain.
 | **Distortion** | Distortion, Bitcrusher |
 | **Pitch** | Vocoder, Auto-Tune |
 | **Utility** | Stereo Width, Utility |
+| **Visualizer** | **3D Scope** |
 
 **Stuttero** is our own Stutter Edit-style stutter / beat-repeat performance effect: it captures
 incoming audio and chops it into tempo-synced slices (1/4 down to 1/512), shaped by a drawable
@@ -55,6 +61,23 @@ per-slice gate curve and a reorderable multi-FX rack (tape-stop, lo-fi, comb, ph
 low-pass). "Gestures" bundle those settings with time-variant curves (stutter-rate sweep, filter
 cutoff, per-module depth) and fire either from the transport (Auto) or from mapped MIDI keys (MIDI
 mode), with a hold-to-freeze buffer.
+
+**3D Scope** is a pass-through visualizer that shows off Ongenet's GPU 3D controls: it never alters the
+audio, it only taps it and renders the live signal as a smoothed waveform in 3D — drawn at an angle, with
+fading "snapshot" trails receding into the distance — at display refresh rate. Its colours follow the
+active Catppuccin theme (and update live), and the whole visual can be popped out into a freely resizable
+window.
+
+## 3D engine
+
+Ongenet ships a small, GPU-accelerated **3D engine** for hardware-rendered custom controls. It's a
+hand-written **Vulkan** renderer (native on Windows/Linux, **MoltenVK** on macOS) behind a clean Render
+Hardware Interface seam, with a portable scene model (`Ongenet.Engine3D.Abstractions`) and an embeddable
+Avalonia control (`Engine3DView`) that composes with the rest of the UI like any other control. Visuals
+are theme-aware and can be opened in resizable pop-out windows. The **3D Scope** effect is a worked demo
+of an audio-modulated 3D visual — see the tutorial in
+**[docs/creating-3d-visual-effects.md](docs/creating-3d-visual-effects.md)**. The engine is desktop-only
+and degrades gracefully to a placeholder where no GPU is available (web/Android, or no Vulkan device).
 
 ## Plugins
 

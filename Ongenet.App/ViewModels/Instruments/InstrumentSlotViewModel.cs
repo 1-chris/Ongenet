@@ -6,12 +6,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Controls.Engine3D;
 using Ongenet.App.Services;
 using Ongenet.App.ViewModels.Effects;
 
@@ -213,6 +215,28 @@ namespace Ongenet.App.ViewModels.Instruments
         private ISampleHost? SampleHost => Instrument as ISampleHost;
         public bool IsSampler => SampleHost is not null;
         public string SampleName => SampleHost?.SampleName ?? "(no sample loaded)";
+
+        // --- Wavetable synth support (bespoke 3D inspector + built-in table presets) ---
+
+        private WavetableInstrument? Wavetable => Instrument as WavetableInstrument;
+        public bool IsWavetable => Wavetable is not null;
+
+        /// <summary>Builds a fresh 3D visualization bound to this instrument's table (one per hosted view).</summary>
+        public Func<IEngine3DVisualization>? WavetableVisualizationFactory =>
+            Wavetable is { } wt ? () => new Wavetable3DVisualization(wt) : null;
+
+        private RelayCommand? _wtBasic, _wtHarmonics, _wtRandom;
+        public RelayCommand WavetableBasicCommand => _wtBasic ??= new RelayCommand(() => SetWavetablePreset(WavetablePreset.Basic));
+        public RelayCommand WavetableHarmonicsCommand => _wtHarmonics ??= new RelayCommand(() => SetWavetablePreset(WavetablePreset.Harmonics));
+        public RelayCommand WavetableRandomCommand => _wtRandom ??= new RelayCommand(() => SetWavetablePreset(WavetablePreset.Random));
+
+        private void SetWavetablePreset(WavetablePreset preset)
+        {
+            if (Wavetable is not { } wt) return;
+            _history.Capture("Wavetable preset");
+            wt.LoadPreset(preset);
+            OnPropertyChanged(nameof(SampleName));
+        }
 
         // --- "Sampler" support (SFZ + SF2 sound fonts) ---
 

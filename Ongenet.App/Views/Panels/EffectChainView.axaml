@@ -126,6 +126,32 @@
                     </Border>
                 </DataTemplate>
 
+                <!-- Live Difference: pick a track to subtract (vocal isolation), then the Amount/Output knobs. -->
+                <DataTemplate DataType="fx:LiveDifferenceEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Subtract" VerticalAlignment="Center" Width="50"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <ComboBox Width="200" ItemsSource="{Binding Sources}"
+                                          SelectedItem="{Binding SelectedSource, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="fx:SourceTrackOption">
+                                            <TextBlock Text="{Binding Name}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <TextBlock FontSize="10" TextWrapping="Wrap" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       Text="out = in − Amount × source. For vocal isolation, subtract the instrumental from the full song (place that track ABOVE this one). Coarse-align the clips on the timeline, then tune Align by ear until the instrumental nulls out. Works best when both are the same master."/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
                 <!-- Vocoder: a carrier-track picker above the generic knobs. -->
                 <DataTemplate DataType="fx:VocoderEffectViewModel">
                     <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"

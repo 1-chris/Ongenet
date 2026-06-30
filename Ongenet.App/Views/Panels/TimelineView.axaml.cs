@@ -370,6 +370,8 @@ namespace Ongenet.App.Views.Panels
             var offset = _lanesScroll.Offset;
             RulerScroll.Offset = new Vector(offset.X, 0);
             HeaderScroll.Offset = new Vector(0, offset.Y);
+            // Publish the horizontal scroll so the per-lane grid repaints clipped to the new visible window.
+            if (_vm is not null) _vm.Metrics.HorizontalOffset = offset.X;
             UpdateOverlays();
         }
 

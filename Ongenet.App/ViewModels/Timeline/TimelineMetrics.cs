@@ -21,8 +21,9 @@ namespace Ongenet.App.ViewModels.Timeline
             get => _pixelsPerBeat;
             set
             {
-                // Clamp to a sane zoom range.
-                var clamped = value < 2.0 ? 2.0 : value > 200.0 ? 200.0 : value;
+                // Clamp to a sane zoom range. The high end allows deep zoom for sample-accurate edits
+                // (e.g. aligning clips for Live Difference); the grid subdivides further to match (GridMath).
+                var clamped = value < 2.0 ? 2.0 : value > 3200.0 ? 3200.0 : value;
                 if (SetField(ref _pixelsPerBeat, clamped))
                 {
                     OnPropertyChanged(nameof(TotalWidth));

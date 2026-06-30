@@ -203,7 +203,11 @@ public sealed class OfflineRenderer
             foreach (var rt in renderTracks)
             {
                 if (rt.Source.IsBus) continue;
-                if (rt.Source.IsMuted || (soloActive && !(rt.Source.IsSoloed || AncestorSoloed(rt.Source)))) continue;
+                // A silenced (muted / soloed-out) track is skipped entirely UNLESS it's tapped as a sidechain
+                // source (e.g. Live Difference for vocal isolation) — then it's rendered + published below but
+                // not mixed into the output, mirroring the live engine.
+                var silenced = rt.Source.IsMuted || (soloActive && !(rt.Source.IsSoloed || AncestorSoloed(rt.Source)));
+                if (silenced && !sidechain.IsRequested(rt.Source.Id)) continue;
 
                 var tempSpan = temp.AsSpan(0, sampleCount);
                 tempSpan.Clear();
@@ -252,7 +256,7 @@ public sealed class OfflineRenderer
 
                 if (sidechain.IsRequested(rt.Source.Id)) sidechain.Publish(rt.Source.Id, tempSpan, channels);
 
-                if (!hasContent) continue;
+                if (silenced || !hasContent) continue; // silenced source: published for the tap, but not heard
 
                 var parent = rt.Source.ParentId is { } pid && busByTrackId.TryGetValue(pid, out var pb) ? pb : masterBus;
                 var target = parent is not null ? parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
