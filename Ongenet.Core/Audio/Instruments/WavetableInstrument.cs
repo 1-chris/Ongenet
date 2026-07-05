@@ -16,7 +16,7 @@ namespace Ongenet.Core.Audio.Instruments;
 /// frames (<see cref="ISampleHost"/>). Reuses <see cref="AdsrEnvelope"/>, <see cref="Biquad"/>,
 /// <see cref="Lfo"/>, <see cref="OnePole"/> and <see cref="MusicalMath"/>.
 /// </summary>
-public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IProjectStatefulComponent
+public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IProjectStatefulComponent, IWavetableView
 {
     public const string TypeId = "wavetable";
     protected override string GetTypeId() => TypeId;

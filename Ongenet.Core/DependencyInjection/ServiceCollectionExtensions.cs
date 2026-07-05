@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Services.Implementation;
@@ -28,6 +29,11 @@ public static class ServiceCollectionExtensions
         // and one selection shared across the whole application.
         services.AddSingleton<IInstrumentRegistry, InstrumentRegistry>();
         services.AddSingleton<IEffectRegistry, EffectRegistry>();
+
+        // The Field modular instrument/effect: its node catalogue, plus (via FieldBootstrap.Initialize,
+        // called by the app after the provider is built) the "field" instrument/effect entries and the
+        // module-wrapper nodes for every instrument/effect/plugin.
+        services.AddSingleton<IFieldNodeRegistry, FieldNodeRegistry>();
         services.AddSingleton<IProjectService, ProjectService>();
         services.AddSingleton<IProjectFileService, ProjectFileService>();
         services.AddSingleton<ITransportService, TransportService>();

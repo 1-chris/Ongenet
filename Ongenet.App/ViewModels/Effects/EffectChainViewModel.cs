@@ -5,6 +5,7 @@ using System.Linq;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services.Interfaces;
@@ -236,6 +237,7 @@ namespace Ongenet.App.ViewModels.Effects
             {
                 Effects.Add(effect switch
                 {
+                    FieldEffect fe => new FieldEffectViewModel(fe, RemoveEffect, MoveUp, MoveDown),
                     EqEffect eq => new EqEffectViewModel(eq, RemoveEffect, MoveUp, MoveDown),
                     FilterEffect filter => new FilterEffectViewModel(filter, RemoveEffect, MoveUp, MoveDown),
                     SidechainEffect sc => new SidechainEffectViewModel(sc, RemoveEffect, MoveUp, MoveDown),

@@ -137,6 +137,13 @@ namespace Ongenet.App
             Core.Audio.Instruments.Sampler.SamplerInstrument.Loader =
                 ServiceProvider.GetService<Core.Audio.Instruments.Sampler.ISamplerLoadService>();
 
+            // Register the Field modular instrument/effect and the module-wrapper nodes for every
+            // instrument/effect/plugin (done after the provider is built to avoid a construction cycle).
+            Core.Audio.Field.FieldBootstrap.Initialize(
+                ServiceProvider.GetRequiredService<Core.Audio.Field.IFieldNodeRegistry>(),
+                ServiceProvider.GetRequiredService<Core.Audio.Instruments.IInstrumentRegistry>(),
+                ServiceProvider.GetRequiredService<Core.Audio.Effects.IEffectRegistry>());
+
             // Establish the font-size resources used across the app.
             ApplyFontScale(1.0);
 

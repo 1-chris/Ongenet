@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:field="using:Ongenet.App.Controls.Field"
+             xmlns:panels="using:Ongenet.App.Views.Panels"
+             xmlns:vm="using:Ongenet.App.ViewModels.Field"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="420"
+             x:DataType="vm:FieldEditorViewModel"
+             x:Class="Ongenet.App.Views.Field.FieldEditorView">
+    <Grid RowDefinitions="Auto,*">
+        <!-- Toolbar -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto" Margin="6" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Text="Preset" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+            <ComboBox Grid.Column="1" Width="180" ItemsSource="{Binding PresetNames}"
+                      SelectedIndex="{Binding SelectedPreset, Mode=TwoWay}"
+                      PlaceholderText="Built-in patch…"/>
+            <TextBlock Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext1}"
+                       Text="Middle-drag to pan · scroll to zoom · drag ports to connect · right-click to add"/>
+            <Button Grid.Column="3" Name="PopOutButton" Content="Pop out"/>
+        </Grid>
+
+        <!-- Body: palette | canvas | inspector -->
+        <Grid Grid.Row="1" ColumnDefinitions="190,*,230">
+            <Border Grid.Column="0" Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="0,0,1,0">
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding PaletteGroups}" Margin="4">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,6">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="11"
+                                               Foreground="{StaticResource CatppuccinMauve}" Margin="2,4,0,2"/>
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Classes="PaletteItem" Content="{Binding DisplayName}"
+                                                        Tag="{Binding}" Click="OnPaletteItemClick"
+                                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                        Padding="6,2" Margin="0,1" FontSize="11"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <Panel Grid.Column="1" ClipToBounds="True">
+                <field:FieldCanvasControl Name="Canvas"/>
+                <!-- Live GPU visualizations (scope, wavetable) positioned over their nodes. -->
+                <Canvas Name="VisualOverlay" IsHitTestVisible="False"/>
+            </Panel>
+
+            <Border Grid.Column="2" Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1,0,0,0">
+                <ScrollViewer>
+                    <StackPanel Margin="8">
+                        <TextBlock Text="{Binding SelectedNodeName}" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CatppuccinText}"
+                                   IsVisible="{Binding HasSelection}"/>
+
+                        <!-- Resource loaders for sample / soundfont nodes -->
+                        <StackPanel Spacing="4" Margin="0,4,0,0"
+                                    IsVisible="{Binding SelectedIsSampleHost}">
+                            <Button Content="Load sample…" Name="LoadSampleButton" Click="OnLoadSample"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedResourceStatus}" FontSize="10" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        </StackPanel>
+                        <StackPanel Spacing="4" Margin="0,4,0,0"
+                                    IsVisible="{Binding SelectedIsSoundFont}">
+                            <Button Content="Load soundfont…" Name="LoadSoundFontButton" Click="OnLoadSoundFont"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedResourceStatus}" FontSize="10" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        </StackPanel>
+
+                        <panels:ParametersView DataContext="{Binding SelectedParameters}"
+                                               Margin="0,6,0,0"/>
+                        <TextBlock Text="Select a node to edit its parameters."
+                                   TextWrapping="Wrap" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"
+                                   IsVisible="{Binding !HasSelection}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -5,6 +5,7 @@
              xmlns:fx="using:Ongenet.App.ViewModels.Effects"
              xmlns:controls="using:Ongenet.App.Controls"
              xmlns:panels="using:Ongenet.App.Views.Panels"
+             xmlns:field="using:Ongenet.App.Views.Field"
              mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="200"
              x:Class="Ongenet.App.Views.Panels.EffectChainView"
              x:DataType="fx:EffectChainViewModel">
@@ -77,6 +78,21 @@
                             </Border>
                             <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
                                        Text="Double-click to add a band · drag to move · wheel for Q · right-click for type / delete"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Field: the full modular node-graph editor embedded in the effect card. -->
+                <DataTemplate DataType="fx:FieldEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <Border CornerRadius="4" ClipToBounds="True" Height="380"
+                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                <field:FieldEditorView DataContext="{Binding FieldEditor}"/>
+                            </Border>
                         </StackPanel>
                     </Border>
                 </DataTemplate>

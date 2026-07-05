@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Instruments.Sampler;
@@ -16,6 +17,7 @@ using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Controls.Engine3D;
 using Ongenet.App.Services;
 using Ongenet.App.ViewModels.Effects;
+using Ongenet.App.ViewModels.Field;
 
 namespace Ongenet.App.ViewModels.Instruments
 {
@@ -357,6 +359,24 @@ namespace Ongenet.App.ViewModels.Instruments
         }
 
         public void ResetPitchBend() => PitchBendValue = 8192;
+
+        // --- Field modular instrument (embedded node-graph editor) ---
+
+        private FieldEditorViewModel? _fieldEditor;
+        public bool IsField => Instrument is FieldInstrument;
+
+        /// <summary>The node-graph editor for the Field instrument, or null for other instruments.</summary>
+        public FieldEditorViewModel? FieldEditor
+        {
+            get
+            {
+                if (Instrument is not FieldInstrument fi) return null;
+                return _fieldEditor ??= new FieldEditorViewModel(fi.Graph,
+                    App.ServiceProvider?.GetService<IFieldNodeRegistry>() ?? new FieldNodeRegistry(),
+                    fi.Recompile, fi.PresetNames,
+                    i => { fi.LoadPreset(i); RebuildParameters(); }, () => fi.Compiled, isInstrument: true);
+            }
+        }
 
         // --- Granular support (grain monitor) ---
 

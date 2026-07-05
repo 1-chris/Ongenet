@@ -25,7 +25,7 @@ namespace Ongenet.App.Controls.Engine3D
         private const float HalfThickness = 0.012f;
         private const float HighlightFalloff = 6f; // frames over which the glow fades
 
-        private readonly WavetableInstrument _inst;
+        private readonly IWavetableView _inst;
         private uint[] _indices = Array.Empty<uint>();
         private readonly SceneNode[] _nodes = new SceneNode[DisplayFrames];
         private readonly MeshData[] _meshes = new MeshData[DisplayFrames];
@@ -43,7 +43,7 @@ namespace Ongenet.App.Controls.Engine3D
         private Vector3 _cursorRgb = new(0.95f, 0.7f, 1f);
         private Vector3 _dim = new(0.25f, 0.30f, 0.5f);
 
-        public Wavetable3DVisualization(WavetableInstrument instrument) => _inst = instrument;
+        public Wavetable3DVisualization(IWavetableView instrument) => _inst = instrument;
 
         public void Build(Scene scene)
         {

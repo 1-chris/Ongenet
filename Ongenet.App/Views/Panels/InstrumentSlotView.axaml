@@ -5,6 +5,7 @@
              xmlns:inst="using:Ongenet.App.ViewModels.Instruments"
              xmlns:panels="using:Ongenet.App.Views.Panels"
              xmlns:controls="using:Ongenet.App.Controls"
+             xmlns:field="using:Ongenet.App.Views.Field"
              mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="260"
              x:Class="Ongenet.App.Views.Panels.InstrumentSlotView"
              x:DataType="inst:InstrumentSlotViewModel">
@@ -118,6 +119,12 @@
 
             <!-- Parameters -->
             <panels:GroupedParametersView DataContext="{Binding ParameterGroups}"/>
+
+            <!-- Field: the full modular node-graph editor embedded in the instrument card. -->
+            <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding IsField}" Height="420"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                <field:FieldEditorView DataContext="{Binding FieldEditor}"/>
+            </Border>
 
             <!-- Wavetable synth: a fixed-width 3D table view next to its controls (not the full panel width). -->
             <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding IsWavetable}" Height="220"

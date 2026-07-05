@@ -37,6 +37,7 @@ runtime and appears alongside them.
 | **Padda** | Lush pad synth: two unison oscillator layers plus a sine sub and noise feed a modulated resonant filter, then an internal drive → chorus → delay → reverb chain. Ships an init patch and five presets; a loaded sample becomes a "Custom" waveform. |
 | **Kicka** | Kick-drum synth spanning drumkit, trance, EDM, hardcore and hardstyle (plus Zaag/Piep variations). Each one-shot splits into a transient "tok" and a pitch-swept, distortion-stacked tail over a clean parallel sub, with the low end kept mono. The inspector preview matches playback. |
 | **Sampler (SFZ)** | Multi-sample SFZ instrument: parses an `.sfz` patch and maps notes/velocities to regions (velocity layers + round-robin), each played through its own voice with envelopes and a filter. A few global macros are exposed as automatable parameters. |
+| **Field** | A modular node-graph instrument (in the spirit of Bitwig's Grid): patch oscillators, envelopes, filters, modulators and math nodes on a zoomable canvas to build any synth. Every knob has a modulation inlet, whole instruments/effects/plugins are available as module nodes, and built-in presets reconstruct every other instrument as an editable graph. Also available as an **effect**. See [docs/creating-field-nodes.md](docs/creating-field-nodes.md). |
 
 ## Effects
 
@@ -54,6 +55,7 @@ same chain.
 | **Pitch** | Vocoder, Auto-Tune |
 | **Utility** | Stereo Width, Utility |
 | **Visualizer** | **3D Scope** |
+| **Modular** | **Field** (node-graph effect — the same modular engine as the Field instrument) |
 
 **Stuttero** is our own Stutter Edit-style stutter / beat-repeat performance effect: it captures
 incoming audio and chops it into tempo-synced slices (1/4 down to 1/512), shaped by a drawable

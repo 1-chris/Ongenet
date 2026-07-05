@@ -1,0 +1,58 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:field="using:Ongenet.App.Views.Field"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="640"
+        x:Class="Ongenet.App.Views.Windows.FieldWindow"
+        Width="1000" Height="640" MinWidth="520" MinHeight="360"
+        Title="Field"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True">
+
+    <Panel>
+        <Border Name="RootBorder" Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}"
+                BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+            <Grid RowDefinitions="Auto, *">
+                <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto"
+                      PointerPressed="TitleBar_PointerPressed">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
+                                    VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
+                            <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
+                                    Click="CloseButton_Click" ToolTip.Tip="Close">
+                                <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Name="TitleText" Text="Field" Margin="10,0" FontSize="12"
+                                   Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
+                        <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
+                            <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10"
+                                  Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Border Grid.Row="1" Margin="8" CornerRadius="6" ClipToBounds="True"
+                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                    <field:FieldEditorView Name="Editor"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Name="ResizeHandles" IsHitTestVisible="True">
+            <Border Width="4" HorizontalAlignment="Left" Cursor="LeftSide" PointerPressed="OnResizeHandlePressed" Tag="Left" Background="Transparent"/>
+            <Border Width="4" HorizontalAlignment="Right" Cursor="RightSide" PointerPressed="OnResizeHandlePressed" Tag="Right" Background="Transparent"/>
+            <Border Height="4" VerticalAlignment="Top" Cursor="TopSide" PointerPressed="OnResizeHandlePressed" Tag="Top" Background="Transparent"/>
+            <Border Height="4" VerticalAlignment="Bottom" Cursor="BottomSide" PointerPressed="OnResizeHandlePressed" Tag="Bottom" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="TopLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="TopLeft" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="TopRightCorner" PointerPressed="OnResizeHandlePressed" Tag="TopRight" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="BottomLeftCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomLeft" Background="Transparent"/>
+            <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="BottomRightCorner" PointerPressed="OnResizeHandlePressed" Tag="BottomRight" Background="Transparent"/>
+        </Grid>
+    </Panel>
+</Window>

@@ -14,7 +14,11 @@ public enum PresetKind
 {
     Instrument,
     Effect,
-    EffectChain
+    EffectChain,
+
+    /// <summary>A Field graph patch. Persisted like an instrument component (the graph is the component's
+    /// custom state), but tagged distinctly so a library can present it as a Field patch.</summary>
+    FieldPatch
 }
 
 /// <summary>Metadata describing a preset (read from its manifest without decoding the component).</summary>
@@ -51,6 +55,12 @@ public static class PresetFile
         => Save(PresetKind.Instrument, instrument.TypeId, displayName, author, output,
             (w, store) => ComponentSerializer.WriteComponent(w, instrument.TypeId, instrument,
                 instrument.Parameters, store, enabled: true, instrument as ISampleHost));
+
+    /// <summary>Saves a Field instrument patch (tagged as <see cref="PresetKind.FieldPatch"/>).</summary>
+    public static void SaveFieldPatch(IInstrument fieldInstrument, string displayName, string author, Stream output)
+        => Save(PresetKind.FieldPatch, fieldInstrument.TypeId, displayName, author, output,
+            (w, store) => ComponentSerializer.WriteComponent(w, fieldInstrument.TypeId, fieldInstrument,
+                fieldInstrument.Parameters, store, enabled: true, fieldInstrument as ISampleHost));
 
     public static void SaveEffect(IAudioEffect effect, string displayName, string author, Stream output)
         => Save(PresetKind.Effect, effect.TypeId, displayName, author, output,
@@ -130,7 +140,7 @@ public static class PresetFile
         using var data = ReadEntry(dataEntry);
         using var r = new OngenReader(data);
 
-        if (meta.Kind == PresetKind.Instrument)
+        if (meta.Kind is PresetKind.Instrument or PresetKind.FieldPatch)
         {
             var (inst, _) = ComponentSerializer.ReadInstrument(r, instruments, Lookup, warnings);
             return new PresetLoadResult { Meta = meta, Instrument = inst, Warnings = warnings };
