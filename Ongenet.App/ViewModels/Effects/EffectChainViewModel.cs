@@ -30,7 +30,7 @@ namespace Ongenet.App.ViewModels.Effects
 
         // Preferred display order for the add-effect menu categories (plugin formats grouped separately).
         private static readonly string[] CategoryOrder =
-            { "Dynamics", "EQ & Filter", "Modulation", "Delay & Reverb", "Distortion", "Pitch", "Utility", "Visualizer", "CLAP", "LV2", "VST2", "VST3" };
+            { "Dynamics", "EQ & Filter", "Modulation", "Delay & Reverb", "Distortion", "Pitch", "Utility", "Visualizer", "CLAP", "LV2", "VST2", "VST3", "AU" };
 
         public EffectChainViewModel(List<IAudioEffect> effects, Action commit, Action changed,
             IEffectRegistry registry, IHistoryService history, ITransportService transport, IPlaybackClock clock)

@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Ongenet.Au;
 using Ongenet.Audio;
 using Ongenet.Clap;
 using Ongenet.Core.Audio;
@@ -75,6 +76,19 @@ public sealed class DesktopPlatform : IPlatformServices
             var logger = sp.GetService<ILoggerFactory>()?.CreateLogger("Vst");
             return new VstPluginProvider(instruments, effects, msg => logger?.LogInformation("{Message}", msg));
         });
+
+        // Apple Audio Unit hosting (macOS only): scans the Component Manager and registers music
+        // devices as instruments and effects as effects.
+        if (OperatingSystem.IsMacOS())
+        {
+            services.AddSingleton(sp =>
+            {
+                var instruments = sp.GetRequiredService<IInstrumentRegistry>();
+                var effects = sp.GetRequiredService<IEffectRegistry>();
+                var logger = sp.GetService<ILoggerFactory>()?.CreateLogger("Au");
+                return new AuPluginProvider(instruments, effects, msg => logger?.LogInformation("{Message}", msg));
+            });
+        }
     }
 
     public object CreateShell(IServiceProvider services) => new MainWindow
@@ -102,5 +116,13 @@ public sealed class DesktopPlatform : IPlatformServices
         Vst2PluginBase.Log = msg => { vstLogger?.LogInformation("{Message}", msg); Console.Error.WriteLine($"[Vst] {msg}"); };
         Vst3PluginBase.Log = msg => { vstLogger?.LogInformation("{Message}", msg); Console.Error.WriteLine($"[Vst] {msg}"); };
         services.GetRequiredService<VstPluginProvider>().ScanAsync();
+
+        // Apple Audio Units (macOS only).
+        if (OperatingSystem.IsMacOS())
+        {
+            var auLogger = services.GetService<ILoggerFactory>()?.CreateLogger("Au");
+            AuPluginBase.Log = msg => auLogger?.LogInformation("{Message}", msg);
+            services.GetRequiredService<AuPluginProvider>().ScanAsync();
+        }
     }
 }
