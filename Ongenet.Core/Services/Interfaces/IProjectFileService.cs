@@ -39,4 +39,8 @@ public interface IProjectFileService
 
     /// <summary>Replaces the project with a fresh blank one and clears the file/dirty state.</summary>
     void NewProject();
+
+    /// <summary>Swaps in an in-memory project (e.g. a built-in demo song): syncs the transport to its
+    /// tempo and clears the file/dirty state, like opening a file that has no path yet.</summary>
+    void LoadProject(Models.Audio.Project project);
 }

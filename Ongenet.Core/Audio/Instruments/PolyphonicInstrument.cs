@@ -102,6 +102,30 @@ public abstract class PolyphonicInstrument : IInstrument
         }
     }
 
+    /// <summary>True when any voice in the pool is currently sounding.</summary>
+    protected bool AnyVoiceActive
+    {
+        get
+        {
+            foreach (var voice in _voices)
+                if (voice.IsActive) return true;
+            return false;
+        }
+    }
+
+    /// <summary>Scans an interleaved buffer for any sample above <paramref name="threshold"/>.</summary>
+    protected static bool HasSignal(ReadOnlySpan<float> buffer, float threshold = 1e-6f)
+    {
+        for (var i = 0; i < buffer.Length; i++)
+        {
+            var a = buffer[i];
+            if (a < 0) a = -a;
+            if (a > threshold) return true;
+        }
+
+        return false;
+    }
+
     private int FindFreeVoice()
     {
         for (var i = 0; i < _voices.Length; i++)

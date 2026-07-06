@@ -113,6 +113,8 @@ namespace Ongenet.App
             services.AddSingleton<ViewModels.Library.InstrumentPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectChainPresetLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.ProjectsLibraryViewModel>();
+            services.AddSingleton<ViewModels.ProjectClipsViewModel>();
 
             services.AddSingleton<MainViewModel>();
 
@@ -143,6 +145,12 @@ namespace Ongenet.App
                 ServiceProvider.GetRequiredService<Core.Audio.Field.IFieldNodeRegistry>(),
                 ServiceProvider.GetRequiredService<Core.Audio.Instruments.IInstrumentRegistry>(),
                 ServiceProvider.GetRequiredService<Core.Audio.Effects.IEffectRegistry>());
+
+            // Replace the blank startup project with a built-in song ("Ascension"), so a fresh launch
+            // opens on something that plays. Must run after FieldBootstrap (the leads are Field
+            // patches) and before the shell exists (so nothing marks the project dirty). File > New
+            // still creates a blank project.
+            TryLoadPreviewSong();
 
             // Establish the font-size resources used across the app.
             ApplyFontScale(1.0);
@@ -181,6 +189,30 @@ namespace Ongenet.App
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        /// <summary>
+        /// Builds the startup song and makes it the current project, syncing the transport to its
+        /// tempo. Logs (rather than crashing) on failure — the app then simply starts on the usual
+        /// blank project.
+        /// </summary>
+        private static void TryLoadPreviewSong()
+        {
+            try
+            {
+                var instruments = ServiceProvider!.GetRequiredService<Core.Audio.Instruments.IInstrumentRegistry>();
+                var song = Core.Music.UpliftingTranceSongFactory.Create(instruments);
+
+                var transport = ServiceProvider.GetRequiredService<ITransportService>();
+                transport.Tempo = song.Tempo;
+
+                ServiceProvider.GetRequiredService<IProjectService>().SetCurrentProject(song);
+            }
+            catch (Exception ex)
+            {
+                var logger = ServiceProvider?.GetService<ILoggerFactory>()?.CreateLogger("PreviewSong");
+                logger?.LogError(ex, "Failed to build the startup song; starting with a blank project.");
+            }
         }
 
         /// <summary>Disposes any plugin instruments + effects on the project's tracks (frees native modules).</summary>

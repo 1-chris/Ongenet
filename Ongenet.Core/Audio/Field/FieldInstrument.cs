@@ -96,22 +96,34 @@ public sealed class FieldInstrument : IInstrument, IProjectStatefulComponent, IP
         var compiled = _compiled;
         if (compiled is null) return; // prepared by the engine before the first render
 
+        var hasEvents = false;
         lock (_eventLock)
         {
-            _drain.Clear();
-            _drain.AddRange(_events);
-            _events.Clear();
+            if (_events.Count > 0)
+            {
+                hasEvents = true;
+                _drain.Clear();
+                _drain.AddRange(_events);
+                _events.Clear();
+            }
         }
 
-        foreach (var ev in _drain)
+        if (hasEvents)
         {
-            switch (ev.Type)
+            foreach (var ev in _drain)
             {
-                case EvType.On: compiled.NoteOn(ev.Note, ev.Value); break;
-                case EvType.Off: compiled.NoteOff(ev.Note); break;
-                case EvType.AllOff: compiled.AllNotesOff(); break;
-                case EvType.Bend: compiled.PitchBend(ev.Value); break;
+                switch (ev.Type)
+                {
+                    case EvType.On: compiled.NoteOn(ev.Note, ev.Value); break;
+                    case EvType.Off: compiled.NoteOff(ev.Note); break;
+                    case EvType.AllOff: compiled.AllNotesOff(); break;
+                    case EvType.Bend: compiled.PitchBend(ev.Value); break;
+                }
             }
+        }
+        else if (!AnyVoiceActive(compiled))
+        {
+            return;
         }
 
         // Process in chunks no larger than the compiled block size (handles any host buffer length without
@@ -126,6 +138,13 @@ public sealed class FieldInstrument : IInstrument, IProjectStatefulComponent, IP
             compiled.Process(buffer.Slice(offset * channels, n * channels), 120.0, 0.0, false, ReadOnlySpan<float>.Empty, 0);
             offset += n;
         }
+    }
+
+    private static bool AnyVoiceActive(CompiledGraph compiled)
+    {
+        foreach (var v in compiled.Voices.Voices)
+            if (v.Active) return true;
+        return false;
     }
 
     public IInstrument Clone()

@@ -152,6 +152,8 @@ public sealed class CompiledGraph
         for (var i = 0; i < vs.Length; i++)
             if (vs[i].Active) _activeVoices[activeCount++] = i;
 
+        if (IsInstrument && activeCount == 0) return;
+
         foreach (var cn in _order)
         {
             if (cn.PerVoice)

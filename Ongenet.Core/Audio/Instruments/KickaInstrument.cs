@@ -200,7 +200,7 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
     private static readonly string[] PresetNamesList =
     {
         "Drumkit", "Trance Kick", "EDM Kick", "Hardstyle Kick", "UKHC Kick",
-        "Oldschool Happy Hardcore Kick", "Hardstyle Zaag", "Hardstyle Piep"
+        "Oldschool Happy Hardcore Kick", "Hardstyle Zaag", "Hardstyle Piep", "Deep House Kick", "DnB Kick"
     };
 
     public IReadOnlyList<string> PresetNames => PresetNamesList;
@@ -216,6 +216,8 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
             case 5: HappyHardcore(); break;
             case 6: Zaag(); break;
             case 7: Piep(); break;
+            case 8: DeepHouse(); break;
+            case 9: Dnb(); break;
             default: Reset(); break; // 0 = Drumkit / init
         }
     }
@@ -305,6 +307,35 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
         TailMode = 1; TailLengthMs = 200; TailPitch = 0; TailDecayMs = 190; TailCurve = 0.6; TailDrive = 0.5; TailLevel = 0.45;
         Width = 0.15; Comb = 0.05;
         Gain = 0.85; Punch = 0.55;
+    }
+
+    /// <summary>A deep-house kick with weight: a firm punch transient over a long, saturated sub tail.</summary>
+    private void DeepHouse()
+    {
+        Reset();
+        StartPitch = 26; PitchDecayMs = 40; PitchCurve = 0.6;
+        PunchLevel = 0.6; PunchPitch = 26; PunchDecayMs = 15; TokHp = 130; TokSat = 0.3;
+        ClickLevel = 0.35; ClickDecayMs = 4; ClickTone = 3000; TickLevel = 0.25;
+        BodyWave = 0; BodyDecayMs = 300; BodyCurve = 0.6; BodyLevel = 0.95;
+        SubLevel = 0.85; SubDecayMs = 420;
+        // A couple of gentle tanh stages thicken the body without turning it into a hardstyle scream.
+        Stages = 2; StackDriveDb = 4; Scream = 500; Boost = 5; StackQ = 0.8;
+        Asymmetry = 0.15; Character = (int)ShaperType.Tanh; StackTone = 6500; StackMix = 0.3;
+        Gain = 0.9; Punch = 0.55;
+    }
+
+    /// <summary>A tight, punchy drum &amp; bass kick: short body, hard transient, quick sub thump.</summary>
+    private void Dnb()
+    {
+        Reset();
+        StartPitch = 30; PitchDecayMs = 28; PitchCurve = 0.7;
+        PunchLevel = 0.65; PunchPitch = 30; PunchPitchDecayMs = 10; TokHp = 160; TokSat = 0.35;
+        ClickLevel = 0.5; ClickDecayMs = 4; ClickTone = 4200; TickLevel = 0.35;
+        BodyWave = 0; BodyDecayMs = 160; BodyCurve = 0.75; BodyLevel = 0.9;
+        SubLevel = 0.7; SubDecayMs = 180;
+        Stages = 3; StackDriveDb = 5; Scream = 600; Boost = 6; StackQ = 0.85;
+        Asymmetry = 0.2; Character = (int)ShaperType.Tanh; StackTone = 7500; StackMix = 0.4;
+        Gain = 0.9; Punch = 0.55;
     }
 
     private void Zaag()

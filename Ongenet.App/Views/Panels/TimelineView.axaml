@@ -290,6 +290,7 @@
                                                     Classes.selected="{Binding IsSelected}">
                                                 <Border.ContextMenu>
                                                     <ContextMenu>
+                                                        <MenuItem Header="Rename…" Command="{Binding RenameCommand}"/>
                                                         <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
                                                         <MenuItem Header="Reverse" Command="{Binding ReverseCommand}"
                                                                   IsVisible="{Binding IsAudio}"/>

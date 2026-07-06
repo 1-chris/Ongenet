@@ -457,6 +457,88 @@ namespace Ongenet.App.ViewModels
             if (ReferenceEquals(_selection.SelectedClip, clip.Model)) _selection.SelectTrack(lane.Model);
         }
 
+        /// <summary>Context-menu rename: prompts for a new name and applies it to this one clip.</summary>
+        public async void RenameClip(ClipViewModel clip)
+        {
+            var owner = OwnerWindow();
+            if (owner is null) return;
+            var name = await Views.Windows.InputDialog.Prompt(owner, "Rename clip", "Clip name:",
+                clip.Model.Name, "Rename");
+            if (name is null || name == clip.Model.Name) return;
+
+            _history.Capture("Rename clip");
+            clip.Model.Name = name;
+            clip.RefreshFromModel();
+            _events.Publish(new ClipChangedEvent(clip.Model));
+        }
+
+        /// <summary>Renames every clip in <paramref name="clips"/> (the Project Clips panel's "rename all").</summary>
+        public void RenameClips(IReadOnlyCollection<Clip> clips, string name)
+        {
+            if (clips.Count == 0) return;
+            _history.Capture("Rename clips");
+            foreach (var clip in clips)
+            {
+                clip.Name = name;
+                var vm = _trackLanes.SelectMany(l => l.Clips).FirstOrDefault(c => ReferenceEquals(c.Model, clip));
+                vm?.RefreshFromModel();
+                _events.Publish(new ClipChangedEvent(clip));
+            }
+        }
+
+        /// <summary>Deletes every clip in <paramref name="clips"/> from the whole project
+        /// (the Project Clips panel's "delete all from project").</summary>
+        public void DeleteClips(IReadOnlyCollection<Clip> clips)
+        {
+            if (clips.Count == 0) return;
+            _history.Capture("Delete clips");
+            foreach (var lane in _trackLanes)
+            {
+                var doomed = lane.Clips.Where(c => clips.Contains(c.Model)).ToList();
+                if (doomed.Count == 0) continue;
+                foreach (var vm in doomed)
+                {
+                    lane.Model.Clips.Remove(vm.Model);
+                    lane.Clips.Remove(vm);
+                    if (ReferenceEquals(_selection.SelectedClip, vm.Model)) _selection.SelectTrack(lane.Model);
+                }
+
+                UpdateCrossfades(lane);
+            }
+
+            _events.Publish(new TracksChangedEvent()); // let the engine drop the removed clips
+        }
+
+        /// <summary>Finds a clip anywhere in the project by its id (used to resolve clip drag payloads).</summary>
+        public Clip? FindClipById(Guid id)
+            => _project.Current.Tracks.SelectMany(t => t.Clips).FirstOrDefault(c => c.Id == id);
+
+        /// <summary>True when <paramref name="clip"/> may be dropped on <paramref name="lane"/>:
+        /// MIDI clips go to instrument tracks, audio clips to audio tracks.</summary>
+        public static bool CanDropClip(Clip clip, TrackLaneViewModel lane)
+            => clip.IsAudio ? lane.Model.Kind == TrackKind.Audio : lane.Model.Kind == TrackKind.Instrument;
+
+        /// <summary>
+        /// Drops a copy of an existing project clip (dragged from the Project Clips panel) onto
+        /// <paramref name="lane"/> at <paramref name="beat"/>, snapped to the nearest beat.
+        /// </summary>
+        public void AddClipCopy(Clip source, TrackLaneViewModel lane, double beat)
+        {
+            if (!CanDropClip(source, lane)) return;
+            _history.Capture("Add clip");
+            var copy = CloneClip(source);
+            copy.StartBeat = Math.Max(0, Math.Round(beat));
+            lane.Model.Clips.Add(copy);
+            lane.Clips.Add(new ClipViewModel(copy, lane.Model, Metrics, this));
+            ExtendTimeline(copy.EndBeat);
+            UpdateCrossfades(lane);
+            _selection.SelectClip(copy, lane.Model);
+        }
+
+        private static Avalonia.Controls.Window? OwnerWindow()
+            => (Avalonia.Application.Current?.ApplicationLifetime
+                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+
         // --- Rubber-band multi-select (Select mode) ---
 
         /// <summary>Selects every clip intersecting the rectangle (content pixel coordinates).</summary>

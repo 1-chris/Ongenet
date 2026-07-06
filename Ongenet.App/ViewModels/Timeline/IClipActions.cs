@@ -6,5 +6,6 @@ namespace Ongenet.App.ViewModels.Timeline
         void DuplicateClip(ClipViewModel clip);
         void DeleteClip(ClipViewModel clip);
         void ReverseClip(ClipViewModel clip);
+        void RenameClip(ClipViewModel clip);
     }
 }

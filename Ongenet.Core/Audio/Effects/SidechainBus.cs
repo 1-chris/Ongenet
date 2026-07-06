@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace Ongenet.Core.Audio.Effects;
@@ -13,8 +14,9 @@ namespace Ongenet.Core.Audio.Effects;
 /// it has rendered + effected each requested track, calls <see cref="Publish"/> with that track's output;
 /// the consumer reads it with <see cref="Read"/>. If the source is processed after the consumer in the
 /// block, the consumer reads the previous block's signal (sub-block latency, inaudible for ducking).
-/// All access is on the single audio thread, so no locking is needed; buffers are reused to avoid
-/// per-block allocation.
+/// <see cref="Request"/>/<see cref="IsRequested"/>/<see cref="Read"/> may be called concurrently from
+/// the engine's render workers; <see cref="Publish"/> runs only on the serial mixdown phase, so the
+/// tap buffers themselves need no locking. Buffers are reused to avoid per-block allocation.
 /// </summary>
 public interface ISidechainBus
 {
@@ -44,15 +46,20 @@ public sealed class SidechainBus : ISidechainBus
         public int Channels = 1;
     }
 
+    // Requests arrive from parallel render workers (effects call Request inside Process), so the
+    // request set is a concurrent map. Taps are written only on the serial phase.
     private readonly Dictionary<Guid, Tap> _taps = new();
-    private readonly HashSet<Guid> _requested = new();
+    private readonly ConcurrentDictionary<Guid, byte> _requested = new();
 
     public void Request(Guid trackId)
     {
-        if (trackId != Guid.Empty) _requested.Add(trackId);
+        if (trackId != Guid.Empty) _requested.TryAdd(trackId, 0);
     }
 
-    public bool IsRequested(Guid trackId) => _requested.Contains(trackId);
+    public bool IsRequested(Guid trackId) => _requested.ContainsKey(trackId);
+
+    /// <summary>Clears per-block request flags. Call once at the start of each render block.</summary>
+    public void BeginBlock() => _requested.Clear();
 
     public void Publish(Guid trackId, ReadOnlySpan<float> interleaved, int channels)
     {

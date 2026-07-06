@@ -20,8 +20,10 @@ public sealed class EffectRegistry : IEffectRegistry
     private readonly List<EffectInfo> _builtIn = new()
     {
         new EffectInfo(EqEffect.TypeId, "EQ", () => new EqEffect(), CatEqFilter),
+        new EffectInfo(MidSideEqEffect.TypeId, "Mid/Side EQ", () => new MidSideEqEffect(), CatEqFilter),
         new EffectInfo(FilterEffect.TypeId, "Filter", () => new FilterEffect(), CatEqFilter),
         new EffectInfo(CompressorEffect.TypeId, "Compressor", () => new CompressorEffect(), CatDynamics),
+        new EffectInfo(MultibandCompressorEffect.TypeId, "Multiband (OTT)", () => new MultibandCompressorEffect(), CatDynamics),
         new EffectInfo(LimiterEffect.TypeId, "Limiter", () => new LimiterEffect(), CatDynamics),
         new EffectInfo(GateEffect.TypeId, "Gate", () => new GateEffect(), CatDynamics),
         new EffectInfo(SidechainEffect.TypeId, "Sidechain", () => new SidechainEffect(), CatDynamics),
@@ -33,6 +35,7 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(DelayEffect.TypeId, "Delay", () => new DelayEffect(), CatDelayReverb),
         new EffectInfo(ReverbEffect.TypeId, "Reverb", () => new ReverbEffect(), CatDelayReverb),
         new EffectInfo(DistortionEffect.TypeId, "Distortion", () => new DistortionEffect(), CatDistortion),
+        new EffectInfo(ClipperEffect.TypeId, "Clipper", () => new ClipperEffect(), CatDistortion),
         new EffectInfo(BitcrusherEffect.TypeId, "Bitcrusher", () => new BitcrusherEffect(), CatDistortion),
         new EffectInfo(VocoderEffect.TypeId, "Vocoder", () => new VocoderEffect(), CatPitch),
         new EffectInfo(AutoTuneEffect.TypeId, "Auto-Tune", () => new AutoTuneEffect(), CatPitch),

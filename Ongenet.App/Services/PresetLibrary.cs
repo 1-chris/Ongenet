@@ -168,6 +168,42 @@ public sealed class PresetLibrary : IPresetLibrary
                 }
             }
         }
+
+        // Code-defined factory presets for instruments without an IPresetProvider (e.g. 3x Osc).
+        foreach (var def in FactoryPresets.Definitions)
+        {
+            var dir = Path.Combine(factoryDir, Sanitize(def.InstrumentDisplayName));
+            var path = Path.Combine(dir, Sanitize(def.PresetName) + ".ongenpreset");
+            if (File.Exists(path)) continue;
+            try
+            {
+                Directory.CreateDirectory(dir);
+                using var fs = File.Create(path);
+                PresetFile.SaveInstrument(def.Create(), def.PresetName, "Factory", fs);
+            }
+            catch
+            {
+                // Skip a preset that fails to materialize; the rest still work.
+            }
+        }
+
+        // Factory FX chains (ready-made insert stacks) for the FX Chains tab.
+        foreach (var def in FactoryPresets.ChainDefinitions)
+        {
+            var dir = Path.Combine(factoryDir, "FX Chains");
+            var path = Path.Combine(dir, Sanitize(def.PresetName) + ".ongenpreset");
+            if (File.Exists(path)) continue;
+            try
+            {
+                Directory.CreateDirectory(dir);
+                using var fs = File.Create(path);
+                PresetFile.SaveChain(def.Create(), def.PresetName, "Factory", fs);
+            }
+            catch
+            {
+                // Skip a chain that fails to materialize; the rest still work.
+            }
+        }
     }
 
     private static IEnumerable<string> SafeEnumerate(string root)

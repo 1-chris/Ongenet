@@ -20,8 +20,11 @@ public sealed class OfflineRenderer
     private const int BlockFrames = 512;
     private const double TailSeconds = 2.0; // let instrument/effect tails ring out
 
-    /// <summary>Renders the project to <paramref name="path"/> as a 16-bit PCM WAV.</summary>
-    public void RenderToWav(Project project, AudioFormat format, double bpm, string path)
+    /// <summary>Renders the project to <paramref name="path"/> as a 16-bit PCM WAV.
+    /// <paramref name="progress"/> (optional) receives the completed fraction, 0..1, at most once
+    /// per whole percent so UI marshalling stays cheap.</summary>
+    public void RenderToWav(Project project, AudioFormat format, double bpm, string path,
+        IProgress<double>? progress = null)
     {
         var channels = format.Channels < 1 ? 1 : format.Channels;
         var sampleRate = format.SampleRate;
@@ -169,6 +172,8 @@ public sealed class OfflineRenderer
 
         using var writer = new WavWriter(path, channels, sampleRate);
 
+        var lastPercent = -1;
+
         while (framesWritten < totalFrames)
         {
             var framesThisBlock = (int)Math.Min(BlockFrames, totalFrames - framesWritten);
@@ -290,7 +295,19 @@ public sealed class OfflineRenderer
 
             writer.Write(blockSpan);
             framesWritten += framesThisBlock;
+
+            if (progress is not null)
+            {
+                var percent = (int)(framesWritten * 100 / totalFrames);
+                if (percent != lastPercent)
+                {
+                    lastPercent = percent;
+                    progress.Report(framesWritten / (double)totalFrames);
+                }
+            }
         }
+
+        progress?.Report(1.0);
     }
 
     private static void MixIntoBlock(Span<float> target, Span<float> source, float leftGain, float rightGain,

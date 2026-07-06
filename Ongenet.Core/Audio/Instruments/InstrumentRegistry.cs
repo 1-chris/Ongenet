@@ -26,7 +26,8 @@ public sealed class InstrumentRegistry : IInstrumentRegistry
         new InstrumentInfo(BasicSamplerInstrument.TypeId, "Basic Sampler", () => new BasicSamplerInstrument(), CatSampler),
         new InstrumentInfo(Sampler.SamplerInstrument.TypeId, "Sampler", () => new Sampler.SamplerInstrument(), CatSampler),
         new InstrumentInfo(GranularInstrument.TypeId, "Granular", () => new GranularInstrument(), CatSampler),
-        new InstrumentInfo(KickaInstrument.TypeId, "Kicka", () => new KickaInstrument(), CatDrum)
+        new InstrumentInfo(KickaInstrument.TypeId, "Kicka", () => new KickaInstrument(), CatDrum),
+        new InstrumentInfo(PercaInstrument.TypeId, "Perca", () => new PercaInstrument(), CatDrum)
     };
 
     // Dynamically discovered instruments (e.g. CLAP plugins), added at runtime.

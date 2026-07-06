@@ -18,7 +18,8 @@ public enum OscWave
 /// <summary>
 /// A reusable audio-rate oscillator: phase accumulator with selectable waveform, a static phase offset,
 /// optional phase invert, white-noise mode (its own <see cref="FastRandom"/>), and a custom wavetable.
-/// Naive (not band-limited), matching the project's other oscillators. Reusable by any synth/effect.
+/// The saw and square are band-limited with PolyBLEP so they stay smooth and alias-free (the difference
+/// between a "primitive" buzzy saw and a modern soft-synth supersaw). Reusable by any synth/effect.
 /// </summary>
 public sealed class WaveOscillator
 {
@@ -52,21 +53,61 @@ public sealed class WaveOscillator
     {
         var p = _phase + PhaseOffset;
         p -= Math.Floor(p);
+        var dt = _inc <= 0 ? 0.0 : (_inc >= 0.5 ? 0.5 : _inc);
 
-        var value = Wave switch
+        double value;
+        switch (Wave)
         {
-            OscWave.Triangle => 1.0 - 4.0 * Math.Abs(p - 0.5),
-            OscWave.Saw => 2.0 * p - 1.0,
-            OscWave.Square => p < 0.5 ? 1.0 : -1.0,
-            OscWave.Noise => _rng.NextBipolar(),
-            OscWave.Custom => ReadCustom(p),
-            _ => Math.Sin(p * 2.0 * Math.PI)
-        };
+            case OscWave.Triangle:
+                value = 1.0 - 4.0 * Math.Abs(p - 0.5);
+                break;
+            case OscWave.Saw:
+                // Band-limited: correct the ramp discontinuity at the wrap point.
+                value = 2.0 * p - 1.0 - PolyBlep(p, dt);
+                break;
+            case OscWave.Square:
+            {
+                value = p < 0.5 ? 1.0 : -1.0;
+                value += PolyBlep(p, dt);            // rising edge at 0
+                var pHalf = p + 0.5;
+                pHalf -= Math.Floor(pHalf);
+                value -= PolyBlep(pHalf, dt);        // falling edge at 0.5
+                break;
+            }
+            case OscWave.Noise:
+                value = _rng.NextBipolar();
+                break;
+            case OscWave.Custom:
+                value = ReadCustom(p);
+                break;
+            default:
+                value = Math.Sin(p * 2.0 * Math.PI);
+                break;
+        }
 
         _phase += _inc;
         if (_phase >= 1.0) _phase -= 1.0;
 
         return (float)(Invert ? -value : value);
+    }
+
+    // PolyBLEP residual: smooths the one-sample step at a waveform discontinuity to kill aliasing.
+    private static double PolyBlep(double t, double dt)
+    {
+        if (dt <= 0.0) return 0.0;
+        if (t < dt)
+        {
+            t /= dt;
+            return t + t - t * t - 1.0;
+        }
+
+        if (t > 1.0 - dt)
+        {
+            t = (t - 1.0) / dt;
+            return t * t + t + t + 1.0;
+        }
+
+        return 0.0;
     }
 
     private double ReadCustom(double p)

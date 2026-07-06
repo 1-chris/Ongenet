@@ -36,6 +36,9 @@ public sealed class AppSettings
 
     /// <summary>Whether auto-stretch preserves pitch (time-stretch) instead of resampling (pitch tracks tempo).</summary>
     public bool AutoStretchPitchCorrection { get; set; }
+
+    /// <summary>Recently opened/saved project files, most recent first (drives the library's Projects tab).</summary>
+    public List<string> RecentProjects { get; set; } = new();
 }
 
 /// <summary>Serializable form of a <see cref="Core.Audio.Midi.TransportMapping"/>.</summary>

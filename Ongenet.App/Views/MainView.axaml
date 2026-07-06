@@ -55,9 +55,15 @@
 
             <!-- Workspace: track inspector | timeline | library -->
             <Grid Grid.Row="2" ColumnDefinitions="240,4,*,4,300">
-                <views:TrackInspectorView Grid.Column="0" MinWidth="180"
-                                          DataContext="{Binding TrackInspector}"
-                                          Background="{StaticResource CatppuccinMantle}"/>
+                <!-- Left sidebar: tabbed like the library — Track Controls + Project Clips. -->
+                <TabControl Grid.Column="0" MinWidth="180" Background="{StaticResource CatppuccinMantle}">
+                    <TabItem Header="Track Controls">
+                        <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
+                    </TabItem>
+                    <TabItem Header="Project Clips">
+                        <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
+                    </TabItem>
+                </TabControl>
                 <GridSplitter Grid.Column="1" ResizeDirection="Columns"
                               Background="{StaticResource CatppuccinCrust}"/>
 
@@ -79,6 +85,9 @@
                         </TabItem>
                         <TabItem Header="Everything">
                             <views:LibraryListView DataContext="{Binding Everything}"/>
+                        </TabItem>
+                        <TabItem Header="Projects">
+                            <views:LibraryListView DataContext="{Binding ProjectsLibrary}"/>
                         </TabItem>
                         <TabItem Header="Files">
                             <views:FileBrowserView DataContext="{Binding FileBrowser}"/>

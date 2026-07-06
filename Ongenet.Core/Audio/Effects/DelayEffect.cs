@@ -23,6 +23,10 @@ public sealed class DelayEffect : IAudioEffect
     public double Feedback { get; set; } = 0.4;
     public double Mix { get; set; } = 0.35;
 
+    /// <summary>When true (and stereo), echoes bounce across the stereo field: each side's feedback
+    /// feeds the opposite channel, so the repeats alternate left/right — the classic trance delay.</summary>
+    public bool PingPong { get; set; }
+
     private int _channels = 2;
     private double _sampleRate = 44100.0;
     private DelayLine[] _lines = Array.Empty<DelayLine>();
@@ -36,7 +40,8 @@ public sealed class DelayEffect : IAudioEffect
     {
         new FloatParameter("Time", 1.0, 2000.0, () => TimeMs, v => TimeMs = v, "0", "ms", 2.0),
         new FloatParameter("Feedback", 0.0, 0.95, () => Feedback, v => Feedback = v),
-        new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v)
+        new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v),
+        new BoolParameter("Ping-Pong", () => PingPong, v => PingPong = v)
     };
 
     public void Prepare(AudioFormat format)
@@ -50,7 +55,7 @@ public sealed class DelayEffect : IAudioEffect
 
     public IAudioEffect Clone() => new DelayEffect
     {
-        Enabled = Enabled, TimeMs = TimeMs, Feedback = Feedback, Mix = Mix
+        Enabled = Enabled, TimeMs = TimeMs, Feedback = Feedback, Mix = Mix, PingPong = PingPong
     };
 
     public void Process(Span<float> buffer)
@@ -62,6 +67,37 @@ public sealed class DelayEffect : IAudioEffect
         var mix = (float)Math.Clamp(Mix, 0, 1);
 
         var frames = buffer.Length / channels;
+
+        if (PingPong && channels >= 2)
+        {
+            for (var frame = 0; frame < frames; frame++)
+            {
+                var i = frame * channels;
+                var dryL = buffer[i];
+                var dryR = buffer[i + 1];
+                var delL = _lines[0].ReadInt(delay);
+                var delR = _lines[1].ReadInt(delay);
+
+                buffer[i] = dryL * (1 - mix) + delL * mix;
+                buffer[i + 1] = dryR * (1 - mix) + delR * mix;
+
+                // Cross the feedback so repeats hop between the channels.
+                _lines[0].Write(dryL + delR * fb);
+                _lines[1].Write(dryR + delL * fb);
+
+                // Any further channels pass through their own straight delay.
+                for (var c = 2; c < channels; c++)
+                {
+                    var dry = buffer[i + c];
+                    var delayed = _lines[c].ReadInt(delay);
+                    buffer[i + c] = dry * (1 - mix) + delayed * mix;
+                    _lines[c].Write(dry + delayed * fb);
+                }
+            }
+
+            return;
+        }
+
         for (var frame = 0; frame < frames; frame++)
         {
             var i = frame * channels;

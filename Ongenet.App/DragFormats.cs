@@ -25,5 +25,8 @@ namespace Ongenet.App
 
         /// <summary>Payload: the full path of a sound font (.sf2/.sfz) dragged from the Soundfonts tab.</summary>
         public static readonly DataFormat<string> SoundFont = DataFormat.CreateStringApplicationFormat("net.ongenet.soundfont");
+
+        /// <summary>Payload: a project clip's <c>Guid</c> (as a string) dragged from the Project Clips panel.</summary>
+        public static readonly DataFormat<string> ProjectClip = DataFormat.CreateStringApplicationFormat("net.ongenet.projectclip");
     }
 }

@@ -92,8 +92,13 @@
             <!-- Col 4: render + master loudness meter (device selection lives in the Settings window) -->
             <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="10"
                         VerticalAlignment="Center" HorizontalAlignment="Right">
+                <ProgressBar Minimum="0" Maximum="1" Value="{Binding RenderProgress}"
+                             Width="90" Height="8" VerticalAlignment="Center"
+                             IsVisible="{Binding IsRendering}"
+                             Foreground="{StaticResource CatppuccinMauve}"
+                             ToolTip.Tip="Rendering…"/>
                 <Button Classes="accent compact" Click="OnRender" IsEnabled="{Binding CanRender}"
-                        ToolTip.Tip="Export the arrangement to a WAV file">
+                        ToolTip.Tip="Export the arrangement (WAV, or MP3 320 / FLAC when ffmpeg is installed)">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <Path Classes="icon small" Data="{StaticResource IconExport}"/>
                         <TextBlock Text="Render" VerticalAlignment="Center"/>

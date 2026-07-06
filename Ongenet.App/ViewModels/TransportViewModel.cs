@@ -90,20 +90,63 @@ namespace Ongenet.App.ViewModels
 
         public bool CanRender => !IsRendering;
 
-        /// <summary>Renders the whole arrangement to a WAV file at <paramref name="path"/> (off the UI thread).</summary>
+        private double _renderProgress;
+
+        /// <summary>Render completion, 0..1 — drives the little progress bar next to the Render button.</summary>
+        public double RenderProgress
+        {
+            get => _renderProgress;
+            private set => SetField(ref _renderProgress, value);
+        }
+
+        /// <summary>
+        /// Renders the whole arrangement to <paramref name="path"/> off the UI thread. The format
+        /// follows the file extension: .wav writes directly, .mp3 (320 kbps) and .flac render to a
+        /// temporary WAV and encode it with the system ffmpeg.
+        /// </summary>
         public async System.Threading.Tasks.Task RenderToFileAsync(string path)
         {
             if (IsRendering) return;
             IsRendering = true;
+            RenderProgress = 0;
             try
             {
                 var format = _engine.Format;
                 var bpm = _transport.Tempo.BeatsPerMinute;
-                await System.Threading.Tasks.Task.Run(() => _renderer.RenderToWav(_project.Current, format, bpm, path));
+                var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+                var encode = ext is ".mp3" or ".flac";
+
+                // Encoding is quick next to the render, so the render owns most of the bar.
+                var renderShare = encode ? 0.9 : 1.0;
+                var progress = new Progress<double>(p => RenderProgress = p * renderShare);
+
+                if (!encode)
+                {
+                    await System.Threading.Tasks.Task.Run(
+                        () => _renderer.RenderToWav(_project.Current, format, bpm, path, progress));
+                    return;
+                }
+
+                var tempWav = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"ongen-render-{Guid.NewGuid():N}.wav");
+                try
+                {
+                    await System.Threading.Tasks.Task.Run(() =>
+                    {
+                        _renderer.RenderToWav(_project.Current, format, bpm, tempWav, progress);
+                        if (ext == ".mp3") Core.Audio.Files.FfmpegEncoder.EncodeMp3(tempWav, path);
+                        else Core.Audio.Files.FfmpegEncoder.EncodeFlac(tempWav, path);
+                    });
+                    RenderProgress = 1.0;
+                }
+                finally
+                {
+                    try { System.IO.File.Delete(tempWav); } catch { /* temp file — best effort */ }
+                }
             }
             finally
             {
                 IsRendering = false;
+                RenderProgress = 0;
             }
         }
 

@@ -32,6 +32,8 @@ namespace Ongenet.App.ViewModels
             Library.InstrumentPresetLibraryViewModel instrumentPresets,
             Library.EffectPresetLibraryViewModel effectPresets,
             Library.EffectChainPresetLibraryViewModel chainPresets,
+            Library.ProjectsLibraryViewModel projectsLibrary,
+            ProjectClipsViewModel projectClips,
             IProjectFileService projectFile,
             Services.IHistoryService history,
             ObservableCollectionLoggerProvider? logProvider = null)
@@ -51,6 +53,8 @@ namespace Ongenet.App.ViewModels
             InstrumentPresets = instrumentPresets;
             EffectPresets = effectPresets;
             EffectChainPresets = chainPresets;
+            ProjectsLibrary = projectsLibrary;
+            ProjectClips = projectClips;
             _projectFile = projectFile;
             _history = history;
             _history.Changed += () =>
@@ -116,6 +120,10 @@ namespace Ongenet.App.ViewModels
         public Library.InstrumentPresetLibraryViewModel InstrumentPresets { get; }
         public Library.EffectPresetLibraryViewModel EffectPresets { get; }
         public Library.EffectChainPresetLibraryViewModel EffectChainPresets { get; }
+        public Library.ProjectsLibraryViewModel ProjectsLibrary { get; }
+
+        /// <summary>Left sidebar's Project Clips tab (unique clips across the project).</summary>
+        public ProjectClipsViewModel ProjectClips { get; }
 
         /// <summary>Log entries captured by the in-app logger; surfaced by the Log window.</summary>
         public ObservableCollection<LogEntry> LogEntries => _logEntries;

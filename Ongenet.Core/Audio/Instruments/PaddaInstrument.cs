@@ -211,6 +211,9 @@ public sealed class PaddaInstrument : PolyphonicInstrument, ISampleHost, IPreset
         mix.Clear();
         RenderVoices(mix);
 
+        // Skip the internal chorus/delay/reverb chain when every voice is idle — the expensive part.
+        if (!HasSignal(mix)) return;
+
         var drive = (float)Drive;
         if (drive > 0.0001f)
         {
@@ -270,7 +273,7 @@ public sealed class PaddaInstrument : PolyphonicInstrument, ISampleHost, IPreset
     // ===== Presets =====
 
     private static readonly string[] PresetNamesList =
-        { "Init", "Cathedral Choir", "Tar Pit", "Aurora Shimmer", "Biotope", "Velvet Strings" };
+        { "Init", "Cathedral Choir", "Tar Pit", "Aurora Shimmer", "Biotope", "Velvet Strings", "Dusk Pads", "Deep Space" };
 
     public IReadOnlyList<string> PresetNames => PresetNamesList;
 
@@ -283,6 +286,8 @@ public sealed class PaddaInstrument : PolyphonicInstrument, ISampleHost, IPreset
             case 3: Aurora(); break;
             case 4: Biotope(); break;
             case 5: VelvetStrings(); break;
+            case 6: DuskPads(); break;
+            case 7: DeepSpace(); break;
             default: Reset(); break;
         }
     }
@@ -398,6 +403,45 @@ public sealed class PaddaInstrument : PolyphonicInstrument, ISampleHost, IPreset
         ReverbMix = 0.35; ReverbSize = 0.8; ReverbDamp = 0.4;
         DelayMix = 0.12; DelayTime = 360; DelayFeedback = 0.3;
         Gain = 0.78; Glide = 0.08;
+    }
+
+    /// <summary>Smooth, dark deep-house pad — slow detuned saws under a low filter with gentle motion.</summary>
+    private void DuskPads()
+    {
+        Reset();
+        WaveA = (int)OscWave.Saw; LevelA = 0.75;
+        WaveB = (int)OscWave.Saw; OctaveB = -1; LevelB = 0.5;
+        UnisonVoices = 6; UnisonDetune = 15; UnisonWidth = 0.8; UnisonBlend = 0.8;
+        SubLevel = 0.2;
+        Cutoff = 1800; Resonance = 1.2; FilterEnvAmount = 0.2; KeyTrack = 0.2;
+        FAttack = 0.9; FDecay = 1.4; FSustain = 0.6; FRelease = 1.4;
+        Attack = 0.6; Decay = 0.5; Sustain = 0.95; Release = 1.6;
+        LfoRate = 0.2; LfoShape = (int)LfoWave.Sine; LfoDepth = 0.25; LfoDest = 1; // cutoff
+        DriftAmount = 0.25;
+        ChorusMix = 0.4; ChorusRate = 0.3; ChorusDepth = 0.55;
+        ReverbMix = 0.35; ReverbSize = 0.85; ReverbDamp = 0.45;
+        DelayMix = 0.15; DelayTime = 469; DelayFeedback = 0.35; // dotted 8th at 128 BPM
+        Gain = 0.75;
+    }
+
+    /// <summary>A vast, slow atmosphere — airy noise and drifting detuned layers lost in a huge wet
+    /// space. Meant to sit far behind a mix as the environmental bed.</summary>
+    private void DeepSpace()
+    {
+        Reset();
+        WaveA = (int)OscWave.Saw; LevelA = 0.5;
+        WaveB = (int)OscWave.Triangle; OctaveB = -1; LevelB = 0.5;
+        UnisonVoices = 6; UnisonDetune = 28; UnisonWidth = 1.0; UnisonBlend = 0.85;
+        SubLevel = 0.3; NoiseLevel = 0.25;
+        Cutoff = 900; Resonance = 0.9; FilterEnvAmount = 0.25; KeyTrack = 0.1;
+        FAttack = 2.5; FDecay = 2.0; FSustain = 0.7; FRelease = 2.5;
+        Attack = 2.2; Decay = 1.0; Sustain = 1.0; Release = 3.0;
+        LfoRate = 0.08; LfoShape = (int)LfoWave.Sine; LfoDepth = 0.5; LfoDest = 1; // slow cutoff drift
+        DriftAmount = 0.5;
+        ChorusMix = 0.5; ChorusRate = 0.2; ChorusDepth = 0.8;
+        ReverbMix = 0.65; ReverbSize = 0.95; ReverbDamp = 0.25;
+        DelayMix = 0.3; DelayTime = 640; DelayFeedback = 0.5;
+        Gain = 0.6;
     }
 
     /// <summary>One sounding note: two unison layers + sub + noise → modulated filter → amp envelope.</summary>

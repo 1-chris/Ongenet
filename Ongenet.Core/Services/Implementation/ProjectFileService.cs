@@ -162,6 +162,30 @@ public sealed class ProjectFileService : IProjectFileService
         Changed?.Invoke();
     }
 
+    public void LoadProject(Models.Audio.Project project)
+    {
+        _suppressDirty = true;
+        try
+        {
+            _transport.Stop();
+            _transport.LoopStart = 0;
+            _transport.LoopEnd = 0;
+            _transport.StartBeat = 0;
+            _selection.SelectTrack(null);
+            _project.SetCurrentProject(project);
+            _transport.Tempo = project.Tempo;
+        }
+        finally
+        {
+            _suppressDirty = false;
+        }
+
+        CurrentPath = null;
+        OpenedFromNewerVersion = false;
+        SetDirty(false);
+        Changed?.Invoke();
+    }
+
     private void MarkDirty()
     {
         if (_suppressDirty || IsDirty) return;

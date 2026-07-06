@@ -380,6 +380,14 @@ namespace Ongenet.App.Views.Panels
         private void OnDragOver(object? sender, DragEventArgs e)
         {
             if (DataContext is not TimelineViewModel vm) return;
+
+            // A clip dragged from the Project Clips panel: only lanes of the matching kind accept it.
+            if (e.DataTransfer.Contains(DragFormats.ProjectClip))
+            {
+                OnProjectClipDragOver(e, vm);
+                return;
+            }
+
             // Audio can arrive from the in-app file browser (DragFormats.AudioFile) or from the OS
             // file manager as files.
             var isAudio = e.DataTransfer.Contains(DragFormats.AudioFile) || ExternalAudioPaths(e, vm).Count > 0;
@@ -436,7 +444,13 @@ namespace Ongenet.App.Views.Panels
 
             var (rowIndex, beat) = LocatePoint(e.GetPosition(LanesList), vm);
             var (insertIndex, _) = LocateBoundary(e, vm);
-            if (e.DataTransfer.TryGetValue(DragFormats.Instrument) is { } instrumentId)
+            if (ResolveProjectClip(e, vm) is { } clip)
+            {
+                var target = rowIndex < vm.RowCount ? vm.TrackLaneAtRow(rowIndex) : null;
+                if (target is not null && TimelineViewModel.CanDropClip(clip, target))
+                    vm.AddClipCopy(clip, target, beat);
+            }
+            else if (e.DataTransfer.TryGetValue(DragFormats.Instrument) is { } instrumentId)
             {
                 var laneIndex = insertIndex >= 0 ? insertIndex : vm.TrackInsertIndexForRow(rowIndex);
                 vm.CreateInstrumentTrack(instrumentId, laneIndex);
@@ -480,6 +494,29 @@ namespace Ongenet.App.Views.Panels
             NewTrackGhost.IsVisible = false;
             DragInsertLine.IsVisible = false;
             (DataContext as TimelineViewModel)?.ClearDropHighlight();
+        }
+
+        // Drag-over feedback for a Project Clips drag: highlight the hovered lane only when the clip
+        // kind matches the track kind (MIDI → instrument track, audio → audio track).
+        private void OnProjectClipDragOver(DragEventArgs e, TimelineViewModel vm)
+        {
+            DragInsertLine.IsVisible = false;
+            NewTrackGhost.IsVisible = false;
+
+            var clip = ResolveProjectClip(e, vm);
+            var (target, _, _) = Locate(e, vm);
+            var valid = clip is not null && target is not null && TimelineViewModel.CanDropClip(clip, target);
+
+            vm.SetDropHighlight(valid ? target : null);
+            e.DragEffects = valid ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        // Resolves a Project Clips drag payload (a clip Guid string) back to the live project clip.
+        private static Core.Models.Audio.Clip? ResolveProjectClip(DragEventArgs e, TimelineViewModel vm)
+        {
+            if (e.DataTransfer.TryGetValue(DragFormats.ProjectClip) is not { } id) return null;
+            return Guid.TryParse(id, out var guid) ? vm.FindClipById(guid) : null;
         }
 
         // Content-Y of the drag mapped to an inter-track boundary (insert index + indicator Y), or (-1, 0).

@@ -15,16 +15,31 @@ namespace Ongenet.Core.Audio;
 
 /// <summary>
 /// Default <see cref="IAudioEngine"/>. Mixes the project per track: each track renders its content
-/// (an instrument's voices, or its audio clips while playing) into a scratch buffer, then a single
-/// strip pass applies volume, constant-power pan, mute and solo while measuring that track's output
-/// level. Instruments render every block (audible for live play); audio clips render only while the
-/// transport is playing, sampled at the playhead. While playing, a sample-accurate sequencer fires
-/// MIDI clip notes into the instruments. Per-track and master peak levels (with release ballistics)
-/// are published for the UI meters.
+/// (an instrument's voices, or its audio clips while playing) into its own scratch buffer, then a
+/// single strip pass applies volume, constant-power pan, mute and solo while measuring that track's
+/// output level. Instruments render every block (audible for live play); audio clips render only
+/// while the transport is playing, sampled at the playhead. While playing, a sample-accurate
+/// sequencer fires MIDI clip notes into the instruments. Per-track and master peak levels (with
+/// release ballistics) are published for the UI meters.
+///
+/// <para><b>Performance.</b> Each block runs in two phases. The RENDER phase — instruments, slot
+/// effects and insert chains, by far the bulk of the CPU — fans out across cores via
+/// <see cref="AudioWorkerPool"/>: every content track renders into its own buffer, touching only its
+/// own DSP state, so no locks are needed. The MIXDOWN phase (sidechain publishes, strip gains, bus
+/// summing) then runs serially on the audio thread in deterministic order. Sidechain consumers
+/// therefore always read the previous block's published signal — a fixed one-block latency,
+/// inaudible for ducking, and more consistent than the old order-dependent behaviour. Tracks whose
+/// content has been silent longer than the longest plausible effect tail go DORMANT: their insert
+/// chains are skipped entirely, so a big project only pays for the tracks actually sounding.</para>
 /// </summary>
 public sealed class AudioEngine : IAudioEngine
 {
     private const float MeterRelease = 0.92f; // per-block decay → ~0.5s fall
+
+    // How long a track's content must stay silent before its effect chain stops being processed —
+    // generous enough for the longest delay/reverb tails to ring out fully first.
+    private const double DormancyTailSeconds = 12.0;
+    private const float SilenceThreshold = 1e-6f;
 
     private readonly IAudioOutput _output;
     private readonly IProjectService _project;
@@ -61,10 +76,23 @@ public sealed class AudioEngine : IAudioEngine
     private double _clickPhaseInc;
     private float _clickAmp;
 
-    private float[] _temp = Array.Empty<float>();
-    private float[] _slotTemp = Array.Empty<float>(); // per-instrument render scratch (slot → slot fx → sum into _temp)
     private float _masterL;
     private float _masterR;
+
+    // The render fan-out pool plus the cached per-block parameters its job delegate reads (kept in
+    // fields so dispatching a block never allocates a closure on the audio thread).
+    private readonly AudioWorkerPool _workers = new();
+    private readonly Action<int> _renderJob;
+    private TrackState[] _blkStates = Array.Empty<TrackState>();
+    private Routing _blkRouting = new();
+    private int _blkBufferLength;
+    private int _blkChannels;
+    private int _blkSampleRate;
+    private int _blkDormantSamples;
+    private double _blkPrevBeat;
+    private double _blkBpm;
+    private bool _blkPlaying;
+    private bool _blkSoloActive;
 
     // Per-block context + cross-track signal bus handed to effects that opt in via IContextualEffect.
     private readonly Effects.SidechainBus _sidechain = new();
@@ -78,6 +106,7 @@ public sealed class AudioEngine : IAudioEngine
         _project = project;
         _transport = transport;
         _audition = audition;
+        _renderJob = RenderTrackJob;
         _project.ProjectChanged += RebuildTracks;
         _transport.StateChanged += OnTransportStateChanged;
         _output.FormatChanged += RebuildTracks; // re-prepare DSP when the device's sample rate changes
@@ -149,14 +178,47 @@ public sealed class AudioEngine : IAudioEngine
             bus.Depth = depth;
         }
 
+        // Per-content-track render state (own buffer + dormancy counter), in project track order so
+        // the serial mixdown phase is deterministic.
+        var states = new List<TrackState>();
+        foreach (var t in tracks)
+        {
+            if (!t.IsBus) states.Add(new TrackState { Track = t });
+        }
+
         _routing = new Routing
         {
             TrackById = trackById,
             BusById = busById,
             Master = master,
             MasterTrack = masterTrack,
-            BusesDeepestFirst = busById.Values.OrderByDescending(b => b.Depth).ToArray()
+            BusesDeepestFirst = busById.Values.OrderByDescending(b => b.Depth).ToArray(),
+            ContentStates = states.ToArray(),
+            SidechainSources = CollectSidechainSources(tracks)
         };
+    }
+
+    // Tracks referenced as sidechain sources must render even when muted/soloed-out.
+    private static HashSet<Guid> CollectSidechainSources(Track[] tracks)
+    {
+        var set = new HashSet<Guid>();
+        foreach (var track in tracks)
+        {
+            CollectSidechainSourcesFromEffects(track.ActiveEffects, set);
+            foreach (var slot in track.ActiveInstruments)
+                CollectSidechainSourcesFromEffects(slot.ActiveEffects, set);
+        }
+
+        return set;
+    }
+
+    private static void CollectSidechainSourcesFromEffects(IAudioEffect[] effects, HashSet<Guid> set)
+    {
+        foreach (var fx in effects)
+        {
+            if (fx is SidechainEffect sc && sc.SourceTrackId is { } id && id != Guid.Empty)
+                set.Add(id);
+        }
     }
 
     // The bus a track's output feeds into (its ParentId group, or the master when unset).
@@ -298,6 +360,8 @@ public sealed class AudioEngine : IAudioEngine
         _events = notes.ToArray();
         _audioClips = clips.ToArray();
 
+        foreach (var st in _routing.ContentStates) st.SilentSamples = 0;
+
         // A count-in (recording pre-roll) plays a bar of metronome clicks with the playhead parked
         // at the start marker; content begins only once the clicks have elapsed.
         var countInBeats = _transport.CountInBeats;
@@ -322,8 +386,6 @@ public sealed class AudioEngine : IAudioEngine
     private void Render(Span<float> buffer)
     {
         buffer.Clear();
-        if (_temp.Length < buffer.Length) _temp = new float[buffer.Length];
-        if (_slotTemp.Length < buffer.Length) _slotTemp = new float[buffer.Length];
 
         var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
         var frames = buffer.Length / channels;
@@ -366,7 +428,10 @@ public sealed class AudioEngine : IAudioEngine
 
         var tracks = _tracks;
         var routing = _routing;
+        var states = routing.ContentStates;
         var buses = routing.BusesDeepestFirst;
+
+        foreach (var st in states) st.EnsureCapacity(buffer.Length);
 
         // Prepare each bus's accumulation buffer for this block.
         foreach (var bus in buses)
@@ -387,8 +452,6 @@ public sealed class AudioEngine : IAudioEngine
             if (track.IsSoloed) { soloActive = true; break; }
         }
 
-        var temp = _temp.AsSpan(0, buffer.Length);
-
         // Per-block context for tempo-aware / sidechain effects (the bus's tap buffers persist across blocks).
         _effectCtx.Format = _output.Format;
         // Tempo-aware effects (e.g. Stuttero) see the same live, automation-driven tempo the playhead uses;
@@ -397,44 +460,50 @@ public sealed class AudioEngine : IAudioEngine
         _effectCtx.PlayheadBeats = prevBeat;
         _effectCtx.Playing = playing;
         _effectCtx.Sidechain = _sidechain;
+        _sidechain.BeginBlock();
 
-        // 1) Content tracks: render → insert effects → strip → sum into their parent bus.
-        foreach (var track in tracks)
+        // RENDER phase: fan out across worker threads (plus this audio thread). Each content track renders
+        // into its own buffer with no shared scratch — safe without locks.
+        _blkStates = states;
+        _blkRouting = routing;
+        _blkBufferLength = buffer.Length;
+        _blkChannels = channels;
+        _blkSampleRate = sampleRate;
+        _blkDormantSamples = Math.Max(frames, (int)(DormancyTailSeconds * sampleRate));
+        _blkPrevBeat = prevBeat;
+        _blkBpm = effectiveBpm;
+        _blkPlaying = playing;
+        _blkSoloActive = soloActive;
+        if (states.Length > 0) _workers.Run(states.Length, _renderJob);
+
+        // MIXDOWN phase: sidechain publishes, strip gains, bus summing — serial and deterministic.
+        foreach (var st in states)
         {
-            if (track.IsBus) continue;
+            var track = st.Track;
+            var silenced = IsSilenced(track, soloActive, routing);
+            var sidechainSource = routing.SidechainSources.Contains(track.Id);
 
-            if (IsSilenced(track, soloActive, routing))
+            if (silenced)
             {
                 track.MeterLevel *= MeterRelease;
-                // A muted / soloed-out track is still rendered when something taps it as a sidechain source
-                // (e.g. Live Difference for vocal isolation, or a ducking trigger): its real signal is
-                // published to the bus but NOT mixed into the output, so it can drive an effect while staying
-                // silent. When nothing requests it, RenderTrackContent leaves `temp` cleared (publishes silence).
-                if (_sidechain.IsRequested(track.Id))
-                {
-                    RenderTrackContent(track, temp, buffer.Length, channels, prevBeat, sampleRate, effectiveBpm, playing);
-                    _sidechain.Publish(track.Id, temp, channels);
-                }
-
+                if (st.Rendered && (sidechainSource || _sidechain.IsRequested(track.Id)))
+                    _sidechain.Publish(track.Id, st.Buffer.AsSpan(0, buffer.Length), channels);
                 continue;
             }
 
-            var hasContent = RenderTrackContent(track, temp, buffer.Length, channels, prevBeat, sampleRate, effectiveBpm, playing);
-
-            // Make this track's post-effect output available to any sidechain consumer that asked for it.
-            if (_sidechain.IsRequested(track.Id)) _sidechain.Publish(track.Id, temp, channels);
-
-            if (!hasContent)
+            if (!st.HasContent)
             {
                 track.MeterLevel *= MeterRelease;
                 continue;
             }
 
-            // Sum into the parent bus (or straight to the device buffer if there is no master bus).
+            if (sidechainSource || _sidechain.IsRequested(track.Id))
+                _sidechain.Publish(track.Id, st.Buffer.AsSpan(0, buffer.Length), channels);
+
             var parent = ParentBusOf(track, routing);
             var target = parent is not null ? parent.Buffer.AsSpan(0, buffer.Length) : buffer;
             var (lg, rg) = Mixing.StripGains(track.Volume, track.Pan);
-            track.MeterLevel = MixInto(target, temp, lg, rg, channels, frames, track.MeterLevel);
+            track.MeterLevel = MixInto(target, st.Buffer.AsSpan(0, buffer.Length), lg, rg, channels, frames, track.MeterLevel);
         }
 
         // 2) Buses deepest-first: insert effects on the summed input → strip → into the parent bus
@@ -510,20 +579,45 @@ public sealed class AudioEngine : IAudioEngine
         return peak > decayed ? peak : decayed;
     }
 
-    // Renders a content track's signal into <paramref name="temp"/>: its instrument rack (each enabled slot
-    // through its own pre-effect chain) or its audio clips, then the track's insert (post) effects. Returns
-    // whether anything was rendered. Shared by the normal path and the "render a silenced sidechain source"
-    // path, so a muted/soloed-out track can still feed an effect (Live Difference, ducking) without being heard.
-    private bool RenderTrackContent(Track track, Span<float> temp, int bufferLength, int channels,
-        double prevBeat, int sampleRate, double effectiveBpm, bool playing)
+    // Worker-pool job: render one content track into its own <see cref="TrackState"/> buffer.
+    private void RenderTrackJob(int index)
     {
-        var hasContent = false;
+        var st = _blkStates[index];
+        var track = st.Track;
+        var silenced = IsSilenced(track, _blkSoloActive, _blkRouting);
+        var sidechainSource = _blkRouting.SidechainSources.Contains(track.Id);
+
+        st.Rendered = false;
+        st.HasContent = false;
+
+        if (silenced && !sidechainSource) return;
+
+        st.HasContent = RenderTrackContent(st, _blkBufferLength, _blkChannels, _blkPrevBeat,
+            _blkSampleRate, _blkBpm, _blkPlaying, _blkDormantSamples);
+        st.Rendered = true;
+    }
+
+    // Renders a content track's signal into <paramref name="state"/>.Buffer: its instrument rack (each
+    // enabled slot through its own pre-effect chain) or its audio clips, then the track's insert (post)
+    // effects. Returns whether anything audible remains. Insert chains are skipped only after the track
+    // has been silent long enough for tails to decay — instruments always render so a dormant track
+    // wakes immediately when new notes arrive.
+    private bool RenderTrackContent(TrackState state, int bufferLength, int channels,
+        double prevBeat, int sampleRate, double effectiveBpm, bool playing, int dormantSamples)
+    {
+        var track = state.Track;
+        var temp = state.Buffer.AsSpan(0, bufferLength);
+        var frames = bufferLength / Math.Max(1, channels);
         temp.Clear();
 
+        var effects = track.ActiveEffects;
+        var insertDormant = effects.Length > 0 && state.SilentSamples >= dormantSamples;
+
+        var hasContent = false;
+        var slotTemp = state.SlotScratch.AsSpan(0, bufferLength);
         var slots = track.ActiveInstruments;
         if (slots.Length > 0)
         {
-            var slotTemp = _slotTemp.AsSpan(0, bufferLength);
             foreach (var slot in slots)
             {
                 if (!slot.Enabled) continue;
@@ -552,10 +646,12 @@ public sealed class AudioEngine : IAudioEngine
             }
         }
 
-        // Run the track's insert effects (e.g. reverb) before the strip. Effects run even on a near-silent
-        // block so tails ring out; only skip when the track has no effects.
-        var effects = track.ActiveEffects;
-        if (effects.Length > 0)
+        // New instrument/audio content always wakes the track — don't leave it stuck dormant.
+        var drySignal = HasSignal(temp);
+        if (drySignal) state.SilentSamples = 0;
+
+        // Skip insert FX only while dormant AND the dry path is still silent (tails have finished).
+        if (effects.Length > 0 && (!insertDormant || drySignal))
         {
             foreach (var fx in effects)
             {
@@ -567,7 +663,30 @@ public sealed class AudioEngine : IAudioEngine
             hasContent = true;
         }
 
-        return hasContent;
+        if (HasSignal(temp))
+        {
+            state.SilentSamples = 0;
+            return true;
+        }
+
+        if (drySignal) return true;
+
+        if (effects.Length == 0) return false;
+
+        state.SilentSamples += frames;
+        return hasContent && state.SilentSamples < dormantSamples;
+    }
+
+    private static bool HasSignal(ReadOnlySpan<float> buffer)
+    {
+        for (var i = 0; i < buffer.Length; i++)
+        {
+            var a = buffer[i];
+            if (a < 0) a = -a;
+            if (a > SilenceThreshold) return true;
+        }
+
+        return false;
     }
 
     // Mixes <paramref name="source"/> through per-channel gains additively into <paramref name="target"/>,
@@ -607,6 +726,7 @@ public sealed class AudioEngine : IAudioEngine
         _nextEvent = 0;
         var events = _events;
         while (_nextEvent < events.Length && events[_nextEvent].OnBeat < target) _nextEvent++;
+        foreach (var st in _routing.ContentStates) st.SilentSamples = 0;
     }
 
     // The track's MIDI-aware insert effects (empty array when none), captured for the note scheduler.
@@ -745,6 +865,24 @@ public sealed class AudioEngine : IAudioEngine
         _output.FormatChanged -= RebuildTracks;
         _output.Stop();
         _output.Dispose();
+        _workers.Dispose();
+    }
+
+    // Per-content-track render state: own buffer, slot scratch, and dormancy counter.
+    private sealed class TrackState
+    {
+        public Track Track = null!;
+        public float[] Buffer = Array.Empty<float>();
+        public float[] SlotScratch = Array.Empty<float>();
+        public int SilentSamples;
+        public bool HasContent;
+        public bool Rendered;
+
+        public void EnsureCapacity(int length)
+        {
+            if (Buffer.Length < length) Buffer = new float[length];
+            if (SlotScratch.Length < length) SlotScratch = new float[length];
+        }
     }
 
     // A scheduled note targets a track's instrument rack (sound — every enabled slot) and/or its
@@ -916,5 +1054,7 @@ public sealed class AudioEngine : IAudioEngine
         public Dictionary<Guid, Track> TrackById = new();
         public Bus? Master;
         public Track? MasterTrack;
+        public TrackState[] ContentStates = Array.Empty<TrackState>();
+        public HashSet<Guid> SidechainSources = new();
     }
 }

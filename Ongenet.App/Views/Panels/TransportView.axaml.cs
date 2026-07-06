@@ -52,26 +52,46 @@ namespace Ongenet.App.Views.Panels
             }
         }
 
-        // Render → choose a WAV path → export off the UI thread.
+        // Render → choose a path/format → export off the UI thread. MP3/FLAC are offered only when a
+        // system ffmpeg is available; the export format follows the chosen file's extension.
         private async void OnRender(object? sender, RoutedEventArgs e)
         {
             if (DataContext is not TransportViewModel vm) return;
             var top = TopLevel.GetTopLevel(this);
             if (top is null) return;
 
+            var types = new List<FilePickerFileType>
+            {
+                new("WAV audio") { Patterns = new[] { "*.wav" } }
+            };
+            if (Core.Audio.Files.FfmpegEncoder.IsAvailable)
+            {
+                types.Add(new FilePickerFileType("MP3 audio (320 kbps)") { Patterns = new[] { "*.mp3" } });
+                types.Add(new FilePickerFileType("FLAC audio") { Patterns = new[] { "*.flac" } });
+            }
+
             var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Render to WAV",
+                Title = "Render Audio",
                 SuggestedFileName = "render.wav",
                 DefaultExtension = "wav",
-                FileTypeChoices = new List<FilePickerFileType>
-                {
-                    new("WAV audio") { Patterns = new[] { "*.wav" } }
-                }
+                FileTypeChoices = types
             });
 
             var path = file?.TryGetLocalPath();
-            if (!string.IsNullOrEmpty(path)) await vm.RenderToFileAsync(path);
+            if (string.IsNullOrEmpty(path)) return;
+
+            try
+            {
+                await vm.RenderToFileAsync(path);
+            }
+            catch (Exception ex)
+            {
+                var logger = App.ServiceProvider?.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()
+                    ?.CreateLogger("Render");
+                if (logger is not null)
+                    Microsoft.Extensions.Logging.LoggerExtensions.LogError(logger, ex, "Render to '{Path}' failed.", path);
+            }
         }
     }
 }

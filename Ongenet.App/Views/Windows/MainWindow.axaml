@@ -150,8 +150,16 @@
                                     Foreground="{StaticResource CatppuccinSubtext0}"
                                     ToolTip.Tip="Collapse / expand panel"/>
                         </Border>
-                        <views:TrackInspectorView Grid.Row="1" Name="LeftContent" MinWidth="180"
-                                                  DataContext="{Binding TrackInspector}"/>
+                        <!-- Tabbed like the right sidebar: Track Controls (selected track) + Project Clips. -->
+                        <TabControl Grid.Row="1" Name="LeftContent" MinWidth="180"
+                                    Background="{StaticResource CatppuccinMantle}">
+                            <TabItem Header="Track Controls">
+                                <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
+                            </TabItem>
+                            <TabItem Header="Project Clips">
+                                <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
+                            </TabItem>
+                        </TabControl>
                     </Grid>
                     <GridSplitter Grid.Column="1" Grid.Row="0" Name="LeftSplitter" ResizeDirection="Columns"
                                   Background="{StaticResource CatppuccinCrust}"/>
@@ -179,7 +187,8 @@
                             </Border>
                             <!-- Custom vertical tab strip: a fully-templated ListBox of rotated labels so we
                                  control the centring ourselves. -->
-                            <ListBox Name="RightTabStrip" SelectedIndex="0" FontSize="12"
+                            <!-- Default to "Everything" (index 1); "Projects" sits first in the strip. -->
+                            <ListBox Name="RightTabStrip" SelectedIndex="1" FontSize="12"
                                      Background="Transparent" BorderThickness="0" Padding="0"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListBox.Styles>
@@ -200,6 +209,7 @@
                                         <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
                                     </Style>
                                 </ListBox.Styles>
+                                <ListBoxItem Name="TabProjects"><controls:VerticalTabLabel Text="Projects" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabEverything"><controls:VerticalTabLabel Text="Everything" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabFiles"><controls:VerticalTabLabel Text="Files" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabSamples"><controls:VerticalTabLabel Text="Samples" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
@@ -226,6 +236,7 @@
                             </views:LibraryOptionsView>
                             <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
                             <Grid>
+                                <views:LibraryListView IsVisible="{Binding #TabProjects.IsSelected}" DataContext="{Binding ProjectsLibrary}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabEverything.IsSelected}" DataContext="{Binding Everything}"/>
                                 <views:FileBrowserView IsVisible="{Binding #TabFiles.IsSelected}" DataContext="{Binding FileBrowser}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabSamples.IsSelected}" DataContext="{Binding SampleLibrary}"/>
