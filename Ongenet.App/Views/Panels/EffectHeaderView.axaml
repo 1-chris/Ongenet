@@ -58,7 +58,7 @@
                     <StackPanel Width="200" Spacing="6">
                         <TextBlock Text="Preset name" FontSize="11"
                                    Foreground="{StaticResource CatppuccinSubtext0}"/>
-                        <TextBox Text="{Binding PresetName, Mode=TwoWay}" Watermark="{Binding Name}"/>
+                        <TextBox Text="{Binding PresetName, Mode=TwoWay}" PlaceholderText="{Binding Name}"/>
                         <Button Content="Save" Click="OnSaveEffectPreset" HorizontalAlignment="Right"
                                 Background="{StaticResource CatppuccinSurface1}"/>
                     </StackPanel>

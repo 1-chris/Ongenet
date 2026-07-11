@@ -223,6 +223,7 @@ public static class ProjectFile
             // Appended after the notes so older readers (which stop here) load fine; newer readers pick it
             // up via ChunkHasMore.
             c.WriteBool(clip.PitchCorrected);
+            c.WriteString(clip.SourceKey ?? "");
         });
     }
 
@@ -273,6 +274,11 @@ public static class ProjectFile
                 loopStart = c.ReadDouble();
                 loopEnd = c.ReadDouble();
                 startBeat = c.ReadDouble();
+                if (c.ChunkHasMore)
+                {
+                    _ = c.ReadInt(); // legacy KeyRootPitchClass
+                    if (c.ChunkHasMore) _ = c.ReadBool(); // legacy KeyIsMinor
+                }
             });
 
             var trackCount = r.ReadInt();
@@ -481,6 +487,11 @@ public static class ProjectFile
 
             // Trailing field added in a later format revision; absent in older files.
             if (c.ChunkHasMore) clip.PitchCorrected = c.ReadBool();
+            if (c.ChunkHasMore)
+            {
+                var key = c.ReadString();
+                clip.SourceKey = key.Length > 0 ? key : null;
+            }
         });
         return clip;
     }

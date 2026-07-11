@@ -25,12 +25,15 @@ namespace Ongenet.App.ViewModels.Timeline
             DeleteCommand = new RelayCommand(() => actions.DeleteClip(this));
             ReverseCommand = new RelayCommand(() => actions.ReverseClip(this));
             RenameCommand = new RelayCommand(() => actions.RenameClip(this));
+            MakeUniqueCommand = new RelayCommand(() => actions.MakeClipUnique(this),
+                () => actions.GetSharedInstanceCount(this) > 1);
         }
 
         public RelayCommand DuplicateCommand { get; }
         public RelayCommand DeleteCommand { get; }
         public RelayCommand ReverseCommand { get; }
         public RelayCommand RenameCommand { get; }
+        public RelayCommand MakeUniqueCommand { get; }
 
         /// <summary>The underlying domain clip.</summary>
         public Clip Model { get; }

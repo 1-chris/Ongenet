@@ -38,6 +38,20 @@ public class AuditionPlayerTests
     }
 
     [Fact]
+    public void Play_StartsAtOffset()
+    {
+        var player = new AuditionPlayer();
+        var buffer = new AudioSampleBuffer(Enumerable.Repeat(0.5f, 44100).ToArray(), 1, 44100);
+        player.Play(buffer, 0.5);
+        Assert.True(player.IsPlaying);
+        Assert.InRange(player.PositionSeconds, 0.49, 0.51);
+
+        var block = new float[64];
+        player.Mix(block, Format);
+        Assert.Contains(block, s => Math.Abs(s) > 0.1f);
+    }
+
+    [Fact]
     public void Stop_SilencesImmediately()
     {
         var player = new AuditionPlayer();

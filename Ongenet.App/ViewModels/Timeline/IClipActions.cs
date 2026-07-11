@@ -7,5 +7,7 @@ namespace Ongenet.App.ViewModels.Timeline
         void DeleteClip(ClipViewModel clip);
         void ReverseClip(ClipViewModel clip);
         void RenameClip(ClipViewModel clip);
+        void MakeClipUnique(ClipViewModel clip);
+        int GetSharedInstanceCount(ClipViewModel clip);
     }
 }

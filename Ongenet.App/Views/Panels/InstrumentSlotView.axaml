@@ -107,7 +107,7 @@
                                 <StackPanel Width="200" Spacing="6">
                                     <TextBlock Text="Preset name" FontSize="11"
                                                Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                    <TextBox Text="{Binding PresetName, Mode=TwoWay}" Watermark="{Binding InstrumentName}"/>
+                                    <TextBox Text="{Binding PresetName, Mode=TwoWay}" PlaceholderText="{Binding InstrumentName}"/>
                                     <Button Content="Save" Click="OnSavePreset" HorizontalAlignment="Right"
                                             Background="{StaticResource CatppuccinSurface1}"/>
                                 </StackPanel>

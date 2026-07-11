@@ -177,12 +177,45 @@ internal sealed class AndroidAudioInput : IAudioInput
 /// </summary>
 internal sealed class AndroidAudioDeviceService : IAudioDeviceService
 {
+    private AudioDevice? _selectedOutput;
+    private AudioDevice? _selectedInput;
+    private AudioInputChannelMode _inputChannelMode = AudioInputChannelMode.Stereo;
+
     public IReadOnlyList<AudioDevice> InputDevices { get; } = Array.Empty<AudioDevice>();
     public IReadOnlyList<AudioDevice> OutputDevices { get; } = Array.Empty<AudioDevice>();
 
-    public AudioDevice? SelectedOutput { get; set; }
-    public AudioDevice? SelectedInput { get; set; }
-    public AudioInputChannelMode InputChannelMode { get; set; } = AudioInputChannelMode.Stereo;
+    public AudioDevice? SelectedOutput
+    {
+        get => _selectedOutput;
+        set
+        {
+            if (Equals(_selectedOutput, value)) return;
+            _selectedOutput = value;
+            OutputChanged?.Invoke();
+        }
+    }
+
+    public AudioDevice? SelectedInput
+    {
+        get => _selectedInput;
+        set
+        {
+            if (Equals(_selectedInput, value)) return;
+            _selectedInput = value;
+            InputChanged?.Invoke();
+        }
+    }
+
+    public AudioInputChannelMode InputChannelMode
+    {
+        get => _inputChannelMode;
+        set
+        {
+            if (_inputChannelMode == value) return;
+            _inputChannelMode = value;
+            InputChanged?.Invoke();
+        }
+    }
 
     public void Refresh() => DevicesChanged?.Invoke();
 

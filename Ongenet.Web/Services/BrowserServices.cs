@@ -64,6 +64,6 @@ public sealed class BrowserMidiInputService : IMidiInputService
     public void Select(MidiDeviceInfo? device) => SelectedDeviceChanged?.Invoke();
     public event Action? DevicesChanged;
     public event Action? SelectedDeviceChanged;
-    public event Action<MidiMessage>? MessageReceived;
+    public event Action<MidiMessage>? MessageReceived { add { } remove { } }
     public void Dispose() { }
 }

@@ -46,6 +46,11 @@ public sealed class Clip
     public double? SourceTempo { get; set; }
 
     /// <summary>
+    /// Detected musical key for this sample (e.g. <c>"A min"</c>), or null when unknown.
+    /// </summary>
+    public string? SourceKey { get; set; }
+
+    /// <summary>
     /// When true the engine time-stretches (resamples) the audio so the whole sample spans
     /// <see cref="LengthBeats"/> at the project tempo — i.e. the loop stays locked to the beat grid.
     /// False for one-shots and recordings, which play at their native speed.
@@ -80,8 +85,9 @@ public sealed class Clip
     /// </summary>
     public double? SourceLengthSeconds { get; set; }
 
-    /// <summary>The notes of a MIDI clip (empty for audio clips). Positions are clip-relative.</summary>
-    public List<MidiNote> Notes { get; } = new();
+    /// <summary>The notes of a MIDI clip (empty for audio clips). Positions are clip-relative.
+    /// Duplicated MIDI clips share the same list until one is made unique.</summary>
+    public List<MidiNote> Notes { get; set; } = new();
 
     /// <summary>True when this clip carries MIDI notes rather than audio.</summary>
     public bool IsMidi => !IsAudio;

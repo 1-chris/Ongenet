@@ -108,6 +108,7 @@ public static class ProjectCloner
             Waveform = s.Waveform, // immutable — shared by reference
             Samples = s.Samples,   // immutable PCM — shared by reference (keeps snapshots cheap)
             SourceTempo = s.SourceTempo,
+            SourceKey = s.SourceKey,
             StretchToTempo = s.StretchToTempo,
             PitchCorrected = s.PitchCorrected,
             IsAudio = s.IsAudio,
@@ -117,6 +118,9 @@ public static class ProjectCloner
 
         foreach (var n in s.Notes)
             c.Notes.Add(new MidiNote { Note = n.Note, StartBeat = n.StartBeat, LengthBeats = n.LengthBeats, Velocity = n.Velocity });
+
+        if (!s.IsAudio)
+            c.Notes = s.Notes;
 
         return c;
     }

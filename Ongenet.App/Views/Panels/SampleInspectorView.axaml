@@ -3,9 +3,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.App.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="240"
+             xmlns:controls="using:Ongenet.App.Controls"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="380"
              x:Class="Ongenet.App.Views.Panels.SampleInspectorView"
-             x:DataType="vm:SampleInspectorViewModel">
+             x:DataType="vm:SampleInspectorViewModel"
+             Focusable="True">
 
     <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
         <Grid>
@@ -14,7 +16,12 @@
 
             <StackPanel IsVisible="{Binding HasSample}" Spacing="10">
 
-                <!-- Header: sample name + source info -->
+                <Border Background="{StaticResource CatppuccinYellow}" CornerRadius="4" Padding="8,4"
+                        IsVisible="{Binding IsSharedSample}" Opacity="0.85">
+                    <TextBlock Text="{Binding SharedWarning}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource CatppuccinCrust}"/>
+                </Border>
+
                 <StackPanel Spacing="2">
                     <TextBlock Text="{Binding SampleName}" FontSize="14" FontWeight="SemiBold"
                                Foreground="{StaticResource CatppuccinText}" TextTrimming="CharacterEllipsis"/>
@@ -22,29 +29,131 @@
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                 </StackPanel>
 
-                <!-- Tempo + stretch controls -->
+                <Border Name="EditorHost" Height="158" CornerRadius="4" ClipToBounds="True"
+                        Background="{StaticResource CatppuccinCrust}">
+                    <ScrollViewer Name="WaveScroll" HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <controls:SampleWaveformEditorControl Name="WaveEditor"
+                            Width="{Binding ContentWidth}"
+                            Height="158"
+                            Waveform="{Binding Waveform}" Revision="{Binding WaveRevision}"
+                            DurationSeconds="{Binding DurationSeconds}"
+                            SecondsPerBeat="{Binding GridSecondsPerBeat}"
+                            BeatsPerBar="{Binding GridBeatsPerBar}"
+                            ViewportWidth="{Binding ViewportWidth}"
+                            ContentWidth="{Binding ContentWidth}"
+                            TrimStartSeconds="{Binding TrimStartSeconds, Mode=TwoWay}"
+                            TrimEndSeconds="{Binding TrimEndSeconds, Mode=TwoWay}"
+                            HighlightStartSeconds="{Binding HighlightStartSeconds}"
+                            HighlightEndSeconds="{Binding HighlightEndSeconds}"
+                            SelectionStartSeconds="{Binding SelectionStartSeconds, Mode=TwoWay}"
+                            SelectionEndSeconds="{Binding SelectionEndSeconds, Mode=TwoWay}"
+                            HoverSeconds="{Binding HoverSeconds, Mode=TwoWay}"
+                            PlayheadSeconds="{Binding PlayheadSeconds}"
+                            SnapEnabled="{Binding SnapEnabled, Mode=TwoWay}"/>
+                    </ScrollViewer>
+                </Border>
+
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
+                    <Button Grid.Column="0" Content="{Binding PlayButtonText}" Command="{Binding PlayStopCommand}"
+                            MinWidth="56" Margin="0,0,10,0" Padding="10,4"/>
+                    <Button Grid.Column="1" Content="Cut" Command="{Binding CutCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <Button Grid.Column="2" Content="Copy" Command="{Binding CopyCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <Button Grid.Column="3" Content="Paste" Command="{Binding PasteCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <Button Grid.Column="4" Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <ToggleButton Grid.Column="5" Content="Snap" IsChecked="{Binding SnapEnabled, Mode=TwoWay}"
+                                  Margin="0,0,6,0" Padding="10,4"/>
+                    <TextBlock Grid.Column="7" Text="{Binding HoverInfo}" VerticalAlignment="Center"
+                               FontSize="11" Foreground="{StaticResource CatppuccinSubtext1}" Margin="0,0,12,0"/>
+                    <TextBlock Grid.Column="8" Text="{Binding SelectionInfo}" VerticalAlignment="Center"
+                               FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                </Grid>
+
+                <Border CornerRadius="4" Padding="8,6"
+                        Background="{StaticResource CatppuccinSurface0}"
+                        IsVisible="{Binding HasSelection}">
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <TextBlock Text="Region edit" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,0,4,0"/>
+                        <StackPanel Width="58" HorizontalAlignment="Center">
+                            <controls:Knob Name="GainKnob" Width="40" Height="40" HorizontalAlignment="Center"
+                                           Minimum="-24" Maximum="24" Skew="1"
+                                           Value="{Binding SelectionGainDb, Mode=TwoWay}"/>
+                            <TextBlock Text="Gain" FontSize="10" HorizontalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding SelectionGainText}" FontSize="9" HorizontalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext1}"/>
+                        </StackPanel>
+                        <StackPanel Width="58" HorizontalAlignment="Center"
+                                    IsVisible="{Binding CanEditSelectionPan}">
+                            <controls:Knob Name="PanKnob" Width="40" Height="40" HorizontalAlignment="Center"
+                                           Minimum="-1" Maximum="1" Skew="1"
+                                           Value="{Binding SelectionPan, Mode=TwoWay}"/>
+                            <TextBlock Text="Pan" FontSize="10" HorizontalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding SelectionPanText}" FontSize="9" HorizontalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext1}"/>
+                        </StackPanel>
+                        <Button Content="Swap L/R" Command="{Binding SwapChannelsCommand}"
+                                VerticalAlignment="Center" Padding="10,4"
+                                IsVisible="{Binding CanSwapChannels}"/>
+                        <Button Content="Reverse" Command="{Binding ReverseSelectionCommand}"
+                                VerticalAlignment="Center" Padding="10,4"/>
+                    </StackPanel>
+                </Border>
+
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <TextBlock Text="Natural tempo" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <NumericUpDown Value="{Binding NaturalBpm}" Minimum="0" Maximum="400" Increment="1"
-                                   FormatString="0.##" Width="120" VerticalAlignment="Center"
-                                   ToolTip.Tip="The sample's natural BPM (0 = unknown). Detected from the file/folder name or estimated."/>
+                                   FormatString="0.##" Width="120" VerticalAlignment="Center"/>
                     <TextBlock Text="BPM" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <Button Content="Re-detect tempo" Command="{Binding RedetectTempoCommand}"
+                            Margin="8,0,0,0" Padding="10,4"/>
                 </StackPanel>
+
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="Sample key" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding KeyInfo}" VerticalAlignment="Center" MinWidth="56"
+                               Foreground="{StaticResource CatppuccinText}"/>
+                    <Button Grid.Column="3" Content="Detect key" Command="{Binding DetectKeyCommand}" Padding="10,4"/>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="Target key" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <ComboBox Grid.Column="1" MinWidth="180" VerticalAlignment="Center"
+                              ItemsSource="{Binding TargetKeyOptions}"
+                              SelectedItem="{Binding SelectedTargetKey}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TargetKeyOption">
+                                <TextBlock Text="{Binding Label}" ToolTip.Tip="{Binding Hint}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Grid.Column="2" Content="Change key" Command="{Binding ChangeKeyCommand}"
+                            Padding="10,4" IsEnabled="{Binding CanChangeKey}"/>
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding IsChangingKey}">
+                    <TextBlock Grid.Column="0" Text="Changing key…" VerticalAlignment="Center" FontSize="11"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <ProgressBar Grid.Column="1" Height="6" VerticalAlignment="Center"
+                                 Minimum="0" Maximum="1" Value="{Binding KeyChangeProgress}"/>
+                </Grid>
+                <TextBlock Text="{Binding KeyChangeHint}" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource CatppuccinSubtext1}"/>
 
                 <CheckBox IsChecked="{Binding StretchEnabled}"
                           Content="Stretch to project tempo (lock to the beat grid)"
-                          Foreground="{StaticResource CatppuccinText}"
-                          ToolTip.Tip="When on, the sample is time-stretched so it spans a whole number of beats at the project tempo."/>
+                          Foreground="{StaticResource CatppuccinText}"/>
 
                 <CheckBox IsChecked="{Binding PitchCorrected}" IsEnabled="{Binding StretchEnabled}" Margin="20,0,0,0"
                           Content="Preserve pitch when stretching"
-                          Foreground="{StaticResource CatppuccinText}"
-                          ToolTip.Tip="Time-stretch without changing pitch (instead of resampling, which lets pitch track tempo)."/>
+                          Foreground="{StaticResource CatppuccinText}"/>
 
-                <!-- Read-outs -->
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" >
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Stretch" Margin="0,0,12,2"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StretchInfo}" Margin="0,0,0,2"

@@ -249,6 +249,8 @@ namespace Ongenet.App.ViewModels
             }
             else
             {
+                EnsureUniqueNotes(model);
+
                 // Partition notes around the cut (clip-relative). A note crossing the boundary is split so
                 // each piece keeps the part that falls within it.
                 var leftNotes = new List<MidiNote>();
@@ -364,6 +366,7 @@ namespace Ongenet.App.ViewModels
             ExtendTimeline(copy.EndBeat);
             UpdateCrossfades(lane);
             _selection.SelectClip(copy, lane.Model);
+            InvalidateClipCommands();
         }
 
         /// <summary>
@@ -411,44 +414,59 @@ namespace Ongenet.App.ViewModels
         public void ReverseClip(ClipViewModel clip)
         {
             var m = clip.Model;
-            if (!m.IsAudio || m.Samples is not { } samples || samples.FrameCount <= 0) return;
+            if (!m.IsAudio || ClipSampleOps.ExtractWindow(m) is not ({ } buffer, _)) return;
 
-            var channels = samples.Channels;
-            var sampleRate = samples.SampleRate;
-            var totalFrames = samples.FrameCount;
-            var fullDuration = totalFrames / (double)sampleRate;
-
-            // The portion of the source this clip currently plays (whole buffer for an un-sliced clip).
-            var wasWindowed = m.SourceLengthSeconds is not null;
-            var windowSeconds = m.SourceLengthSeconds ?? Math.Max(0.0, fullDuration - m.SourceOffsetSeconds);
-
-            var startFrame = (long)Math.Round(m.SourceOffsetSeconds * sampleRate);
-            var windowFrames = (long)Math.Round(windowSeconds * sampleRate);
-            if (startFrame < 0) startFrame = 0;
-            if (windowFrames <= 0 || startFrame >= totalFrames) return;
-            if (startFrame + windowFrames > totalFrames) windowFrames = totalFrames - startFrame;
             _history.Capture("Reverse clip");
 
-            // Copy the clip's window frame-reversed (channels preserved within each frame) into a new buffer.
-            var src = samples.Samples;
-            var reversed = new float[windowFrames * channels];
+            var channels = buffer.Channels;
+            var windowFrames = buffer.FrameCount;
+            var reversed = new float[buffer.Samples.Length];
             for (long i = 0; i < windowFrames; i++)
             {
-                var srcBase = (startFrame + windowFrames - 1 - i) * channels;
+                var srcBase = (windowFrames - 1 - i) * channels;
                 var dstBase = i * channels;
-                for (var c = 0; c < channels; c++) reversed[dstBase + c] = src[srcBase + c];
+                for (var c = 0; c < channels; c++) reversed[dstBase + c] = buffer.Samples[srcBase + c];
             }
 
-            var reversedBuffer = new AudioSampleBuffer(reversed, channels, sampleRate);
+            var wasWindowed = m.SourceLengthSeconds is not null;
+            var reversedBuffer = new AudioSampleBuffer(reversed, channels, buffer.SampleRate);
             m.Samples = reversedBuffer;
             m.Waveform = AudioWaveform.Build(reversedBuffer);
             m.SourceOffsetSeconds = 0;
-            // The new buffer is exactly the window; preserve the slice/whole distinction so tempo re-fitting
-            // still behaves the same (frozen for slices, octave-snapped for whole loops).
-            m.SourceLengthSeconds = wasWindowed ? reversedBuffer.FrameCount / (double)sampleRate : null;
+            m.SourceLengthSeconds = wasWindowed ? reversedBuffer.FrameCount / (double)reversedBuffer.SampleRate : null;
 
             clip.RefreshFromModel();
             _events.Publish(new ClipChangedEvent(m));
+            InvalidateClipCommands();
+        }
+
+        public int GetSharedInstanceCount(ClipViewModel clip)
+            => ClipSharingOps.SharedInstanceCount(_project.Current, clip.Model);
+
+        /// <summary>
+        /// Detaches this clip from a shared audio buffer or MIDI note list so later edits affect only this
+        /// instance.
+        /// </summary>
+        public void MakeClipUnique(ClipViewModel clip)
+        {
+            var m = clip.Model;
+            if (GetSharedInstanceCount(clip) <= 1) return;
+            _history.Capture("Make clip unique");
+
+            if (m.IsAudio)
+            {
+                if (!ClipSampleOps.MakeUnique(m)) return;
+                clip.RefreshFromModel();
+                _events.Publish(new ClipChangedEvent(m));
+            }
+            else if (m.IsMidi)
+            {
+                EnsureUniqueNotes(m);
+                clip.NotifyNotesChanged();
+                _events.Publish(new ClipNotesChangedEvent(m));
+            }
+
+            InvalidateClipCommands();
         }
 
         public void DeleteClip(ClipViewModel clip)
@@ -460,6 +478,7 @@ namespace Ongenet.App.ViewModels
             lane.Clips.Remove(clip);
             UpdateCrossfades(lane);
             if (ReferenceEquals(_selection.SelectedClip, clip.Model)) _selection.SelectTrack(lane.Model);
+            InvalidateClipCommands();
         }
 
         /// <summary>Context-menu rename: prompts for a new name and applies it to this one clip.</summary>
@@ -1505,17 +1524,9 @@ namespace Ongenet.App.ViewModels
                 SourceOffsetSeconds = src.SourceOffsetSeconds,
                 SourceLengthSeconds = src.SourceLengthSeconds
             };
-            foreach (var note in src.Notes)
-            {
-                copy.Notes.Add(new MidiNote
-                {
-                    Note = note.Note,
-                    StartBeat = note.StartBeat,
-                    LengthBeats = note.LengthBeats,
-                    Velocity = note.Velocity
-                });
-            }
+            if (src.IsAudio) return copy;
 
+            copy.Notes = src.Notes;
             return copy;
         }
 
@@ -1565,6 +1576,31 @@ namespace Ongenet.App.ViewModels
                 clipVm.NotifyNotesChanged();
                 return;
             }
+        }
+
+        private static void EnsureUniqueNotes(Clip clip)
+        {
+            if (clip.IsAudio) return;
+            var unique = new List<MidiNote>();
+            foreach (var n in clip.Notes)
+            {
+                unique.Add(new MidiNote
+                {
+                    Note = n.Note,
+                    StartBeat = n.StartBeat,
+                    LengthBeats = n.LengthBeats,
+                    Velocity = n.Velocity
+                });
+            }
+
+            clip.Notes = unique;
+        }
+
+        private void InvalidateClipCommands()
+        {
+            foreach (var lane in _trackLanes)
+                foreach (var clipVm in lane.Clips)
+                    clipVm.MakeUniqueCommand.RaiseCanExecuteChanged();
         }
 
         private void OnSelectionChanged()

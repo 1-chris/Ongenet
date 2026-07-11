@@ -206,10 +206,10 @@ namespace Ongenet.App
                 var instruments = ServiceProvider!.GetRequiredService<Core.Audio.Instruments.IInstrumentRegistry>();
                 var song = Core.Music.UpliftingTranceSongFactory.Create(instruments);
 
-                var transport = ServiceProvider.GetRequiredService<ITransportService>();
+                var transport = ServiceProvider!.GetRequiredService<ITransportService>();
                 transport.Tempo = song.Tempo;
 
-                ServiceProvider.GetRequiredService<IProjectService>().SetCurrentProject(song);
+                ServiceProvider!.GetRequiredService<IProjectService>().SetCurrentProject(song);
             }
             catch (Exception ex)
             {

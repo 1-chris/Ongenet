@@ -10,12 +10,12 @@ swappable device/UI layer around it.
 | `Ongenet.Core` | none | The heart of the app, fully platform-agnostic. Audio models (project / tracks / clips / MIDI notes), the lock-free audio **engine** (sequencer, per-track mixing, metering, automation), the **instrument** framework (Oscillator, 3x Osc, FM, Basic Sampler, Granular, Padda, Kicka, SFZ Sampler) and **effects** chain (filter, EQ, dynamics, modulation, delay/reverb…), the shared DSP toolkit (`Audio/Dsp`), the parameter framework, WAV decode/encode, a cross-platform **MIDI** model (running-status parser, learn/transport mappings), and the app services (project, transport, selection, recording, edit-mode, MIDI input/mapping) plus DI registration, an in-process event aggregator, and logging. Depends only on the BCL. |
 | `Ongenet.App` | Avalonia | The **shared UI library** used by every head (desktop / web / Android): the `App` composition root + DI, all views & view-models, custom controls, the Catppuccin **theming** system, arrange/timeline, piano roll, inspectors, mixer/meters, editable automation lanes, the unified **Settings** window, a debug Log window, and the embeddable **3D controls**. Each head injects its platform pieces (audio backend, MIDI, plugins, GPU engine, shell) through `IPlatformServices`. |
 | `Ongenet.Engine3D.Abstractions` | none | Portable, dependency-free **3D scene model** (meshes, materials, orbit camera, lights, the immutable per-frame `SceneSnapshot`) plus the engine contracts (`I3DEngineFactory` / `I3DRenderSession`). Referenced by both the UI and the native engine, so the UI never touches GPU code and the engine never touches Avalonia. BCL only. |
-| `Ongenet.Engine3D` | Vulkan / MoltenVK | The **native GPU 3D engine** behind Ongenet's embeddable 3D controls. A hand-written Render Hardware Interface (RHI) over **Silk.NET**, with a **Vulkan** backend that renders scenes offscreen — native on Windows/Linux and on macOS via **MoltenVK** (bundled; no Vulkan SDK needed). Desktop-only; injected into the shared UI via DI, so the web/Android heads never pull native GPU code. |
+| `Ongenet.Engine3D` | Vulkan / MoltenVK | The **native GPU 3D engine** behind Ongenet's embeddable 3D controls. A Render Hardware Interface (RHI) over **Silk.NET**, with a **Vulkan** backend that renders scenes offscreen — native on Windows/Linux and on macOS via **MoltenVK** (bundled; no Vulkan SDK needed). Desktop-only; injected into the shared UI via DI, so the web/Android heads never pull native GPU code. |
 | `Ongenet.Audio` | OS audio + MIDI | The audio **and MIDI** device backend. P/Invoke layers over each platform's native **audio** API — ALSA (with PipeWire/JACK/PulseAudio routing) on Linux, **CoreAudio** on macOS, **WASAPI** on Windows — and each platform's native **MIDI** API — the **ALSA sequencer** on Linux (works with PipeWire/JACK), **WinMM** on Windows and **CoreMIDI** on macOS, behind single `IAudioBackend` / `IMidiInputBackend` seams. This is the only project that touches native audio/MIDI libraries; Core depends solely on the device seams, so the backend is swappable. |
 | `Ongenet.Clap` | CLAP plugins | CLAP plugin hosting: a direct interop over the [CLAP](https://cleveraudio.org/) ABI that scans for, loads, and bridges third-party `.clap` instruments and effects (incl. their plugin GUIs) into Core's instrument/effect registries. Plugins are discovered at runtime; none are required to run the app. |
-| `Ongenet.Lv2` | LV2 plugins | LV2 plugin hosting, written from scratch over the [LV2](https://lv2plug.in/) ABI — no `lilv`/`suil`. A hand-written **Turtle/RDF** parser discovers `.lv2` bundles; audio runs through the port-based `connect_port`/`run` model (control ports become automatable parameters, MIDI is delivered via an LV2 Atom sequence), with the **URID-map**, **Options** and **Worker** host features and native **X11 plugin-UI** embedding. Instruments and effects are bridged into Core's registries; discovered at runtime, none required. |
+| `Ongenet.Lv2` | LV2 plugins | LV2 plugin hosting, written from scratch over the [LV2](https://lv2plug.in/) ABI — no `lilv`/`suil`. A **Turtle/RDF** parser discovers `.lv2` bundles; audio runs through the port-based `connect_port`/`run` model (control ports become automatable parameters, MIDI is delivered via an LV2 Atom sequence), with the **URID-map**, **Options** and **Worker** host features and native **X11 plugin-UI** embedding. Instruments and effects are bridged into Core's registries; discovered at runtime, none required. |
 | `Ongenet.Vst` | VST2 + VST3 plugins | VST2 **and** VST3 plugin hosting, both written from scratch over the public ABIs — no Steinberg SDK or wrapper libraries. **VST2** drives the flat `AEffect` dispatcher (params, `processReplacing`, `effProcessEvents` MIDI, `effEditOpen` GUI) with a full `audioMaster` host callback. **VST3** implements the COM-style `IPluginFactory` → `IComponent`/`IAudioProcessor`/`IEditController` model with host-side `IComponentHandler`/`IHostApplication`/`IPlugFrame`, `process()` over `ProcessData`, note/parameter input via `IEventList`/`IParameterChanges`, and the `IPlugView` editor. Cross-platform (Windows/macOS/Linux, x64 + arm64), with native X11 GUI embedding on Linux. Discovered at runtime; none required. |
-| `Ongenet.Desktop` | Avalonia (+ all native) | The **desktop head**: a thin exe that wires the native stack — Avalonia desktop backends, `Ongenet.Audio`, the CLAP/LV2/VST plugin hosts, and the `Ongenet.Engine3D` GPU engine — into the shared `Ongenet.App` UI via `DesktopPlatform`. Hand-rolled MVVM, DI bootstrap, the classic `MainWindow`. Publishes as `Ongenet`. |
+| `Ongenet.Desktop` | Avalonia (+ all native) | The **desktop head**: a thin exe that wires the native stack — Avalonia desktop backends, `Ongenet.Audio`, the CLAP/LV2/VST plugin hosts, and the `Ongenet.Engine3D` GPU engine — into the shared `Ongenet.App` UI via `DesktopPlatform`. MVVM, DI bootstrap, the classic `MainWindow`. Publishes as `Ongenet`. |
 | `Ongenet.Web` | none (browser) | The **browser / WebAssembly head** (`net10.0-browser`): reuses `Ongenet.App` + `Ongenet.Core` with a Web Audio backend and browser-safe stubs. A demo build deployed to GitHub Pages (no native audio/plugin/GPU projects). |
 | `Ongenet.Android` | AAudio | The **Android (tablet) head** (`net10.0-android`): reuses the shared UI + portable engine with a native **AAudio** backend, shown in the same single-view shell as the web head. Sideloaded APK. |
 
@@ -73,7 +73,7 @@ window.
 ## 3D engine
 
 Ongenet ships a small, GPU-accelerated **3D engine** for hardware-rendered custom controls. It's a
-hand-written **Vulkan** renderer (native on Windows/Linux, **MoltenVK** on macOS) behind a clean Render
+**Vulkan** renderer (native on Windows/Linux, **MoltenVK** on macOS) behind a clean Render
 Hardware Interface seam, with a portable scene model (`Ongenet.Engine3D.Abstractions`) and an embeddable
 Avalonia control (`Engine3DView`) that composes with the rest of the UI like any other control. Visuals
 are theme-aware and can be opened in resizable pop-out windows. The **3D Scope** effect is a worked demo
@@ -93,7 +93,7 @@ are required — with no plugins installed, the app runs exactly as before.
 | Format | Notes |
 | --- | --- |
 | **CLAP** | Direct [CLAP](https://cleveraudio.org/) ABI interop: scans `.clap` modules, exposes their parameters, and bridges note/audio/parameter flow. |
-| **LV2** | `.lv2` bundle discovery via a hand-written **Turtle/RDF** parser; the port-based `connect_port`/`run` model (control ports → automatable parameters, MIDI via an LV2 Atom sequence); the **URID-map**, **Options** and **Worker** host features, so sampler- and engine-class plugins (e.g. Cardinal / VCV Rack) load too. |
+| **LV2** | `.lv2` bundle discovery via a **Turtle/RDF** parser; the port-based `connect_port`/`run` model (control ports → automatable parameters, MIDI via an LV2 Atom sequence); the **URID-map**, **Options** and **Worker** host features, so sampler- and engine-class plugins (e.g. Cardinal / VCV Rack) load too. |
 | **VST2** | The flat `AEffect` ABI: scans `.dll`/`.so`/`.vst` modules, drives `processReplacing`, sends notes via `effProcessEvents`, exposes normalised parameters, and opens the native editor via `effEditOpen` — backed by a full `audioMaster` host callback (time info, sample rate, can-do, size-window). |
 | **VST3** | The COM-style ABI: `.vst3` bundle discovery via `IPluginFactory`, the `IComponent`/`IAudioProcessor`/`IEditController` model with component↔controller connection and state transfer, `process()` over `ProcessData`, notes via `IEventList` and parameter changes via `IParameterChanges`, and the `IPlugView` editor — with host-side `IComponentHandler`/`IHostApplication`/`IPlugFrame`. Cross-platform TUID byte layout and arch-specific bundle resolution (x64 / arm64). |
 
@@ -138,3 +138,22 @@ dotnet run --project Ongenet.Desktop
 
 For development setup (audio notes), and for building self-contained, packaged releases for
 Linux/Windows/macOS, see **[DEVELOPMENT.md](DEVELOPMENT.md)**.
+
+## Acknowledgements
+
+Some audio analysis and processing in Ongenet is inspired by well-known open-source projects.
+Ongenet does not ship or link their libraries; the implementations are original C# in
+`Ongenet.Core`.
+
+- **[Rubber Band Library](https://breakfastquay.com/rubberband/)** (Particular Programs Ltd, GPL) —
+  duration-preserving sample pitch shift is a pure .NET port of Rubber Band's R2 offline engine
+  (study pass, adaptive chunk increments, laminar phase linking, Hann overlap-add, Hermite resample)
+  in `Ongenet.Core/Audio/Dsp/` — no native Rubber Band library is linked.
+- **[Queen Mary qm-dsp](https://github.com/c4dm/qm-dsp)** (Centre for Digital Music, GPL) and
+  **[Mixxx](https://github.com/mixxxdj/mixxx)** (GPL) — musical key detection ports Mixxx's default
+  Queen Mary <c>GetKeyMode</c> pipeline (decimation, Constant-Q chromagram, HPCP averaging, Krumhansl
+  profiles, median filter) in `Ongenet.Core/Audio/Files/QueenMaryKeyDetector.cs`; tempo detection uses
+  the Queen Mary complex-domain onset function and `TempoTrackV2` beat tracker from Mixxx's default
+  beat analyzer (`Ongenet.Core/Audio/Files/QueenMaryTempoDetector.cs`).
+
+Thank you to the authors and maintainers of these projects for publishing their work.

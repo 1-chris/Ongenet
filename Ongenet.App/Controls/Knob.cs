@@ -52,6 +52,9 @@ namespace Ongenet.App.Controls
         private double _dragStartY;
         private double _dragStartT;
 
+        /// <summary>Raised when a pointer drag ends (release or capture lost).</summary>
+        public event EventHandler? DragCompleted;
+
         private static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
 
         static Knob()
@@ -114,7 +117,11 @@ namespace Ongenet.App.Controls
         {
             base.OnPointerMoved(e);
             if (!_dragging) return;
-            if (!_dragCaptured) { History?.Capture("Adjust parameter"); _dragCaptured = true; }
+            if (!_dragCaptured && DataContext is ViewModels.FloatParameterViewModel)
+            {
+                History?.Capture("Adjust parameter");
+                _dragCaptured = true;
+            }
             var dy = _dragStartY - e.GetPosition(this).Y; // up = increase
             Value = ValueFromT(_dragStartT + dy / DragRangePixels);
             e.Handled = true;
@@ -123,10 +130,22 @@ namespace Ongenet.App.Controls
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
+            if (_dragging) e.Pointer.Capture(null);
+            EndDrag();
+            e.Handled = true;
+        }
+
+        protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+        {
+            base.OnPointerCaptureLost(e);
+            EndDrag();
+        }
+
+        private void EndDrag()
+        {
             if (!_dragging) return;
             _dragging = false;
-            e.Pointer.Capture(null);
-            e.Handled = true;
+            DragCompleted?.Invoke(this, EventArgs.Empty);
         }
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)

@@ -133,7 +133,7 @@ Clip interactions (mouse):
 | Drag a clip's left/right edge | Resize / trim it |
 | Double-click an empty instrument lane | Create a new MIDI clip |
 | Ctrl+click a clip (or use Slice mode) | Slice the clip at that point |
-| Right-click a clip | Menu: Duplicate, Reverse (audio), Delete |
+| Right-click a clip | Menu: Rename, Duplicate, Make unique (when shared), Reverse (audio), Delete |
 | Drag from the ruler / empty lane | Rubber-band select multiple clips |
 | Middle-drag | Zoom (vertical) and pan (horizontal) |
 | Drag audio from the library | Drop onto a lane, or create a new track |
@@ -233,6 +233,26 @@ plugins), the parameter knobs, and a per-instrument **pre**-effect chain.
 [`EffectChainView`](../Ongenet.App/Views/Panels/EffectChainView.axaml)): the track's chain of effects.
 Add effects from a categorised menu or by dragging from the library; each effect has a bypass toggle, a
 reorder handle, an order badge, and a "save preset" button.
+
+**Sample inspector** ([`SampleInspectorView`](../Ongenet.App/Views/Panels/SampleInspectorView.axaml)):
+shown when an audio clip is selected. Includes a tempo-aware waveform editor with bar/beat grid and ruler
+labels, a hover cursor line (with bar/time readout in the toolbar), and snap-to-beat for pointer edits
+(toggle **Snap** in the toolbar to disable). **Middle-mouse drag** zooms vertically and pans horizontally
+(same gesture as the timeline); a horizontal scrollbar appears when zoomed in. A **Play / Stop** button
+auditions the sample through the output device without engaging the transport (plays the selection when one
+exists, otherwise the whole sample); a red **playhead** line tracks audition progress in the waveform. Draggable trim handles
+(destructive crop on release), click-drag selection, segment move (drag inside a selection), and Cut / Copy /
+Paste / Delete toolbar buttons. When a time range is selected, a **region edit** strip offers gain
+(−24…+24 dB), pan (stereo), **Swap L/R**, and **Reverse** controls that apply only to the selected frames
+(gain/pan commit when you **release** the knob after dragging; buttons apply immediately).
+When multiple timeline clips share the same PCM buffer, a yellow banner warns that edits affect all instances
+— use **Make unique** on a clip (timeline context menu) to detach one instance. Tempo controls: natural BPM,
+stretch-to-project-tempo, and preserve-pitch. **Detect key** analyses the sample chromagram; **Re-detect tempo**
+runs filename/onset tempo detection into the natural BPM field. **Change key** pitch-shifts the selected sample
+to a user-chosen target key; entries marked **★** are musically related or low-shift options that tend to
+sound smoother. Transposition moves by semitones only — it does not convert major ↔ minor harmony, so
+re-detect may report a different mode than the label. Keyboard shortcuts (when the Sample panel has focus):
+**Ctrl+X/C/V** cut/copy/paste, **Delete** removes the selection.
 
 **Parameter knobs** ([`Knob`](../Ongenet.App/Controls/Knob.cs)) appear throughout. **Right-click** any
 knob, slider or switch to **MIDI-learn** it or **create an automation track** for it.

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Ongenet.Core.Audio.Files;
 
 namespace Ongenet.Core.Audio;
@@ -16,17 +17,37 @@ public sealed class AuditionPlayer : IAuditionPlayer
     private volatile AudioSampleBuffer? _buffer;
     private volatile bool _playing;
     private double _pos;            // fractional read position in source frames (audio thread owns it)
+    private double _positionSeconds;  // UI-readable snapshot updated each Mix block
 
     public bool IsPlaying => _playing;
 
+    public double PositionSeconds => _playing ? Volatile.Read(ref _positionSeconds) : 0;
+
+    public double DurationSeconds
+    {
+        get
+        {
+            var src = _buffer;
+            return src is { SampleRate: > 0 } ? src.FrameCount / (double)src.SampleRate : 0;
+        }
+    }
+
     public event Action? Finished;
 
-    public void Play(AudioSampleBuffer buffer)
+    public void Play(AudioSampleBuffer buffer, double startSeconds = 0)
     {
         if (buffer.FrameCount <= 0) { Stop(); return; }
         _playing = false;   // pause the audio thread's read while we re-point
         _buffer = null;
-        _pos = 0;
+
+        var startFrame = buffer.SampleRate > 0
+            ? (long)Math.Round(startSeconds * buffer.SampleRate)
+            : 0;
+        startFrame = Math.Clamp(startFrame, 0, Math.Max(0, buffer.FrameCount - 1));
+        var clampedSeconds = buffer.SampleRate > 0 ? startFrame / (double)buffer.SampleRate : 0;
+
+        _pos = startFrame;
+        Volatile.Write(ref _positionSeconds, clampedSeconds);
         _buffer = buffer;
         _playing = true;
     }
@@ -35,6 +56,7 @@ public sealed class AuditionPlayer : IAuditionPlayer
     {
         _playing = false;
         _buffer = null;
+        Volatile.Write(ref _positionSeconds, 0);
     }
 
     public void Mix(Span<float> buffer, AudioFormat format)
@@ -70,10 +92,13 @@ public sealed class AuditionPlayer : IAuditionPlayer
         }
 
         _pos = pos;
+        Volatile.Write(ref _positionSeconds, src.SampleRate > 0 ? pos / src.SampleRate : 0);
+
         if (ended)
         {
             _playing = false;
             _buffer = null;
+            Volatile.Write(ref _positionSeconds, 0);
             Finished?.Invoke();
         }
     }

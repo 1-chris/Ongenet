@@ -78,7 +78,7 @@ public abstract class ChromedWindow : Window
         }
 
         // On macOS, keep the native traffic lights visible in fullscreen (they otherwise auto-hide).
-        if (UseMacChrome)
+        if (OperatingSystem.IsMacOS())
             MacTitleBar.SetFullScreen(this, WindowState == WindowState.FullScreen);
 
         if (this.FindControl<Control>("StandardWindowButtons") is { } standard)
@@ -101,15 +101,21 @@ public abstract class ChromedWindow : Window
             if (UseMacChrome)
             {
                 var fullScreen = WindowState == WindowState.FullScreen;
-                MacTitleBar.SetFullScreen(this, fullScreen);
+                if (OperatingSystem.IsMacOS())
+                    MacTitleBar.SetFullScreen(this, fullScreen);
                 // The state change fires as the fullscreen animation *starts*, so the pin above runs
                 // against a mid-transition window. Re-assert at a few staggered points so the final
                 // placement is always computed on a fully settled window, whatever its duration —
                 // RefreshButtons is idempotent and no-ops if we're no longer fullscreen.
-                if (fullScreen)
+                if (fullScreen && OperatingSystem.IsMacOS())
                     foreach (var seconds in new[] { 0.3, 0.8, 1.5 })
                         Avalonia.Threading.DispatcherTimer.RunOnce(
-                            () => MacTitleBar.RefreshButtons(this), TimeSpan.FromSeconds(seconds));
+                            () =>
+                            {
+                                if (OperatingSystem.IsMacOS())
+                                    MacTitleBar.RefreshButtons(this);
+                            },
+                            TimeSpan.FromSeconds(seconds));
             }
         }
     }

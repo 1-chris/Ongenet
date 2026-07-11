@@ -48,7 +48,7 @@
                         <StackPanel Width="200" Spacing="6">
                             <TextBlock Text="FX chain name" FontSize="11"
                                        Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <TextBox Text="{Binding ChainPresetName, Mode=TwoWay}" Watermark="FX Chain"/>
+                            <TextBox Text="{Binding ChainPresetName, Mode=TwoWay}" PlaceholderText="FX Chain"/>
                             <Button Content="Save" Click="OnSaveChain" HorizontalAlignment="Right"
                                     Background="{StaticResource CatppuccinSurface1}"/>
                         </StackPanel>

@@ -8,9 +8,7 @@ public sealed class NullSystemMetricsSampler : ISystemMetricsSampler
     public bool IsAvailable => false;
     public double? CpuPercent => null;
     public long MemoryBytes => 0;
-#pragma warning disable CS0067
-    public event Action? Updated;
-#pragma warning restore CS0067
+public event Action? Updated { add { } remove { } }
 
     public void Start() { }
 }

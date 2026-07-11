@@ -51,70 +51,11 @@ public static class TempoDetector
     }
 
     /// <summary>
-    /// Estimates tempo from the audio: builds a half-wave-rectified energy-flux onset envelope, then
-    /// autocorrelates it to find the dominant periodicity, folded into a musical range. Returns null
-    /// for material too short or too flat to judge.
+    /// Estimates tempo from the audio using the Queen Mary beat tracker (Mixxx default).
+    /// When <paramref name="hintBpm"/> is supplied, analysis is biased toward that tempo —
+    /// useful when re-analyzing after a pitch shift that should not change BPM.
+    /// Returns null for material too short or too flat to judge.
     /// </summary>
-    public static double? Estimate(AudioSampleBuffer buffer)
-    {
-        const int win = 1024;
-        const int hop = 512;
-
-        var sampleRate = buffer.SampleRate;
-        var frames = buffer.FrameCount;
-        if (sampleRate <= 0 || frames < sampleRate) return null; // need ~1s
-
-        var numHops = (int)((frames - win) / hop);
-        if (numHops < 16) return null;
-
-        // Onset envelope: positive change in short-window energy.
-        var env = new float[numHops];
-        var prevEnergy = 0f;
-        for (var h = 0; h < numHops; h++)
-        {
-            long start = (long)h * hop;
-            var energy = 0f;
-            for (var i = 0; i < win; i++)
-            {
-                var f = start + i;
-                var sum = 0f;
-                for (var c = 0; c < buffer.Channels; c++) sum += buffer.Sample(f, c);
-                var mono = sum / buffer.Channels;
-                energy += mono * mono;
-            }
-
-            var flux = energy - prevEnergy;
-            prevEnergy = energy;
-            env[h] = flux > 0 ? flux : 0;
-        }
-
-        var envRate = (double)sampleRate / hop; // onset-envelope samples per second
-
-        // Autocorrelate over lags spanning 60..200 BPM and take the strongest period.
-        var minLag = Math.Max(1, (int)(60.0 * envRate / 200.0));
-        var maxLag = Math.Min(numHops - 1, (int)(60.0 * envRate / 60.0));
-        if (maxLag <= minLag) return null;
-
-        var bestScore = 0.0;
-        var bestLag = 0;
-        for (var lag = minLag; lag <= maxLag; lag++)
-        {
-            var sum = 0.0;
-            for (var i = 0; i + lag < numHops; i++) sum += env[i] * env[i + lag];
-            sum /= numHops - lag; // normalise by overlap so long lags aren't penalised
-            if (sum > bestScore)
-            {
-                bestScore = sum;
-                bestLag = lag;
-            }
-        }
-
-        if (bestLag <= 0 || bestScore <= 0) return null;
-
-        var bpm = 60.0 * envRate / bestLag;
-        // Fold into a typical musical range so half/double-time detections normalise.
-        while (bpm < 70.0) bpm *= 2.0;
-        while (bpm > 160.0) bpm /= 2.0;
-        return bpm;
-    }
+    public static double? Estimate(AudioSampleBuffer buffer, double? hintBpm = null)
+        => QueenMaryTempoDetector.Detect(buffer, hintBpm);
 }
