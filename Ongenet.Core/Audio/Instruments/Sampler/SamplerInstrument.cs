@@ -14,7 +14,7 @@ namespace Ongenet.Core.Audio.Instruments.Sampler;
 /// <see cref="SamplerVoice"/>. The playback engine is format-agnostic; only <see cref="ISamplerLoadService"/>
 /// knows how to read each file format, so the instrument stays free of file I/O and parser detail.
 /// </summary>
-public sealed class SamplerInstrument : IInstrument, IProjectStatefulComponent, IRuntimeCloneable
+public sealed class SamplerInstrument : IInstrument, IInstrumentVoiceState, IProjectStatefulComponent, IRuntimeCloneable
 {
     // Legacy id: the Sampler shipped as the SFZ-only "sfz" instrument, so the type id is kept for
     // backward compatibility with existing .ongen projects even though it now loads multiple formats.
@@ -67,6 +67,16 @@ public sealed class SamplerInstrument : IInstrument, IProjectStatefulComponent, 
     }
 
     public string Name => _displayName.Length > 0 ? _displayName : "Sampler";
+
+    public bool HasActiveVoices
+    {
+        get
+        {
+            foreach (var v in _voices)
+                if (v.IsActive) return true;
+            return false;
+        }
+    }
     string IInstrument.TypeId => TypeId;
 
     /// <summary>The loaded regions (for the zone-map UI). Empty until a patch is loaded.</summary>

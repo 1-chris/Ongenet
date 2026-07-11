@@ -360,9 +360,9 @@ public static class FieldBuiltInPatches
         // filter sits high so it stays "clear as day"; hard soft-clip drive packs in harmonics and
         // loudness, and the chorus widens the whole thing before the track's hall reverb.
         var note = Add(g, new NoteInNode { X = 40, Y = 300 });
-        var uniA = Add(g, new UnisonOscNode { X = 220, Y = 40, WaveIndex = 2, Voices = 9, DetuneCents = 26, StereoWidth = 1.0, Blend = 0.8, Level = 0.7 });
-        var uniB = Add(g, new UnisonOscNode { X = 220, Y = 200, WaveIndex = 2, Voices = 7, DetuneCents = 44, StereoWidth = 0.85, Blend = 0.7, Level = 0.4 }); // detuned thickness stack
-        var uniC = Add(g, new UnisonOscNode { X = 220, Y = 360, WaveIndex = 2, Voices = 5, DetuneCents = 14, Coarse = 12, StereoWidth = 0.9, Blend = 0.7, Level = 0.26 }); // octave-up air
+        var uniA = Add(g, new UnisonOscNode { X = 220, Y = 40, WaveIndex = 2, Voices = 5, DetuneCents = 26, StereoWidth = 1.0, Blend = 0.8, Level = 0.7 });
+        var uniB = Add(g, new UnisonOscNode { X = 220, Y = 200, WaveIndex = 2, Voices = 3, DetuneCents = 44, StereoWidth = 0.85, Blend = 0.7, Level = 0.4 }); // detuned thickness stack
+        var uniC = Add(g, new UnisonOscNode { X = 220, Y = 360, WaveIndex = 2, Voices = 3, DetuneCents = 14, Coarse = 12, StereoWidth = 0.9, Blend = 0.7, Level = 0.26 }); // octave-up air
         var sub = Add(g, new WaveOscNode { X = 220, Y = 520, WaveIndex = 0, Coarse = -12, Level = 0.32 }); // sub weight (mono)
         var sumL1 = Add(g, new AddNode { X = 420, Y = 80 });
         var sumL2 = Add(g, new AddNode { X = 540, Y = 100 });

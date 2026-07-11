@@ -195,6 +195,10 @@ public sealed class UnisonOscNode : FieldNode
     public double Level { get; set; } = 1.0;
 
     private UnisonOscillator[] _osc = Array.Empty<UnisonOscillator>();
+    private int[] _cfgVoices = Array.Empty<int>();
+    private double[] _cfgDetune = Array.Empty<double>();
+    private double[] _cfgWidth = Array.Empty<double>();
+    private double[] _cfgBlend = Array.Empty<double>();
 
     public UnisonOscNode()
     {
@@ -216,24 +220,50 @@ public sealed class UnisonOscNode : FieldNode
     {
         base.Prepare(format, maxBlock, voiceCount);
         _osc = new UnisonOscillator[VoiceCount];
+        _cfgVoices = new int[VoiceCount];
+        _cfgDetune = new double[VoiceCount];
+        _cfgWidth = new double[VoiceCount];
+        _cfgBlend = new double[VoiceCount];
         for (var i = 0; i < VoiceCount; i++)
         {
             _osc[i] = new UnisonOscillator(MaxUnison);
             _osc[i].SetSampleRate(format.SampleRate);
             _osc[i].Seed((uint)(0x5000 + i * 2246822519u));
+            _cfgVoices[i] = -1; // force first Configure
         }
     }
 
     public override void ResetVoice(int voice)
     {
-        if (voice < _osc.Length) _osc[voice].Seed((uint)(0x5000 + voice * 2246822519u));
+        if (voice < _osc.Length)
+        {
+            _osc[voice].Seed((uint)(0x5000 + voice * 2246822519u));
+            _cfgVoices[voice] = -1;
+        }
+    }
+
+    private void EnsureConfigured(int voice)
+    {
+        var voices = Math.Clamp(Voices, 1, MaxUnison);
+        if (_cfgVoices[voice] == voices &&
+            _cfgDetune[voice] == DetuneCents &&
+            _cfgWidth[voice] == StereoWidth &&
+            _cfgBlend[voice] == Blend)
+            return;
+
+        _cfgVoices[voice] = voices;
+        _cfgDetune[voice] = DetuneCents;
+        _cfgWidth[voice] = StereoWidth;
+        _cfgBlend[voice] = Blend;
+        _osc[voice].Configure(voices, DetuneCents, StereoWidth, Blend);
     }
 
     public override void ProcessBlock(FieldRenderContext ctx)
     {
-        var osc = _osc[ctx.Voice];
+        var voice = ctx.Voice;
+        var osc = _osc[voice];
         osc.Wave = (OscWave)Math.Clamp(WaveIndex, 0, 3);
-        osc.Configure(Math.Clamp(Voices, 1, MaxUnison), DetuneCents, StereoWidth, Blend);
+        EnsureConfigured(voice);
         var pitch = ctx.Input(0);
         var outL = ctx.Output(0);
         var outR = ctx.Output(1);

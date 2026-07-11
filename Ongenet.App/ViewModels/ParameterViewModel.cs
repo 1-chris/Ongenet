@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Parameters;
@@ -68,9 +69,24 @@ namespace Ongenet.App.ViewModels
 
         public override void Refresh()
         {
+            var value = Value;
+            if (Math.Abs(value - _lastRefreshedValue) < 1e-9)
+            {
+                var text = ValueText;
+                if (text == _lastRefreshedText) return;
+                _lastRefreshedText = text;
+                OnPropertyChanged(nameof(ValueText));
+                return;
+            }
+
+            _lastRefreshedValue = value;
+            _lastRefreshedText = ValueText;
             OnPropertyChanged(nameof(Value));
             OnPropertyChanged(nameof(ValueText));
         }
+
+        private double _lastRefreshedValue = double.NaN;
+        private string? _lastRefreshedText;
     }
 
     /// <summary>A two-state parameter (checkbox).</summary>

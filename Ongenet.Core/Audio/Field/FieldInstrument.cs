@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Ongenet.Core.Audio.Field.Patches;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Persistence;
 
@@ -14,7 +15,7 @@ namespace Ongenet.Core.Audio.Field;
 /// graph is (re)compiled off the audio path and swapped in via a volatile reference, so editing is safe
 /// while playing. The whole graph is persisted through <see cref="IProjectStatefulComponent"/>.
 /// </summary>
-public sealed class FieldInstrument : IInstrument, IProjectStatefulComponent, IPresetProvider
+public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProjectStatefulComponent, IPresetProvider
 {
     public const string Id = "field";
     private const int InitialMaxBlock = 2048;
@@ -31,9 +32,7 @@ public sealed class FieldInstrument : IInstrument, IProjectStatefulComponent, IP
     private readonly IFieldNodeRegistry _registry;
     private readonly FieldGraph _graph = new();
     private readonly object _compileLock = new();
-    private readonly object _eventLock = new();
-    private readonly List<NoteEvent> _events = new();
-    private readonly List<NoteEvent> _drain = new();
+    private readonly NoteEventQueue<NoteEvent> _events = new();
 
     private volatile CompiledGraph? _compiled;
     private volatile int _compiledRevision = -1;
@@ -49,6 +48,14 @@ public sealed class FieldInstrument : IInstrument, IProjectStatefulComponent, IP
     public string Name => "Field";
     public string TypeId => Id;
     public IReadOnlyList<Parameter> Parameters => Array.Empty<Parameter>();
+    public bool HasActiveVoices
+    {
+        get
+        {
+            var compiled = _compiled;
+            return compiled is not null && AnyVoiceActive(compiled);
+        }
+    }
 
     /// <summary>The editable graph. UI edits this then calls <see cref="Recompile"/>.</summary>
     public FieldGraph Graph => _graph;
@@ -86,31 +93,17 @@ public sealed class FieldInstrument : IInstrument, IProjectStatefulComponent, IP
         Enqueue(new NoteEvent(EvType.Bend, 0, (float)semis));
     }
 
-    private void Enqueue(in NoteEvent ev)
-    {
-        lock (_eventLock) _events.Add(ev);
-    }
+    private void Enqueue(in NoteEvent ev) => _events.Enqueue(ev);
 
     public void Render(Span<float> buffer)
     {
         var compiled = _compiled;
         if (compiled is null) return; // prepared by the engine before the first render
 
-        var hasEvents = false;
-        lock (_eventLock)
+        var pending = _events.Drain();
+        if (pending.Length > 0)
         {
-            if (_events.Count > 0)
-            {
-                hasEvents = true;
-                _drain.Clear();
-                _drain.AddRange(_events);
-                _events.Clear();
-            }
-        }
-
-        if (hasEvents)
-        {
-            foreach (var ev in _drain)
+            foreach (var ev in pending)
             {
                 switch (ev.Type)
                 {

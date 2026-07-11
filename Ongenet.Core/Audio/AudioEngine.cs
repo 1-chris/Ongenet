@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using Ongenet.Core.Audio.Automation;
@@ -40,6 +41,7 @@ public sealed class AudioEngine : IAudioEngine
     // generous enough for the longest delay/reverb tails to ring out fully first.
     private const double DormancyTailSeconds = 12.0;
     private const float SilenceThreshold = 1e-6f;
+    private const int LookaheadBlocks = 2;
 
     private readonly IAudioOutput _output;
     private readonly IProjectService _project;
@@ -50,6 +52,7 @@ public sealed class AudioEngine : IAudioEngine
 
     private volatile bool _playing;
     private ScheduledNote[] _events = Array.Empty<ScheduledNote>();
+    private TrackActivityMap _trackActivity = TrackActivityMap.Empty;
     private AudioClipPlayback[] _audioClips = Array.Empty<AudioClipPlayback>();
     private readonly List<ScheduledNote> _active = new();
     private int _nextEvent;
@@ -90,6 +93,8 @@ public sealed class AudioEngine : IAudioEngine
     private int _blkSampleRate;
     private int _blkDormantSamples;
     private double _blkPrevBeat;
+    private double _blkCurBeat;
+    private double _blkLookaheadBeats;
     private double _blkBpm;
     private bool _blkPlaying;
     private bool _blkSoloActive;
@@ -288,7 +293,7 @@ public sealed class AudioEngine : IAudioEngine
                         var onBeat = clip.StartBeat + note.StartBeat;
                         var offBeat = onBeat + note.LengthBeats;
                         if (offBeat <= startBeat) continue;
-                        notes.Add(new ScheduledNote(onBeat, offBeat, slots, midiFx, note.Note, note.Velocity));
+                        notes.Add(new ScheduledNote(track.Id, onBeat, offBeat, slots, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
@@ -303,7 +308,7 @@ public sealed class AudioEngine : IAudioEngine
                         var onBeat = clip.StartBeat + note.StartBeat;
                         var offBeat = onBeat + note.LengthBeats;
                         if (offBeat <= startBeat) continue;
-                        notes.Add(new ScheduledNote(onBeat, offBeat, null, midiFx, note.Note, note.Velocity));
+                        notes.Add(new ScheduledNote(track.Id, onBeat, offBeat, null, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
@@ -358,6 +363,7 @@ public sealed class AudioEngine : IAudioEngine
         while (_nextEvent < notes.Count && notes[_nextEvent].OnBeat < startBeat) _nextEvent++;
 
         _events = notes.ToArray();
+        _trackActivity = TrackActivityMap.Build(_events);
         _audioClips = clips.ToArray();
 
         foreach (var st in _routing.ContentStates) st.SilentSamples = 0;
@@ -385,6 +391,7 @@ public sealed class AudioEngine : IAudioEngine
 
     private void Render(Span<float> buffer)
     {
+        var blockStart = Stopwatch.GetTimestamp();
         buffer.Clear();
 
         var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
@@ -471,6 +478,8 @@ public sealed class AudioEngine : IAudioEngine
         _blkSampleRate = sampleRate;
         _blkDormantSamples = Math.Max(frames, (int)(DormancyTailSeconds * sampleRate));
         _blkPrevBeat = prevBeat;
+        _blkCurBeat = curBeat;
+        _blkLookaheadBeats = frames * LookaheadBlocks / _samplesPerBeat;
         _blkBpm = effectiveBpm;
         _blkPlaying = playing;
         _blkSoloActive = soloActive;
@@ -571,6 +580,10 @@ public sealed class AudioEngine : IAudioEngine
 
         _masterL = MaxWithRelease(masterPeakL, _masterL);
         _masterR = MaxWithRelease(masterPeakR, _masterR);
+
+        var elapsedTicks = Stopwatch.GetTimestamp() - blockStart;
+        var micros = elapsedTicks * 1_000_000 / Stopwatch.Frequency;
+        AudioDiagnostics.RecordBlock(micros);
     }
 
     private static float MaxWithRelease(float peak, float current)
@@ -591,6 +604,8 @@ public sealed class AudioEngine : IAudioEngine
         st.HasContent = false;
 
         if (silenced && !sidechainSource) return;
+
+        if (_blkPlaying && !sidechainSource && !TrackNeedsRender(st, track)) return;
 
         st.HasContent = RenderTrackContent(st, _blkBufferLength, _blkChannels, _blkPrevBeat,
             _blkSampleRate, _blkBpm, _blkPlaying, _blkDormantSamples);
@@ -621,17 +636,24 @@ public sealed class AudioEngine : IAudioEngine
             foreach (var slot in slots)
             {
                 if (!slot.Enabled) continue;
+                if (playing && !InstrumentNeedsRender(slot.Instrument, track.Id)) continue;
+
                 slotTemp.Clear();
                 slot.Instrument.Render(slotTemp);
-                foreach (var fx in slot.ActiveEffects)
-                {
-                    if (!fx.Enabled) continue;
-                    if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
-                    fx.Process(slotTemp);
-                }
 
-                for (var i = 0; i < slotTemp.Length; i++) temp[i] += slotTemp[i];
-                hasContent = true;
+                var slotSignal = HasSignal(slotTemp);
+                if (slotSignal)
+                {
+                    foreach (var fx in slot.ActiveEffects)
+                    {
+                        if (!fx.Enabled) continue;
+                        if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
+                        fx.Process(slotTemp);
+                    }
+
+                    for (var i = 0; i < slotTemp.Length; i++) temp[i] += slotTemp[i];
+                    hasContent = true;
+                }
             }
         }
         else if (playing && track.Kind == TrackKind.Audio)
@@ -684,6 +706,43 @@ public sealed class AudioEngine : IAudioEngine
             var a = buffer[i];
             if (a < 0) a = -a;
             if (a > SilenceThreshold) return true;
+        }
+
+        return false;
+    }
+
+    private bool TrackNeedsRender(TrackState st, Track track)
+    {
+        if (AnySlotHasActiveVoices(track)) return true;
+        var endBeat = _blkCurBeat + _blkLookaheadBeats;
+        if (_trackActivity.HasActivity(track.Id, _blkPrevBeat, endBeat)) return true;
+        if (track.Kind == TrackKind.Audio && HasActiveAudioClip(track, _blkPrevBeat, _blkCurBeat)) return true;
+        return false;
+    }
+
+    private bool InstrumentNeedsRender(IInstrument instrument, Guid trackId)
+    {
+        if (instrument is IInstrumentVoiceState vs && vs.HasActiveVoices) return true;
+        return _trackActivity.HasActivity(trackId, _blkCurBeat, _blkCurBeat + _blkLookaheadBeats);
+    }
+
+    private static bool AnySlotHasActiveVoices(Track track)
+    {
+        foreach (var slot in track.ActiveInstruments)
+        {
+            if (!slot.Enabled) continue;
+            if (slot.Instrument is IInstrumentVoiceState vs && vs.HasActiveVoices) return true;
+        }
+
+        return false;
+    }
+
+    private bool HasActiveAudioClip(Track track, double prevBeat, double curBeat)
+    {
+        foreach (var acp in _audioClips)
+        {
+            if (!ReferenceEquals(acp.Track, track)) continue;
+            if (acp.StartBeat + acp.LengthBeats > prevBeat && acp.StartBeat < curBeat) return true;
         }
 
         return false;
@@ -888,7 +947,7 @@ public sealed class AudioEngine : IAudioEngine
     // A scheduled note targets a track's instrument rack (sound — every enabled slot) and/or its
     // MIDI-aware effects (gestures); either may be absent. Slots and MidiEffects are the track's
     // snapshots, captured when playback began (slot.Enabled is read live so toggles take effect).
-    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, InstrumentSlot[]? Slots,
+    private readonly record struct ScheduledNote(Guid TrackId, double OnBeat, double OffBeat, InstrumentSlot[]? Slots,
         IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
     {
         public void Fire(bool on)
@@ -1056,5 +1115,46 @@ public sealed class AudioEngine : IAudioEngine
         public Track? MasterTrack;
         public TrackState[] ContentStates = Array.Empty<TrackState>();
         public HashSet<Guid> SidechainSources = new();
+    }
+
+    // Per-track MIDI note intervals built at playback start for skipping idle instrument tracks.
+    private sealed class TrackActivityMap
+    {
+        public static readonly TrackActivityMap Empty = new(new Dictionary<Guid, (double On, double Off)[]>());
+
+        private readonly Dictionary<Guid, (double On, double Off)[]> _intervals;
+
+        private TrackActivityMap(Dictionary<Guid, (double On, double Off)[]> intervals) => _intervals = intervals;
+
+        public static TrackActivityMap Build(ScheduledNote[] notes)
+        {
+            var building = new Dictionary<Guid, List<(double On, double Off)>>();
+            foreach (var note in notes)
+            {
+                if (note.TrackId == Guid.Empty) continue;
+                if (!building.TryGetValue(note.TrackId, out var list))
+                {
+                    list = new List<(double On, double Off)>();
+                    building[note.TrackId] = list;
+                }
+
+                list.Add((note.OnBeat, note.OffBeat));
+            }
+
+            var intervals = new Dictionary<Guid, (double On, double Off)[]>(building.Count);
+            foreach (var kv in building) intervals[kv.Key] = kv.Value.ToArray();
+            return new TrackActivityMap(intervals);
+        }
+
+        public bool HasActivity(Guid trackId, double windowStart, double windowEnd)
+        {
+            if (!_intervals.TryGetValue(trackId, out var intervals)) return false;
+            foreach (var (on, off) in intervals)
+            {
+                if (off > windowStart && on < windowEnd) return true;
+            }
+
+            return false;
+        }
     }
 }

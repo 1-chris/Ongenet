@@ -7,7 +7,7 @@ namespace Ongenet.Core.Audio.Effects;
 /// <summary>
 /// A stereo reverb based on the classic Freeverb topology (8 parallel comb filters with damping
 /// feeding 4 series all-pass filters, per channel). Parameters: Mix (dry/wet), Room Size,
-/// Damping, Width. The first built-in effect.
+/// Damping, Width. <see cref="Quality"/> selects a lighter 4-comb/2-allpass variant for insert chains.
 /// </summary>
 public sealed class ReverbEffect : IAudioEffect
 {
@@ -30,6 +30,9 @@ public sealed class ReverbEffect : IAudioEffect
     public double Damping { get; set; } = 0.5;
     public double Width { get; set; } = 1.0;
 
+    /// <summary>0 = full (8 combs), 1 = lite (4 combs, 2 all-pass) for lower CPU on insert chains.</summary>
+    public int Quality { get; set; }
+
     private Comb[] _combL = Array.Empty<Comb>();
     private Comb[] _combR = Array.Empty<Comb>();
     private Allpass[] _allpassL = Array.Empty<Allpass>();
@@ -44,7 +47,8 @@ public sealed class ReverbEffect : IAudioEffect
         new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v),
         new FloatParameter("Room Size", 0.0, 1.0, () => RoomSize, v => RoomSize = v),
         new FloatParameter("Damping", 0.0, 1.0, () => Damping, v => Damping = v),
-        new FloatParameter("Width", 0.0, 1.0, () => Width, v => Width = v)
+        new FloatParameter("Width", 0.0, 1.0, () => Width, v => Width = v),
+        new ChoiceParameter("Quality", new[] { "Full", "Lite" }, () => Quality, v => Quality = v)
     };
 
     public void Prepare(AudioFormat format)
@@ -67,17 +71,28 @@ public sealed class ReverbEffect : IAudioEffect
         }
     }
 
-    public IAudioEffect Clone() => new ReverbEffect { Enabled = Enabled, Mix = Mix, RoomSize = RoomSize, Damping = Damping, Width = Width };
+    public IAudioEffect Clone() => new ReverbEffect
+    {
+        Enabled = Enabled, Mix = Mix, RoomSize = RoomSize, Damping = Damping, Width = Width, Quality = Quality
+    };
 
     public void Process(Span<float> buffer)
     {
         if (_combL.Length == 0) return;
 
+        var combCount = Quality >= 1 ? 4 : CombTuning.Length;
+        var allpassCount = Quality >= 1 ? 2 : AllpassTuning.Length;
+
         // Read parameters once per block so live edits take effect.
         var feedback = (float)(RoomSize * ScaleRoom + OffsetRoom);
         var damp = (float)(Damping * 0.4);
-        foreach (var c in _combL) { c.Feedback = feedback; c.Damp = damp; }
-        foreach (var c in _combR) { c.Feedback = feedback; c.Damp = damp; }
+        for (var i = 0; i < combCount; i++)
+        {
+            _combL[i].Feedback = feedback;
+            _combL[i].Damp = damp;
+            _combR[i].Feedback = feedback;
+            _combR[i].Damp = damp;
+        }
 
         var wet = (float)Mix;
         var dry = 1f - wet;
@@ -97,10 +112,10 @@ public sealed class ReverbEffect : IAudioEffect
                 var input = (inL + inR) * FixedGain;
 
                 float outL = 0, outR = 0;
-                foreach (var c in _combL) outL += c.Process(input);
-                foreach (var c in _combR) outR += c.Process(input);
-                foreach (var a in _allpassL) outL = a.Process(outL);
-                foreach (var a in _allpassR) outR = a.Process(outR);
+                for (var c = 0; c < combCount; c++) outL += _combL[c].Process(input);
+                for (var c = 0; c < combCount; c++) outR += _combR[c].Process(input);
+                for (var a = 0; a < allpassCount; a++) outL = _allpassL[a].Process(outL);
+                for (var a = 0; a < allpassCount; a++) outR = _allpassR[a].Process(outR);
 
                 buffer[i] = inL * dry + outL * wet1 + outR * wet2;
                 buffer[i + 1] = inR * dry + outR * wet1 + outL * wet2;
@@ -112,8 +127,8 @@ public sealed class ReverbEffect : IAudioEffect
             {
                 var input = buffer[i] * FixedGain;
                 float o = 0;
-                foreach (var c in _combL) o += c.Process(input);
-                foreach (var a in _allpassL) o = a.Process(o);
+                for (var c = 0; c < combCount; c++) o += _combL[c].Process(input);
+                for (var a = 0; a < allpassCount; a++) o = _allpassL[a].Process(o);
                 buffer[i] = buffer[i] * dry + o * wet;
             }
         }

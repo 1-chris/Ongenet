@@ -129,6 +129,7 @@ internal sealed unsafe class MacAudioOutput : IAudioOutput
             // allocation/GC/JIT cost here is absorbed by the ring rather than dropping a device block.
             render(_scratch);
             WriteRing(_scratch);
+            AudioDiagnostics.RecordRingFill(Volatile.Read(ref _writeCount) - Volatile.Read(ref _readCount));
         }
     }
 
@@ -256,7 +257,11 @@ internal sealed unsafe class MacAudioOutput : IAudioOutput
         _ring.AsSpan(startSample, first).CopyTo(dst);
         if (first < n) _ring.AsSpan(0, n - first).CopyTo(dst.Slice(first));
 
-        if (n < dst.Length) dst.Slice(n).Clear(); // under-run → silence the remainder (never garbage)
+        if (n < dst.Length)
+        {
+            dst.Slice(n).Clear(); // under-run → silence the remainder (never garbage)
+            AudioDiagnostics.RecordUnderrun();
+        }
         Volatile.Write(ref _readCount, read + n / Channels);
     }
 

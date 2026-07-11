@@ -158,8 +158,9 @@ public sealed class CompiledGraph
         {
             if (cn.PerVoice)
             {
+                var active = _activeVoices.AsSpan(0, activeCount);
                 for (var a = 0; a < activeCount; a++)
-                    ProcessNode(cn, _activeVoices[a], frames, activeCount);
+                    ProcessNode(cn, active[a], frames, activeCount);
             }
             else
             {

@@ -232,7 +232,7 @@ public static class UpliftingTranceSongFactory
     private static Track BuildClap()
     {
         var track = NewInstrumentTrack("Clap", "CatppuccinPeach", 0.75, PresetInstrument(new PercaInstrument(), "House Clap"));
-        track.Effects.Add(new ReverbEffect { Mix = 0.22, RoomSize = 0.6, Damping = 0.4 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.22, RoomSize = 0.6, Damping = 0.4, Quality = 1 });
         track.Effects.Add(new StereoWidthEffect { Width = 1.3 }); // stadium spread
 
         var backbeat = new[] { (1.0, 0.9f), (3.0, 0.9f) };
@@ -245,7 +245,7 @@ public static class UpliftingTranceSongFactory
     private static Track BuildSnare()
     {
         var track = NewInstrumentTrack("Snare", "CatppuccinMaroon", 0.8, PresetInstrument(new PercaInstrument(), "Dark Snare"));
-        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.7, Damping = 0.35 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.7, Damping = 0.35, Quality = 1 });
 
         // Four-bar crescendo rolls into each climax (the trance build's engine room), scaled back a
         // touch so the roll drives the build without dominating the mix.
@@ -471,7 +471,7 @@ public static class UpliftingTranceSongFactory
         // The arp emerges from behind a closed low-pass, sweeping open through every build.
         track.Effects.Add(new FilterEffect { Mode = FilterMode.LowPass, Frequency = 900, Resonance = 1.2 });
         track.Effects.Add(new DelayEffect { TimeMs = DottedEighthMs(), Feedback = 0.3, Mix = 0.18 });
-        track.Effects.Add(new ReverbEffect { Mix = 0.12, RoomSize = 0.65, Damping = 0.45 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.12, RoomSize = 0.65, Damping = 0.45, Quality = 1 });
 
         track.Clips.Add(ArpClip("Arp", Break1 + 16, Climax1 - Break1 - 16));
         track.Clips.Add(ArpClip("Arp", Climax1, Break2 - Climax1));
@@ -539,7 +539,7 @@ public static class UpliftingTranceSongFactory
         var track = NewInstrumentTrack("Sparkle", "CatppuccinFlamingo", 0.4, sparkle);
         track.Pan = -0.45;
         track.Effects.Add(new DelayEffect { TimeMs = DottedEighthMs(), Feedback = 0.5, Mix = 0.35 });
-        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.75, Damping = 0.35 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.75, Damping = 0.35, Quality = 1 });
         // A light crush gives the shimmer a glassy lo-fi edge that separates it from the arp.
         track.Effects.Add(new BitcrusherEffect { Bits = 10, Downsample = 2, Mix = 0.35 });
 
@@ -690,7 +690,7 @@ public static class UpliftingTranceSongFactory
         var track = NewInstrumentTrack("Bells", "CatppuccinRosewater", 0.32, FactoryPresets.GlassBells());
         track.Pan = 0.35;
         track.Effects.Add(new DelayEffect { TimeMs = DottedEighthMs(), Feedback = 0.35, Mix = 0.18 });
-        track.Effects.Add(new ReverbEffect { Mix = 0.25, RoomSize = 0.75, Damping = 0.4 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.25, RoomSize = 0.75, Damping = 0.4, Quality = 1 });
         track.Effects.Add(new StereoWidthEffect { Width = 1.3 });
         // Light kick duck: the long bell tails bow out of the kick's way, keeping the top end clear.
         track.Effects.Add(new SidechainEffect { SourceTrackId = kickTrackId, Amount = 0.3, AttackMs = 3, ReleaseMs = 120 });
@@ -832,7 +832,7 @@ public static class UpliftingTranceSongFactory
     {
         var saw = PresetInstrument(instruments.Create(FieldInstrument.Id), "Nova Saw");
         var track = NewInstrumentTrack("Saw Layer", "CatppuccinSapphire", 0.45, saw);
-        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.8, Damping = 0.35 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.8, Damping = 0.35, Quality = 1 });
         track.Effects.Add(new SidechainEffect
         {
             SourceTrackId = kickTrackId,
@@ -854,7 +854,7 @@ public static class UpliftingTranceSongFactory
         var counter = PresetInstrument(instruments.Create(FieldInstrument.Id), "Solace Lead");
         var track = NewInstrumentTrack("Counter", "CatppuccinGreen", 0.38, counter);
         track.Pan = -0.3;
-        track.Effects.Add(new ReverbEffect { Mix = 0.35, RoomSize = 0.85, Damping = 0.4 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.35, RoomSize = 0.85, Damping = 0.4, Quality = 1 });
 
         // Enters half-way through the second breakdown and carries into the final climax.
         track.Clips.Add(PhraseClip("Counter", Break2 + 16, Climax2 - Break2 - 16, Counter, 0.6f));
@@ -995,7 +995,7 @@ public static class UpliftingTranceSongFactory
     private static Track BuildCrash()
     {
         var track = NewInstrumentTrack("Crash", "CatppuccinSubtext0", 0.6, PresetInstrument(new PercaInstrument(), "Crash"));
-        track.Effects.Add(new ReverbEffect { Mix = 0.35, RoomSize = 0.8, Damping = 0.3 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.35, RoomSize = 0.8, Damping = 0.3, Quality = 1 });
 
         var clip = new Clip { Name = "Crashes", StartBeat = 0, LengthBeats = Bars * BeatsPerBar, IsAudio = false };
         foreach (var bar in new[]
@@ -1071,7 +1071,7 @@ public static class UpliftingTranceSongFactory
     {
         var comet = PresetInstrument(instruments.Create(FieldInstrument.Id), "Comet Riser");
         var track = NewInstrumentTrack("Tonal Riser", "CatppuccinSapphire", 0.0, comet);
-        track.Effects.Add(new ReverbEffect { Mix = 0.35, RoomSize = 0.8, Damping = 0.35 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.35, RoomSize = 0.8, Damping = 0.35, Quality = 1 });
 
         foreach (var climax in new[] { Climax1, Climax2 })
         {
@@ -1091,7 +1091,7 @@ public static class UpliftingTranceSongFactory
     private static Track BuildSweeps()
     {
         var track = NewInstrumentTrack("Sweeps", "CatppuccinTeal", 0.55, FactoryPresets.ReverseCymbal());
-        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.75, Damping = 0.35 });
+        track.Effects.Add(new ReverbEffect { Mix = 0.3, RoomSize = 0.75, Damping = 0.35, Quality = 1 });
         track.Effects.Add(new StereoWidthEffect { Width = 1.4 });
 
         var clip = new Clip { Name = "Sweeps", StartBeat = 0, LengthBeats = Bars * BeatsPerBar, IsAudio = false };

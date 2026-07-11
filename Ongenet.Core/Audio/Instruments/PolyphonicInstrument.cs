@@ -10,7 +10,7 @@ namespace Ongenet.Core.Audio.Instruments;
 /// and sums the active voices in <see cref="Render"/>. Concrete instruments only implement
 /// <see cref="CreateVoice"/> and their parameters.
 /// </summary>
-public abstract class PolyphonicInstrument : IInstrument
+public abstract class PolyphonicInstrument : IInstrument, IInstrumentVoiceState
 {
     private readonly Voice[] _voices;
     private readonly object _lock = new();
@@ -47,6 +47,8 @@ public abstract class PolyphonicInstrument : IInstrument
     protected AudioFormat Format => _format;
 
     public virtual void Prepare(AudioFormat format) => _format = format;
+
+    bool IInstrumentVoiceState.HasActiveVoices => AnyVoiceActive;
 
     public void NoteOn(int midiNote, float velocity)
     {
@@ -94,6 +96,7 @@ public abstract class PolyphonicInstrument : IInstrument
     /// <summary>Sums every active voice's output into <paramref name="buffer"/> (additive).</summary>
     protected void RenderVoices(Span<float> buffer)
     {
+        if (!AnyVoiceActive) return;
         // Read voices without locking the audio thread against UI note events; each voice
         // checks its own active flag.
         foreach (var voice in _voices)

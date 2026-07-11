@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Media;
 using Ongenet.App.Theming;
@@ -14,6 +15,8 @@ namespace Ongenet.App.Controls
             AvaloniaProperty.Register<LevelMeterControl, double>(nameof(Level));
 
         private IBrush _background = Brushes.Black;
+        private IBrush _fillBrush = Brushes.Green;
+        private double _cachedHeight = -1;
 
         protected override void BuildThemeResources() => _background = new SolidColorBrush(ThemePalette.Mantle);
 
@@ -40,23 +43,25 @@ namespace Ongenet.App.Controls
             if (fill <= 0) return;
 
             var fillH = h * fill;
-            // Gradient fixed to the full control height (green bottom → red top), so the fill
-            // shows the correct colour band regardless of its height.
-            var brush = new LinearGradientBrush
+            if (Math.Abs(h - _cachedHeight) > 0.5)
             {
-                StartPoint = new RelativePoint(0, h, RelativeUnit.Absolute),
-                EndPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
-                GradientStops =
+                _cachedHeight = h;
+                _fillBrush = new LinearGradientBrush
                 {
-                    new GradientStop(ThemePalette.Green, 0.0),
-                    new GradientStop(ThemePalette.Green, 0.6),
-                    new GradientStop(ThemePalette.Yellow, 0.8),
-                    new GradientStop(ThemePalette.Peach, 0.9),
-                    new GradientStop(ThemePalette.Red, 1.0)
-                }
-            };
+                    StartPoint = new RelativePoint(0, h, RelativeUnit.Absolute),
+                    EndPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
+                    GradientStops =
+                    {
+                        new GradientStop(ThemePalette.Green, 0.0),
+                        new GradientStop(ThemePalette.Green, 0.6),
+                        new GradientStop(ThemePalette.Yellow, 0.8),
+                        new GradientStop(ThemePalette.Peach, 0.9),
+                        new GradientStop(ThemePalette.Red, 1.0)
+                    }
+                };
+            }
 
-            context.FillRectangle(brush, new Rect(0, h - fillH, w, fillH));
+            context.FillRectangle(_fillBrush, new Rect(0, h - fillH, w, fillH));
         }
     }
 }

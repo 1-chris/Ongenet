@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Ongenet.Core.Audio.Effects;
 
@@ -46,20 +47,27 @@ public sealed class SidechainBus : ISidechainBus
         public int Channels = 1;
     }
 
-    // Requests arrive from parallel render workers (effects call Request inside Process), so the
-    // request set is a concurrent map. Taps are written only on the serial phase.
+    // Requests arrive from parallel render workers (effects call Request inside Process). A generation
+    // counter is bumped each block instead of clearing a concurrent map — stale entries are ignored.
     private readonly Dictionary<Guid, Tap> _taps = new();
-    private readonly ConcurrentDictionary<Guid, byte> _requested = new();
+    private readonly ConcurrentDictionary<Guid, int> _requestedGen = new();
+    private int _requestGeneration;
 
     public void Request(Guid trackId)
     {
-        if (trackId != Guid.Empty) _requested.TryAdd(trackId, 0);
+        if (trackId == Guid.Empty) return;
+        _requestedGen[trackId] = Volatile.Read(ref _requestGeneration);
     }
 
-    public bool IsRequested(Guid trackId) => _requested.ContainsKey(trackId);
+    public bool IsRequested(Guid trackId)
+    {
+        if (trackId == Guid.Empty) return false;
+        var gen = Volatile.Read(ref _requestGeneration);
+        return _requestedGen.TryGetValue(trackId, out var stored) && stored == gen;
+    }
 
-    /// <summary>Clears per-block request flags. Call once at the start of each render block.</summary>
-    public void BeginBlock() => _requested.Clear();
+    /// <summary>Bumps the request generation. Call once at the start of each render block.</summary>
+    public void BeginBlock() => Interlocked.Increment(ref _requestGeneration);
 
     public void Publish(Guid trackId, ReadOnlySpan<float> interleaved, int channels)
     {

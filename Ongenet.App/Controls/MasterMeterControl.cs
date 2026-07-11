@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Media;
 using Ongenet.App.Theming;
@@ -18,11 +19,14 @@ namespace Ongenet.App.Controls
 
         private IBrush _background = Brushes.Black;
         private IPen _tickPen = new Pen(Brushes.Gray, 1);
+        private IBrush _barBrush = Brushes.Green;
+        private double _cachedBarWidth = -1;
 
         protected override void BuildThemeResources()
         {
             _background = new SolidColorBrush(ThemePalette.Mantle);
             _tickPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Crust, 120)), 1);
+            _cachedBarWidth = -1;
         }
 
         static MasterMeterControl()
@@ -54,26 +58,30 @@ namespace Ongenet.App.Controls
             }
         }
 
-        private static void DrawBar(DrawingContext context, Rect area, double level)
+        private void DrawBar(DrawingContext context, Rect area, double level)
         {
             var fill = MeterScale.Normalize(level);
             if (fill <= 0) return;
 
-            var brush = new LinearGradientBrush
+            if (Math.Abs(area.Width - _cachedBarWidth) > 0.5)
             {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
-                EndPoint = new RelativePoint(area.Width, 0, RelativeUnit.Absolute),
-                GradientStops =
+                _cachedBarWidth = area.Width;
+                _barBrush = new LinearGradientBrush
                 {
-                    new GradientStop(ThemePalette.Green, 0.0),
-                    new GradientStop(ThemePalette.Green, 0.6),
-                    new GradientStop(ThemePalette.Yellow, 0.8),
-                    new GradientStop(ThemePalette.Peach, 0.9),
-                    new GradientStop(ThemePalette.Red, 1.0)
-                }
-            };
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
+                    EndPoint = new RelativePoint(area.Width, 0, RelativeUnit.Absolute),
+                    GradientStops =
+                    {
+                        new GradientStop(ThemePalette.Green, 0.0),
+                        new GradientStop(ThemePalette.Green, 0.6),
+                        new GradientStop(ThemePalette.Yellow, 0.8),
+                        new GradientStop(ThemePalette.Peach, 0.9),
+                        new GradientStop(ThemePalette.Red, 1.0)
+                    }
+                };
+            }
 
-            context.FillRectangle(brush, new Rect(area.X, area.Y, area.Width * fill, area.Height));
+            context.FillRectangle(_barBrush, new Rect(area.X, area.Y, area.Width * fill, area.Height));
         }
     }
 }

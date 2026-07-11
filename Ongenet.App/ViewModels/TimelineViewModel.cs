@@ -81,11 +81,16 @@ namespace Ongenet.App.ViewModels
         /// <summary>True when Slice mode (click a clip to cut it) is active.</summary>
         public bool IsSliceMode => _editMode.Mode == EditMode.Slice;
 
-        /// <summary>Raises the per-lane meter levels (called from the view's meter timer).</summary>
+        /// <summary>Raises the per-lane meter levels (throttled to ~30 Hz while playing).</summary>
         public void RefreshMeters()
         {
+            var now = Environment.TickCount64;
+            if (IsPlaying && now - _lastMeterMs < 33) return;
+            _lastMeterMs = now;
             foreach (var lane in _trackLanes) lane.RaiseMeter();
         }
+
+        private long _lastMeterMs;
 
         /// <summary>
         /// Pumps the live recording take (called from the view's frame timer): grows the take clip

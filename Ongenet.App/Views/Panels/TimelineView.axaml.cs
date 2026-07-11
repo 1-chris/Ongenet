@@ -113,6 +113,12 @@ namespace Ongenet.App.Views.Panels
         private readonly Avalonia.Media.TranslateTransform _loopXform = new();
         private readonly Avalonia.Media.TranslateTransform _loopRulerXform = new();
 
+        // Cached ContentOriginX results — recomputed only when scroll offset or zoom changes.
+        private double _cachedLanesOrigin;
+        private double _cachedRulerOrigin;
+        private double _cachedScrollX = double.NaN;
+        private double _cachedPpb = double.NaN;
+
         private void OnDataContextChanged(object? sender, EventArgs e)
         {
             if (_vm is not null)
@@ -181,7 +187,11 @@ namespace Ongenet.App.Views.Panels
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
-            if (change.Property == BoundsProperty) UpdateOverlays();
+            if (change.Property == BoundsProperty)
+            {
+                InvalidateOriginCache();
+                UpdateOverlays();
+            }
         }
 
         private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -193,7 +203,11 @@ namespace Ongenet.App.Views.Panels
             }
         }
 
-        private void OnMetricsPropertyChanged(object? sender, PropertyChangedEventArgs e) => UpdateOverlays();
+        private void OnMetricsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            InvalidateOriginCache();
+            UpdateOverlays();
+        }
 
         // Positions the playhead/start-marker lines and the ruler play icon. The horizontal origin
         // is derived from where the scrolled content actually renders (via the visual tree), so it
@@ -208,7 +222,7 @@ namespace Ongenet.App.Views.Panels
             var width = PlayheadOverlay.Bounds.Width;
 
             // Pixel X (in the overlay's space) where content beat 0 currently renders.
-            var lanesOrigin = ContentOriginX(_lanesScroll, PlayheadOverlay);
+            var lanesOrigin = CachedLanesOrigin();
 
             var startX = lanesOrigin + _vm.StartBeat * ppb;
             StartMarkerLine.Height = height;
@@ -220,7 +234,7 @@ namespace Ongenet.App.Views.Panels
             _playheadXform.X = playX;
             PlayheadLine.IsVisible = playX >= 0 && playX <= width;
 
-            var rulerOrigin = ContentOriginX(RulerScroll, RulerOverlay);
+            var rulerOrigin = CachedRulerOrigin();
             var iconX = rulerOrigin + _vm.StartBeat * ppb;
             _startIconXform.X = iconX;
             Canvas.SetTop(StartMarkerIcon, 7);
@@ -245,6 +259,36 @@ namespace Ongenet.App.Views.Panels
                 LoopRegion.IsVisible = false;
                 LoopRegionRuler.IsVisible = false;
             }
+        }
+
+        private void InvalidateOriginCache()
+        {
+            _cachedScrollX = double.NaN;
+            _cachedPpb = double.NaN;
+        }
+
+        private double CachedLanesOrigin()
+        {
+            RefreshOriginCacheIfNeeded();
+            return _cachedLanesOrigin;
+        }
+
+        private double CachedRulerOrigin()
+        {
+            RefreshOriginCacheIfNeeded();
+            return _cachedRulerOrigin;
+        }
+
+        private void RefreshOriginCacheIfNeeded()
+        {
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            var scrollX = _lanesScroll?.Offset.X ?? 0;
+            var ppb = _vm?.Metrics.PixelsPerBeat ?? 0;
+            if (scrollX == _cachedScrollX && ppb == _cachedPpb) return;
+            _cachedScrollX = scrollX;
+            _cachedPpb = ppb;
+            _cachedLanesOrigin = ContentOriginX(_lanesScroll, PlayheadOverlay);
+            _cachedRulerOrigin = ContentOriginX(RulerScroll, RulerOverlay);
         }
 
         // The X (in <paramref name="overlay"/>'s coordinates) at which the scroll viewer's content

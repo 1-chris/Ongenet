@@ -374,3 +374,27 @@ To build an audio-modulated 3D visual of your own, follow
 
 Each head plugs its platform pieces into the shared `App` through
 `Ongenet.App.Platform.IPlatformServices` (`DesktopPlatform` / `WebPlatform` / `AndroidPlatform`).
+
+---
+
+## 7. Audio performance profiling
+
+The engine exposes lightweight diagnostics via `Ongenet.Core.Audio.AudioDiagnostics`:
+
+- `LastBlockMicroseconds` — most recent render block duration
+- `Snapshot()` — block count, average/max block time, macOS ring underrun count, ring fill level
+
+On macOS, `MacAudioOutput` increments the underrun counter when the CoreAudio consumer reads
+past the end of the producer ring (audible crackle/dropout).
+
+### Climax2 stress test (Ascension demo)
+
+1. Launch the desktop app (loads the **Ascension** demo by default).
+2. Set the loop region to bars **152–168** (Climax2 peak).
+3. Play for at least **2 minutes**.
+4. Inspect diagnostics (e.g. log or debugger watch on `AudioDiagnostics.Snapshot()`):
+   - **Target:** `MaxBlockMicroseconds` < **8000** (~20% headroom under a 512-frame @ 48 kHz budget of ~10.7 ms)
+   - **Target:** `UnderrunCount` = **0**
+5. Toggle **F8** in the main window to overlay UI frame/render timing and confirm the timeline stays smooth.
+
+Re-run after performance changes and compare average/max block time and underrun count.
