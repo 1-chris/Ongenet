@@ -14,6 +14,8 @@ namespace Ongenet.App.ViewModels.Timeline
     {
         private readonly TimelineMetrics _metrics;
         private bool _isSelected;
+        private bool _isRendering;
+        private double _renderProgress;
 
         public ClipViewModel(Clip model, Track owner, TimelineMetrics metrics, IClipActions actions)
         {
@@ -27,6 +29,9 @@ namespace Ongenet.App.ViewModels.Timeline
             RenameCommand = new RelayCommand(() => actions.RenameClip(this));
             MakeUniqueCommand = new RelayCommand(() => actions.MakeClipUnique(this),
                 () => actions.GetSharedInstanceCount(this) > 1);
+            RenderToNewTrackCommand = new RelayCommand(
+                () => _ = actions.RenderClipToNewTrackAsync(this),
+                () => !actions.IsRenderingClip);
         }
 
         public RelayCommand DuplicateCommand { get; }
@@ -34,6 +39,7 @@ namespace Ongenet.App.ViewModels.Timeline
         public RelayCommand ReverseCommand { get; }
         public RelayCommand RenameCommand { get; }
         public RelayCommand MakeUniqueCommand { get; }
+        public RelayCommand RenderToNewTrackCommand { get; }
 
         /// <summary>The underlying domain clip.</summary>
         public Clip Model { get; }
@@ -48,6 +54,24 @@ namespace Ongenet.App.ViewModels.Timeline
 
         /// <summary>Width of the clip, in pixels.</summary>
         public double Width => _metrics.BeatsToPixels(Model.LengthBeats);
+
+        /// <summary>True while this clip is being rendered to a new track.</summary>
+        public bool IsRendering
+        {
+            get => _isRendering;
+            private set => SetField(ref _isRendering, value);
+        }
+
+        /// <summary>Width in pixels of the render-progress sweep.</summary>
+        public double RenderProgressWidth => Width * _renderProgress;
+
+        /// <summary>Updates the render-progress overlay; values are clamped to 0..1.</summary>
+        public void SetRenderProgress(double progress)
+        {
+            _renderProgress = System.Math.Clamp(progress, 0.0, 1.0);
+            IsRendering = _renderProgress < 1.0;
+            OnPropertyChanged(nameof(RenderProgressWidth));
+        }
 
         /// <summary>Waveform peaks for an audio clip, or null.</summary>
         public AudioWaveform? Waveform => Model.Waveform;
@@ -185,6 +209,7 @@ namespace Ongenet.App.ViewModels.Timeline
             OnPropertyChanged(nameof(IsAudio));
             OnPropertyChanged(nameof(IsMidi));
             OnPropertyChanged(nameof(ClipLengthBeats));
+            OnPropertyChanged(nameof(RenderProgressWidth));
             // Repaint the miniature note view and waveform too (a resize/grow changes their mapping).
             NotifyNotesChanged();
             WaveformRevision++;
@@ -196,6 +221,7 @@ namespace Ongenet.App.ViewModels.Timeline
             {
                 OnPropertyChanged(nameof(Left));
                 OnPropertyChanged(nameof(Width));
+                OnPropertyChanged(nameof(RenderProgressWidth));
                 OnPropertyChanged(nameof(FadeInWidth));
                 OnPropertyChanged(nameof(FadeOutWidth));
             }

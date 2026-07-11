@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
@@ -26,80 +27,206 @@ public sealed class OfflineRenderer
     public void RenderToWav(Project project, AudioFormat format, double bpm, string path,
         IProgress<double>? progress = null)
     {
-        var channels = format.Channels < 1 ? 1 : format.Channels;
-        var sampleRate = format.SampleRate;
-        var samplesPerBeat = bpm > 0 ? sampleRate * 60.0 / bpm : sampleRate;
-        var beatsPerBar = Math.Max(1, project.TimeSignature.Numerator);
+        var session = new RenderSession();
+        session.Build(project, format, bpm, scope: null);
+        using var writer = new WavWriter(path, session.Channels, session.SampleRate);
+        session.RenderToWriter(writer, progress);
+    }
 
-        // Render at least the arrangement length, extended to cover any clips beyond it.
-        var contentEnd = project.Tracks.SelectMany(t => t.Clips).Select(c => c.EndBeat).DefaultIfEmpty(0).Max();
-        var renderBeats = Math.Max(project.BarCount * beatsPerBar, contentEnd);
-        var totalFrames = (long)(renderBeats * samplesPerBeat) + (long)(TailSeconds * sampleRate);
+    /// <summary>
+    /// Offline-renders a scoped beat region through slot, track, and ancestor group FX (excluding master),
+    /// returning interleaved PCM at the engine format sample rate.
+    /// </summary>
+    public AudioSampleBuffer RenderScopeToBuffer(Project project, AudioFormat format, double bpm,
+        ClipRenderScope scope, IProgress<double>? progress = null)
+    {
+        var session = new RenderSession();
+        session.Build(project, format, bpm, scope);
+        return session.RenderScopeToBuffer(progress);
+    }
 
-        var soloActive = project.Tracks.Any(t => t.IsSoloed);
+    private sealed class RenderSession
+    {
+        private Project _project = null!;
+        private AudioFormat _format;
+        private double _fallbackBpm;
+        private ClipRenderScope? _scope;
+        private int _channels;
+        private int _sampleRate;
+        private long _totalFrames;
+        private double _startBeat;
+        private HashSet<Guid> _contentTrackIds = new();
+        private HashSet<Guid> _sidechainOnlyIds = new();
+        private HashSet<Guid> _includedTrackIds = new();
 
-        // Build per-track render state from clones + the merged, sorted note schedule.
-        var renderTracks = new List<RenderTrack>();
-        var events = new List<ScheduledNote>();
-        foreach (var track in project.Tracks)
+        private readonly List<RenderTrack> _renderTracks = new();
+        private readonly List<ScheduledNote> _events = new();
+        private readonly List<RenderBus> _buses = new();
+        private Dictionary<Guid, RenderBus> _busByTrackId = new();
+        private RenderBus? _masterBus;
+        private Track? _masterTrack;
+        private Dictionary<Guid, Track> _trackById = new();
+
+        public int Channels => _channels;
+        public int SampleRate => _sampleRate;
+
+        public void Build(Project project, AudioFormat format, double bpm, ClipRenderScope? scope)
+        {
+            _project = project;
+            _format = format;
+            _fallbackBpm = bpm;
+            _scope = scope;
+            _channels = format.Channels < 1 ? 1 : format.Channels;
+            _sampleRate = format.SampleRate;
+            _startBeat = scope?.StartBeat ?? 0;
+            _trackById = project.Tracks.ToDictionary(t => t.Id);
+
+            if (scope is not null)
+            {
+                foreach (var kv in scope.ContentByTrack) _contentTrackIds.Add(kv.Key.Id);
+                foreach (var id in scope.SidechainSourceIds)
+                {
+                    if (!_contentTrackIds.Contains(id)) _sidechainOnlyIds.Add(id);
+                }
+
+                _includedTrackIds = new HashSet<Guid>(_contentTrackIds);
+                foreach (var id in _sidechainOnlyIds) _includedTrackIds.Add(id);
+                foreach (var track in scope.ContentByTrack.Keys)
+                    AddAncestorGroups(track, scope.TapAfterGroupId);
+                if (scope.TapAfterGroupId is { } tap) _includedTrackIds.Add(tap);
+            }
+
+            _renderTracks.Clear();
+            _events.Clear();
+
+            foreach (var track in project.Tracks)
+            {
+                if (scope is not null && !_includedTrackIds.Contains(track.Id)) continue;
+
+                var clips = scope?.ContentByTrack.GetValueOrDefault(track);
+                var rt = BuildRenderTrack(track, clips);
+                _renderTracks.Add(rt);
+            }
+
+            _events.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
+
+            _busByTrackId = new Dictionary<Guid, RenderBus>();
+            _buses.Clear();
+            foreach (var rt in _renderTracks)
+            {
+                if (!rt.Source.IsBus) continue;
+                var rb = new RenderBus(rt) { Buffer = new float[BlockFrames * _channels] };
+                _busByTrackId[rt.Source.Id] = rb;
+                _buses.Add(rb);
+            }
+
+            _masterBus = _buses.FirstOrDefault(b => b.Track.Source.Kind == TrackKind.Master);
+            _masterTrack = _masterBus?.Track.Source;
+            foreach (var rb in _buses)
+            {
+                rb.Parent = rb.Track.Source.Kind == TrackKind.Master ? null
+                    : rb.Track.Source.ParentId is { } pid && _busByTrackId.TryGetValue(pid, out var p) ? p : _masterBus;
+            }
+
+            foreach (var rb in _buses)
+            {
+                var d = 0;
+                var p = rb.Parent;
+                while (p is not null && d < 64) { d++; p = p.Parent; }
+                rb.Depth = d;
+            }
+
+            _buses.Sort((a, b) => b.Depth.CompareTo(a.Depth));
+
+            if (scope is not null)
+            {
+                var samplesPerBeat = bpm > 0 ? _sampleRate * 60.0 / bpm : _sampleRate;
+                _totalFrames = (long)Math.Ceiling(scope.LengthBeats * samplesPerBeat);
+            }
+            else
+            {
+                var beatsPerBar = Math.Max(1, project.TimeSignature.Numerator);
+                var contentEnd = project.Tracks.SelectMany(t => t.Clips).Select(c => c.EndBeat).DefaultIfEmpty(0).Max();
+                var renderBeats = Math.Max(project.BarCount * beatsPerBar, contentEnd);
+                var samplesPerBeat = bpm > 0 ? _sampleRate * 60.0 / bpm : _sampleRate;
+                _totalFrames = (long)(renderBeats * samplesPerBeat) + (long)(TailSeconds * _sampleRate);
+            }
+        }
+
+        private void AddAncestorGroups(Track track, Guid? stopAtInclusive)
+        {
+            var pid = track.ParentId;
+            var guard = 0;
+            while (pid is { } gid && guard++ < 64)
+            {
+                _includedTrackIds.Add(gid);
+                if (stopAtInclusive is not null && gid == stopAtInclusive) break;
+                pid = _trackById.GetValueOrDefault(gid)?.ParentId;
+            }
+        }
+
+        private RenderTrack BuildRenderTrack(Track track, IReadOnlyList<Clip>? scopedClips)
         {
             var rt = new RenderTrack(track);
-
-            // Clone the effects up front so the note schedule can target the cloned MIDI-aware ones.
-            rt.Effects = track.Effects.Select(e => { var c = e.Clone(); c.Prepare(format); return c; }).ToArray();
+            rt.Effects = track.Effects.Select(e => { var c = e.Clone(); c.Prepare(_format); return c; }).ToArray();
             var midiFx = MidiEffectsOf(rt.Effects);
+
+            var midiClips = scopedClips is not null
+                ? scopedClips.Where(c => c.IsMidi)
+                : track.Clips.Where(c => c.IsMidi);
 
             if (track.Kind == TrackKind.Instrument && track.Instruments.Count > 0)
             {
                 foreach (var s in track.Instruments)
                 {
                     var inst = s.Instrument.Clone();
-                    inst.Prepare(format);
-                    var slotFx = s.Effects.Select(e => { var c = e.Clone(); c.Prepare(format); return c; }).ToArray();
-                    rt.Slots.Add(new RenderSlot(inst, s.Enabled, slotFx));
+                    inst.Prepare(_format);
+                    var slotFx = s.Effects.Select(e => { var c = e.Clone(); c.Prepare(_format); return c; }).ToArray();
+                    rt.Slots.Add(new RenderSlot(inst, s.Enabled, slotFx, s));
                 }
 
                 var slots = rt.Slots.ToArray();
-                foreach (var clip in track.Clips.Where(c => c.IsMidi))
+                foreach (var clip in midiClips)
                 {
                     foreach (var note in clip.Notes)
                     {
                         var onBeat = clip.StartBeat + note.StartBeat;
-                        events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, slots, midiFx, note.Note, note.Velocity));
+                        _events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, slots, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
             else if (midiFx.Length > 0 && track.Kind != TrackKind.Audio)
             {
-                foreach (var clip in track.Clips.Where(c => c.IsMidi))
+                foreach (var clip in midiClips)
                 {
                     foreach (var note in clip.Notes)
                     {
                         var onBeat = clip.StartBeat + note.StartBeat;
-                        events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, null, midiFx, note.Note, note.Velocity));
+                        _events.Add(new ScheduledNote(onBeat, onBeat + note.LengthBeats, null, midiFx, note.Note, note.Velocity));
                     }
                 }
             }
 
             if (track.Kind == TrackKind.Audio)
             {
-                var fades = Crossfade.Compute(track.Clips);
-                foreach (var clip in track.Clips)
+                var audioClips = scopedClips is not null
+                    ? scopedClips.Where(c => c.IsAudio).ToList()
+                    : track.Clips.Where(c => c.IsAudio).ToList();
+                var fades = Crossfade.Compute(audioClips);
+                foreach (var clip in audioClips)
                 {
                     if (clip.Samples is not { } samples) continue;
-                    // A sliced clip spans only part of the source (SourceLengthSeconds); stretch off that
-                    // window so a tempo-synced piece plays just its portion of the loop.
                     var sourceDur = clip.SourceLengthSeconds
                         ?? Math.Max(0.0, samples.FrameCount / (double)samples.SampleRate - clip.SourceOffsetSeconds);
                     var stretch = clip.StretchToTempo
-                        ? TempoSync.Stretch(sourceDur, bpm, clip.LengthBeats)
+                        ? TempoSync.Stretch(sourceDur, _fallbackBpm, clip.LengthBeats)
                         : 1.0;
                     var fade = fades.TryGetValue(clip, out var f) ? f : (FadeInBeats: 0.0, FadeOutBeats: 0.0);
                     PitchShifter[]? shifters = null;
                     if (clip is { PitchCorrected: true, StretchToTempo: true })
                     {
-                        shifters = new PitchShifter[channels];
-                        for (var i = 0; i < channels; i++) { shifters[i] = new PitchShifter(); shifters[i].Configure(sampleRate); }
+                        shifters = new PitchShifter[_channels];
+                        for (var i = 0; i < _channels; i++) { shifters[i] = new PitchShifter(); shifters[i].Configure(_sampleRate); }
                     }
 
                     rt.AudioClips.Add((clip.StartBeat, clip.LengthBeats, samples, stretch, clip.SourceOffsetSeconds,
@@ -107,50 +234,242 @@ public sealed class OfflineRenderer
                 }
             }
 
-            renderTracks.Add(rt);
+            return rt;
         }
 
-        events.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
-
-        // Build the bus graph (mirrors AudioEngine): a RenderBus per group/master, linked to its parent,
-        // ordered deepest-first so a block mixes children → groups → master in one pass.
-        var trackById = project.Tracks.ToDictionary(t => t.Id);
-        var busByTrackId = new Dictionary<Guid, RenderBus>();
-        var buses = new List<RenderBus>();
-        foreach (var rt in renderTracks)
+        public void RenderToWriter(WavWriter writer, IProgress<double>? progress)
         {
-            if (!rt.Source.IsBus) continue;
-            var rb = new RenderBus(rt) { Buffer = new float[BlockFrames * channels] };
-            busByTrackId[rt.Source.Id] = rb;
-            buses.Add(rb);
+            RenderCore(
+                block => writer.Write(block),
+                progress);
         }
 
-        var masterBus = buses.FirstOrDefault(b => b.Track.Source.Kind == TrackKind.Master);
-        var masterTrack = masterBus?.Track.Source;
-        foreach (var rb in buses)
+        public AudioSampleBuffer RenderScopeToBuffer(IProgress<double>? progress)
         {
-            rb.Parent = rb.Track.Source.Kind == TrackKind.Master ? null
-                : rb.Track.Source.ParentId is { } pid && busByTrackId.TryGetValue(pid, out var p) ? p : masterBus;
+            var output = new float[_totalFrames * _channels];
+            var framesWritten = 0L;
+            RenderCore(
+                block =>
+                {
+                    var frames = block.Length / _channels;
+                    block.CopyTo(output.AsSpan((int)(framesWritten * _channels), block.Length));
+                    framesWritten += frames;
+                },
+                progress);
+            return new AudioSampleBuffer(output, _channels, _sampleRate);
         }
 
-        foreach (var rb in buses)
+        private void RenderCore(Action<ReadOnlySpan<float>> writeBlock, IProgress<double>? progress)
         {
-            var d = 0;
-            var p = rb.Parent;
-            while (p is not null && d < 64) { d++; p = p.Parent; }
-            rb.Depth = d;
+            var soloActive = _scope is null && _project.Tracks.Any(t => t.IsSoloed);
+            var block = new float[BlockFrames * _channels];
+            var temp = new float[BlockFrames * _channels];
+            var slotTemp = new float[BlockFrames * _channels];
+            var active = new List<ScheduledNote>();
+            var nextEvent = 0;
+            var currentBeat = _startBeat;
+            long framesWritten = 0;
+            var lastPercent = -1;
+
+            var sidechain = new SidechainBus();
+            var ctx = new EffectContext { Format = _format, Bpm = _fallbackBpm, Playing = true, Sidechain = sidechain };
+
+            while (framesWritten < _totalFrames)
+            {
+                var bpm = OfflineAutomationDriver.ResolveTempo(_project, currentBeat, _fallbackBpm);
+                var samplesPerBeat = bpm > 0 ? _sampleRate * 60.0 / bpm : _sampleRate;
+                var framesThisBlock = (int)Math.Min(BlockFrames, _totalFrames - framesWritten);
+                var sampleCount = framesThisBlock * _channels;
+                var blockSpan = block.AsSpan(0, sampleCount);
+                blockSpan.Clear();
+
+                var prevBeat = currentBeat;
+                currentBeat = prevBeat + framesThisBlock / samplesPerBeat;
+                ctx.Bpm = bpm;
+                ctx.PlayheadBeats = prevBeat;
+                sidechain.BeginBlock();
+                if (_scope is not null)
+                {
+                    foreach (var id in _sidechainOnlyIds) sidechain.Request(id);
+                }
+                else
+                {
+                    foreach (var id in OfflineAutomationDriver.CollectSidechainSources(_project.Tracks))
+                        sidechain.Request(id);
+                }
+
+                foreach (var track in _project.Tracks)
+                    OfflineAutomationDriver.ApplyTrack(track, prevBeat);
+
+                foreach (var rt in _renderTracks)
+                {
+                    OfflineAutomationDriver.SyncEffects(rt.Source.ActiveEffects, rt.Effects);
+                    if (rt.Source.Kind == TrackKind.Instrument)
+                    {
+                        for (var i = 0; i < rt.Slots.Count; i++)
+                        {
+                            var slot = rt.Slots[i];
+                            slot.Enabled = slot.Live.Enabled;
+                            OfflineAutomationDriver.SyncEffects(slot.Live.ActiveEffects, slot.Effects);
+                            OfflineAutomationDriver.SyncInstrument(slot.Live.Instrument, slot.Instrument);
+                        }
+                    }
+                }
+
+                while (nextEvent < _events.Count && _events[nextEvent].OnBeat < currentBeat)
+                {
+                    var ev = _events[nextEvent++];
+                    ev.Fire(on: true);
+                    active.Add(ev);
+                }
+
+                for (var i = active.Count - 1; i >= 0; i--)
+                {
+                    if (active[i].OffBeat <= currentBeat)
+                    {
+                        active[i].Fire(on: false);
+                        active.RemoveAt(i);
+                    }
+                }
+
+                foreach (var rb in _buses) Array.Clear(rb.Buffer, 0, sampleCount);
+
+                foreach (var rt in _renderTracks)
+                {
+                    if (rt.Source.IsBus) continue;
+                    var silenced = IsSilenced(rt.Source, soloActive);
+                    if (silenced && !sidechain.IsRequested(rt.Source.Id)) continue;
+
+                    var tempSpan = temp.AsSpan(0, sampleCount);
+                    tempSpan.Clear();
+                    var hasContent = false;
+
+                    if (rt.Slots.Count > 0)
+                    {
+                        var slotSpan = slotTemp.AsSpan(0, sampleCount);
+                        foreach (var slot in rt.Slots)
+                        {
+                            if (!slot.Enabled) continue;
+                            slotSpan.Clear();
+                            slot.Instrument.Render(slotSpan);
+                            foreach (var fx in slot.Effects)
+                            {
+                                if (!fx.Enabled) continue;
+                                if (fx is IContextualEffect cae) cae.SetContext(ctx);
+                                fx.Process(slotSpan);
+                            }
+
+                            for (var i = 0; i < slotSpan.Length; i++) tempSpan[i] += slotSpan[i];
+                            hasContent = true;
+                        }
+                    }
+                    else
+                    {
+                        foreach (var (start, length, samples, stretch, sourceOffset, fadeIn, fadeOut, shifters) in rt.AudioClips)
+                        {
+                            Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat, _sampleRate, _channels,
+                                stretch, sourceOffset, fadeIn, fadeOut, shifters);
+                            hasContent = true;
+                        }
+                    }
+
+                    if (rt.Effects.Length > 0)
+                    {
+                        foreach (var fx in rt.Effects)
+                        {
+                            if (!fx.Enabled) continue;
+                            if (fx is IContextualEffect cae) cae.SetContext(ctx);
+                            fx.Process(tempSpan);
+                        }
+
+                        hasContent = true;
+                    }
+
+                    if (sidechain.IsRequested(rt.Source.Id)) sidechain.Publish(rt.Source.Id, tempSpan, _channels);
+
+                    if (_scope is not null && _scope.TapAfterGroupId is null && _contentTrackIds.Contains(rt.Source.Id))
+                    {
+                        ApplyStripGains(tempSpan, rt.Source.Volume, rt.Source.Pan, _channels, framesThisBlock);
+                        writeBlock(tempSpan);
+                        continue;
+                    }
+
+                    var sidechainOnly = _scope is not null && _sidechainOnlyIds.Contains(rt.Source.Id);
+                    if ((silenced && !sidechainOnly) || !hasContent) continue;
+
+                    var parent = rt.Source.ParentId is { } pid && _busByTrackId.TryGetValue(pid, out var pb) ? pb : _masterBus;
+                    var target = parent is not null ? parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
+                    var (lg, rg) = Mixing.StripGains(rt.Source.Volume, rt.Source.Pan);
+                    MixIntoBlock(target, tempSpan, lg, rg, _channels, framesThisBlock);
+                }
+
+                foreach (var rb in _buses)
+                {
+                    var bt = rb.Track.Source;
+                    if (_scope is null && bt.IsMuted) continue;
+                    if (_scope is not null && !_includedTrackIds.Contains(bt.Id)) continue;
+
+                    var busSpan = rb.Buffer.AsSpan(0, sampleCount);
+                    if (rb.Track.Effects.Length > 0)
+                    {
+                        foreach (var fx in rb.Track.Effects)
+                        {
+                            if (!fx.Enabled) continue;
+                            if (fx is IContextualEffect cae) cae.SetContext(ctx);
+                            fx.Process(busSpan);
+                        }
+                    }
+
+                    if (sidechain.IsRequested(bt.Id)) sidechain.Publish(bt.Id, busSpan, _channels);
+
+                    if (_scope is not null && _scope.TapAfterGroupId == bt.Id)
+                    {
+                        ApplyBusGains(busSpan, bt.Volume, bt.Pan, _channels, framesThisBlock);
+                        writeBlock(busSpan);
+                        continue;
+                    }
+
+                    if (_scope is null && bt.IsMuted) continue;
+
+                    var target = rb.Parent is not null ? rb.Parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
+                    var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
+                    MixIntoBlock(target, busSpan, lg, rg, _channels, framesThisBlock);
+                }
+
+                if (_scope is null)
+                {
+                    writeBlock(blockSpan);
+                }
+
+                framesWritten += framesThisBlock;
+
+                if (progress is not null)
+                {
+                    var percent = (int)(framesWritten * 100 / _totalFrames);
+                    if (percent != lastPercent)
+                    {
+                        lastPercent = percent;
+                        progress.Report(framesWritten / (double)_totalFrames);
+                    }
+                }
+            }
+
+            progress?.Report(1.0);
         }
 
-        buses.Sort((a, b) => b.Depth.CompareTo(a.Depth)); // deepest first
-
-        Track? ParentTrack(Track t)
+        private bool IsSilenced(Track track, bool soloActive)
         {
-            if (t.Kind == TrackKind.Master) return null;
-            if (t.ParentId is { } id && trackById.TryGetValue(id, out var p)) return p;
-            return masterTrack;
+            if (_scope is not null)
+            {
+                if (_contentTrackIds.Contains(track.Id)) return false;
+                return _sidechainOnlyIds.Contains(track.Id) || track.IsMuted;
+            }
+
+            if (track.IsMuted) return true;
+            return soloActive && !(track.IsSoloed || AncestorSoloed(track));
         }
 
-        bool AncestorSoloed(Track t)
+        private bool AncestorSoloed(Track t)
         {
             var p = ParentTrack(t);
             var n = 0;
@@ -158,156 +477,12 @@ public sealed class OfflineRenderer
             return false;
         }
 
-        var block = new float[BlockFrames * channels];
-        var temp = new float[BlockFrames * channels];
-        var slotTemp = new float[BlockFrames * channels];
-        var active = new List<ScheduledNote>();
-        var nextEvent = 0;
-        var currentBeat = 0.0;
-        long framesWritten = 0;
-
-        // Mirror the live engine's tempo/sidechain context so tempo-synced + sidechain effects render too.
-        var sidechain = new SidechainBus();
-        var ctx = new EffectContext { Format = format, Bpm = bpm, Playing = true, Sidechain = sidechain };
-
-        using var writer = new WavWriter(path, channels, sampleRate);
-
-        var lastPercent = -1;
-
-        while (framesWritten < totalFrames)
+        private Track? ParentTrack(Track t)
         {
-            var framesThisBlock = (int)Math.Min(BlockFrames, totalFrames - framesWritten);
-            var sampleCount = framesThisBlock * channels;
-            var blockSpan = block.AsSpan(0, sampleCount);
-            blockSpan.Clear();
-
-            var prevBeat = currentBeat;
-            currentBeat = prevBeat + framesThisBlock / samplesPerBeat;
-            ctx.PlayheadBeats = prevBeat;
-
-            // Fire note on/off for this block.
-            while (nextEvent < events.Count && events[nextEvent].OnBeat < currentBeat)
-            {
-                var ev = events[nextEvent++];
-                ev.Fire(on: true);
-                active.Add(ev);
-            }
-
-            for (var i = active.Count - 1; i >= 0; i--)
-            {
-                if (active[i].OffBeat <= currentBeat)
-                {
-                    active[i].Fire(on: false);
-                    active.RemoveAt(i);
-                }
-            }
-
-            foreach (var rb in buses) Array.Clear(rb.Buffer, 0, sampleCount);
-
-            // 1) Content tracks: render → effects → strip → sum into their parent bus.
-            foreach (var rt in renderTracks)
-            {
-                if (rt.Source.IsBus) continue;
-                // A silenced (muted / soloed-out) track is skipped entirely UNLESS it's tapped as a sidechain
-                // source (e.g. Live Difference for vocal isolation) — then it's rendered + published below but
-                // not mixed into the output, mirroring the live engine.
-                var silenced = rt.Source.IsMuted || (soloActive && !(rt.Source.IsSoloed || AncestorSoloed(rt.Source)));
-                if (silenced && !sidechain.IsRequested(rt.Source.Id)) continue;
-
-                var tempSpan = temp.AsSpan(0, sampleCount);
-                tempSpan.Clear();
-                var hasContent = false;
-
-                if (rt.Slots.Count > 0)
-                {
-                    var slotSpan = slotTemp.AsSpan(0, sampleCount);
-                    foreach (var slot in rt.Slots)
-                    {
-                        if (!slot.Enabled) continue;
-                        slotSpan.Clear();
-                        slot.Instrument.Render(slotSpan);
-                        foreach (var fx in slot.Effects)
-                        {
-                            if (!fx.Enabled) continue;
-                            if (fx is IContextualEffect cae) cae.SetContext(ctx);
-                            fx.Process(slotSpan);
-                        }
-
-                        for (var i = 0; i < slotSpan.Length; i++) tempSpan[i] += slotSpan[i];
-                        hasContent = true;
-                    }
-                }
-                else
-                {
-                    foreach (var (start, length, samples, stretch, sourceOffset, fadeIn, fadeOut, shifters) in rt.AudioClips)
-                    {
-                        Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat, sampleRate, channels,
-                            stretch, sourceOffset, fadeIn, fadeOut, shifters);
-                        hasContent = true;
-                    }
-                }
-
-                if (rt.Effects.Length > 0)
-                {
-                    foreach (var fx in rt.Effects)
-                    {
-                        if (!fx.Enabled) continue;
-                        if (fx is IContextualEffect cae) cae.SetContext(ctx);
-                        fx.Process(tempSpan);
-                    }
-
-                    hasContent = true;
-                }
-
-                if (sidechain.IsRequested(rt.Source.Id)) sidechain.Publish(rt.Source.Id, tempSpan, channels);
-
-                if (silenced || !hasContent) continue; // silenced source: published for the tap, but not heard
-
-                var parent = rt.Source.ParentId is { } pid && busByTrackId.TryGetValue(pid, out var pb) ? pb : masterBus;
-                var target = parent is not null ? parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
-                var (lg, rg) = Mixing.StripGains(rt.Source.Volume, rt.Source.Pan);
-                MixIntoBlock(target, tempSpan, lg, rg, channels, framesThisBlock);
-            }
-
-            // 2) Buses deepest-first: effects on the summed input → strip → into parent (master → block).
-            foreach (var rb in buses)
-            {
-                var bt = rb.Track.Source;
-                if (bt.IsMuted) continue;
-
-                var busSpan = rb.Buffer.AsSpan(0, sampleCount);
-                if (rb.Track.Effects.Length > 0)
-                {
-                    foreach (var fx in rb.Track.Effects)
-                    {
-                        if (!fx.Enabled) continue;
-                        if (fx is IContextualEffect cae) cae.SetContext(ctx);
-                        fx.Process(busSpan);
-                    }
-                }
-
-                if (sidechain.IsRequested(rb.Track.Source.Id)) sidechain.Publish(rb.Track.Source.Id, busSpan, channels);
-
-                var target = rb.Parent is not null ? rb.Parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
-                var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
-                MixIntoBlock(target, busSpan, lg, rg, channels, framesThisBlock);
-            }
-
-            writer.Write(blockSpan);
-            framesWritten += framesThisBlock;
-
-            if (progress is not null)
-            {
-                var percent = (int)(framesWritten * 100 / totalFrames);
-                if (percent != lastPercent)
-                {
-                    lastPercent = percent;
-                    progress.Report(framesWritten / (double)totalFrames);
-                }
-            }
+            if (t.Kind == TrackKind.Master) return null;
+            if (t.ParentId is { } id && _trackById.TryGetValue(id, out var p)) return p;
+            return _masterTrack;
         }
-
-        progress?.Report(1.0);
     }
 
     private static void MixIntoBlock(Span<float> target, Span<float> source, float leftGain, float rightGain,
@@ -323,6 +498,28 @@ public sealed class OfflineRenderer
         }
     }
 
+    private static void ApplyStripGains(Span<float> buffer, double volume, double pan, int channels, int frames)
+    {
+        var (lg, rg) = Mixing.StripGains(volume, pan);
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var i = frame * channels;
+            for (var c = 0; c < channels; c++)
+                buffer[i + c] *= Mixing.ChannelGain(c, lg, rg);
+        }
+    }
+
+    private static void ApplyBusGains(Span<float> buffer, double volume, double pan, int channels, int frames)
+    {
+        var (lg, rg) = Mixing.BusGains(volume, pan);
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var i = frame * channels;
+            for (var c = 0; c < channels; c++)
+                buffer[i + c] *= Mixing.ChannelGain(c, lg, rg);
+        }
+    }
+
     private sealed class RenderTrack
     {
         public RenderTrack(Track source) => Source = source;
@@ -332,20 +529,20 @@ public sealed class OfflineRenderer
         public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch, double SourceOffset, double FadeInBeats, double FadeOutBeats, Dsp.PitchShifter[]? PitchShifters)> AudioClips { get; } = new();
     }
 
-    // A cloned instrument-rack slot for offline render: the instrument, its bypass flag, and its own
-    // (cloned) effect chain processed before the track-level effects.
     private sealed class RenderSlot
     {
-        public RenderSlot(IInstrument instrument, bool enabled, IAudioEffect[] effects)
+        public RenderSlot(IInstrument instrument, bool enabled, IAudioEffect[] effects, InstrumentSlot live)
         {
             Instrument = instrument;
             Enabled = enabled;
             Effects = effects;
+            Live = live;
         }
 
         public IInstrument Instrument { get; }
-        public bool Enabled { get; }
+        public bool Enabled { get; set; }
         public IAudioEffect[] Effects { get; }
+        public InstrumentSlot Live { get; }
     }
 
     private sealed class RenderBus
@@ -357,12 +554,8 @@ public sealed class OfflineRenderer
         public int Depth { get; set; }
     }
 
-    // The track's MIDI-aware effects (cloned), for delivering gesture-triggering notes during render.
     private static IMidiAwareEffect[] MidiEffectsOf(IAudioEffect[] effects)
-    {
-        var aware = effects.OfType<IMidiAwareEffect>().ToArray();
-        return aware;
-    }
+        => effects.OfType<IMidiAwareEffect>().ToArray();
 
     private readonly record struct ScheduledNote(double OnBeat, double OffBeat, RenderSlot[]? Slots,
         IMidiAwareEffect[] MidiEffects, int Note, float Velocity)

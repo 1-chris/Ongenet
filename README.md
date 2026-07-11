@@ -1,7 +1,11 @@
 # Ongenet
 
-A Digital Audio Workstation (DAW) built on Avalonia, with a clean native-free Core and a thin,
-swappable device/UI layer around it.
+A **free, open-source** Digital Audio Workstation (DAW) built on Avalonia, with a clean native-free
+Core and a thin, swappable device/UI layer around it. Licensed under the [MIT License](LICENSE).
+
+**Website:** [onge.net](https://onge.net/) &middot; **Downloads:**
+[GitHub Releases](https://github.com/1-chris/Ongenet/releases) &middot; **Try in browser:**
+[web demo](https://onge.net/app/)
 
 ## Projects
 
@@ -69,6 +73,15 @@ audio, it only taps it and renders the live signal as a smoothed waveform in 3D 
 fading "snapshot" trails receding into the distance — at display refresh rate. Its colours follow the
 active Catppuccin theme (and update live), and the whole visual can be popped out into a freely resizable
 window.
+
+## Clip rendering
+
+Right-click any **MIDI clip**, **audio clip** or **group summary** on the timeline and choose
+**Render clip to new track** to offline-bounce it through the full effect chain — instrument slot
+pre-FX, track post-FX and ancestor group buses (master FX excluded) — with automation applied.
+The result lands as a beat-aligned audio clip on a new track below the source, and a progress sweep
+animates across the clip while rendering. Group summaries flatten every descendant track in the mix,
+including nested group FX, onto a track outside the group.
 
 ## 3D engine
 

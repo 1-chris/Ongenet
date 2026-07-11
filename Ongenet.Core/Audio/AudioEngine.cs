@@ -205,26 +205,7 @@ public sealed class AudioEngine : IAudioEngine
 
     // Tracks referenced as sidechain sources must render even when muted/soloed-out.
     private static HashSet<Guid> CollectSidechainSources(Track[] tracks)
-    {
-        var set = new HashSet<Guid>();
-        foreach (var track in tracks)
-        {
-            CollectSidechainSourcesFromEffects(track.ActiveEffects, set);
-            foreach (var slot in track.ActiveInstruments)
-                CollectSidechainSourcesFromEffects(slot.ActiveEffects, set);
-        }
-
-        return set;
-    }
-
-    private static void CollectSidechainSourcesFromEffects(IAudioEffect[] effects, HashSet<Guid> set)
-    {
-        foreach (var fx in effects)
-        {
-            if (fx is SidechainEffect sc && sc.SourceTrackId is { } id && id != Guid.Empty)
-                set.Add(id);
-        }
-    }
+        => Automation.OfflineAutomationDriver.CollectSidechainSources(tracks);
 
     // The bus a track's output feeds into (its ParentId group, or the master when unset).
     private static Bus? ParentBusOf(Track track, Routing routing)
@@ -869,35 +850,17 @@ public sealed class AudioEngine : IAudioEngine
     // ignored while recording so the manual tempo being captured drives playback, not the old curve.
     private double EffectiveBpm(double beat, double fallback)
     {
-        var master = _routing.MasterTrack;
-        if (master is not null)
-        {
-            var recording = _transport.IsRecording;
-            foreach (var lane in master.ActiveAutoLanes)
-            {
-                if (lane.Binding?.Kind != AutomationTargetKind.Tempo) continue;
-                if (recording && lane.IsArmed) break;
-                return Math.Clamp(lane.Evaluate(beat),
-                    ProjectAutomationTargets.MinBpm, ProjectAutomationTargets.MaxBpm);
-            }
-        }
+        if (_transport.IsRecording && _routing.MasterTrack?.ActiveAutoLanes
+                .Any(l => l.Binding?.Kind == AutomationTargetKind.Tempo && l.IsArmed) == true)
+            return fallback > 0 ? fallback : 120.0;
 
-        return fallback > 0 ? fallback : 120.0;
+        return Automation.OfflineAutomationDriver.ResolveTempo(_project.Current, beat, fallback);
     }
 
     // Drives each automation lane's target from its curve at the current beat. Armed lanes are
     // left alone while recording so the user's manual control moves are captured, not overwritten.
     private void ApplyAutomation(Track track, double beat)
-    {
-        var lanes = track.ActiveAutoLanes;
-        if (lanes.Length == 0) return;
-        var recording = _transport.IsRecording;
-        foreach (var lane in lanes)
-        {
-            if (recording && lane.IsArmed) continue;
-            lane.Target.Write(lane.Evaluate(beat));
-        }
-    }
+        => Automation.OfflineAutomationDriver.ApplyTrack(track, beat, skipArmedLanes: _transport.IsRecording);
 
     // A content track is silenced by its own mute, or — when anything is soloed — unless it or one of its
     // ancestor groups is soloed (so soloing a group plays its children; buses always pass soloed signals).

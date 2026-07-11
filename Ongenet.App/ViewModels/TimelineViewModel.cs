@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
@@ -33,6 +34,9 @@ namespace Ongenet.App.ViewModels
         private readonly IRecordingService _recording;
         private readonly Services.IHistoryService _history;
         private readonly Services.IAppSettingsService _settings;
+        private readonly OfflineRenderer _renderer;
+        private readonly IAudioEngine _engine;
+        private bool _isRenderingClip;
 
         // Canonical per-track lanes (one per track). The rendered <see cref="Lanes"/> collection
         // interleaves these with their (expanded) automation rows; both reference the same track lane
@@ -44,7 +48,8 @@ namespace Ongenet.App.ViewModels
         public TimelineViewModel(IProjectService project, ISelectionService selection,
             IEventAggregator events, IAudioFileService audioFiles, ITransportService transport,
             IInstrumentRegistry instruments, IEditModeService editMode, IRecordingService recording,
-            Services.IHistoryService history, Services.IAppSettingsService settings)
+            Services.IHistoryService history, Services.IAppSettingsService settings,
+            OfflineRenderer renderer, IAudioEngine engine)
         {
             _project = project;
             _selection = selection;
@@ -56,6 +61,8 @@ namespace Ongenet.App.ViewModels
             _recording = recording;
             _history = history;
             _settings = settings;
+            _renderer = renderer;
+            _engine = engine;
 
             SelectClipCommand = new RelayCommand<ClipViewModel>(OnClipClicked);
             AddInstrumentTrackCommand = new RelayCommand(AddInstrumentTrack);
@@ -307,6 +314,128 @@ namespace Ongenet.App.ViewModels
         }
 
         // --- IClipActions (context menu) ---
+
+        public bool IsRenderingClip => _isRenderingClip;
+
+        public async Task RenderClipToNewTrackAsync(ClipViewModel clip)
+        {
+            if (_isRenderingClip) return;
+            var sourceLane = FindLaneOf(clip);
+            if (sourceLane is null) return;
+
+            SetRenderingClip(true);
+            clip.SetRenderProgress(0);
+            try
+            {
+                var project = _project.Current;
+                var scope = ClipRenderScope.ForClip(project, clip.Owner, clip.Model);
+                var format = _engine.Format;
+                var bpm = _transport.Tempo.BeatsPerMinute;
+                var progress = new Progress<double>(clip.SetRenderProgress);
+                var samples = await Task.Run(() =>
+                    _renderer.RenderScopeToBuffer(project, format, bpm, scope, progress));
+
+                InsertRenderedClip(sourceLane, clip.Name, clip.Model.StartBeat, clip.Model.LengthBeats,
+                    samples, clip.Owner.ParentId);
+            }
+            finally
+            {
+                clip.SetRenderProgress(1);
+                SetRenderingClip(false);
+            }
+        }
+
+        /// <summary>Renders a group summary's descendant mix to a new audio track outside the group.</summary>
+        public async Task RenderGroupSummaryToNewTrackAsync(GroupClipSummaryViewModel summary)
+        {
+            if (_isRenderingClip || summary.UnderlyingClips.Count == 0) return;
+            var groupLane = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, summary.OwnerGroup));
+            if (groupLane is null) return;
+
+            SetRenderingClip(true);
+            summary.SetRenderProgress(0);
+            try
+            {
+                var project = _project.Current;
+                var descendants = _trackLanes
+                    .Where(l => l.Model.Kind is TrackKind.Audio or TrackKind.Instrument
+                                && IsDescendantOf(l.Model, summary.OwnerGroup.Id, project.Tracks))
+                    .Select(l => l.Model);
+                var scope = ClipRenderScope.ForGroup(project, summary.OwnerGroup,
+                    summary.StartBeat, summary.LengthBeats, descendants);
+                var format = _engine.Format;
+                var bpm = _transport.Tempo.BeatsPerMinute;
+                var progress = new Progress<double>(summary.SetRenderProgress);
+                var samples = await Task.Run(() =>
+                    _renderer.RenderScopeToBuffer(project, format, bpm, scope, progress));
+
+                InsertRenderedClip(groupLane, summary.OwnerGroup.Name, summary.StartBeat, summary.LengthBeats,
+                    samples, summary.OwnerGroup.ParentId, insertAfterSubtree: true);
+            }
+            finally
+            {
+                summary.SetRenderProgress(1);
+                SetRenderingClip(false);
+            }
+        }
+
+        private void InsertRenderedClip(TrackLaneViewModel sourceLane, string sourceName, double startBeat,
+            double lengthBeats, AudioSampleBuffer samples, Guid? parentId, bool insertAfterSubtree = false)
+        {
+            _history.Capture("Render clip to new track");
+
+            var track = new Track
+            {
+                Name = $"Audio {AudioTrackNumber()}",
+                Kind = TrackKind.Audio,
+                ColorKey = "CatppuccinTeal",
+                ParentId = parentId
+            };
+            var clip = new Clip
+            {
+                Name = $"{sourceName} (rendered)",
+                IsAudio = true,
+                StartBeat = startBeat,
+                LengthBeats = lengthBeats,
+                StretchToTempo = false,
+                Samples = samples,
+                Waveform = AudioWaveform.Build(samples)
+            };
+            track.Clips.Add(clip);
+
+            var insertIndex = insertAfterSubtree
+                ? InsertIndexAfterSubtree(sourceLane.Model)
+                : _trackLanes.IndexOf(sourceLane) + 1;
+            InsertTrack(track, insertIndex);
+
+            var lane = _trackLanes.First(l => ReferenceEquals(l.Model, track));
+            ExtendTimeline(clip.EndBeat);
+            UpdateCrossfades(lane);
+            _selection.SelectClip(clip, track);
+            RefreshAllGroupSummaries();
+        }
+
+        private void SetRenderingClip(bool rendering)
+        {
+            _isRenderingClip = rendering;
+            OnPropertyChanged(nameof(IsRenderingClip));
+            InvalidateClipCommands();
+        }
+
+        private void InvalidateClipCommands()
+        {
+            foreach (var lane in _trackLanes)
+            {
+                foreach (var clip in lane.Clips)
+                {
+                    clip.MakeUniqueCommand.RaiseCanExecuteChanged();
+                    clip.RenderToNewTrackCommand.RaiseCanExecuteChanged();
+                }
+
+                foreach (var summary in lane.GroupSummaries)
+                    summary.RenderToNewTrackCommand.RaiseCanExecuteChanged();
+            }
+        }
 
         /// <summary>
         /// Duplicates the selected clip(s) (Ctrl+D). A single clip's copy lands one clip-length to the right.
@@ -1071,7 +1200,7 @@ namespace Ongenet.App.ViewModels
                 }
 
                 lane.GroupSummaries.Add(new GroupClipSummaryViewModel(
-                    minStart, length, descendantClips, bars, Metrics, this));
+                    minStart, length, lane.Model, descendantClips, bars, Metrics, this));
             }
         }
 
@@ -1551,6 +1680,15 @@ namespace Ongenet.App.ViewModels
             return false;
         }
 
+        // Document-order index for inserting a track immediately after <paramref name="root"/> and all descendants.
+        private int InsertIndexAfterSubtree(Track root)
+        {
+            var subtree = SubtreeOf(root, _project.Current.Tracks);
+            var last = subtree[^1];
+            var laneIndex = _trackLanes.FindIndex(l => ReferenceEquals(l.Model, last));
+            return laneIndex < 0 ? _trackLanes.Count : laneIndex + 1;
+        }
+
         // A track followed by all its descendants, in document order.
         private static List<Track> SubtreeOf(Track root, List<Track> tracks)
         {
@@ -1767,13 +1905,6 @@ namespace Ongenet.App.ViewModels
             }
 
             clip.Notes = unique;
-        }
-
-        private void InvalidateClipCommands()
-        {
-            foreach (var lane in _trackLanes)
-                foreach (var clipVm in lane.Clips)
-                    clipVm.MakeUniqueCommand.RaiseCanExecuteChanged();
         }
 
         private void OnSelectionChanged()

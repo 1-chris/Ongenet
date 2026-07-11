@@ -3,7 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ongenet — a native, dependency-light DAW</title>
+<title>Ongenet — free, open-source DAW for Linux, Windows &amp; macOS</title>
+<meta name="description" content="Ongenet is a free, open-source digital audio workstation (DAW) for Linux, Windows and macOS. Arrange MIDI and audio, host CLAP/LV2/VST plugins, automate mixes, render clips to new tracks, and export offline — built on Avalonia and .NET 10.">
+<meta name="keywords" content="Ongenet, DAW, digital audio workstation, open source, free DAW, music production, MIDI, audio, Linux DAW, Windows DAW, macOS DAW, VST, CLAP, LV2, Avalonia">
+<meta name="author" content="Ongenet">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#1e1e2e">
+<link rel="canonical" href="https://onge.net/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Ongenet">
+<meta property="og:title" content="Ongenet — free, open-source DAW">
+<meta property="og:description" content="A modern, native DAW for Linux, Windows and macOS. Free and open source (MIT). Arrange, mix, automate, render clips to new tracks, and try it in your browser.">
+<meta property="og:url" content="https://onge.net/">
+<meta property="og:image" content="https://onge.net/caps/Ongenet_Mocha.png">
+<meta property="og:image:alt" content="Screenshot of the Ongenet main window with timeline, transport and instrument editor.">
+<meta property="og:locale" content="en_GB">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Ongenet — free, open-source DAW">
+<meta name="twitter:description" content="A modern, native DAW for Linux, Windows and macOS. Free and open source (MIT). Arrange, mix, automate, and render clips to new tracks.">
+<meta name="twitter:image" content="https://onge.net/caps/Ongenet_Mocha.png">
+<meta name="twitter:image:alt" content="Screenshot of the Ongenet main window with timeline, transport and instrument editor.">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Ongenet",
+  "applicationCategory": "MultimediaApplication",
+  "applicationSubCategory": "Digital Audio Workstation",
+  "operatingSystem": "Windows, macOS, Linux",
+  "description": "Free, open-source digital audio workstation for arranging MIDI and audio, hosting plugins, automating mixes, and offline export.",
+  "url": "https://onge.net/",
+  "downloadUrl": "https://github.com/1-chris/Ongenet/releases",
+  "codeRepository": "https://github.com/1-chris/Ongenet",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
 <script>
 (function(){var k='onge-theme',v={mocha:1,macchiato:1,frappe:1,latte:1},s=localStorage.getItem(k);
 var d=matchMedia('(prefers-color-scheme:light)').matches?'latte':'mocha';
@@ -66,9 +109,9 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
 <!-- ===== Hero ===== -->
 <header class="wrap hero">
   <h1>Ongenet</h1>
-  <p class="tag">A modern Digital Audio Workstation.</p>
-  <p class="sub">Built on Avalonia and .NET 10 &middot; Linux, Windows &amp; macOS &middot;
-     four Catppuccin flavours, switchable live in-app and on this page.</p>
+  <p class="tag">A free, open-source Digital Audio Workstation.</p>
+  <p class="sub">MIT-licensed and free to download, modify and share &middot; built on Avalonia and .NET 10
+     &middot; Linux, Windows &amp; macOS &middot; four Catppuccin flavours, switchable live in-app and on this page.</p>
   <div class="cta">
     <a class="btn btn-primary" href="https://github.com/1-chris/Ongenet/releases">⬇ Download</a>
     <a class="btn btn-ghost" href="app/">▶ Try it in your browser</a>
@@ -132,6 +175,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
           <li>Per-track mute, solo, record-arm and constant-power pan; live peak metering on every track header.</li>
           <li>Automation lanes under tracks — add, drag and bend breakpoints; bound controls move live during playback.</li>
           <li>Drag-to-move, edge-resize and cross-track reparenting; Edit / Select / Slice tools, rubber-band multi-select, duplicate, reverse and slice.</li>
+          <li><strong>Render clip to new track</strong> — right-click any MIDI clip, audio clip or group summary to bake instrument racks, track FX and ancestor group buses into a perfectly sized audio clip on a fresh track below, with a live progress sweep across the source clip.</li>
           <li>Drop audio from the built-in browser or the OS — WAV decodes natively, other formats transcode via ffmpeg; loops auto-stretch to project tempo.</li>
           <li>Middle-mouse horizontal zoom around the cursor; clickable bar ruler, start marker and moving playhead.</li>
         </ul>
@@ -488,6 +532,18 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
       </ul>
     </div>
 
+    <div class="feature" style="border-left-color:var(--green)">
+      <h3>Render clip to new track <span class="pill">new</span></h3>
+      <p>Flatten a clip in place — instruments, slot pre-FX, track post-FX and ancestor group buses — without
+         leaving the arrange view.</p>
+      <ul>
+        <li>Right-click any <strong>MIDI clip</strong>, <strong>audio clip</strong> or <strong>group summary</strong> on the timeline and choose <em>Render clip to new track</em>.</li>
+        <li>The offline renderer applies the full rack chain (slot pre → track post → nested group FX, excluding master) with automation honoured, then places a beat-aligned audio clip on a new track below.</li>
+        <li>Group summaries render every descendant track in the mix — child effects, the group bus and any parent group FX — onto a track outside the group, below the whole subtree.</li>
+        <li>A progress sweep animates across the source clip while rendering so you can see how far through the bounce you are.</li>
+      </ul>
+    </div>
+
     <div class="feature c-pink">
       <h3>Themes, history &amp; projects</h3>
       <p>The conveniences that make a session pleasant to live in.</p>
@@ -495,7 +551,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
         <li><strong>Live theming</strong> — 26 semantic tokens across Mocha, Macchiato, Frappé and Latte, a built-in theme editor in Settings and JSON import/export, all applied without a restart.</li>
         <li><strong>Undo / redo</strong> — snapshot-based history with a jump-to-any-point History window (Ctrl+Z / Ctrl+Y).</li>
         <li><strong>Single-file projects</strong> — the <code>.ongen</code> format bundles everything (samples de-duplicated) in one version-tolerant file.</li>
-        <li><strong>Offline export</strong> — render the whole arrangement to a WAV faster than real time, sidechain and all.</li>
+        <li><strong>Offline export</strong> — render the whole arrangement to a WAV faster than real time, with automation, sidechain and effect tails honoured.</li>
       </ul>
     </div>
   </section>
@@ -504,8 +560,8 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
   <section>
     <div class="band">
       <h2>Get Ongenet</h2>
-      <p>Self-contained builds for Linux, Windows and macOS are published on GitHub Releases —
-         no runtime to install.</p>
+      <p>Free and open source under the MIT licence. Self-contained builds for Linux, Windows and macOS
+         are published on GitHub Releases — no runtime to install, no paywall, no account required.</p>
       <a class="btn btn-primary" href="https://github.com/1-chris/Ongenet/releases">⬇ Go to downloads</a>
     </div>
   </section>
@@ -515,9 +571,10 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
 <!-- ===== Footer ===== -->
 <footer>
   <div class="wrap">
-    Ongenet — built on Avalonia &amp; .NET 10.
+    Ongenet — free &amp; open source (MIT) &middot; built on Avalonia &amp; .NET 10.
     &nbsp;&middot;&nbsp; <a href="https://github.com/1-chris/Ongenet">GitHub</a>
     &nbsp;&middot;&nbsp; <a href="https://github.com/1-chris/Ongenet/releases">Releases</a>
+    &nbsp;&middot;&nbsp; <a href="https://github.com/1-chris/Ongenet/blob/main/LICENSE">License</a>
   </div>
 </footer>
 

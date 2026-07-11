@@ -308,6 +308,8 @@
                                                         <MenuItem Header="Make unique" Command="{Binding MakeUniqueCommand}"/>
                                                         <MenuItem Header="Reverse" Command="{Binding ReverseCommand}"
                                                                   IsVisible="{Binding IsAudio}"/>
+                                                        <MenuItem Header="Render clip to new track"
+                                                                  Command="{Binding RenderToNewTrackCommand}"/>
                                                         <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
                                                     </ContextMenu>
                                                 </Border.ContextMenu>
@@ -342,6 +344,14 @@
                                                                IsHitTestVisible="False"
                                                                VerticalAlignment="Top"
                                                                Foreground="{StaticResource CatppuccinCrust}"/>
+                                                    <Border Width="{Binding RenderProgressWidth}"
+                                                            HorizontalAlignment="Left"
+                                                            IsVisible="{Binding IsRendering}"
+                                                            IsHitTestVisible="False"
+                                                            Background="{StaticResource CatppuccinGreen}"
+                                                            BorderBrush="{StaticResource CatppuccinText}"
+                                                            BorderThickness="0,0,2,0"
+                                                            Opacity="0.35"/>
                                                 </Grid>
                                             </Border>
                                     </DataTemplate>
@@ -369,9 +379,12 @@
                                                     <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
                                                     <MenuItem Header="Reverse" Command="{Binding ReverseCommand}"
                                                               IsVisible="{Binding IsAllAudio}"/>
+                                                    <MenuItem Header="Render clip to new track"
+                                                              Command="{Binding RenderToNewTrackCommand}"/>
                                                     <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
                                                 </ContextMenu>
                                             </Border.ContextMenu>
+                                            <Grid>
                                             <ItemsControl ItemsSource="{Binding ChildBars}">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
@@ -409,6 +422,15 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
+                                            <Border Width="{Binding RenderProgressWidth}"
+                                                    HorizontalAlignment="Left"
+                                                    IsVisible="{Binding IsRendering}"
+                                                    IsHitTestVisible="False"
+                                                    Background="{StaticResource CatppuccinGreen}"
+                                                    BorderBrush="{StaticResource CatppuccinText}"
+                                                    BorderThickness="0,0,2,0"
+                                                    Opacity="0.35"/>
+                                            </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

@@ -9,5 +9,7 @@ namespace Ongenet.App.ViewModels.Timeline
         void RenameClip(ClipViewModel clip);
         void MakeClipUnique(ClipViewModel clip);
         int GetSharedInstanceCount(ClipViewModel clip);
+        System.Threading.Tasks.Task RenderClipToNewTrackAsync(ClipViewModel clip);
+        bool IsRenderingClip { get; }
     }
 }
