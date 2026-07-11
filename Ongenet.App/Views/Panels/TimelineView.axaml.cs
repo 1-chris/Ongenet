@@ -41,6 +41,9 @@ namespace Ongenet.App.Views.Panels
         // Active-gesture state.
         private Gesture _gesture = Gesture.None;
         private ClipViewModel? _dragClip;
+        private List<ClipViewModel>? _dragClips;
+        private Dictionary<ClipViewModel, double>? _origStarts;
+        private bool _draggingGroupSummary;
         private bool _clipDragCaptured; // history snapshot taken once per move/resize drag (on first actual move)
         private double _pressBeat;
         private double _origStart;
@@ -648,7 +651,7 @@ namespace Ongenet.App.Views.Panels
             // Slice is armed by the Slice tool OR by holding CTRL: click a clip to cut it at the snapped beat.
             if (vm.IsSliceMode || e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
-                var sliceHit = ResolveClip(e);
+                var sliceHit = ResolveClipOnly(e);
                 if (sliceHit is not null)
                 {
                     var (_, sliceBeat) = LocatePoint(pos, vm);
@@ -666,7 +669,7 @@ namespace Ongenet.App.Views.Panels
             // Automation rows: don't intercept — let the curve control handle the pointer.
             if (vm.IsAutomationRow(rowIndex)) return;
 
-            var hit = ResolveClip(e);
+            var hit = ResolveClipOrSummary(e);
 
             if (hit is null)
             {
@@ -692,9 +695,23 @@ namespace Ongenet.App.Views.Panels
                 return;
             }
 
-            // A clip was hit: select it and begin a move/resize gesture. Edge zones are measured
-            // against the clip's own visual rectangle so body clicks always move (never resize).
-            var (clip, clipVisual) = hit.Value;
+            // A clip or group summary was hit.
+            if (hit.Value.Summary is { } summary)
+            {
+                vm.SelectGroupSummary(summary);
+                _gesture = Gesture.Move;
+                _dragClip = null;
+                _draggingGroupSummary = true;
+                _dragClips = summary.UnderlyingClips.ToList();
+                _origStarts = _dragClips.ToDictionary(c => c, c => c.Model.StartBeat);
+                _clipDragCaptured = false;
+                _pressBeat = beat;
+                e.Pointer.Capture(LanesList);
+                e.Handled = true;
+                return;
+            }
+
+            var (clip, clipVisual) = (hit.Value.Clip!, hit.Value.Visual!);
             vm.SelectClip(clip);
 
             var localX = e.GetPosition(clipVisual).X;
@@ -705,6 +722,9 @@ namespace Ongenet.App.Views.Panels
                 : Gesture.Move;
 
             _dragClip = clip;
+            _dragClips = null;
+            _origStarts = null;
+            _draggingGroupSummary = false;
             _clipDragCaptured = false; // snapshot on the first real move, not on a plain click-select
             _pressBeat = beat;
             _origStart = clip.Model.StartBeat;
@@ -745,6 +765,21 @@ namespace Ongenet.App.Views.Panels
                     _bandMoved = true;
                 BandSelect(_bandStart, pos, vm);
                 ShowBand(_bandStart, pos);
+                e.Handled = true;
+                return;
+            }
+
+            if (_dragClips is not null && _origStarts is not null)
+            {
+                if (!_clipDragCaptured)
+                {
+                    History?.Capture("Move clips");
+                    _clipDragCaptured = true;
+                }
+
+                var (_, moveBeat) = LocatePoint(pos, vm);
+                var moveDelta = moveBeat - _pressBeat;
+                vm.MoveClips(_dragClips, _origStarts, moveDelta);
                 e.Handled = true;
                 return;
             }
@@ -806,8 +841,8 @@ namespace Ongenet.App.Views.Panels
             var scrollX = _lanesScroll?.Offset.X ?? 0;
             var scrollY = _lanesScroll?.Offset.Y ?? 0;
 
-            var rowIndex = vm.Lanes.IndexOf(targetLane);
-            Canvas.SetTop(ClipDragGhost, vm.RowTop(rowIndex) + 6 - scrollY); // clips sit 6px from the lane top
+            var rowIndex = targetRow;
+            Canvas.SetTop(ClipDragGhost, vm.RowTop(rowIndex) + TrackLaneViewModel.ClipTopInset - scrollY);
             Canvas.SetLeft(ClipDragGhost, _dragClip.Left - scrollX);
             ClipDragGhost.Width = System.Math.Max(2, _dragClip.Width);
             ClipDragGhost.IsVisible = true;
@@ -817,7 +852,7 @@ namespace Ongenet.App.Views.Panels
         {
             ClipDragGhost.IsVisible = false;
             if (_gesture == Gesture.None) { return; }
-            if (DataContext is TimelineViewModel vm && _gesture == Gesture.Move && _dragClip is not null)
+            if (DataContext is TimelineViewModel vm && _gesture == Gesture.Move && _dragClip is not null && !_draggingGroupSummary)
             {
                 // Cross-track move: reparent to the instrument lane under the pointer, if different.
                 var (targetRow, _) = LocatePoint(e.GetPosition(LanesList), vm);
@@ -838,6 +873,9 @@ namespace Ongenet.App.Views.Panels
 
             _gesture = Gesture.None;
             _dragClip = null;
+            _dragClips = null;
+            _origStarts = null;
+            _draggingGroupSummary = false;
             e.Pointer.Capture(null);
             e.Handled = true;
         }
@@ -877,29 +915,37 @@ namespace Ongenet.App.Views.Panels
             Band.IsVisible = true;
         }
 
+        // Finds the clip or group summary under the pointer and its outermost scoped visual.
+        private static (ClipViewModel? Clip, GroupClipSummaryViewModel? Summary, Visual Visual)? ResolveClipOrSummary(PointerEventArgs e)
+        {
+            var v = e.Source as Visual;
+            while (v is not null)
+            {
+                if (v is StyledElement { DataContext: GroupClipSummaryViewModel gsm })
+                    return (null, gsm, v);
+                if (v is StyledElement { DataContext: ClipViewModel cvm })
+                    return (cvm, null, v);
+                v = v.GetVisualParent();
+            }
+
+            return null;
+        }
+
+        // Finds only a real clip (for slice).
+        private static (ClipViewModel Clip, Visual Visual)? ResolveClipOnly(PointerEventArgs e)
+        {
+            var hit = ResolveClipOrSummary(e);
+            if (hit is null || hit.Value.Clip is null) return null;
+            return (hit.Value.Clip, hit.Value.Visual);
+        }
+
         // Finds the clip under the pointer and its outermost clip-scoped visual (the item
         // container, sized to the clip), or null for empty lane space.
         private static (ClipViewModel Clip, Visual Visual)? ResolveClip(PointerEventArgs e)
         {
-            var v = e.Source as Visual;
-            ClipViewModel? clip = null;
-            Visual? visual = null;
-            while (v is not null)
-            {
-                if (v is StyledElement { DataContext: ClipViewModel cvm })
-                {
-                    clip = cvm;
-                    visual = v;
-                }
-                else if (clip is not null)
-                {
-                    break; // walked out of the clip's subtree
-                }
-
-                v = v.GetVisualParent();
-            }
-
-            return clip is not null && visual is not null ? (clip, visual) : null;
+            var hit = ResolveClipOrSummary(e);
+            if (hit is null || hit.Value.Clip is null) return null;
+            return (hit.Value.Clip, hit.Value.Visual);
         }
 
         private void ShowNewTrackGhost(TimelineViewModel vm, string label)

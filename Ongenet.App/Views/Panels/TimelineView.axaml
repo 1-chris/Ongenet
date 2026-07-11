@@ -12,6 +12,8 @@
     <UserControl.Resources>
         <x:Double x:Key="HeaderWidth">140</x:Double>
         <x:Double x:Key="RulerHeight">26</x:Double>
+        <x:Double x:Key="ClipTopInset">6</x:Double>
+        <x:Double x:Key="ClipHeight">52</x:Double>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -22,6 +24,11 @@
         <Style Selector="Border.clip.selected">
             <Setter Property="BorderBrush" Value="{StaticResource CatppuccinText}"/>
             <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+        <Style Selector="Border.group-summary">
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinOverlay1}"/>
+            <Setter Property="Opacity" Value="0.85"/>
         </Style>
     </UserControl.Styles>
 
@@ -231,7 +238,7 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <!-- [1,1] lanes — the master scroll region (selection + virtualization) -->
+            <!-- [1,1] lanes — the master scroll region -->
             <ListBox Grid.Row="1" Grid.Column="1" Name="LanesList"
                      ItemsSource="{Binding Lanes}"
                      SelectedItem="{Binding SelectedLane, Mode=TwoWay}"
@@ -239,6 +246,12 @@
                      DragDrop.AllowDrop="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <!-- Non-virtualizing panel: mixed 64px/56px row heights misalign when recycled. -->
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
                 <!-- Right-clicking blank space below the tracks offers to add a track. -->
                 <ListBox.ContextMenu>
                     <ContextMenu>
@@ -278,9 +291,9 @@
                                 <ItemsControl.ItemContainerTheme>
                                     <ControlTheme TargetType="ContentPresenter" x:DataType="tl:ClipViewModel">
                                         <Setter Property="Canvas.Left" Value="{Binding Left}"/>
-                                        <Setter Property="Canvas.Top" Value="6"/>
+                                        <Setter Property="Canvas.Top" Value="{StaticResource ClipTopInset}"/>
                                         <Setter Property="Width" Value="{Binding Width}"/>
-                                        <Setter Property="Height" Value="52"/>
+                                        <Setter Property="Height" Value="{StaticResource ClipHeight}"/>
                                     </ControlTheme>
                                 </ItemsControl.ItemContainerTheme>
                                 <ItemsControl.ItemTemplate>
@@ -334,6 +347,72 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <!-- Group lane: aggregate child clips as coloured mini bars -->
+                            <ItemsControl ItemsSource="{Binding GroupSummaries}" IsVisible="{Binding IsGroup}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemContainerTheme>
+                                    <ControlTheme TargetType="ContentPresenter" x:DataType="tl:GroupClipSummaryViewModel">
+                                        <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                        <Setter Property="Canvas.Top" Value="{StaticResource ClipTopInset}"/>
+                                        <Setter Property="Width" Value="{Binding Width}"/>
+                                        <Setter Property="Height" Value="{StaticResource ClipHeight}"/>
+                                    </ControlTheme>
+                                </ItemsControl.ItemContainerTheme>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="tl:GroupClipSummaryViewModel">
+                                        <Border Classes="group-summary" CornerRadius="4" ClipToBounds="True"
+                                                Background="{StaticResource CatppuccinSurface0}">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
+                                                    <MenuItem Header="Reverse" Command="{Binding ReverseCommand}"
+                                                              IsVisible="{Binding IsAllAudio}"/>
+                                                    <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                            <ItemsControl ItemsSource="{Binding ChildBars}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemContainerTheme>
+                                                    <ControlTheme TargetType="ContentPresenter" x:DataType="tl:GroupChildClipBarViewModel">
+                                                        <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                                        <Setter Property="Canvas.Top" Value="{Binding Top}"/>
+                                                        <Setter Property="Width" Value="{Binding Width}"/>
+                                                        <Setter Property="Height" Value="{Binding BarHeight}"/>
+                                                    </ControlTheme>
+                                                </ItemsControl.ItemContainerTheme>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="tl:GroupChildClipBarViewModel">
+                                                        <Border CornerRadius="2" ClipToBounds="True"
+                                                                Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}">
+                                                            <Grid>
+                                                                <controls:WaveformControl Waveform="{Binding Waveform}"
+                                                                                          Revision="{Binding WaveformRevision}"
+                                                                                          StartFraction="{Binding WaveStartFraction}"
+                                                                                          EndFraction="{Binding WaveEndFraction}"
+                                                                                          IsVisible="{Binding IsAudio}"
+                                                                                          IsHitTestVisible="False"
+                                                                                          Fill="{StaticResource CatppuccinCrust}"
+                                                                                          Opacity="0.55"/>
+                                                                <controls:MidiNoteMiniControl Notes="{Binding Notes}"
+                                                                                              ClipLengthBeats="{Binding ClipLengthBeats}"
+                                                                                              Revision="{Binding NotesRevision}"
+                                                                                              IsVisible="{Binding IsMidi}"
+                                                                                              IsHitTestVisible="False"
+                                                                                              Fill="{StaticResource CatppuccinCrust}"
+                                                                                              Opacity="0.6" Margin="1,1"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                             <!-- Drop highlight while dragging an audio file over this lane -->
                             <Border IsVisible="{Binding IsDropTarget}" IsHitTestVisible="False"
                                     BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="2">
@@ -372,7 +451,7 @@
                                    FontWeight="SemiBold" Foreground="{StaticResource CatppuccinGreen}"/>
                     </Grid>
                 </Border>
-                <Border Name="ClipDragGhost" Height="52" IsVisible="False" CornerRadius="3" Opacity="0.6"
+                <Border Name="ClipDragGhost" Height="{StaticResource ClipHeight}" IsVisible="False" CornerRadius="3" Opacity="0.6"
                         BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="2">
                     <Rectangle Fill="{StaticResource CatppuccinMauve}" Opacity="0.25"/>
                 </Border>

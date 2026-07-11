@@ -13,6 +13,12 @@ namespace Ongenet.App.ViewModels.Timeline
         /// <summary>Fixed row height shared by the lane and its header, in pixels.</summary>
         public const double RowHeight = 64.0;
 
+        /// <summary>Vertical inset of clips inside a track row, in pixels.</summary>
+        public const double ClipTopInset = 6.0;
+
+        /// <summary>Rendered height of clips inside a track row, in pixels.</summary>
+        public const double ClipHeight = 52.0;
+
         private readonly TimelineMetrics _metrics;
         private readonly ITrackActions _actions;
         private readonly IClipActions _clipActions;
@@ -228,6 +234,9 @@ namespace Ongenet.App.ViewModels.Timeline
 
         /// <summary>The clips on this lane.</summary>
         public ObservableCollection<ClipViewModel> Clips { get; } = new();
+
+        /// <summary>Aggregate child-clip summaries shown on group lanes.</summary>
+        public ObservableCollection<GroupClipSummaryViewModel> GroupSummaries { get; } = new();
 
         /// <summary>Re-reads header values after the model changes elsewhere.</summary>
         public void RefreshFromModel()

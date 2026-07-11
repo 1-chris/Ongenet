@@ -195,6 +195,7 @@ namespace Ongenet.App.ViewModels
             ExtendTimeline(clip.Model.EndBeat);
             // Crossfades refresh via the ClipChangedEvent → RefreshClip path below (avoids doing it twice).
             _events.Publish(new ClipChangedEvent(clip.Model));
+            RefreshAllGroupSummaries();
         }
 
         /// <summary>
@@ -302,6 +303,7 @@ namespace Ongenet.App.ViewModels
             if (model.IsAudio) UpdateCrossfades(lane);
             _events.Publish(new ClipChangedEvent(model));
             _selection.SelectClip(model, lane.Model);
+            RefreshAllGroupSummaries();
         }
 
         // --- IClipActions (context menu) ---
@@ -352,6 +354,7 @@ namespace Ongenet.App.ViewModels
             }
 
             foreach (var lane in affected) UpdateCrossfades(lane);
+            RefreshAllGroupSummaries();
         }
 
         public void DuplicateClip(ClipViewModel clip)
@@ -367,6 +370,7 @@ namespace Ongenet.App.ViewModels
             UpdateCrossfades(lane);
             _selection.SelectClip(copy, lane.Model);
             InvalidateClipCommands();
+            RefreshAllGroupSummaries();
         }
 
         /// <summary>
@@ -479,6 +483,7 @@ namespace Ongenet.App.ViewModels
             UpdateCrossfades(lane);
             if (ReferenceEquals(_selection.SelectedClip, clip.Model)) _selection.SelectTrack(lane.Model);
             InvalidateClipCommands();
+            RefreshAllGroupSummaries();
         }
 
         /// <summary>Context-menu rename: prompts for a new name and applies it to this one clip.</summary>
@@ -557,6 +562,7 @@ namespace Ongenet.App.ViewModels
             ExtendTimeline(copy.EndBeat);
             UpdateCrossfades(lane);
             _selection.SelectClip(copy, lane.Model);
+            RefreshAllGroupSummaries();
         }
 
         private static Avalonia.Controls.Window? OwnerWindow()
@@ -579,10 +585,22 @@ namespace Ongenet.App.ViewModels
                 var height = Lanes[i].Height;
                 if (Lanes[i] is TrackLaneViewModel track)
                 {
-                    var laneOverlaps = top < maxY && top + height > minY;
+                    var clipTop = top + TrackLaneViewModel.ClipTopInset;
+                    var clipBottom = clipTop + TrackLaneViewModel.ClipHeight;
+                    var bandOverlaps = clipTop < maxY && clipBottom > minY;
                     foreach (var clip in track.Clips)
                     {
-                        clip.IsSelected = laneOverlaps && clip.Left < maxX && clip.Left + clip.Width > minX;
+                        clip.IsSelected = bandOverlaps && clip.Left < maxX && clip.Left + clip.Width > minX;
+                    }
+
+                    if (track.IsGroup)
+                    {
+                        foreach (var summary in track.GroupSummaries)
+                        {
+                            if (!bandOverlaps || summary.Left >= maxX || summary.Left + summary.Width <= minX) continue;
+                            foreach (var child in summary.UnderlyingClips)
+                                child.IsSelected = true;
+                        }
                     }
                 }
 
@@ -607,6 +625,8 @@ namespace Ongenet.App.ViewModels
 
                 if (selected.Count > 0) UpdateCrossfades(lane);
             }
+
+            RefreshAllGroupSummaries();
         }
 
         /// <summary>
@@ -635,6 +655,7 @@ namespace Ongenet.App.ViewModels
             UpdateCrossfades(origin);
             UpdateCrossfades(target);
             _selection.SelectClip(clip.Model, target.Model);
+            RefreshAllGroupSummaries();
             return moved;
         }
 
@@ -744,6 +765,7 @@ namespace Ongenet.App.ViewModels
             // the bottom edge is already the "append new track" affordance handled by the ghost).
             for (var i = 1; i < Lanes.Count; i++)
             {
+                if (Lanes[i] is AutomationLaneViewModel) continue;
                 var top = RowTop(i);
                 if (Math.Abs(y - top) <= band)
                     return (TrackInsertIndexForRow(i), top);
@@ -999,6 +1021,156 @@ namespace Ongenet.App.ViewModels
             }
 
             OnPropertyChanged(nameof(RowCount));
+            RefreshAllGroupSummaries();
+        }
+
+        /// <summary>Rebuilds aggregate clip summaries on every group lane from descendant clips.</summary>
+        public void RefreshAllGroupSummaries()
+        {
+            var tracks = _project.Current.Tracks;
+            foreach (var lane in _trackLanes)
+            {
+                lane.GroupSummaries.Clear();
+                if (!lane.IsGroup) continue;
+
+                var descendantLanes = new List<TrackLaneViewModel>();
+                var descendantClips = new List<ClipViewModel>();
+                foreach (var child in _trackLanes)
+                {
+                    if (child.Model.Kind is not (TrackKind.Audio or TrackKind.Instrument)) continue;
+                    if (!IsDescendantOf(child.Model, lane.Model.Id, tracks)) continue;
+                    descendantLanes.Add(child);
+                    descendantClips.AddRange(child.Clips);
+                }
+
+                if (descendantClips.Count == 0) continue;
+
+                var minStart = descendantClips.Min(c => c.Model.StartBeat);
+                var maxEnd = descendantClips.Max(c => c.Model.EndBeat);
+                var length = maxEnd - minStart;
+                if (length <= 0) continue;
+
+                // One vertical row per descendant track; every clip on that track shares the row
+                // so multiple instances across the timeline all render at their beat positions.
+                var stackByTrack = new Dictionary<Guid, int>();
+                for (var i = 0; i < descendantLanes.Count; i++)
+                    stackByTrack[descendantLanes[i].Model.Id] = i;
+
+                var laneCount = descendantLanes.Count;
+                var rowStride = laneCount > 0
+                    ? Math.Max(4, (TrackLaneViewModel.ClipHeight - 8) / laneCount)
+                    : 10;
+                var barHeight = Math.Max(3, rowStride - 1);
+
+                var bars = new List<GroupChildClipBarViewModel>();
+                foreach (var clip in descendantClips)
+                {
+                    var stack = stackByTrack[clip.Owner.Id];
+                    bars.Add(new GroupChildClipBarViewModel(
+                        clip, clip.Owner.ColorKey, stack, minStart, rowStride, barHeight, Metrics));
+                }
+
+                lane.GroupSummaries.Add(new GroupClipSummaryViewModel(
+                    minStart, length, descendantClips, bars, Metrics, this));
+            }
+        }
+
+        /// <summary>Duplicates every clip represented by a group summary as a block.</summary>
+        public void DuplicateGroupSummary(GroupClipSummaryViewModel summary)
+        {
+            var clips = summary.UnderlyingClips;
+            if (clips.Count == 0) return;
+
+            if (clips.Count == 1) { DuplicateClip(clips[0]); return; }
+
+            var minStart = clips.Min(c => c.Model.StartBeat);
+            var maxEnd = clips.Max(c => c.Model.EndBeat);
+            var offset = maxEnd - minStart;
+            if (offset <= 0) return;
+
+            _history.Capture("Duplicate clips");
+            _selection.SelectTrack(null);
+
+            var affected = new HashSet<TrackLaneViewModel>();
+            foreach (var clipVm in clips)
+            {
+                var lane = FindLaneOf(clipVm);
+                if (lane is null) continue;
+                var copy = CloneClip(clipVm.Model);
+                copy.StartBeat = clipVm.Model.StartBeat + offset;
+                lane.Model.Clips.Add(copy);
+                lane.Clips.Add(new ClipViewModel(copy, lane.Model, Metrics, this) { IsSelected = true });
+                ExtendTimeline(copy.EndBeat);
+                affected.Add(lane);
+            }
+
+            foreach (var lane in affected) UpdateCrossfades(lane);
+            RefreshAllGroupSummaries();
+        }
+
+        /// <summary>Deletes every clip represented by a group summary.</summary>
+        public void DeleteGroupSummary(GroupClipSummaryViewModel summary)
+        {
+            var toDelete = summary.UnderlyingClips.ToList();
+            if (toDelete.Count == 0) return;
+            _history.Capture("Delete clips");
+            foreach (var clip in toDelete)
+            {
+                var lane = FindLaneOf(clip);
+                if (lane is null) continue;
+                lane.Model.Clips.Remove(clip.Model);
+                lane.Clips.Remove(clip);
+                if (ReferenceEquals(_selection.SelectedClip, clip.Model)) _selection.SelectTrack(lane.Model);
+                UpdateCrossfades(lane);
+            }
+
+            InvalidateClipCommands();
+            RefreshAllGroupSummaries();
+        }
+
+        /// <summary>Reverses every audio clip represented by a group summary.</summary>
+        public void ReverseGroupSummary(GroupClipSummaryViewModel summary)
+        {
+            if (!summary.IsAllAudio) return;
+            _history.Capture("Reverse clips");
+            foreach (var clip in summary.UnderlyingClips)
+                ReverseClip(clip);
+        }
+
+        /// <summary>Selects every underlying clip in a group summary.</summary>
+        public void SelectGroupSummary(GroupClipSummaryViewModel summary)
+        {
+            foreach (var lane in _trackLanes)
+                foreach (var clip in lane.Clips)
+                    clip.IsSelected = false;
+
+            foreach (var clip in summary.UnderlyingClips)
+                clip.IsSelected = true;
+
+            if (summary.UnderlyingClips.Count > 0)
+                _selection.SelectClip(summary.UnderlyingClips[0].Model, summary.UnderlyingClips[0].Owner);
+        }
+
+        /// <summary>Moves every clip in <paramref name="clips"/> from <paramref name="origStarts"/> by <paramref name="deltaBeats"/>.</summary>
+        public void MoveClips(
+            IReadOnlyList<ClipViewModel> clips,
+            IReadOnlyDictionary<ClipViewModel, double> origStarts,
+            double deltaBeats)
+        {
+            var affected = new HashSet<TrackLaneViewModel>();
+            foreach (var clip in clips)
+            {
+                if (!origStarts.TryGetValue(clip, out var orig)) continue;
+                clip.Model.StartBeat = Math.Max(0, Metrics.Snap(orig + deltaBeats));
+                clip.RefreshFromModel();
+                ExtendTimeline(clip.Model.EndBeat);
+                _events.Publish(new ClipChangedEvent(clip.Model));
+                var lane = FindLaneOf(clip);
+                if (lane is not null) affected.Add(lane);
+            }
+
+            foreach (var lane in affected) UpdateCrossfades(lane);
+            RefreshAllGroupSummaries();
         }
 
         // A track's automation lanes were added/removed/collapsed elsewhere: rebuild the rendered rows.
@@ -1136,8 +1308,6 @@ namespace Ongenet.App.ViewModels
             lane.GroupCollapsed = !lane.GroupCollapsed;
             RebuildRows();
         }
-
-        /// <summary>Groups the multi-selected tracks under a new group bus placed where the first one was.</summary>
         public void GroupSelectedTracks()
         {
             var tracks = _project.Current.Tracks;
@@ -1245,10 +1415,11 @@ namespace Ongenet.App.ViewModels
         /// </summary>
         public DragDropPlan ComputeDrop(double contentY, Track dragged)
         {
-            var rows = new List<(TrackLaneViewModel Lane, double Top)>();
+            var rows = new List<(TrackLaneViewModel Lane, double Top, double Height)>();
             for (var i = 0; i < Lanes.Count; i++)
             {
-                if (Lanes[i] is TrackLaneViewModel t) rows.Add((t, RowTop(i)));
+                if (Lanes[i] is TrackLaneViewModel t)
+                    rows.Add((t, RowTop(i), t.Height));
             }
 
             if (rows.Count == 0) return new DragDropPlan(false, 0, 0, null, null);
@@ -1256,7 +1427,7 @@ namespace Ongenet.App.ViewModels
             var hoverIdx = -1;
             for (var i = 0; i < rows.Count; i++)
             {
-                if (contentY < rows[i].Top + TrackLaneViewModel.RowHeight) { hoverIdx = i; break; }
+                if (contentY < rows[i].Top + rows[i].Height) { hoverIdx = i; break; }
             }
 
             Guid? parentId;
@@ -1552,6 +1723,7 @@ namespace Ongenet.App.ViewModels
                 if (clipVm is null) continue;
                 clipVm.RefreshFromModel();
                 if (clip.IsAudio) UpdateCrossfades(lane);
+                RefreshAllGroupSummaries();
                 return;
             }
         }
@@ -1565,6 +1737,7 @@ namespace Ongenet.App.ViewModels
             lane.Clips.Add(new ClipViewModel(clip, lane.Model, Metrics, this));
             ExtendTimeline(clip.EndBeat);
             if (clip.IsAudio) UpdateCrossfades(lane);
+            RefreshAllGroupSummaries();
         }
 
         private void RefreshClipNotes(Core.Models.Audio.Clip clip)
