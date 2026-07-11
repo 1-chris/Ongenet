@@ -21,11 +21,13 @@ namespace Ongenet.App.ViewModels
         private readonly IEditModeService _editMode;
         private readonly OfflineRenderer _renderer;
         private readonly IRecordingService _recording;
+        private readonly ISystemMetricsSampler _metrics;
         private bool _isRendering;
 
         public TransportViewModel(ITransportService transport, IAudioEngine engine,
             IProjectService project, IEventAggregator events, IEditModeService editMode,
-            OfflineRenderer renderer, IRecordingService recording, AudioDevicesViewModel devices)
+            OfflineRenderer renderer, IRecordingService recording, AudioDevicesViewModel devices,
+            ISystemMetricsSampler metrics)
         {
             _transport = transport;
             _engine = engine;
@@ -34,7 +36,10 @@ namespace Ongenet.App.ViewModels
             _editMode = editMode;
             _renderer = renderer;
             _recording = recording;
+            _metrics = metrics;
             Devices = devices;
+
+            _metrics.Updated += OnMetricsUpdated;
 
             _transport.StateChanged += _ => OnStateChanged();
             _transport.TempoChanged += _ => OnTempoChanged();
@@ -230,6 +235,15 @@ namespace Ongenet.App.ViewModels
         public double MasterLevelLeft => _engine.MasterLevelLeft;
         public double MasterLevelRight => _engine.MasterLevelRight;
 
+        /// <summary>True when the host exposes process CPU/RAM sampling (desktop).</summary>
+        public bool ShowSystemMetrics => _metrics.IsAvailable;
+
+        /// <summary>Formatted process CPU usage for the transport bar.</summary>
+        public string CpuText => _metrics.CpuPercent is { } pct ? $"{pct:0}%" : "—";
+
+        /// <summary>Formatted process working-set size for the transport bar.</summary>
+        public string RamText => FormatBytes(_metrics.MemoryBytes);
+
         private long _lastTimeRefreshMs;
 
         /// <summary>Refreshes the polled values — called once per render frame via the PlaybackClock.
@@ -267,6 +281,21 @@ namespace Ongenet.App.ViewModels
             var millis = (int)((seconds - Math.Floor(seconds)) * 1000);
             return $"{minutes}:{secs:00}.{millis:000}";
         }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 0) bytes = 0;
+            const long gb = 1024L * 1024 * 1024;
+            if (bytes >= gb) return $"{bytes / (double)gb:0.#} GB";
+            return $"{bytes / (1024.0 * 1024):0} MB";
+        }
+
+        private void OnMetricsUpdated() =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                OnPropertyChanged(nameof(CpuText));
+                OnPropertyChanged(nameof(RamText));
+            });
 
         private void OnStateChanged()
         {

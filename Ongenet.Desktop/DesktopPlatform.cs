@@ -9,6 +9,7 @@ using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Platform;
+using Ongenet.App.Services;
 using Ongenet.App.ViewModels;
 using Ongenet.App.Views.Windows;
 using Ongenet.Desktop.Services;
@@ -42,6 +43,9 @@ public sealed class DesktopPlatform : IPlatformServices
 
         // External MIDI controller input (ALSA / winmm / CoreMIDI).
         services.AddSingleton<IMidiInputService, MidiInputService>();
+
+        // Transport-bar process CPU/RAM indicators (overrides the shared null default).
+        services.AddSingleton<ISystemMetricsSampler, ProcessSystemMetricsSampler>();
 
         // GPU 3D engine for the embeddable 3D controls (Vulkan, natively on Windows/Linux and via MoltenVK
         // on macOS). It brings up the device lazily and reports IsAvailable=false instead of throwing if no
@@ -98,6 +102,8 @@ public sealed class DesktopPlatform : IPlatformServices
 
     public void OnStarted(IServiceProvider services)
     {
+        services.GetRequiredService<ISystemMetricsSampler>().Start();
+
         // Route CLAP host/plugin diagnostics (incl. GUI open steps) to the in-app log, then scan in the
         // background; plugins appear in the Instruments tab + effects menu as they are found.
         var clapLogger = services.GetService<ILoggerFactory>()?.CreateLogger("Clap");

@@ -88,6 +88,9 @@ namespace Ongenet.App
             // ~30fps UI heartbeat so automated controls visibly move during playback.
             services.AddSingleton<Services.IPlaybackClock, Services.PlaybackClock>();
 
+            // Process CPU/RAM indicators (desktop overrides with a real sampler).
+            services.AddSingleton<Services.ISystemMetricsSampler, Services.NullSystemMetricsSampler>();
+
             // ViewModels. Panel view models are singletons: they share the one transport,
             // selection, and project for the lifetime of the single main window.
             services.AddSingleton<AudioDevicesViewModel>();
