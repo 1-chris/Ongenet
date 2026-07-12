@@ -105,4 +105,5 @@ I2PSharp/
 # DocFX site build output
 /_site/
 /site/_site/
-/site/api/
+/site/api/**
+!/site/api/index.md
