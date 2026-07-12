@@ -57,14 +57,16 @@ public sealed class TrackRouteRow : ViewModelBase
         Track = track;
         _changed = changed;
         OutputBuses = allTracks.Where(t => t.IsBus && t.Kind != TrackKind.Master && t.Id != track.Id).ToList();
+        Sends = new ObservableCollection<TrackSendRouteRow>(
+            track.Sends.Select(send => new TrackSendRouteRow(send, allTracks, changed)));
     }
 
     public Track Track { get; }
     public string TrackName => Track.Name;
     public Array OutputTargets { get; } = Enum.GetValues<TrackOutputTarget>();
     public System.Collections.Generic.IReadOnlyList<Track> OutputBuses { get; }
-    public bool HasSend => Track.Sends.Count > 0;
-    public string SendName => Track.Sends.Count == 0 ? "No send" : "First send";
+    public ObservableCollection<TrackSendRouteRow> Sends { get; }
+    public bool HasSends => Sends.Count > 0;
 
     public TrackOutputTarget OutputTarget
     {
@@ -94,15 +96,54 @@ public sealed class TrackRouteRow : ViewModelBase
             OnPropertyChanged(nameof(OutputTarget));
         }
     }
+}
 
-    public double SendLevel
+public sealed class TrackSendRouteRow : ViewModelBase
+{
+    private readonly TrackSend _send;
+    private readonly Action _changed;
+
+    public TrackSendRouteRow(TrackSend send, System.Collections.Generic.List<Track> allTracks, Action changed)
     {
-        get => Track.Sends.FirstOrDefault()?.Level ?? 0;
+        _send = send;
+        _changed = changed;
+        TargetName = allTracks.FirstOrDefault(t => t.Id == send.TargetTrackId)?.Name ?? "(missing)";
+    }
+
+    public string TargetName { get; }
+
+    public double Level
+    {
+        get => _send.Level;
         set
         {
-            var send = Track.Sends.FirstOrDefault();
-            if (send is null) return;
-            send.Level = Math.Clamp(value, 0, 1);
+            var clamped = Math.Clamp(value, 0, 1);
+            if (_send.Level == clamped) return;
+            _send.Level = clamped;
+            _changed();
+            OnPropertyChanged();
+        }
+    }
+
+    public bool PreFader
+    {
+        get => _send.PreFader;
+        set
+        {
+            if (_send.PreFader == value) return;
+            _send.PreFader = value;
+            _changed();
+            OnPropertyChanged();
+        }
+    }
+
+    public bool Enabled
+    {
+        get => _send.Enabled;
+        set
+        {
+            if (_send.Enabled == value) return;
+            _send.Enabled = value;
             _changed();
             OnPropertyChanged();
         }
@@ -124,12 +165,13 @@ public sealed class MultiOutRouteRow : ViewModelBase
     public string SourceTrackName { get; }
     public int PluginOutputBus => _route.PluginOutputBus;
     public System.Collections.Generic.IReadOnlyList<Track> Destinations { get; }
+
     public Track? Destination
     {
         get => Destinations.FirstOrDefault(t => t.Id == _route.DestinationTrackId);
         set
         {
-            if (value is null || value.Id == _route.DestinationTrackId) return;
+            if (value is null || _route.DestinationTrackId == value.Id) return;
             _route.DestinationTrackId = value.Id;
             OnPropertyChanged();
         }
@@ -141,7 +183,7 @@ public sealed class MultiOutRouteRow : ViewModelBase
         set
         {
             var clamped = Math.Clamp(value, 0, 1);
-            if (Math.Abs(_route.Level - clamped) < 1e-9) return;
+            if (_route.Level == clamped) return;
             _route.Level = clamped;
             OnPropertyChanged();
         }

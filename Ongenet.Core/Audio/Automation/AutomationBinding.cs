@@ -5,6 +5,10 @@ public enum AutomationTargetKind
 {
     TrackVolume,
     TrackPan,
+
+    /// <summary>Send level on a track. ParamIndex is the index in the track's Sends list.</summary>
+    TrackSendLevel,
+
     EffectEnabled,
     EffectParam,
     InstrumentParam,

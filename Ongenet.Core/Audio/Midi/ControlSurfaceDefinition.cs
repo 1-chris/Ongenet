@@ -25,7 +25,8 @@ public sealed class ControlSurfaceBinding
 {
     /// <summary>
     /// Action id: transport (<c>PlayPause</c>, <c>Stop</c>, <c>Record</c>), session
-    /// (<c>LaunchScene</c>, <c>LaunchSlot</c>, …), or mixer (<c>MixerVolume</c>, <c>MixerPan</c>).
+    /// (<c>LaunchScene</c>, <c>LaunchSlot</c>, …), or mixer (<c>MixerVolume</c>, <c>MixerPan</c>,
+    /// <c>MixerMute</c>, <c>MixerSolo</c>, <c>MixerSend</c>).
     /// </summary>
     public string Action { get; set; } = "";
 

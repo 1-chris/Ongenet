@@ -185,7 +185,8 @@ Mouse extras: **right-click** a note to delete it; **middle-drag** to zoom/pan. 
 
 There is a dedicated **Mixer** centre tab with channel strips, sends, meters, per-track **input monitoring**
 (Off/Auto/On on audio tracks), and an editable **Routing Matrix**
-window for bus and multi-out routing. Mixing is also available from:
+window for bus and multi-out routing. **MIDI** and **Pattern** tracks stay on the timeline only — they are
+not shown as mixer strips. Mixing is also available from:
 
 | Where | What you control |
 | --- | --- |

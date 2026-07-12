@@ -19,24 +19,39 @@
                         <DataTemplate x:DataType="vm:TrackRouteRow">
                             <Border Margin="0,0,0,4" Padding="8" CornerRadius="4"
                                     Background="{StaticResource CatppuccinSurface0}">
-                                <Grid ColumnDefinitions="120,160,160,*">
-                                    <TextBlock Grid.Column="0" Text="{Binding TrackName}" FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis"/>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding OutputTargets}"
-                                              SelectedItem="{Binding OutputTarget}" Margin="6,0"/>
-                                    <ComboBox Grid.Column="2" ItemsSource="{Binding OutputBuses}"
-                                              SelectedItem="{Binding OutputBus}" IsEnabled="{Binding UsesSpecificBus}"
-                                              PlaceholderText="{DynamicResource Routing_Destination_bus}" Margin="6,0">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate x:DataType="audio:Track"><TextBlock Text="{Binding Name}"/></DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6"
-                                                IsVisible="{Binding HasSend}">
-                                        <TextBlock Text="{Binding SendName}" VerticalAlignment="Center" FontSize="10"/>
-                                        <Slider Minimum="0" Maximum="1" Width="100" Value="{Binding SendLevel}"/>
-                                    </StackPanel>
-                                </Grid>
+                                <StackPanel Spacing="6">
+                                    <Grid ColumnDefinitions="120,160,160">
+                                        <TextBlock Grid.Column="0" Text="{Binding TrackName}" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <ComboBox Grid.Column="1" ItemsSource="{Binding OutputTargets}"
+                                                  SelectedItem="{Binding OutputTarget}" Margin="6,0"/>
+                                        <ComboBox Grid.Column="2" ItemsSource="{Binding OutputBuses}"
+                                                  SelectedItem="{Binding OutputBus}" IsEnabled="{Binding UsesSpecificBus}"
+                                                  PlaceholderText="{DynamicResource Routing_Destination_bus}" Margin="6,0">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="audio:Track"><TextBlock Text="{Binding Name}"/></DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding Sends}" IsVisible="{Binding HasSends}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:TrackSendRouteRow">
+                                                <Grid ColumnDefinitions="120,*,Auto,Auto" Margin="0,2,0,0">
+                                                    <TextBlock Grid.Column="0" Text="{Binding TargetName}" FontSize="10"
+                                                               Foreground="{StaticResource CatppuccinSubtext0}"
+                                                               VerticalAlignment="Center"/>
+                                                    <Slider Grid.Column="1" Minimum="0" Maximum="1" Margin="8,0"
+                                                            Value="{Binding Level, Mode=TwoWay}"/>
+                                                    <CheckBox Grid.Column="2" Content="{DynamicResource Routing_Pre_fader}"
+                                                              IsChecked="{Binding PreFader, Mode=TwoWay}" FontSize="9"
+                                                              Margin="4,0"/>
+                                                    <CheckBox Grid.Column="3" Content="{DynamicResource Routing_On}"
+                                                              IsChecked="{Binding Enabled, Mode=TwoWay}" FontSize="9"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

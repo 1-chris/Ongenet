@@ -311,10 +311,23 @@
                                             Background="{StaticResource CatppuccinSurface0}" CornerRadius="4"
                                             ToolTip.Tip="{DynamicResource TrackInspector_Send_to_a_return_bus_controls_how_much_of_this_t_Tip}">
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="{Binding TargetName}" FontSize="11"
-                                                       Foreground="{StaticResource CatppuccinSubtext0}"
-                                                       ToolTip.Tip="{DynamicResource TrackInspector_Return_track_receiving_this_send_the_aux_bus_whe_Tip}"/>
-                                            <Slider Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Content="{DynamicResource TrackInspector_Remove}"
+                                                        Command="{Binding RemoveCommand}" Padding="4,2" FontSize="9"
+                                                        ToolTip.Tip="{DynamicResource TrackInspector_Remove_send_Tip}"/>
+                                                <ComboBox ItemsSource="{Binding ReturnTargets}"
+                                                          SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
+                                                          FontSize="9" HorizontalAlignment="Stretch"
+                                                          PlaceholderText="{DynamicResource TrackInspector_Send_target_Placeholder}">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="audio:Track">
+                                                            <TextBlock Text="{Binding Name}"/>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
+                                            </DockPanel>
+                                            <Slider Name="SendLevelSlider" Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
+                                                    Tag="{Binding Send}"
                                                     ToolTip.Tip="{DynamicResource TrackInspector_Send_level_how_much_signal_goes_to_the_return_0__Tip}"/>
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <CheckBox Content="{DynamicResource TrackInspector_Pre_fader}" IsChecked="{Binding PreFader, Mode=TwoWay}"

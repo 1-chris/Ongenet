@@ -11,10 +11,13 @@
 
 ### Mixer
 
-- Per-track volume, constant-power pan, mute, solo, peak metering
-- **Aux sends** — pre- or post-fader taps into return tracks
-- **Surround pan** — 5.1 / 7.1 when output device has enough channels
-- **Routing matrix** — re-route inputs and outputs per track
+- Per-track volume, constant-power pan, mute, solo, peak metering on **audio, instrument, hybrid, group, return, and master** tracks
+- **MIDI** and **Pattern** tracks are timeline-only — they do not appear as mixer strips (no audio mix path)
+- **Aux sends** — pre- or post-fader taps into return tracks; pick the return destination, adjust level, or remove sends from the mixer strip or Track Inspector
+- **Send automation** — right-click a send level slider to create an automation lane
+- **Surround pan** — 5.1 / 7.1 in the **Track Inspector** when output device has enough channels
+- **Routing matrix** — edit track output destinations, all aux sends per track, and plugin multi-out routes (hardware audio-interface inputs are configured in Settings → Audio)
+- **Control surfaces** — MCU/HUI mute and solo buttons; Push2/APC40 learnable volume, pan, mute, solo, and first-send level (CC 91)
 
 ### Export
 

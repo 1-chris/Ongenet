@@ -1,9 +1,11 @@
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Controls;
 using Ongenet.App.Services;
@@ -27,9 +29,15 @@ namespace Ongenet.App.Views.Panels
             // A left press on a fader is the start of a value change — snapshot once for undo.
             if (props.IsLeftButtonPressed
                 && (e.Source as Visual)?.FindAncestorOfType<Slider>(includeSelf: true) is { } s
-                && (s.Name == "VolumeSlider" || s.Name == "PanSlider"))
+                && (s.Name == "VolumeSlider" || s.Name == "PanSlider" || s.Name == "SendLevelSlider"))
             {
-                App.ServiceProvider?.GetService<IHistoryService>()?.Capture(s.Name == "VolumeSlider" ? "Adjust volume" : "Adjust pan");
+                var action = s.Name switch
+                {
+                    "VolumeSlider" => "Adjust volume",
+                    "PanSlider" => "Adjust pan",
+                    _ => "Adjust send level"
+                };
+                App.ServiceProvider?.GetService<IHistoryService>()?.Capture(action);
                 return;
             }
 
@@ -52,6 +60,15 @@ namespace Ongenet.App.Views.Panels
             {
                 AutomationGesture.Offer(slider, owner, AutomationGesture.ForPan(owner),
                     () => { if (vm is not null) vm.Pan = Core.Models.Audio.Track.DefaultPan; });
+                e.Handled = true;
+            }
+            else if (slider.Name == "SendLevelSlider" && slider.Tag is TrackSend send)
+            {
+                var targetName = App.ServiceProvider?.GetService<IProjectService>()?.Current.Tracks
+                    .FirstOrDefault(t => t.Id == send.TargetTrackId)?.Name;
+                AutomationGesture.Offer(slider, owner,
+                    AutomationGesture.ForSendLevel(owner, send, targetName),
+                    () => send.Level = 0.5);
                 e.Handled = true;
             }
         }

@@ -1,13 +1,25 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Ongenet.App.ViewModels.Panels"
-             xmlns:controls="using:Ongenet.App.Controls"
+             xmlns:sendVm="using:Ongenet.App.ViewModels"
              xmlns:audio="using:Ongenet.Core.Models.Audio"
+             xmlns:controls="using:Ongenet.App.Controls"
              xmlns:Automation="using:Avalonia.Automation"
              x:Class="Ongenet.App.Views.Panels.MixerView"
              x:DataType="vm:MixerViewModel"
              Automation:AutomationProperties.Name="{DynamicResource Mixer_Mixer_A11yName}"
              Automation:AutomationProperties.HelpText="{DynamicResource Mixer_Channel_mixer_with_faders_pan_and_sends}">
+    <UserControl.Styles>
+        <Style Selector="Border.mixer-strip">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        </Style>
+        <Style Selector="Border.mixer-strip.selected">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinOverlay0}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+    </UserControl.Styles>
+
     <DockPanel>
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="4,4,4,8">
             <Button Content="{DynamicResource Mixer_Reverb}" Command="{Binding AddReverbReturnCommand}"
@@ -18,7 +30,7 @@
                     Classes="compact" ToolTip.Tip="{DynamicResource Mixer_View_track_and_multi_out_routing_Tip}"/>
         </StackPanel>
 
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Strips}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -27,83 +39,123 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:MixerStripViewModel">
-                        <Border Width="92" Padding="6,6,10,6" ClipToBounds="False"
-                                Background="{StaticResource CatppuccinSurface0}"
+                        <Border Tag="mixer-strip" Width="100" Padding="0" ClipToBounds="False"
+                                Classes="mixer-strip" Classes.selected="{Binding IsSelected}"
                                 CornerRadius="4" Margin="2">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="{Binding Name}" FontSize="10" TextTrimming="CharacterEllipsis"
-                                           HorizontalAlignment="Center"/>
+                            <Grid ColumnDefinitions="8,*">
+                                <Border Grid.Column="0" CornerRadius="4,0,0,4"
+                                        Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                <StackPanel Grid.Column="1" Spacing="4" Margin="6,6,8,6">
+                                    <TextBlock Text="{Binding Name}" FontSize="10" TextTrimming="CharacterEllipsis"
+                                               HorizontalAlignment="Center"/>
 
-                                <!-- Meter + fader as one centred unit (same layout as arrangement track headers). -->
-                                <Border ClipToBounds="False" HorizontalAlignment="Center" Padding="0,2,4,2">
-                                    <Grid ColumnDefinitions="6,8,28" Height="120">
-                                        <controls:LevelMeterControl Grid.Column="0" Width="6" Height="120"
-                                                                    Level="{Binding MeterLevel}"/>
-                                        <Slider Classes="fader" Grid.Column="2" Minimum="0" Maximum="1"
-                                                Value="{Binding Volume, Mode=TwoWay}"
-                                                Orientation="Vertical" Height="120" Width="28"
-                                                HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
-                                    </Grid>
-                                </Border>
+                                    <!-- Meter + fader as one centred unit (same layout as arrangement track headers). -->
+                                    <Border ClipToBounds="False" HorizontalAlignment="Center" Padding="0,2,4,2">
+                                        <Grid ColumnDefinitions="6,8,28" Height="120">
+                                            <controls:LevelMeterControl Grid.Column="0" Width="6" Height="120"
+                                                                        Level="{Binding MeterLevel}"/>
+                                            <Slider Name="VolumeSlider" Classes="fader" Grid.Column="2" Minimum="0" Maximum="1"
+                                                    Value="{Binding Volume, Mode=TwoWay}"
+                                                    Orientation="Vertical" Height="120" Width="28"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
+                                        </Grid>
+                                    </Border>
 
-                                <Slider Minimum="-1" Maximum="1" Value="{Binding Pan, Mode=TwoWay}"/>
+                                    <Slider Name="PanSlider" Minimum="-1" Maximum="1" Value="{Binding Pan, Mode=TwoWay}"
+                                            ToolTip.Tip="{DynamicResource Mixer_Pan_Tip}"/>
 
-                                <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
-                                    <ToggleButton Classes="strip" Content="{DynamicResource Mixer_M}" IsChecked="{Binding IsMuted, Mode=TwoWay}"
-                                                  ToolTip.Tip="{DynamicResource Mixer_Mute_Tip}"/>
-                                    <ToggleButton Classes="strip" Content="{DynamicResource Mixer_S}" IsChecked="{Binding IsSoloed, Mode=TwoWay}"
-                                                  ToolTip.Tip="{DynamicResource Mixer_Solo_Tip}"/>
-                                    <ToggleButton Classes="strip record" Content="{DynamicResource Mixer_R}" IsChecked="{Binding IsArmed, Mode=TwoWay}"
-                                                  IsVisible="{Binding IsArmVisible}"
-                                                  ToolTip.Tip="{DynamicResource Mixer_Arm_for_recording_Tip}"/>
-                                </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
+                                        <ToggleButton Classes="strip" Content="{DynamicResource Mixer_M}" IsChecked="{Binding IsMuted, Mode=TwoWay}"
+                                                      Foreground="{StaticResource CatppuccinRed}"
+                                                      ToolTip.Tip="{DynamicResource Mixer_Mute_Tip}"/>
+                                        <ToggleButton Classes="strip" Content="{DynamicResource Mixer_S}" IsChecked="{Binding IsSoloed, Mode=TwoWay}"
+                                                      Foreground="{StaticResource CatppuccinYellow}"
+                                                      ToolTip.Tip="{DynamicResource Mixer_Solo_Tip}"/>
+                                        <ToggleButton Classes="strip record" Content="{DynamicResource Mixer_R}" IsChecked="{Binding IsArmed, Mode=TwoWay}"
+                                                      IsVisible="{Binding IsArmVisible}"
+                                                      Foreground="{StaticResource CatppuccinRed}"
+                                                      ToolTip.Tip="{DynamicResource Mixer_Arm_for_recording_Tip}"/>
+                                    </StackPanel>
 
-                                <ComboBox ItemsSource="{Binding InputMonitoringModes}"
-                                          SelectedItem="{Binding InputMonitoring, Mode=TwoWay}"
-                                          IsVisible="{Binding IsMonitorVisible}"
-                                          FontSize="9" HorizontalAlignment="Stretch"
-                                          ToolTip.Tip="{DynamicResource Mixer_Input_monitoring_Off_Auto_when_armed_or_On_Tip}"/>
+                                    <ComboBox ItemsSource="{Binding InputMonitoringOptions}"
+                                              SelectedItem="{Binding SelectedInputMonitoring, Mode=TwoWay}"
+                                              IsVisible="{Binding IsMonitorVisible}"
+                                              FontSize="9" HorizontalAlignment="Stretch"
+                                              ToolTip.Tip="{DynamicResource Mixer_Input_monitoring_Off_Auto_when_armed_or_On_Tip}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
 
-                                <ComboBox ItemsSource="{Binding OutputTargets}"
-                                          SelectedItem="{Binding OutputTarget, Mode=TwoWay}"
-                                          FontSize="9" HorizontalAlignment="Stretch"
-                                          ToolTip.Tip="{DynamicResource Mixer_Main_output_routing_Tip}"/>
+                                    <ComboBox ItemsSource="{Binding OutputTargetOptions}"
+                                              SelectedItem="{Binding SelectedOutputTarget, Mode=TwoWay}"
+                                              FontSize="9" HorizontalAlignment="Stretch"
+                                              ToolTip.Tip="{DynamicResource Mixer_Main_output_routing_Tip}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
 
-                                <ComboBox ItemsSource="{Binding RoutingBuses}"
-                                          SelectedItem="{Binding SelectedRoutingBus, Mode=TwoWay}"
-                                          IsVisible="{Binding ShowBusPicker}"
-                                          FontSize="9" HorizontalAlignment="Stretch"
-                                          PlaceholderText="{DynamicResource Mixer_Bus}">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:RoutingBusOption">
-                                            <TextBlock Text="{Binding Name}"/>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
+                                    <ComboBox ItemsSource="{Binding RoutingBuses}"
+                                              SelectedItem="{Binding SelectedRoutingBus, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowBusPicker}"
+                                              FontSize="9" HorizontalAlignment="Stretch"
+                                              PlaceholderText="{DynamicResource Mixer_Bus}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:RoutingBusOption">
+                                                <TextBlock Text="{Binding Name}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
 
-                                <CheckBox Content="{DynamicResource Mixer_Master}" IsChecked="{Binding RouteToMaster, Mode=TwoWay}"
-                                          FontSize="9" IsVisible="{Binding !IsBus}"/>
+                                    <CheckBox Content="{DynamicResource Mixer_RouteToMaster}" IsChecked="{Binding RouteToMaster, Mode=TwoWay}"
+                                              FontSize="9" IsVisible="{Binding !IsBus}"
+                                              ToolTip.Tip="{DynamicResource Mixer_RouteToMaster_Tip}"/>
 
-                                <ItemsControl ItemsSource="{Binding Sends}" IsVisible="{Binding HasSends}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:MixerSendViewModel">
-                                            <StackPanel Spacing="2" Margin="0,4,0,0">
-                                                <TextBlock Text="{Binding TargetName}" FontSize="8"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                                <Slider Classes="compact" Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
-                                                        Height="16"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <CheckBox Content="{DynamicResource Mixer_Pre}" IsChecked="{Binding PreFader, Mode=TwoWay}"
-                                                              FontSize="8"/>
-                                                    <CheckBox Content="{DynamicResource Mixer_On}" IsChecked="{Binding Enabled, Mode=TwoWay}"
-                                                              FontSize="8"/>
+                                    <Button Content="{DynamicResource Mixer_AddSend}" Command="{Binding AddSendCommand}"
+                                            IsVisible="{Binding ShowAddSend}" Classes="compact" Padding="4,2"
+                                            FontSize="9" HorizontalAlignment="Stretch"
+                                            ToolTip.Tip="{DynamicResource Mixer_AddSend_Tip}"/>
+
+                                    <ItemsControl ItemsSource="{Binding Sends}" IsVisible="{Binding HasSends}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="sendVm:TrackSendEditorViewModel">
+                                                <StackPanel Spacing="2" Margin="0,4,0,0">
+                                                    <DockPanel>
+                                                        <Button DockPanel.Dock="Right" Content="{DynamicResource Mixer_RemoveSend}"
+                                                                Command="{Binding RemoveCommand}" Classes="compact"
+                                                                Padding="4,1" FontSize="8"
+                                                                ToolTip.Tip="{DynamicResource Mixer_RemoveSend_Tip}"/>
+                                                        <ComboBox ItemsSource="{Binding ReturnTargets}"
+                                                                  SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
+                                                                  FontSize="8" HorizontalAlignment="Stretch"
+                                                                  PlaceholderText="{DynamicResource Mixer_SendTarget_Placeholder}">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate x:DataType="audio:Track">
+                                                                    <TextBlock Text="{Binding Name}" FontSize="8"/>
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                    </DockPanel>
+                                                    <Slider Name="SendLevelSlider" Classes="compact" Minimum="0" Maximum="1"
+                                                            Value="{Binding Level, Mode=TwoWay}" Height="16"
+                                                            Tag="{Binding Send}"/>
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <CheckBox Content="{DynamicResource Mixer_Pre}" IsChecked="{Binding PreFader, Mode=TwoWay}"
+                                                                  FontSize="8"/>
+                                                        <CheckBox Content="{DynamicResource Mixer_On}" IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                                                  FontSize="8"/>
+                                                    </StackPanel>
                                                 </StackPanel>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

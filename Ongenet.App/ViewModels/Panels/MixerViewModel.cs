@@ -1,6 +1,8 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Ongenet.App.Localization;
+using Ongenet.App.ViewModels;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
@@ -17,19 +19,24 @@ public sealed class MixerViewModel : ViewModelBase
     private readonly IHistoryService _history;
     private readonly IEffectRegistry _effects;
     private readonly IInputMonitorService _inputMonitor;
+    private readonly ISelectionService _selection;
 
     public MixerViewModel(IProjectService project, IEventAggregator events, IHistoryService history,
-        IEffectRegistry effects, IPlaybackClock clock, IInputMonitorService inputMonitor)
+        IEffectRegistry effects, IPlaybackClock clock, IInputMonitorService inputMonitor,
+        ISelectionService selection, ILocalizationService localization)
     {
         _project = project;
         _events = events;
         _history = history;
         _effects = effects;
         _inputMonitor = inputMonitor;
+        _selection = selection;
 
         _project.ProjectChanged += Rebuild;
         _events.Subscribe<TracksChangedEvent>(_ => Rebuild());
         _events.Subscribe<TrackChangedEvent>(_ => RefreshStrips());
+        _selection.SelectionChanged += RefreshSelection;
+        localization.CultureChanged += RefreshEnumLabels;
         clock.Tick += OnPlaybackTick;
 
         AddReverbReturnCommand = new RelayCommand(() => AddReturnTrack(ReturnTrackTemplate.Reverb));
@@ -65,11 +72,24 @@ public sealed class MixerViewModel : ViewModelBase
             strip.RefreshFromTrack();
     }
 
+    private void RefreshSelection()
+    {
+        foreach (var strip in Strips)
+            strip.RefreshSelection();
+    }
+
+    private void RefreshEnumLabels()
+    {
+        foreach (var strip in Strips)
+            strip.RefreshEnumLabels();
+    }
+
     private void Rebuild()
     {
         Strips.Clear();
         foreach (var track in _project.Current.Tracks.Where(t => t.Kind is not (TrackKind.Midi or TrackKind.Pattern)))
-            Strips.Add(new MixerStripViewModel(track, _project, _events, _history, _inputMonitor));
+            Strips.Add(new MixerStripViewModel(track, _project, _events, _history, _inputMonitor, _selection));
+        RefreshSelection();
     }
 
     private void AddReturnTrack(ReturnTrackTemplate template)
@@ -101,23 +121,41 @@ public enum ReturnTrackTemplate
     Delay
 }
 
+public sealed class EnumOption<T> where T : struct, Enum
+{
+    public EnumOption(T value, string label)
+    {
+        Value = value;
+        Label = label;
+    }
+
+    public T Value { get; }
+    public string Label { get; }
+}
+
 public sealed class MixerStripViewModel : ViewModelBase
 {
     private readonly IProjectService _project;
     private readonly IEventAggregator _events;
     private readonly IHistoryService _history;
     private readonly IInputMonitorService _inputMonitor;
+    private readonly ISelectionService _selection;
 
     public MixerStripViewModel(Track track, IProjectService project, IEventAggregator events, IHistoryService history,
-        IInputMonitorService inputMonitor)
+        IInputMonitorService inputMonitor, ISelectionService selection)
     {
         Track = track;
         _project = project;
         _events = events;
         _history = history;
         _inputMonitor = inputMonitor;
-        foreach (var send in track.Sends)
-            Sends.Add(new MixerSendViewModel(send, project, NotifyTrack));
+        _selection = selection;
+
+        InputMonitoringOptions = BuildInputMonitoringOptions();
+        OutputTargetOptions = BuildOutputTargetOptions();
+
+        AddSendCommand = new RelayCommand(AddSend, () => ShowAddSend);
+        RebuildSends();
         RefreshRoutingOptions();
     }
 
@@ -125,22 +163,30 @@ public sealed class MixerStripViewModel : ViewModelBase
 
     public string Name => Track.Name;
 
+    public string ColorKey => Track.ColorKey;
+
+    public bool IsSelected => ReferenceEquals(_selection.SelectedTrack, Track);
+
     public bool IsBus => Track.IsBus;
 
     public bool IsArmVisible => Track.Kind is not (TrackKind.Master or TrackKind.Return or TrackKind.Midi or TrackKind.Pattern);
 
     public bool IsMonitorVisible => Track.Kind == TrackKind.Audio;
 
-    public Array InputMonitoringModes => Enum.GetValues<InputMonitoringMode>();
+    public bool ShowAddSend => Track.Kind is not (TrackKind.Master or TrackKind.Return)
+                               && _project.Current.Tracks.Any(t => t.Kind == TrackKind.Return);
 
-    public InputMonitoringMode InputMonitoring
+    public ObservableCollection<EnumOption<InputMonitoringMode>> InputMonitoringOptions { get; }
+
+    public EnumOption<InputMonitoringMode>? SelectedInputMonitoring
     {
-        get => Track.InputMonitoring;
+        get => InputMonitoringOptions.FirstOrDefault(o => o.Value == Track.InputMonitoring);
         set
         {
-            if (Track.InputMonitoring == value) return;
-            Track.InputMonitoring = value;
+            if (value is null || Track.InputMonitoring == value.Value) return;
+            Track.InputMonitoring = value.Value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedInputMonitoring));
             _inputMonitor.Refresh();
         }
     }
@@ -209,15 +255,18 @@ public sealed class MixerStripViewModel : ViewModelBase
 
     public float MeterLevel => Track.MeterLevel;
 
-    public TrackOutputTarget OutputTarget
+    public ObservableCollection<EnumOption<TrackOutputTarget>> OutputTargetOptions { get; }
+
+    public EnumOption<TrackOutputTarget>? SelectedOutputTarget
     {
-        get => Track.OutputTarget;
+        get => OutputTargetOptions.FirstOrDefault(o => o.Value == Track.OutputTarget);
         set
         {
-            if (Track.OutputTarget == value) return;
+            if (value is null || Track.OutputTarget == value.Value) return;
             _history.Capture("Change routing");
-            Track.OutputTarget = value;
+            Track.OutputTarget = value.Value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedOutputTarget));
             OnPropertyChanged(nameof(ShowBusPicker));
             NotifyTrack();
         }
@@ -236,23 +285,7 @@ public sealed class MixerStripViewModel : ViewModelBase
         }
     }
 
-    public Guid? OutputBusId
-    {
-        get => Track.OutputBusId;
-        set
-        {
-            if (Track.OutputBusId == value) return;
-            _history.Capture("Change routing");
-            Track.OutputBusId = value;
-            OnPropertyChanged();
-            NotifyTrack();
-        }
-    }
-
-    public bool ShowBusPicker => OutputTarget == TrackOutputTarget.SpecificBus;
-
-    public TrackOutputTarget[] OutputTargets { get; } =
-        Enum.GetValues<TrackOutputTarget>();
+    public bool ShowBusPicker => Track.OutputTarget == TrackOutputTarget.SpecificBus;
 
     public ObservableCollection<RoutingBusOption> RoutingBuses { get; } = new();
 
@@ -270,28 +303,95 @@ public sealed class MixerStripViewModel : ViewModelBase
         }
     }
 
-    public ObservableCollection<MixerSendViewModel> Sends { get; } = new();
+    public ObservableCollection<TrackSendEditorViewModel> Sends { get; } = new();
 
     public bool HasSends => Sends.Count > 0;
 
+    public RelayCommand AddSendCommand { get; }
+
+    public void SelectTrack() => _selection.SelectTrack(Track);
+
     public void RefreshMeters() => OnPropertyChanged(nameof(MeterLevel));
+
+    public void RefreshSelection() => OnPropertyChanged(nameof(IsSelected));
+
+    public void RefreshEnumLabels()
+    {
+        ReplaceOptions(InputMonitoringOptions, BuildInputMonitoringOptions());
+        ReplaceOptions(OutputTargetOptions, BuildOutputTargetOptions());
+        OnPropertyChanged(nameof(SelectedInputMonitoring));
+        OnPropertyChanged(nameof(SelectedOutputTarget));
+    }
 
     public void RefreshFromTrack()
     {
         OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(ColorKey));
         OnPropertyChanged(nameof(Volume));
         OnPropertyChanged(nameof(Pan));
         OnPropertyChanged(nameof(IsMuted));
         OnPropertyChanged(nameof(IsSoloed));
         OnPropertyChanged(nameof(IsArmed));
-        OnPropertyChanged(nameof(OutputTarget));
-        OnPropertyChanged(nameof(OutputBusId));
-        OnPropertyChanged(nameof(RouteToMaster));
+        OnPropertyChanged(nameof(SelectedOutputTarget));
         OnPropertyChanged(nameof(ShowBusPicker));
         OnPropertyChanged(nameof(SelectedRoutingBus));
+        OnPropertyChanged(nameof(RouteToMaster));
+        OnPropertyChanged(nameof(ShowAddSend));
+        OnPropertyChanged(nameof(SelectedInputMonitoring));
         RefreshRoutingOptions();
+        RefreshSends();
+        AddSendCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshSends()
+    {
+        for (var i = Sends.Count - 1; i >= 0; i--)
+        {
+            if (!Track.Sends.Contains(Sends[i].Send))
+                Sends.RemoveAt(i);
+        }
+
+        foreach (var send in Track.Sends)
+        {
+            if (Sends.All(s => s.Send != send))
+                Sends.Add(CreateSendEditor(send));
+        }
+
         foreach (var send in Sends)
             send.RefreshFromModel();
+
+        OnPropertyChanged(nameof(HasSends));
+    }
+
+    private void RebuildSends()
+    {
+        Sends.Clear();
+        foreach (var send in Track.Sends)
+            Sends.Add(CreateSendEditor(send));
+        OnPropertyChanged(nameof(HasSends));
+    }
+
+    private TrackSendEditorViewModel CreateSendEditor(TrackSend send) =>
+        new(Track, send, _project, _history, NotifyTrack, RemoveSendEditor);
+
+    private void RemoveSendEditor(TrackSendEditorViewModel editor)
+    {
+        Track.Sends.Remove(editor.Send);
+        RebuildSends();
+        NotifyTrack();
+    }
+
+    private void AddSend()
+    {
+        var returnTracks = _project.Current.Tracks.Where(t => t.Kind == TrackKind.Return).ToList();
+        if (returnTracks.Count == 0) return;
+
+        var target = returnTracks.FirstOrDefault(t => Track.Sends.All(s => s.TargetTrackId != t.Id))
+                     ?? returnTracks[0];
+        _history.Capture("Add send");
+        Track.Sends.Add(new TrackSend { TargetTrackId = target.Id });
+        RebuildSends();
+        NotifyTrack();
     }
 
     private void RefreshRoutingOptions()
@@ -299,6 +399,29 @@ public sealed class MixerStripViewModel : ViewModelBase
         RoutingBuses.Clear();
         foreach (var bus in _project.Current.Tracks.Where(t => t.IsBus && t.Id != Track.Id))
             RoutingBuses.Add(new RoutingBusOption(bus.Id, bus.Name));
+    }
+
+    private static ObservableCollection<EnumOption<InputMonitoringMode>> BuildInputMonitoringOptions() =>
+        new([
+            new EnumOption<InputMonitoringMode>(InputMonitoringMode.Off, L("Mixer_InputMonitoring_Off")),
+            new EnumOption<InputMonitoringMode>(InputMonitoringMode.Auto, L("Mixer_InputMonitoring_Auto")),
+            new EnumOption<InputMonitoringMode>(InputMonitoringMode.On, L("Mixer_InputMonitoring_On")),
+        ]);
+
+    private static ObservableCollection<EnumOption<TrackOutputTarget>> BuildOutputTargetOptions() =>
+        new([
+            new EnumOption<TrackOutputTarget>(TrackOutputTarget.ParentBus, L("Mixer_OutputTarget_ParentBus")),
+            new EnumOption<TrackOutputTarget>(TrackOutputTarget.Master, L("Mixer_OutputTarget_MasterBus")),
+            new EnumOption<TrackOutputTarget>(TrackOutputTarget.SpecificBus, L("Mixer_OutputTarget_SpecificBus")),
+            new EnumOption<TrackOutputTarget>(TrackOutputTarget.None, L("Mixer_OutputTarget_None")),
+        ]);
+
+    private static void ReplaceOptions<T>(ObservableCollection<EnumOption<T>> target,
+        ObservableCollection<EnumOption<T>> source) where T : struct, Enum
+    {
+        target.Clear();
+        foreach (var option in source)
+            target.Add(option);
     }
 
     private void NotifyTrack() => _events.Publish(new TrackChangedEvent(Track));
@@ -314,72 +437,4 @@ public sealed class RoutingBusOption
 
     public Guid Id { get; }
     public string Name { get; }
-}
-
-public sealed class MixerSendViewModel : ViewModelBase
-{
-    private readonly IProjectService _project;
-    private readonly Action _notify;
-
-    public MixerSendViewModel(TrackSend send, IProjectService project, Action notify)
-    {
-        Send = send;
-        _project = project;
-        _notify = notify;
-    }
-
-    public TrackSend Send { get; }
-
-    public string TargetName
-    {
-        get
-        {
-            var target = _project.Current.Tracks.FirstOrDefault(t => t.Id == Send.TargetTrackId);
-            return target?.Name ?? "(missing)";
-        }
-    }
-
-    public double Level
-    {
-        get => Send.Level;
-        set
-        {
-            if (Send.Level == value) return;
-            Send.Level = value;
-            OnPropertyChanged();
-            _notify();
-        }
-    }
-
-    public bool PreFader
-    {
-        get => Send.PreFader;
-        set
-        {
-            if (Send.PreFader == value) return;
-            Send.PreFader = value;
-            OnPropertyChanged();
-            _notify();
-        }
-    }
-
-    public bool Enabled
-    {
-        get => Send.Enabled;
-        set
-        {
-            if (Send.Enabled == value) return;
-            Send.Enabled = value;
-            OnPropertyChanged();
-            _notify();
-        }
-    }
-
-    public void RefreshFromModel()
-    {
-        OnPropertyChanged(nameof(TargetName));
-        OnPropertyChanged(nameof(Level));
-        OnPropertyChanged(nameof(PreFader));
-        OnPropertyChanged(nameof(Enabled));
-    }
 }

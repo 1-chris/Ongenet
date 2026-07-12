@@ -105,6 +105,11 @@ namespace Ongenet.App.Controls
             => new DelegateAutomationTarget("Pan", -1, 1, () => t.Pan, v => t.Pan = v)
             { BindKind = AutomationTargetKind.TrackPan, BindSource = t };
 
+        public static IAutomationTarget ForSendLevel(Track t, TrackSend send, string? targetName = null)
+            => new DelegateAutomationTarget($"Send {targetName ?? "Return"}", 0, 1,
+                () => send.Level, v => send.Level = v)
+            { BindKind = AutomationTargetKind.TrackSendLevel, BindSource = send };
+
         public static IAutomationTarget ForEffectEnabled(IAudioEffect fx)
             => new DelegateAutomationTarget($"{fx.Name} On/Off", 0, 1,
                 () => fx.Enabled ? 1 : 0, v => fx.Enabled = v >= 0.5, stepped: true)

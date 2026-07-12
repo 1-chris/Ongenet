@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Automation;
@@ -771,6 +772,12 @@ public static class ProjectFile
                 return new DelegateAutomationTarget("Volume", 0, 1, () => track.Volume, v => track.Volume = v);
             case AutomationTargetKind.TrackPan:
                 return new DelegateAutomationTarget("Pan", -1, 1, () => track.Pan, v => track.Pan = v);
+            case AutomationTargetKind.TrackSendLevel:
+                if (paramIndex < 0 || paramIndex >= track.Sends.Count) return null;
+                var send = track.Sends[paramIndex];
+                var sendTarget = project?.Tracks.FirstOrDefault(t => t.Id == send.TargetTrackId)?.Name ?? "Return";
+                return new DelegateAutomationTarget($"Send {sendTarget}", 0, 1,
+                    () => send.Level, v => send.Level = v);
             case AutomationTargetKind.Tempo:
                 return project is null ? null : ProjectAutomationTargets.Tempo(project);
             case AutomationTargetKind.TimeSignature:

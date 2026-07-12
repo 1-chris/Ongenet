@@ -252,6 +252,12 @@ public sealed class ControlSurfaceService
         {
             switch (msg.Data1)
             {
+                case >= 8 and <= 15:
+                    ToggleSolo(msg.Data1 - 8);
+                    return;
+                case >= 16 and <= 23:
+                    ToggleMute(msg.Data1 - 16);
+                    return;
                 case 46: ShiftBank(-1); return;
                 case 47: ShiftBank(+1); return;
             }
@@ -263,8 +269,13 @@ public sealed class ControlSurfaceService
             return;
         }
 
-        if (msg.Kind == MidiMessageKind.ControlChange && msg.Channel is >= 0 and <= 7 && msg.Data1 == 16)
-            ApplyPan(msg.Channel, msg.Data2 / 127.0);
+        if (msg.Kind == MidiMessageKind.ControlChange && msg.Channel is >= 0 and <= 7)
+        {
+            if (msg.Data1 == 16)
+                ApplyPan(msg.Channel, msg.Data2 / 127.0);
+            else if (msg.Data1 == 91)
+                ApplySend(msg.Channel, 0, msg.Data2 / 127.0);
+        }
     }
 
     private void HandleHuiMixer(MidiMessage msg)
@@ -275,6 +286,12 @@ public sealed class ControlSurfaceService
             {
                 case 53: ShiftBank(-1); return;
                 case 54: ShiftBank(+1); return;
+                case >= 48 and <= 55:
+                    ToggleMute(msg.Data1 - 48);
+                    return;
+                case >= 56 and <= 63:
+                    ToggleSolo(msg.Data1 - 56);
+                    return;
             }
         }
 
@@ -299,10 +316,24 @@ public sealed class ControlSurfaceService
         if (track is null) return;
 
         var value = msg.Data2 / 127.0;
-        if (string.Equals(mapping.Target, "Pan", StringComparison.OrdinalIgnoreCase))
-            track.Pan = value * 2.0 - 1.0;
-        else
-            track.Volume = value;
+        switch (mapping.Target.ToUpperInvariant())
+        {
+            case "PAN":
+                track.Pan = value * 2.0 - 1.0;
+                break;
+            case "MUTE":
+                track.IsMuted = value >= 0.5;
+                break;
+            case "SOLO":
+                track.IsSoloed = value >= 0.5;
+                break;
+            case "SEND":
+                ApplySendToTrack(track, 0, value);
+                break;
+            default:
+                track.Volume = value;
+                break;
+        }
 
         _events.Publish(new TrackChangedEvent(track));
     }
@@ -333,6 +364,36 @@ public sealed class ControlSurfaceService
         if (track is null) return;
         track.Pan = normalized * 2.0 - 1.0;
         _events.Publish(new TrackChangedEvent(track));
+    }
+
+    private void ToggleMute(int channelIndex)
+    {
+        var track = TracksInBank().ElementAtOrDefault(channelIndex);
+        if (track is null) return;
+        track.IsMuted = !track.IsMuted;
+        _events.Publish(new TrackChangedEvent(track));
+    }
+
+    private void ToggleSolo(int channelIndex)
+    {
+        var track = TracksInBank().ElementAtOrDefault(channelIndex);
+        if (track is null) return;
+        track.IsSoloed = !track.IsSoloed;
+        _events.Publish(new TrackChangedEvent(track));
+    }
+
+    private void ApplySend(int channelIndex, int sendIndex, double level)
+    {
+        var track = TracksInBank().ElementAtOrDefault(channelIndex);
+        if (track is null) return;
+        ApplySendToTrack(track, sendIndex, level);
+        _events.Publish(new TrackChangedEvent(track));
+    }
+
+    private static void ApplySendToTrack(Track track, int sendIndex, double level)
+    {
+        if (sendIndex < 0 || sendIndex >= track.Sends.Count) return;
+        track.Sends[sendIndex].Level = level;
     }
 
     /// <summary>Stores a learned CC mapping for the active mixer profile.</summary>
@@ -395,6 +456,7 @@ public sealed class ControlSurfaceService
         {
             yield return new ControlSurfaceMappingDto { Profile = key, MixerChannel = ch, CcNumber = 7, Target = "Volume" };
             yield return new ControlSurfaceMappingDto { Profile = key, MixerChannel = ch, CcNumber = 10, Target = "Pan" };
+            yield return new ControlSurfaceMappingDto { Profile = key, MixerChannel = ch, CcNumber = 91, Target = "Send" };
         }
     }
 

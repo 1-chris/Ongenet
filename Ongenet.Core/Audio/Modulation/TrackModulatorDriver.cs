@@ -72,6 +72,8 @@ public static class TrackModulatorDriver
                         Math.Clamp(current * (1.0 - depth + depth * uni), target.Minimum, target.Maximum),
                     AutomationTargetKind.TrackPan =>
                         Math.Clamp(current + (lfo * depth * 0.5), target.Minimum, target.Maximum),
+                    AutomationTargetKind.TrackSendLevel =>
+                        Math.Clamp(current * (1.0 - depth + depth * uni), target.Minimum, target.Maximum),
                     _ => Math.Clamp(current + (lfo * depth * (target.Maximum - target.Minimum) * 0.25),
                         target.Minimum, target.Maximum)
                 };

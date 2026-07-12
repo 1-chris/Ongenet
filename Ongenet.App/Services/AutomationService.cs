@@ -45,8 +45,12 @@ namespace Ongenet.App.Services
             switch (d.BindKind)
             {
                 case AutomationTargetKind.TrackVolume: return new(AutomationTargetKind.TrackVolume, -1, -1);
-                case AutomationTargetKind.TrackPan: return new(AutomationTargetKind.TrackPan, -1, -1);
-                case AutomationTargetKind.Tempo: return new(AutomationTargetKind.Tempo, -1, -1);
+            case AutomationTargetKind.TrackPan:
+                return new(AutomationTargetKind.TrackPan, -1, -1);
+            case AutomationTargetKind.TrackSendLevel:
+                var sendIndex = d.BindSource is TrackSend send ? owner.Sends.IndexOf(send) : -1;
+                return sendIndex >= 0 ? new(AutomationTargetKind.TrackSendLevel, -1, sendIndex) : null;
+            case AutomationTargetKind.Tempo: return new(AutomationTargetKind.Tempo, -1, -1);
                 case AutomationTargetKind.TimeSignature: return new(AutomationTargetKind.TimeSignature, -1, -1);
                 case AutomationTargetKind.EffectEnabled:
                     var fxIndex = d.BindSource is IAudioEffect fx ? owner.Effects.IndexOf(fx) : -1;

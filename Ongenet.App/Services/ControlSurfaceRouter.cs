@@ -129,6 +129,15 @@ public sealed class ControlSurfaceRouter
             case "mixerpan":
                 ApplyMixer(binding, msg, isPan: true);
                 return;
+            case "mixermute":
+                ToggleMixerMute(binding, msg);
+                return;
+            case "mixersolo":
+                ToggleMixerSolo(binding, msg);
+                return;
+            case "mixersend":
+                ApplyMixerSend(binding, msg);
+                return;
             case "bankprevious":
                 ShiftBank(-1);
                 return;
@@ -179,6 +188,54 @@ public sealed class ControlSurfaceRouter
 
         _events.Publish(new TrackChangedEvent(track));
     }
+
+    private void ToggleMixerMute(ControlSurfaceBinding binding, MidiMessage msg)
+    {
+        if (!IsPress(msg)) return;
+        var track = ResolveMixerTrack(binding, msg);
+        if (track is null) return;
+        track.IsMuted = !track.IsMuted;
+        _events.Publish(new TrackChangedEvent(track));
+    }
+
+    private void ToggleMixerSolo(ControlSurfaceBinding binding, MidiMessage msg)
+    {
+        if (!IsPress(msg)) return;
+        var track = ResolveMixerTrack(binding, msg);
+        if (track is null) return;
+        track.IsSoloed = !track.IsSoloed;
+        _events.Publish(new TrackChangedEvent(track));
+    }
+
+    private void ApplyMixerSend(ControlSurfaceBinding binding, MidiMessage msg)
+    {
+        var track = ResolveMixerTrack(binding, msg);
+        if (track is null) return;
+
+        var sendIndex = binding.MixerTarget is { } target && int.TryParse(target, out var idx) ? idx : 0;
+        if (sendIndex < 0 || sendIndex >= track.Sends.Count) return;
+
+        var normalized = msg.Kind == MidiMessageKind.PitchBend
+            ? msg.PitchBend14 / 16383.0
+            : msg.Value / 127.0;
+        track.Sends[sendIndex].Level = normalized;
+        _events.Publish(new TrackChangedEvent(track));
+    }
+
+    private Track? ResolveMixerTrack(ControlSurfaceBinding binding, MidiMessage msg)
+    {
+        var ch = binding.MixerChannel ?? (msg.Channel + 1);
+        if (ch is < 1 or > 8) return null;
+        return TracksInBank().ElementAtOrDefault(ch - 1);
+    }
+
+    private static bool IsPress(MidiMessage msg)
+        => msg.Kind switch
+        {
+            MidiMessageKind.NoteOn => msg.Velocity > 0,
+            MidiMessageKind.ControlChange => msg.Value >= 64,
+            _ => false
+        };
 
     private void ShiftBank(int delta)
     {

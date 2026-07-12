@@ -54,6 +54,7 @@ public enum ScriptAutomationTargetKind
 {
     TrackVolume,
     TrackPan,
+    TrackSendLevel,
     EffectEnabled,
     EffectParam,
     InstrumentParam,

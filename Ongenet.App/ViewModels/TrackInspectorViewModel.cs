@@ -466,11 +466,22 @@ namespace Ongenet.App.ViewModels
             if (Track is not null)
             {
                 foreach (var send in Track.Sends)
-                    Sends.Add(new TrackSendEditorViewModel(send, _project, Notify));
+                    Sends.Add(CreateSendEditor(send));
             }
 
             OnPropertyChanged(nameof(HasSends));
             AddSendCommand.RaiseCanExecuteChanged();
+        }
+
+        private TrackSendEditorViewModel CreateSendEditor(TrackSend send) =>
+            new(Track!, send, _project, _history, Notify, RemoveSendEditor);
+
+        private void RemoveSendEditor(TrackSendEditorViewModel editor)
+        {
+            if (Track is null) return;
+            Track.Sends.Remove(editor.Send);
+            RebuildSends();
+            Notify();
         }
 
         private void Notify()
@@ -571,66 +582,6 @@ namespace Ongenet.App.ViewModels
             RebuildSends();
             FreezeTrackCommand.RaiseCanExecuteChanged();
             UnfreezeTrackCommand.RaiseCanExecuteChanged();
-        }
-    }
-
-    public sealed class TrackSendEditorViewModel : ViewModelBase
-    {
-        private readonly IProjectService _project;
-        private readonly Action _notify;
-
-        public TrackSendEditorViewModel(TrackSend send, IProjectService project, Action notify)
-        {
-            Send = send;
-            _project = project;
-            _notify = notify;
-        }
-
-        public TrackSend Send { get; }
-
-        public string TargetName
-        {
-            get
-            {
-                var target = _project.Current.Tracks.FirstOrDefault(t => t.Id == Send.TargetTrackId);
-                return target?.Name ?? "(missing)";
-            }
-        }
-
-        public double Level
-        {
-            get => Send.Level;
-            set
-            {
-                if (Send.Level == value) return;
-                Send.Level = value;
-                OnPropertyChanged();
-                _notify();
-            }
-        }
-
-        public bool PreFader
-        {
-            get => Send.PreFader;
-            set
-            {
-                if (Send.PreFader == value) return;
-                Send.PreFader = value;
-                OnPropertyChanged();
-                _notify();
-            }
-        }
-
-        public bool Enabled
-        {
-            get => Send.Enabled;
-            set
-            {
-                if (Send.Enabled == value) return;
-                Send.Enabled = value;
-                OnPropertyChanged();
-                _notify();
-            }
         }
     }
 }
