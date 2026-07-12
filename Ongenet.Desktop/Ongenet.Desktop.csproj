@@ -52,16 +52,26 @@
         </ProjectReference>
     </ItemGroup>
 
-    <Target Name="CopyPluginHost" AfterTargets="Build">
+    <PropertyGroup>
+        <!-- PluginHost lands under bin/<cfg>/<tfm>/<rid>/ when publishing with -r. -->
+        <_PluginHostBinDir>..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\</_PluginHostBinDir>
+        <_PluginHostBinDir Condition="'$(RuntimeIdentifier)' != ''">..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\</_PluginHostBinDir>
+    </PropertyGroup>
+
+    <Target Name="CopyPluginHost" AfterTargets="Build;Publish">
         <MSBuild Projects="..\Ongenet.PluginHost\Ongenet.PluginHost.csproj"
-                 Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"
+                 Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained)"
                  Targets="Build" />
         <ItemGroup>
-            <PluginHostOutput Include="..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost*" />
-            <PluginHostOutput Include="..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost.runtimeconfig.json" Condition="Exists('..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost.runtimeconfig.json')" />
-            <PluginHostOutput Include="..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost.deps.json" />
+            <PluginHostOutput Include="$(_PluginHostBinDir)Ongenet.PluginHost*" />
+            <PluginHostOutput Include="$(_PluginHostBinDir)Ongenet.PluginHost.runtimeconfig.json" Condition="Exists('$(_PluginHostBinDir)Ongenet.PluginHost.runtimeconfig.json')" />
+            <PluginHostOutput Include="$(_PluginHostBinDir)Ongenet.PluginHost.deps.json" Condition="Exists('$(_PluginHostBinDir)Ongenet.PluginHost.deps.json')" />
         </ItemGroup>
-        <Copy SourceFiles="@(PluginHostOutput)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+        <PropertyGroup>
+            <_PluginHostDestination Condition="'$(PublishDir)' != '' and Exists('$(PublishDir)')">$(PublishDir)</_PluginHostDestination>
+            <_PluginHostDestination Condition="'$(_PluginHostDestination)' == ''">$(OutputPath)</_PluginHostDestination>
+        </PropertyGroup>
+        <Copy SourceFiles="@(PluginHostOutput)" DestinationFolder="$(_PluginHostDestination)" SkipUnchangedFiles="true" />
     </Target>
 
     <!-- Copy libabl-link next to the executable when auto-detected at build time. -->

@@ -76,9 +76,9 @@ public sealed class ExpressionMapViewModel : ViewModelBase
         Entries.Add(new ExpressionMapEntryRow(entry, this));
     }
 
-    internal void RemoveEntry(ExpressionMapEntryRow row)
+    internal void RemoveEntry(ExpressionMapEntryRow? row)
     {
-        if (Selected is null) return;
+        if (row is null || Selected is null) return;
         _history.Capture("Remove expression entry");
         Selected.Entries.Remove(row.Entry);
         Entries.Remove(row);

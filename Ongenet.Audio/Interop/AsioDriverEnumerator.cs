@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 
 namespace Ongenet.Audio.Interop;
 
@@ -14,6 +15,7 @@ internal static class AsioDriverEnumerator
         return EnumerateWindows();
     }
 
+    [SupportedOSPlatform("windows")]
     private static IReadOnlyList<AsioDriverInfo> EnumerateWindows()
     {
         var list = new List<AsioDriverInfo>();

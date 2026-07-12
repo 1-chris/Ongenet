@@ -14,7 +14,6 @@ using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Audio.Scheduling;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Music;
-using Ongenet.Core.Music;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Core.Persistence;

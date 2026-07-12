@@ -111,7 +111,7 @@ public sealed class OfflineLiveNullTests
         public CapturingAudioOutput(AudioFormat format) => Format = format;
         public AudioFormat Format { get; }
         public bool IsRunning { get; private set; }
-        public event Action? FormatChanged;
+        public event Action? FormatChanged { add { } remove { } }
         public List<float> Samples { get; } = new();
         private AudioRenderCallback? _callback;
 

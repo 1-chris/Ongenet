@@ -6,8 +6,6 @@ namespace Ongenet.App.Views.Windows;
 
 public partial class AudioToMidiWindow : Window
 {
-    private AudioToMidiViewModel? _vm;
-
     public AudioToMidiWindow()
     {
         InitializeComponent();
@@ -15,7 +13,7 @@ public partial class AudioToMidiWindow : Window
 
     public static void Show(Window owner, AudioToMidiViewModel vm)
     {
-        var win = new AudioToMidiWindow { DataContext = vm, _vm = vm };
+        var win = new AudioToMidiWindow { DataContext = vm };
         vm.RequestClose += win.Close;
         win.ShowDialog(owner);
     }

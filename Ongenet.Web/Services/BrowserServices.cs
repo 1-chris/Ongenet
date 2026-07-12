@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
@@ -18,6 +19,8 @@ public sealed class BrowserAppSettingsService : IAppSettingsService
     public string FilePath => string.Empty;
     public void ApplyToServices() { }
     public void CaptureAndSave() { }
+    public void SetUiCulture(string cultureId) => Current.UiCulture = cultureId;
+    public void SetPluginIsolationEnabled(bool enabled) => Current.PluginIsolationEnabled = enabled;
     public void SaveLibrary() => LibraryChanged?.Invoke();
     public event Action? LibraryChanged;
 }
@@ -47,6 +50,8 @@ public sealed class BrowserPresetLibrary : IPresetLibrary
     public event Action? Changed;
     public void Rescan() => Changed?.Invoke();
     public string SaveInstrument(IInstrument instrument, string name) => string.Empty;
+    public string SaveFieldPatch(IInstrument fieldInstrument, string name) => string.Empty;
+    public string SaveFieldEffectPatch(FieldEffect fieldEffect, string name) => string.Empty;
     public string SaveEffect(IAudioEffect effect, string name) => string.Empty;
     public string SaveChain(IReadOnlyList<IAudioEffect> effects, string name) => string.Empty;
 }

@@ -26,7 +26,7 @@ public sealed class NullMidiOutputService : IMidiOutputService
     public IReadOnlyList<MidiDeviceInfo> Devices { get; } = Array.Empty<MidiDeviceInfo>();
     public MidiDeviceInfo? SelectedDevice => null;
     public bool IsAvailable => false;
-    public event Action? DevicesChanged;
+    public event Action? DevicesChanged { add { } remove { } }
     public void RefreshDevices() { }
     public void Select(MidiDeviceInfo? device) { }
     public void SendNote(int channel, int note, bool on, int velocity) { }

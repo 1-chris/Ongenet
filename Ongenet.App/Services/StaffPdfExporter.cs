@@ -21,8 +21,10 @@ public static class StaffPdfExporter
         var leadSheet = doc.LayoutMode == ScoreLayoutMode.LeadSheet;
         var staffHeight = leadSheet ? 64f : 80f;
         var staffBlock = staffHeight + 24f;
-        var maxBeat = doc.Staves.SelectMany(s => s.Notes).DefaultIfEmpty()
-            .Max(n => n.StartBeat + n.LengthBeats);
+        var maxBeat = doc.Staves.SelectMany(s => s.Notes)
+            .Select(n => n.StartBeat + n.LengthBeats)
+            .DefaultIfEmpty(0)
+            .Max();
         var contentWidth = Math.Max(pageWidth - PageMargin * 2,
             (float)(maxBeat * pixelsPerBeat) + LeftPad + 32f);
         _ = contentWidth;
@@ -34,26 +36,16 @@ public static class StaffPdfExporter
         using var linePaint = new SKPaint { Color = SKColors.Gray, StrokeWidth = 1, IsAntialias = true };
         using var notePaint = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Fill, IsAntialias = true };
         using var bgPaint = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill };
-        using var chordPaint = new SKPaint
-        {
-            Color = new SKColor(0x88, 0x7c, 0xb0),
-            TextSize = leadSheet ? 18f : 14f,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
-        };
+        var chordColor = new SKColor(0x88, 0x7c, 0xb0);
+        using var chordTypeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold);
+        var chordTextSize = leadSheet ? 18f : 14f;
 
         canvas.DrawRect(0, 0, pageWidth, pageHeight, bgPaint);
 
         if (!string.IsNullOrWhiteSpace(doc.Title))
         {
-            using var titlePaint = new SKPaint
-            {
-                Color = SKColors.Black,
-                TextSize = 20f,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
-            };
-            canvas.DrawText(doc.Title, PageMargin, PageMargin + 16, titlePaint);
+            using var titleTypeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold);
+            SkiaCanvasText.Draw(canvas, doc.Title, PageMargin, PageMargin + 16, SKColors.Black, 20f, titleTypeface);
         }
 
         var y = PageMargin + (string.IsNullOrWhiteSpace(doc.Title) ? 0 : 28f);
@@ -73,7 +65,7 @@ public static class StaffPdfExporter
             foreach (var sym in staff.ChordSymbols)
             {
                 var cx = PageMargin + LeftPad + (float)(sym.StartBeat * pixelsPerBeat);
-                canvas.DrawText(sym.Text, cx, chordY, chordPaint);
+                SkiaCanvasText.Draw(canvas, sym.Text, cx, chordY, chordColor, chordTextSize, chordTypeface);
             }
 
             for (var line = 0; line < 5; line++)
@@ -112,14 +104,9 @@ public static class StaffPdfExporter
             var x2 = PageMargin + LeftPad + (float)((tuplet.StartBeat + tuplet.LengthBeats) * pixelsPerBeat);
             var ty = PageMargin + 8f;
             canvas.DrawLine(x1, ty, x2, ty, linePaint);
-            using var tupPaint = new SKPaint
-            {
-                Color = new SKColor(0x88, 0x7c, 0xb0),
-                TextSize = 11f,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Arial")
-            };
-            canvas.DrawText($"{tuplet.ActualNotes}:{tuplet.NormalNotes}", (x1 + x2) / 2 - 8, ty - 4, tupPaint);
+            using var tupTypeface = SKTypeface.FromFamilyName("Arial");
+            SkiaCanvasText.Draw(canvas, $"{tuplet.ActualNotes}:{tuplet.NormalNotes}", (x1 + x2) / 2 - 8, ty - 4,
+                chordColor, 11f, tupTypeface);
         }
 
         pdf.EndPage();

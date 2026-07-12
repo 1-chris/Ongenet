@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using Ongenet.App.Services;
 using Ongenet.App.Theming;
 using Ongenet.Core.Models.Notation;
 using SkiaSharp;
@@ -233,13 +234,8 @@ public sealed class StaffControl : ThemedControl
             using var notePaint = new SKPaint { Color = _note, Style = SKPaintStyle.Fill, IsAntialias = true };
             using var selectedPaint = new SKPaint { Color = _selectedNote, Style = SKPaintStyle.Fill, IsAntialias = true };
             using var bgPaint = new SKPaint { Color = _bg, Style = SKPaintStyle.Fill };
-            using var chordPaint = new SKPaint
-            {
-                Color = _chord,
-                TextSize = leadSheet ? 18f : 14f,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Inter", SKFontStyle.Bold)
-            };
+            using var chordTypeface = SKTypeface.FromFamilyName("Inter", SKFontStyle.Bold);
+            var chordTextSize = leadSheet ? 18f : 14f;
 
             canvas.DrawRect(0, 0, (float)_bounds.Width, (float)_bounds.Height, bgPaint);
 
@@ -251,7 +247,7 @@ public sealed class StaffControl : ThemedControl
                 foreach (var sym in staff.ChordSymbols)
                 {
                     var cx = leftPad + (float)(sym.StartBeat * _ppb);
-                    canvas.DrawText(sym.Text, cx, chordY, chordPaint);
+                    SkiaCanvasText.Draw(canvas, sym.Text, cx, chordY, _chord, chordTextSize, chordTypeface);
                 }
 
                 for (var line = 0; line < 5; line++)
@@ -273,13 +269,7 @@ public sealed class StaffControl : ThemedControl
 
                         if (n.Articulation != ScoreArticulation.None)
                         {
-                            using var artPaint = new SKPaint
-                            {
-                                Color = _note,
-                                TextSize = 10f,
-                                IsAntialias = true,
-                                Typeface = SKTypeface.FromFamilyName("Inter")
-                            };
+                            using var artTypeface = SKTypeface.FromFamilyName("Inter");
                             var sym = n.Articulation switch
                             {
                                 ScoreArticulation.Staccato => "·",
@@ -290,18 +280,12 @@ public sealed class StaffControl : ThemedControl
                                 _ => ""
                             };
                             if (sym.Length > 0)
-                                canvas.DrawText(sym, x, ny - 12, artPaint);
+                                SkiaCanvasText.Draw(canvas, sym, x, ny - 12, _note, 10f, artTypeface);
                         }
 
                         if (n.Dynamic != ScoreDynamic.None)
                         {
-                            using var dynPaint = new SKPaint
-                            {
-                                Color = _line,
-                                TextSize = 9f,
-                                IsAntialias = true,
-                                Typeface = SKTypeface.FromFamilyName("Inter", SKFontStyle.Italic)
-                            };
+                            using var dynTypeface = SKTypeface.FromFamilyName("Inter", SKFontStyle.Italic);
                             var dyn = n.Dynamic switch
                             {
                                 ScoreDynamic.Ppp => "ppp",
@@ -315,7 +299,7 @@ public sealed class StaffControl : ThemedControl
                                 _ => ""
                             };
                             if (dyn.Length > 0)
-                                canvas.DrawText(dyn, x, top + staffHeight + 10, dynPaint);
+                                SkiaCanvasText.Draw(canvas, dyn, x, top + staffHeight + 10, _line, 9f, dynTypeface);
                         }
                     }
                 }
@@ -338,14 +322,9 @@ public sealed class StaffControl : ThemedControl
                 var x2 = leftPad + (float)((tuplet.StartBeat + tuplet.LengthBeats) * _ppb);
                 var ty = 12f;
                 canvas.DrawLine(x1, ty, x2, ty, linePaint);
-                using var tupPaint = new SKPaint
-                {
-                    Color = _chord,
-                    TextSize = 11f,
-                    IsAntialias = true,
-                    Typeface = SKTypeface.FromFamilyName("Inter")
-                };
-                canvas.DrawText($"{tuplet.ActualNotes}:{tuplet.NormalNotes}", (x1 + x2) / 2 - 8, ty - 4, tupPaint);
+                using var tupTypeface = SKTypeface.FromFamilyName("Inter");
+                SkiaCanvasText.Draw(canvas, $"{tuplet.ActualNotes}:{tuplet.NormalNotes}", (x1 + x2) / 2 - 8, ty - 4,
+                    _chord, 11f, tupTypeface);
             }
 
             canvas.Restore();

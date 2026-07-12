@@ -14,7 +14,7 @@ internal sealed class AsioOutput : IAudioOutput
     public AsioOutput(AsioDeviceService devices) => _devices = devices;
 
     public AudioFormat Format { get; } = new(48000, 2);
-    public event Action? FormatChanged;
+    public event Action? FormatChanged { add { } remove { } }
     public bool IsRunning { get; private set; }
     public int SampleRate => 48000;
     public int BufferSize => 512;

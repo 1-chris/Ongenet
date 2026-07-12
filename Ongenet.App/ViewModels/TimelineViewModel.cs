@@ -581,9 +581,9 @@ namespace Ongenet.App.ViewModels
 
             var vm = new PolyphonicPitchEditorViewModel(clip, _history, _events);
             var win = new Views.Windows.PolyphonicPitchEditorWindow { DataContext = vm };
-            if (Avalonia.Application.Current?.ApplicationLifetime
-                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-                win.Show(desktop.MainWindow);
+            var owner = OwnerWindow();
+            if (owner is not null)
+                win.Show(owner);
             else
                 win.Show();
         }
@@ -618,9 +618,9 @@ namespace Ongenet.App.ViewModels
                     DataContext = mono
                 };
                 win.Closed += (_, _) => mono.Changed -= OnMonoPitchChanged;
-                if (Avalonia.Application.Current?.ApplicationLifetime
-                    is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-                    win.Show(desktop.MainWindow);
+                var owner = OwnerWindow();
+                if (owner is not null)
+                    win.Show(owner);
                 else
                     win.Show();
             }
@@ -782,9 +782,9 @@ namespace Ongenet.App.ViewModels
             if (!clip.IsAudio) return;
             _selection.SelectClip(clip.Model, clip.Owner);
             var vm = new AudioToMidiViewModel(_project, _transport, this, clip);
-            if (Avalonia.Application.Current?.ApplicationLifetime
-                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-                Views.Windows.AudioToMidiWindow.Show(desktop.MainWindow, vm);
+            var owner = OwnerWindow();
+            if (owner is not null)
+                Views.Windows.AudioToMidiWindow.Show(owner, vm);
             else
                 Views.Windows.AudioToMidiWindow.Show(new Avalonia.Controls.Window(), vm);
         }
@@ -1009,9 +1009,9 @@ namespace Ongenet.App.ViewModels
         {
             var vm = new LogicalMidiEditViewModel(clip, _history, _events);
             var win = new Views.Windows.LogicalMidiEditWindow { DataContext = vm };
-            if (Avalonia.Application.Current?.ApplicationLifetime
-                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-                win.ShowDialog(desktop.MainWindow);
+            var owner = OwnerWindow();
+            if (owner is not null)
+                win.ShowDialog(owner);
             else
                 win.Show();
         }

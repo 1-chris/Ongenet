@@ -53,7 +53,7 @@ public sealed class NullLinkSession : ILinkSession
     public void StartAtBeat(double beatAtStart) { }
     public void Start() { }
     public void Stop() { }
-    public event Action? SyncChanged;
+    public event Action? SyncChanged { add { } remove { } }
     public void Dispose() { }
 }
 
