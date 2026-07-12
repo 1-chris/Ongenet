@@ -6,6 +6,7 @@
         xmlns:views="using:Ongenet.App.Views.Panels"
         xmlns:controls="using:Ongenet.App.Controls"
         xmlns:conv="using:Ongenet.App.Converters"
+        xmlns:Automation="using:Avalonia.Automation"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Ongenet.App.Views.Windows.MainWindow"
         x:DataType="vm:MainViewModel"
@@ -150,6 +151,24 @@
                     <Button Content="{DynamicResource Main_Settings}" Click="OpenSettings_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
                             ToolTip.Tip="{DynamicResource Main_Settings_audio_MIDI_theme_Tip}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
+                                ToolTip.Tip="{DynamicResource Transport_Master_output_volume_Tip}"
+                                Automation:AutomationProperties.Name="{DynamicResource Transport_Master_volume_A11yName}"
+                                Automation:AutomationProperties.HelpText="{DynamicResource Transport_Adjust_master_output_level}">
+                        <Path Classes="icon small" Data="{StaticResource IconVolumeHigh}"/>
+                        <Slider Minimum="0" Maximum="1" Width="72" Value="{Binding Transport.MasterVolume}"
+                                VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <controls:MasterMeterControl Height="20" MinWidth="160" VerticalAlignment="Center"
+                                                 LevelLeft="{Binding Transport.MasterLevelLeft}"
+                                                 LevelRight="{Binding Transport.MasterLevelRight}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                IsVisible="{Binding Transport.ShowSystemMetrics}">
+                        <TextBlock Classes="mono caption" Text="{Binding Transport.CpuText}"
+                                   ToolTip.Tip="{DynamicResource Transport_Ongenet_process_CPU_usage_Tip}"/>
+                        <TextBlock Classes="mono caption" Text="{Binding Transport.RamText}"
+                                   ToolTip.Tip="{DynamicResource Transport_Ongenet_process_memory_working_set_Tip}"/>
+                    </StackPanel>
                     <!-- Save/Load progress indicator -->
                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                                 IsVisible="{Binding IsBusy}">

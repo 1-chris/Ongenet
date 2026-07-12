@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Ongenet.App.Display;
 using Ongenet.App.Theming;
 using Ongenet.Core.Audio.Files;
 
@@ -80,7 +81,10 @@ namespace Ongenet.App.Controls
         private const double MinTrimSeconds = 0.001;
 
         private IBrush _crust = Brushes.Black;
-        private IBrush _mauve = Brushes.Gray;
+        private IBrush _waveFill = Brushes.Gray;
+        private IBrush _bassFill = Brushes.Blue;
+        private IBrush _midFill = Brushes.Green;
+        private IBrush _trebleFill = Brushes.PeachPuff;
         private IPen _barPen = new Pen(Brushes.Gray, 1);
         private IPen _beatPen = new Pen(Brushes.Gray, 1);
         private IPen _subPen = new Pen(Brushes.Gray, 1);
@@ -107,10 +111,27 @@ namespace Ongenet.App.Controls
                 SpectralMagnitudesProperty, SpectralRevisionProperty);
         }
 
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            WaveformDisplayPreferences.Changed += OnWaveformDisplayChanged;
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            WaveformDisplayPreferences.Changed -= OnWaveformDisplayChanged;
+            base.OnDetachedFromVisualTree(e);
+        }
+
+        private void OnWaveformDisplayChanged() => InvalidateVisual();
+
         protected override void BuildThemeResources()
         {
             _crust = ThemePalette.BrushOf("Crust");
-            _mauve = ThemePalette.BrushOf("Mauve");
+            _waveFill = ThemePalette.BrushOf("Mauve");
+            _bassFill = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Sapphire, 210));
+            _midFill = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Green, 200));
+            _trebleFill = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Peach, 210));
             var fg = ThemePalette.Text;
             _barPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(fg, 80)), 1);
             _beatPen = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(fg, 40)), 1);
@@ -168,8 +189,8 @@ namespace Ongenet.App.Controls
 
             using (context.PushTransform(Matrix.CreateTranslation(0, waveTop)))
             {
-                context.DrawGeometry(_mauve, null,
-                    WaveformControl.BuildGeometry(waveform, 0, width, waveHeight, 0, 1));
+                WaveformControl.Draw(context, waveform, 0, width, waveHeight, 0, 1,
+                    WaveformDisplayPreferences.BandColorsEnabled, _waveFill, _bassFill, _midFill, _trebleFill);
             }
 
             var hiStart = SecondsToX(HighlightStartSeconds, width);

@@ -10,6 +10,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.App.Controls;
 using Ongenet.App.Services;
 using Ongenet.App.ViewModels;
 using Ongenet.App.ViewModels.Timeline;
@@ -70,6 +71,8 @@ namespace Ongenet.App.Views.Panels
             LanesList.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
             LanesList.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
             LanesList.AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+            LanesList.AddHandler(PointerWheelChangedEvent, OnLanesPointerWheel, RoutingStrategies.Tunnel);
+            RulerScroll.AddHandler(PointerWheelChangedEvent, OnRulerPointerWheel, RoutingStrategies.Tunnel);
 
             // Clicking a track header selects that track (and clears any clip selection); dragging it
             // reorders / re-groups tracks.
@@ -638,6 +641,37 @@ namespace Ongenet.App.Views.Panels
             var (rowIndex, beat) = LocatePoint(e.GetPosition(LanesList), vm);
             var isNewTrack = rowIndex >= vm.RowCount;
             return (isNewTrack ? null : vm.TrackLaneAtRow(rowIndex), beat, isNewTrack);
+        }
+
+        private void OnLanesPointerWheel(object? sender, PointerWheelEventArgs e) =>
+            ApplyShiftScrollZoom(e, e.GetPosition(LanesList));
+
+        private void OnRulerPointerWheel(object? sender, PointerWheelEventArgs e) =>
+            ApplyShiftScrollZoom(e, e.GetPosition(RulerScroll));
+
+        private void ApplyShiftScrollZoom(PointerWheelEventArgs e, Point viewportPos)
+        {
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)) return;
+            if (DataContext is not TimelineViewModel vm) return;
+
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            if (_lanesScroll is null) return;
+
+            var scrollX = _lanesScroll.Offset.X;
+            var anchorBeat = vm.Metrics.PixelsPerBeat > 0
+                ? (viewportPos.X + scrollX) / vm.Metrics.PixelsPerBeat
+                : 0;
+            var (zoomDelta, panDelta) = ShiftScrollZoom.ResolveWheelDeltas(e.Delta);
+            if (Math.Abs(zoomDelta) < 1e-6 && Math.Abs(panDelta) < 1e-6) return;
+
+            ShiftScrollZoom.ApplyBeatTimeline(
+                anchorBeat, viewportPos, vm.Metrics.PixelsPerBeat,
+                zoomDelta, panDelta, scrollX,
+                out var newPpb, out var newScrollX);
+
+            vm.Metrics.PixelsPerBeat = newPpb;
+            _lanesScroll.Offset = new Vector(newScrollX, _lanesScroll.Offset.Y);
+            e.Handled = true;
         }
 
         // Maps a point (in LanesList coordinates) to a row index + beat, accounting for scroll/zoom.

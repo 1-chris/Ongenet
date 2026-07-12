@@ -139,16 +139,9 @@
                         ToolTip.Tip="{DynamicResource Transport_Capture_recently_played_MIDI_into_a_clip_at_the__Tip}" Padding="7,3"/>
             </StackPanel>
 
-            <!-- Col 4: render + master volume + loudness meter -->
+            <!-- Col 4: metronome + render progress + MIDI export -->
             <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="10"
                         VerticalAlignment="Center" HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal" Spacing="8"
-                            IsVisible="{Binding ShowSystemMetrics}" VerticalAlignment="Center">
-                    <TextBlock Classes="mono caption" Text="{Binding CpuText}"
-                               ToolTip.Tip="{DynamicResource Transport_Ongenet_process_CPU_usage_Tip}"/>
-                    <TextBlock Classes="mono caption" Text="{Binding RamText}"
-                               ToolTip.Tip="{DynamicResource Transport_Ongenet_process_memory_working_set_Tip}"/>
-                </StackPanel>
                 <ToggleButton Classes="toggle" IsChecked="{Binding MetronomeEnabled}"
                               ToolTip.Tip="{DynamicResource Transport_Metronome_click_during_playback_Tip}"
                               Automation:AutomationProperties.Name="{DynamicResource Transport_Metronome_A11yName}"
@@ -158,35 +151,15 @@
                         <TextBlock Text="{DynamicResource Transport_Click}" VerticalAlignment="Center" FontSize="11"/>
                     </StackPanel>
                 </ToggleButton>
-                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
-                            ToolTip.Tip="{DynamicResource Transport_Master_output_volume_Tip}"
-                            Automation:AutomationProperties.Name="{DynamicResource Transport_Master_volume_A11yName}"
-                            Automation:AutomationProperties.HelpText="{DynamicResource Transport_Adjust_master_output_level}">
-                    <Path Classes="icon small" Data="{StaticResource IconVolumeHigh}"/>
-                    <Slider Minimum="0" Maximum="1" Width="72" Value="{Binding MasterVolume}"
-                            VerticalAlignment="Center"/>
-                </StackPanel>
                 <ProgressBar Minimum="0" Maximum="1" Value="{Binding RenderProgress}"
                              Width="90" Height="8" VerticalAlignment="Center"
                              IsVisible="{Binding IsRendering}"
                              Foreground="{StaticResource CatppuccinMauve}"
                              ToolTip.Tip="{DynamicResource Transport_Rendering_Tip}"/>
-                <Button Classes="accent compact" Click="OnRender" IsEnabled="{Binding CanRender}"
-                        ToolTip.Tip="{DynamicResource Transport_Export_master_stems_or_a_beat_region_16_24_32_bi_Tip}"
-                        Automation:AutomationProperties.Name="{DynamicResource Transport_Export_A11yName}"
-                        Automation:AutomationProperties.HelpText="{DynamicResource Transport_Open_export_dialog_for_audio_render}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Path Classes="icon small" Data="{StaticResource IconExport}"/>
-                        <TextBlock Text="{DynamicResource Transport_Export}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
                 <Button Classes="compact" Click="OnExportMidi" Padding="8,4"
                         ToolTip.Tip="{DynamicResource Transport_Export_all_instrument_track_MIDI_to_a_mid_file_Tip}">
                     <TextBlock Text="{DynamicResource Transport_MIDI}" VerticalAlignment="Center" FontSize="11"/>
                 </Button>
-                <controls:MasterMeterControl Height="20" MinWidth="200"
-                                             LevelLeft="{Binding MasterLevelLeft}"
-                                             LevelRight="{Binding MasterLevelRight}"/>
             </StackPanel>
         </Grid>
     </Border>

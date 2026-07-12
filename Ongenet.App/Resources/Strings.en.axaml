@@ -725,6 +725,9 @@
     <system:String x:Key="Settings_Plugins">Plugins</system:String>
     <system:String x:Key="Settings_PluginIsolation">Run VST3 plugins in an isolated process</system:String>
     <system:String x:Key="Settings_PluginIsolationTip">Crash-isolate VST3 effects in Ongenet.PluginHost (requires restart for new instances)</system:String>
+    <system:String x:Key="Settings_Display">Display</system:String>
+    <system:String x:Key="Settings_WaveformBandColors">Colour waveforms by frequency band</system:String>
+    <system:String x:Key="Settings_WaveformBandColorsTip">Show bass, mids, and treble in separate theme colours across timeline and editor waveforms</system:String>
     <system:String x:Key="Settings_Theme">Theme</system:String>
     <system:String x:Key="Settings_Theme_settings_A11yName">Theme settings</system:String>
     <system:String x:Key="Status_Detecting">Detecting…</system:String>

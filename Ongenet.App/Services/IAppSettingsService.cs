@@ -31,4 +31,7 @@ public interface IAppSettingsService
 
     /// <summary>Applies and persists the plugin isolation toggle.</summary>
     void SetPluginIsolationEnabled(bool enabled);
+
+    /// <summary>Applies and persists the waveform band-colour display toggle.</summary>
+    void SetWaveformBandColorsEnabled(bool enabled);
 }

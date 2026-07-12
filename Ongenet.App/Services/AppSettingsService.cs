@@ -6,6 +6,7 @@ using Avalonia.Styling;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Display;
 using Ongenet.App.Localization;
 using Ongenet.App.Theming;
 
@@ -72,6 +73,7 @@ public sealed class AppSettingsService : IAppSettingsService
             ApplyMidi();
             _recording.InputQuantizeBeats = Current.InputQuantizeBeats;
             _transport.SetMappings(Current.TransportMappings.Select(ToMapping).OfType<TransportMapping>());
+            WaveformDisplayPreferences.Apply(Current.WaveformBandColorsEnabled);
         }
         finally
         {
@@ -130,6 +132,13 @@ public sealed class AppSettingsService : IAppSettingsService
     public void SetPluginIsolationEnabled(bool enabled)
     {
         Current.PluginIsolationEnabled = enabled;
+        Save();
+    }
+
+    public void SetWaveformBandColorsEnabled(bool enabled)
+    {
+        Current.WaveformBandColorsEnabled = enabled;
+        WaveformDisplayPreferences.Apply(enabled);
         Save();
     }
 

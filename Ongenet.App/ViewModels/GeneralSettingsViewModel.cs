@@ -72,6 +72,17 @@ public sealed class GeneralSettingsViewModel : ViewModelBase
             OnPropertyChanged();
         }
     }
+
+    public bool WaveformBandColorsEnabled
+    {
+        get => _settings.Current.WaveformBandColorsEnabled;
+        set
+        {
+            if (_settings.Current.WaveformBandColorsEnabled == value) return;
+            _settings.SetWaveformBandColorsEnabled(value);
+            OnPropertyChanged();
+        }
+    }
 }
 
 public sealed record LocaleChoice(string Id, string DisplayName);

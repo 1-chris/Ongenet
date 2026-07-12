@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Ongenet.App.Controls;
 using Ongenet.App.ViewModels;
 
 namespace Ongenet.App.Views.Panels
@@ -31,6 +32,7 @@ namespace Ongenet.App.Views.Panels
             WaveScroll.AddHandler(PointerPressedEvent, OnWavePointerPressed, RoutingStrategies.Tunnel);
             WaveScroll.AddHandler(PointerMovedEvent, OnWavePointerMoved, RoutingStrategies.Tunnel);
             WaveScroll.AddHandler(PointerReleasedEvent, OnWavePointerReleased, RoutingStrategies.Tunnel);
+            WaveScroll.AddHandler(PointerWheelChangedEvent, OnWavePointerWheel, RoutingStrategies.Tunnel);
 
             GainKnob.PointerPressed += OnGainKnobPressed;
             GainKnob.DragCompleted += OnGainKnobDragCompleted;
@@ -120,6 +122,31 @@ namespace Ongenet.App.Views.Panels
             if (!_zooming) return;
             _zooming = false;
             e.Pointer.Capture(null);
+            e.Handled = true;
+        }
+
+        private void OnWavePointerWheel(object? sender, PointerWheelEventArgs e)
+        {
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)) return;
+            if (Vm is null || !Vm.HasSample) return;
+
+            var pos = e.GetPosition(WaveScroll);
+            var scrollX = WaveScroll.Offset.X;
+            var contentWidth = ShiftScrollZoom.SecondsContentWidth(Vm.ViewportWidth, Vm.ZoomScale);
+            var anchorSeconds = Vm.DurationSeconds > 0
+                ? (pos.X + scrollX) / contentWidth * Vm.DurationSeconds
+                : 0;
+            var (zoomDelta, panDelta) = ShiftScrollZoom.ResolveWheelDeltas(e.Delta);
+            if (Math.Abs(zoomDelta) < 1e-6 && Math.Abs(panDelta) < 1e-6) return;
+
+            ShiftScrollZoom.ApplySecondsTimeline(
+                anchorSeconds, pos, Vm.DurationSeconds, Vm.ViewportWidth,
+                Vm.ZoomScale, zoomDelta, panDelta, scrollX,
+                out var newZoomScale, out var newScrollX);
+
+            Vm.ZoomScale = newZoomScale;
+            WaveScroll.Offset = new Vector(newScrollX, WaveScroll.Offset.Y);
+            SyncWaveScrollOffset();
             e.Handled = true;
         }
 

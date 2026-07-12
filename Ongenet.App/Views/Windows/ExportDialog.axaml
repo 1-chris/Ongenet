@@ -10,7 +10,7 @@
         x:DataType="vm:ExportViewModel"
         Title="{DynamicResource Export_Export_Title}"
         Width="420" MinWidth="360"
-        SizeToContent="{DynamicResource Export_Height}"
+        SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 

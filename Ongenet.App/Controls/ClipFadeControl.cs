@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Ongenet.App.Display;
+using Ongenet.App.Theming;
 using Ongenet.Core.Audio.Files;
 
 namespace Ongenet.App.Controls
@@ -10,7 +12,7 @@ namespace Ongenet.App.Controls
     /// <summary>
     /// Draws an audio clip's crossfades with draggable fade handles when selected.
     /// </summary>
-    public sealed class ClipFadeControl : Control
+    public sealed class ClipFadeControl : ThemedControl
     {
         private const double WaveMargin = 3.0;
         private const double HandleHit = 8.0;
@@ -54,6 +56,10 @@ namespace Ongenet.App.Controls
         public static readonly StyledProperty<Action<double, double>?> FadeChangedProperty =
             AvaloniaProperty.Register<ClipFadeControl, Action<double, double>?>(nameof(FadeChanged));
 
+        private IBrush _bassFill = Brushes.Blue;
+        private IBrush _midFill = Brushes.Green;
+        private IBrush _trebleFill = Brushes.PeachPuff;
+
         static ClipFadeControl()
         {
             AffectsRender<ClipFadeControl>(FadeInWidthProperty, FadeOutWidthProperty, FadeInWaveformProperty,
@@ -74,6 +80,27 @@ namespace Ongenet.App.Controls
         public IBrush? Stroke { get => GetValue(StrokeProperty); set => SetValue(StrokeProperty, value); }
         public int Revision { get => GetValue(RevisionProperty); set => SetValue(RevisionProperty, value); }
         public Action<double, double>? FadeChanged { get => GetValue(FadeChangedProperty); set => SetValue(FadeChangedProperty, value); }
+
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            WaveformDisplayPreferences.Changed += OnWaveformDisplayChanged;
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            WaveformDisplayPreferences.Changed -= OnWaveformDisplayChanged;
+            base.OnDetachedFromVisualTree(e);
+        }
+
+        private void OnWaveformDisplayChanged() => InvalidateVisual();
+
+        protected override void BuildThemeResources()
+        {
+            _bassFill = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Sapphire, 210));
+            _midFill = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Green, 200));
+            _trebleFill = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Peach, 210));
+        }
 
         private enum DragKind { None, FadeIn, FadeOut }
         private DragKind _drag = DragKind.None;
@@ -193,8 +220,8 @@ namespace Ongenet.App.Controls
             var waveHeight = Math.Max(1, height - WaveMargin * 2);
             using (context.PushTransform(Matrix.CreateTranslation(0, WaveMargin)))
             {
-                var geo = WaveformControl.BuildGeometry(mix, x0, regionWidth, waveHeight, 0.0, 1.0);
-                context.DrawGeometry(WaveFill ?? Brushes.Black, null, geo);
+                WaveformControl.Draw(context, mix, x0, regionWidth, waveHeight, 0, 1,
+                    WaveformDisplayPreferences.BandColorsEnabled, WaveFill, _bassFill, _midFill, _trebleFill);
             }
         }
 

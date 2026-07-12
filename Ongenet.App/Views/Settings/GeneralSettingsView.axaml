@@ -18,6 +18,13 @@
                       IsChecked="{Binding PluginIsolationEnabled}"
                       ToolTip.Tip="{DynamicResource Settings_PluginIsolationTip}"/>
 
+            <TextBlock Text="{DynamicResource Settings_Display}" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,8,0,0"/>
+
+            <CheckBox Content="{DynamicResource Settings_WaveformBandColors}"
+                      IsChecked="{Binding WaveformBandColorsEnabled}"
+                      ToolTip.Tip="{DynamicResource Settings_WaveformBandColorsTip}"/>
+
             <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource Settings_Language}"
                            VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext1}"/>

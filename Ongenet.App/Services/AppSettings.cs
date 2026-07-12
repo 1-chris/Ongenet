@@ -74,6 +74,9 @@ public sealed class AppSettings
 
     /// <summary>When true, VST3 plugins run in an isolated child process (desktop only).</summary>
     public bool PluginIsolationEnabled { get; set; }
+
+    /// <summary>When true, waveforms draw bass/mid/treble layers in theme colours.</summary>
+    public bool WaveformBandColorsEnabled { get; set; } = true;
 }
 
 public sealed class KeyboardShortcutDto

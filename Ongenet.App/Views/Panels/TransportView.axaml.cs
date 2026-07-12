@@ -63,14 +63,6 @@ namespace Ongenet.App.Views.Panels
             }
         }
 
-        // Export → open the export dialog (master, stems, region, bit depth).
-        private async void OnRender(object? sender, RoutedEventArgs e)
-        {
-            var top = TopLevel.GetTopLevel(this);
-            if (top is Window owner)
-                await Windows.ExportDialog.ShowAsync(owner);
-        }
-
         private static readonly FilePickerFileType MidiFileType =
             new("MIDI files") { Patterns = new[] { "*.mid", "*.midi" } };
 

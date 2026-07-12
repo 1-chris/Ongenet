@@ -725,6 +725,9 @@
     <system:String x:Key="Settings_Plugins">プラグイン</system:String>
     <system:String x:Key="Settings_PluginIsolation">VST3プラグインを分離プロセスで実行</system:String>
     <system:String x:Key="Settings_PluginIsolationTip">Ongenet.PluginHostでVST3エフェクトをクラッシュ分離（新規インスタンスには再起動が必要）</system:String>
+    <system:String x:Key="Settings_Display">表示</system:String>
+    <system:String x:Key="Settings_WaveformBandColors">周波数帯で波形に色分け</system:String>
+    <system:String x:Key="Settings_WaveformBandColorsTip">タイムラインとエディタの波形で低音・中音・高音をテーマ色で表示します</system:String>
     <system:String x:Key="Settings_Theme">テーマ</system:String>
     <system:String x:Key="Settings_Theme_settings_A11yName">テーマ 設定</system:String>
     <system:String x:Key="Status_Detecting">検出中…</system:String>
