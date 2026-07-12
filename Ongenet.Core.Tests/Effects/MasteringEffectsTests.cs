@@ -134,7 +134,7 @@ public class MasteringEffectsTests
                 try { fx.Process(buf); }
                 catch (Exception ex) { caught = ex; return; }
             }
-        }, cts.Token);
+        });
 
         var ui = Task.Run(() =>
         {
@@ -143,7 +143,7 @@ public class MasteringEffectsTests
                 fx.Prepare(new AudioFormat(48000, 2));
                 fx.Prepare(new AudioFormat(44100, 2));
             }
-        }, cts.Token);
+        });
 
         await Task.WhenAll(audio, ui);
         Assert.Null(caught);
@@ -196,7 +196,7 @@ public class MasteringEffectsTests
                 try { fx.Process(buf); }
                 catch (Exception ex) { caught = ex; return; }
             }
-        }, cts.Token);
+        });
 
         var ui = Task.Run(() =>
         {
@@ -205,7 +205,7 @@ public class MasteringEffectsTests
                 fx.Prepare(new AudioFormat(48000, 2));
                 fx.Prepare(new AudioFormat(44100, 2));
             }
-        }, cts.Token);
+        });
 
         await Task.WhenAll(audio, ui);
         Assert.Null(caught);

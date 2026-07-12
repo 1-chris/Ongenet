@@ -38,7 +38,7 @@ public class EffectPrepareConcurrencyTests
                 try { fx.Process(buf); }
                 catch (Exception ex) { caught = ex; return; }
             }
-        }, cts.Token);
+        });
 
         var ui = Task.Run(() =>
         {
@@ -47,7 +47,7 @@ public class EffectPrepareConcurrencyTests
                 fx.Prepare(FormatB);
                 fx.Prepare(FormatA);
             }
-        }, cts.Token);
+        });
 
         await Task.WhenAll(audio, ui);
         Assert.Null(caught);
