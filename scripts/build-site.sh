@@ -8,6 +8,28 @@ cd "$ROOT"
 CONFIG="${ROOT}/site/docfx.json"
 BUILD_WASM="${BUILD_WASM:-1}"
 
+# DocFX does not emit template public/ when a custom layout/_master.tmpl is used (last template wins).
+ensure_docfx_public_assets() {
+  local site_out="${ROOT}/site/_site"
+  if [[ -f "${site_out}/public/docfx.min.css" ]]; then
+    return 0
+  fi
+
+  echo "==> Copy DocFX template public assets (custom master layout skips them)"
+  local version nuget_root src
+  version="$(python3 -c "import json; print(json.load(open('${ROOT}/.config/dotnet-tools.json'))['tools']['docfx']['version'])")"
+  nuget_root="${NUGET_PACKAGES:-${HOME}/.nuget/packages}"
+  src="${nuget_root}/docfx/${version}/templates/modern/public"
+
+  if [[ ! -f "${src}/docfx.min.css" ]]; then
+    echo "error: DocFX public assets not found at ${src}" >&2
+    exit 1
+  fi
+
+  mkdir -p "${site_out}/public"
+  cp -a "${src}/." "${site_out}/public/"
+}
+
 API_PROJECTS=(
   Ongenet.Core/Ongenet.Core.csproj
   Ongenet.App/Ongenet.App.csproj
@@ -86,6 +108,8 @@ if dotnet build Ongenet.Desktop/Ongenet.Desktop.csproj -c Release >/dev/null 2>&
   echo "==> DocFX metadata (Desktop)"
   dotnet docfx metadata "${ROOT}/site/docfx.desktop.json" && dotnet docfx build "$CONFIG" || true
 fi
+
+ensure_docfx_public_assets
 
 echo "==> Assemble _site"
 bash "${ROOT}/scripts/assemble-site.sh"
