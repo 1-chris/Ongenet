@@ -5,6 +5,7 @@ using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Display;
 using Ongenet.App.Services;
 
 namespace Ongenet.Android.Services;
@@ -18,10 +19,15 @@ public sealed class AndroidAppSettingsService : IAppSettingsService
 {
     public AppSettings Current { get; } = new();
     public string FilePath => string.Empty;
-    public void ApplyToServices() { }
+    public void ApplyToServices() => WaveformDisplayPreferences.Apply(Current.WaveformBandColorsEnabled);
     public void CaptureAndSave() { }
     public void SetUiCulture(string cultureId) => Current.UiCulture = cultureId;
     public void SetPluginIsolationEnabled(bool enabled) => Current.PluginIsolationEnabled = enabled;
+    public void SetWaveformBandColorsEnabled(bool enabled)
+    {
+        Current.WaveformBandColorsEnabled = enabled;
+        WaveformDisplayPreferences.Apply(enabled);
+    }
     public void SaveLibrary() => LibraryChanged?.Invoke();
     public event Action? LibraryChanged;
 }
