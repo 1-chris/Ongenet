@@ -49,6 +49,10 @@ jobs:
           BUILD_WASM=1 ./scripts/build-site.sh
           test -d _site/app/_framework
           test -f _site/.nojekyll
+          test -f _site/docfx/docfx.min.css
+          test -f _site/docfx/docfx.min.js
+          test -f _site/api/index.html
+          head -1 _site/api/index.html | grep -q '<!DOCTYPE html>'
           echo "Assembled site:"; find _site -maxdepth 2 -mindepth 1 | sort | head -30
 
       - name: Upload Pages artifact

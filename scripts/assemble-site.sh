@@ -20,9 +20,18 @@ cp -r "$DOCFX_OUT/." "$OUT/"
 # Remove stale nested folders from older docfx dest paths.
 rm -rf "$OUT/dev/dev" "$OUT/api/api"
 
-# API section landing page fallback.
-if [[ ! -f "$OUT/api/index.html" && -f "$OUT/api/toc.html" ]]; then
-  cp "$OUT/api/toc.html" "$OUT/api/index.html"
+# DocFX template assets (Bootstrap + DocFX JS). Publish as /docfx/ — avoids any
+# hosting quirks with a top-level public/ folder and gives us a stable URL.
+if [[ ! -d "$OUT/public" ]]; then
+  echo "error: DocFX public assets missing at $OUT/public — docfx build incomplete" >&2
+  exit 1
+fi
+rm -rf "$OUT/docfx"
+cp -a "$OUT/public" "$OUT/docfx"
+
+if [[ ! -f "$OUT/api/index.html" ]] || ! head -1 "$OUT/api/index.html" | grep -q '<!DOCTYPE html>'; then
+  echo "error: styled api/index.html missing — check site/api/index.md is in docfx.json content" >&2
+  exit 1
 fi
 
 # Marketing homepage replaces DocFX index.md output.
