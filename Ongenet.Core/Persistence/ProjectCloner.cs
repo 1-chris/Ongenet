@@ -14,7 +14,7 @@ namespace Ongenet.Core.Persistence;
 /// <summary>
 /// Produces an in-memory deep copy of a <see cref="Project"/> for the undo/redo history. The structural
 /// graph (project → tracks → clips → notes, automation lanes/points) is copied, but immutable heavy data —
-/// decoded <see cref="AudioSampleBuffer"/>s and precomputed <see cref="AudioWaveform"/>s — is SHARED by
+/// decoded <see cref="Ongenet.Core.Audio.Files.AudioSampleBuffer"/>s and precomputed <see cref="Ongenet.Core.Audio.Files.AudioWaveform"/>s — is SHARED by
 /// reference (it's never mutated in place), so a snapshot is cheap in time and memory. Instruments and
 /// effects are rebuilt from the registries and have their parameter values + custom state copied across;
 /// automation lanes are re-bound to the cloned track via the same logic project load uses.

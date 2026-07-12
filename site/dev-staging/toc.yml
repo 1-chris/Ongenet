@@ -1,0 +1,26 @@
+- name: Developer tutorials
+  href: index.md
+- name: Creating instruments
+  href: creating-instruments.md
+- name: Creating effects
+  href: creating-effects.md
+- name: Field nodes
+  href: creating-field-nodes.md
+- name: 3D visual effects
+  href: creating-3d-visual-effects.md
+- name: Main window layout
+  href: main-window-layout.md
+- name: Theming
+  href: theming.md
+- name: Audio engine
+  href: audio-engine.md
+- name: Audio Editor (architecture)
+  href: audio-editor.md
+- name: Scripting (API)
+  href: scripting.md
+- name: Polyphonic pitch (architecture)
+  href: polyphonic-pitch.md
+- name: Plugin isolation
+  href: plugin-isolation.md
+- name: Internationalization
+  href: i18n.md

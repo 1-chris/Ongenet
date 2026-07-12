@@ -1,0 +1,12 @@
+apiRules:
+- exclude:
+    hasAttribute:
+      uid: System.ComponentModel.EditorBrowsableAttribute
+      ctorArguments:
+      - System.ComponentModel.EditorBrowsableState.Never
+- exclude:
+    uidRegex: \.PrivateImplementationDetails
+    type: Type
+- exclude:
+    uidRegex: \.`<
+    type: Member

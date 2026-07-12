@@ -1,14 +1,13 @@
 name: Deploy web demo to GitHub Pages
 
 # Builds the WebAssembly head (Ongenet.Web) and publishes it to GitHub Pages so the full app runs at
-# onge.net/app/. The existing homepage in ./docs (index.html, CNAME, assets) is served at the site root
-# unchanged; the freshly-built app bundle is injected at /app/. No server is involved — Pages just serves
-# the static assets.
+# onge.net/app/. The documentation site is built with DocFX (./scripts/build-site.sh): guides, dev
+# tutorials, API reference, and the marketing homepage at the site root.
 #
 # IMPORTANT: this requires the repo's Pages source to be set to "GitHub Actions" (Settings -> Pages).
 # The older "Deploy from a branch -> /docs" mode does NOT build the WASM app (GitHub never runs dotnet for
 # branch-based Pages); it would only serve files you committed. This workflow replaces that mode and builds
-# everything, sourcing the homepage from ./docs.
+# everything, sourcing the homepage from ./site/homepage and tutorials from DocFX.
 #
 # The app uses <base href="./"> and a ScriptProcessorNode for audio, so it needs NO cross-origin isolation
 # (no COOP/COEP headers, which Pages can't set) and works from the /app/ sub-path as-is.
@@ -43,24 +42,14 @@ jobs:
       - name: Install WebAssembly tools
         run: dotnet workload install wasm-tools
 
-      - name: Publish Ongenet.Web (Release)
-        run: dotnet publish Ongenet.Web/Ongenet.Web.csproj -c Release
-
-      - name: Assemble Pages site (homepage at /, app at /app/)
+      - name: Assemble Pages site (DocFX docs + homepage + app at /app/)
         run: |
           set -e
-          BUNDLE="Ongenet.Web/bin/Release/net10.0-browser/browser-wasm/AppBundle"
-          rm -rf _site
-          mkdir -p _site/app
-          # Site root: the existing homepage + CNAME + assets from docs/.
-          cp -r docs/. _site/
-          # Dev-only docs shouldn't be published.
-          rm -f _site/web-demo.md
-          # .nojekyll so Pages serves _framework/ (leading underscore) and skips the Jekyll build.
-          touch _site/.nojekyll
-          # The web app under /app/.
-          cp -r "$BUNDLE/." _site/app/
-          echo "Assembled site:"; find _site -maxdepth 2 -mindepth 1 | sort
+          chmod +x scripts/build-site.sh
+          BUILD_WASM=1 ./scripts/build-site.sh
+          test -d _site/app/_framework
+          test -f _site/.nojekyll
+          echo "Assembled site:"; find _site -maxdepth 2 -mindepth 1 | sort | head -30
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

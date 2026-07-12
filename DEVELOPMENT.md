@@ -11,7 +11,7 @@ The repository lives at **<https://github.com/1-chris/Ongenet>**.
 
 ## Tutorials
 
-Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/):
+Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/) and are published as HTML on the website under [onge.net/dev/](https://onge.net/dev/):
 
 | Guide | What it covers |
 | --- | --- |
@@ -291,6 +291,27 @@ no audio-device or platform dependency, so they run anywhere the SDK does, inclu
 some desktop features are stubbed (see [docs/web-demo.md](docs/web-demo.md) for the full list). Audio uses
 a Web Audio `ScriptProcessorNode`; there are no native/plugin projects referenced.
 
+Deployment to GitHub Pages is automated by `.github/workflows/deploy-web.yml` on push to `main`. The
+workflow runs `./scripts/build-site.sh`, which:
+
+1. Builds API-doc projects and runs **DocFX** (`site/docfx.json`) — user [guides](https://onge.net/articles/guides/), [dev tutorials](https://onge.net/dev/), and [API reference](https://onge.net/api/)
+2. Publishes `Ongenet.Web` and copies the bundle to `/app/`
+3. Assembles `_site/` (marketing homepage from `site/homepage/`, assets, screenshots, `.nojekyll`)
+
+### Building the site locally
+
+Requires the .NET 10 SDK only (DocFX is restored via `dotnet tool restore` — no Node, Jekyll, or Ruby):
+
+```bash
+./scripts/build-site.sh              # full site + WASM demo
+BUILD_WASM=0 ./scripts/build-site.sh # docs only (faster)
+dotnet docfx site/docfx.json --serve # preview while editing markdown
+```
+
+See [docs/web-demo.md](docs/web-demo.md) for the WASM architectural split.
+
+### Running the WASM head alone
+
 ```bash
 dotnet workload install wasm-tools             # one-time
 
@@ -304,9 +325,6 @@ dotnet publish Ongenet.Web/Ongenet.Web.csproj -c Release
 
 The published `AppBundle/` can be served by any static server (e.g. `python3 -m http.server` from that
 folder). The app is at `index.html` and uses `<base href="./">`, so it works from a sub-path too.
-
-Deployment to GitHub Pages (`onge.net/app/`) is automated by `.github/workflows/deploy-web.yml` on push to
-`main`. See [docs/web-demo.md](docs/web-demo.md) for the Pages setup and the architectural split.
 
 ---
 
@@ -437,7 +455,7 @@ dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release --self-containe
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `.github/workflows/desktop-build.yml` | push/PR to `main`, `v*` tags, manual | Builds self-contained desktop packages for every RID via `publish-desktop.sh` **and** a sideloadable Android APK via `publish-android.sh` (its own JDK 21 + android-workload job), uploads them as artifacts, and — on a `v*` tag — attaches them all to one GitHub Release. |
-| `.github/workflows/deploy-web.yml` | push to `main`, manual | Installs `wasm-tools`, publishes `Ongenet.Web`, assembles the Pages site (homepage from `docs/` at `/`, app at `/app/`), and deploys to GitHub Pages. |
+| `.github/workflows/deploy-web.yml` | push to `main`, manual | Installs `wasm-tools`, runs `./scripts/build-site.sh` (DocFX site + WASM publish), assembles `_site/` (homepage, guides, dev docs, API at `/`, app at `/app/`), and deploys to GitHub Pages. |
 
 ### Cutting a release
 

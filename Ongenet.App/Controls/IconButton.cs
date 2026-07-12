@@ -15,7 +15,7 @@ namespace Ongenet.App.Controls
     ///   <item><c>flat</c> / <c>small</c> — rounded-square / compact hit targets for toolbars and rows.</item>
     /// </list>
     /// The glyph is supplied via <see cref="Icon"/> (a <see cref="Geometry"/>, usually from the icon resource
-    /// dictionary) and painted with <see cref="Control.Foreground"/> so it follows the theme.
+    /// dictionary) and painted with the control <c>Foreground</c> brush so it follows the theme.
     /// </summary>
     public class IconButton : Button
     {

@@ -1,0 +1,26 @@
+- name: User guides
+  href: index.md
+- name: Getting started
+  href: getting-started.md
+- name: Samples & libraries
+  href: samples-and-libraries.md
+- name: Plugins
+  href: plugins.md
+- name: Timeline & clips
+  href: timeline-and-clips.md
+- name: Session & patterns
+  href: session-and-patterns.md
+- name: Field modular
+  href: field-modular.md
+- name: Mixer & export
+  href: mixer-and-export.md
+- name: Audio Editor
+  href: audio-editor.md
+- name: Polyphonic pitch
+  href: polyphonic-pitch.md
+- name: Scripting
+  href: scripting.md
+- name: Sidechain & dynamics
+  href: sidechain-and-dynamics.md
+- name: Keyboard shortcuts
+  href: keyboard-shortcuts.md

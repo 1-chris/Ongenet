@@ -1,0 +1,97 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+  "rules": {
+    "FailedToLoadAnalyzer": "suggestion"
+  },
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../",
+          "files": [
+            "Ongenet.Core/Ongenet.Core.csproj",
+            "Ongenet.App/Ongenet.App.csproj",
+            "Ongenet.Audio/Ongenet.Audio.csproj",
+            "Ongenet.Scripting/Ongenet.Scripting.csproj",
+            "Ongenet.Engine3D/Ongenet.Engine3D.csproj",
+            "Ongenet.Engine3D.Abstractions/Ongenet.Engine3D.Abstractions.csproj",
+            "Ongenet.PluginHost/Ongenet.PluginHost.csproj",
+            "Ongenet.Clap/Ongenet.Clap.csproj",
+            "Ongenet.Lv2/Ongenet.Lv2.csproj",
+            "Ongenet.Vst/Ongenet.Vst.csproj",
+            "Ongenet.Au/Ongenet.Au.csproj",
+            "Ongenet.Ara/Ongenet.Ara.csproj",
+            "Ongenet.Link/Ongenet.Link.csproj"
+          ],
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**"
+          ]
+        }
+      ],
+      "dest": "api",
+      "filter": "filter.yml",
+      "properties": {
+        "TargetFramework": "net10.0",
+        "RunAnalyzers": "false"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "articles/**.md",
+          "articles/**/toc.yml",
+          "api/index.md",
+          "toc.yml",
+          "index.md"
+        ]
+      },
+      {
+        "files": [
+          "**/*"
+        ],
+        "src": "dev",
+        "dest": "dev"
+      },
+      {
+        "files": [
+          "api/**.yml"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "assets/**",
+          "CNAME"
+        ]
+      }
+    ],
+    "output": "_site",
+    "template": [
+      "default",
+      "modern",
+      "templates/onge"
+    ],
+    "globalMetadata": {
+      "_appName": "Ongenet",
+      "_appTitle": "Ongenet",
+      "_appFooter": "Ongenet — free & open source (MIT) · built on Avalonia & .NET 10",
+      "_enableSearch": true,
+      "_disableContribution": true,
+      "_gitContribute": {
+        "repo": "https://github.com/1-chris/Ongenet"
+      }
+    },
+    "markdownEngineProperties": {
+      "markdigExtensions": [
+        "abbreviations",
+        "definitionlists",
+        "footnotes",
+        "tasklists"
+      ]
+    }
+  }
+}

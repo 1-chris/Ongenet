@@ -1638,8 +1638,8 @@ namespace Ongenet.App.ViewModels
         public void ClearDropHighlight() => SetDropHighlight((TrackLaneViewModel?)null);
 
         /// <summary>
-        /// Inserts an audio clip from <paramref name="path"/> at <paramref name="beat"/> on the
-        /// lane at <paramref name="laneIndex"/>, or on a new audio track if the index is past the
+        /// Inserts an audio clip from <paramref name="path"/> at <paramref name="beat"/> on
+        /// <paramref name="target"/>, or on a new audio track when <paramref name="newTrackIndex"/> is past the
         /// last lane. Decoding runs off the UI thread; the clip appears once decoded.
         /// </summary>
         public async void AddAudioClip(string path, TrackLaneViewModel? target, double beat, int newTrackIndex = -1)

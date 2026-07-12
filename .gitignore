@@ -101,3 +101,8 @@ I2PSharp/
 
 # Ongenet packaging output (publish-desktop.sh)
 /dist/
+
+# DocFX site build output
+/_site/
+/site/_site/
+/site/api/

@@ -7,7 +7,7 @@ namespace Ongenet.Audio.Interop;
 /// <summary>
 /// Hand-rolled COM interop for Windows WASAPI: the device enumerator plus the audio client/render/capture
 /// interfaces needed for shared-mode, event-driven playback and capture (including loopback — Windows'
-/// equivalent of a monitor source). Interfaces are declared in vtable order with <see cref="PreserveSig"/>
+/// equivalent of a monitor source). Interfaces are declared in vtable order with <c>PreserveSig</c>
 /// so we read HRESULTs explicitly and never throw on the audio thread. Windows-only; the types compile
 /// everywhere (COM marshalling just isn't invoked off-Windows, gated by the backend's IsSupported).
 /// </summary>

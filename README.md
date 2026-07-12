@@ -5,7 +5,10 @@ Core and a thin, swappable device/UI layer around it. Licensed under the [MIT Li
 
 **Website:** [onge.net](https://onge.net/) &middot; **Downloads:**
 [GitHub Releases](https://github.com/1-chris/Ongenet/releases) &middot; **Try in browser:**
-[web demo](https://onge.net/app/)
+[web demo](https://onge.net/app/) &middot; **Docs:**
+[Guides](https://onge.net/articles/guides/) ·
+[Dev tutorials](https://onge.net/dev/) ·
+[API reference](https://onge.net/api/)
 
 ## Projects
 

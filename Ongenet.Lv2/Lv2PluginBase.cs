@@ -25,7 +25,7 @@ namespace Ongenet.Lv2;
 /// keeps editable values independent of the native instance, so they survive the re-instantiation LV2
 /// requires on a sample-rate change (and lets parameters exist before the plugin is even loaded).
 ///
-/// GUI: v1 uses the generic parameter inspector; <see cref="TryOpenNativeUi"/> is the seam for
+/// GUI: v1 uses the generic parameter inspector; <c>TryOpenNativeUi</c> is the seam for
 /// embedding LV2 UI binaries (suil-equivalent) in a later phase.
 /// </summary>
 public abstract unsafe partial class Lv2PluginBase : IPluginEditor, IDisposable, ILatencyProvider

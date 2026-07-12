@@ -47,7 +47,7 @@ public sealed class StutterGesture
     /// <summary>Length of one full curve cycle, in beats.</summary>
     public double LengthBeats { get; set; } = 4.0;
 
-    /// <summary>Default subdivision (index into <see cref="Rates"/>) when no Rate curve is assigned.</summary>
+    /// <summary>Default subdivision (index into <see cref="StutterRates.All"/>) when no Rate curve is assigned.</summary>
     public int RateIndex { get; set; } = 2; // 1/16
 
     /// <summary>Rate-curve endpoints: value 0 → this index, value 1 → <see cref="RateMaxIndex"/>.</summary>

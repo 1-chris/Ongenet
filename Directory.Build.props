@@ -6,9 +6,15 @@
     UI reads it back at runtime (see Ongenet.Desktop/AppInfo.cs) to show it in the title bar.
   -->
   <PropertyGroup>
-    <Version>0.32.4</Version>
+    <Version>0.32.5</Version>
     <Product>Ongenet</Product>
     <Company>Ongenet</Company>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
   <!--

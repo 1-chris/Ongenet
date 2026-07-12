@@ -1,0 +1,165 @@
+/* Markdown / article page prose (shared with DocFX output) */
+
+.doc-content .doc-article,
+.doc-page article {
+  line-height: 1.7;
+}
+
+.doc-content h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 0.6em;
+  letter-spacing: -0.02em;
+}
+
+.doc-content h2 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--surface0);
+}
+
+.doc-content h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.4em;
+  color: var(--subtext1);
+}
+
+.doc-content p,
+.doc-content li {
+  color: var(--subtext0);
+}
+
+.doc-content a {
+  color: var(--blue);
+}
+
+.doc-content a:hover {
+  color: var(--sapphire);
+}
+
+.doc-content ul,
+.doc-content ol {
+  margin: 0.6em 0 1em 1.4em;
+}
+
+.doc-content li {
+  margin: 0.25em 0;
+}
+
+.doc-content blockquote {
+  border-left: 3px solid var(--mauve);
+  padding: 0.5em 1em;
+  margin: 1em 0;
+  background: var(--mantle);
+  border-radius: 0 8px 8px 0;
+  color: var(--subtext1);
+}
+
+.doc-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.94rem;
+}
+
+.doc-content th,
+.doc-content td {
+  border: 1px solid var(--surface0);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.doc-content th {
+  background: var(--mantle);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.doc-content pre {
+  overflow-x: auto;
+  padding: 14px 16px;
+  margin: 1em 0;
+  background: var(--crust);
+  border: 1px solid var(--surface0);
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.doc-content pre code {
+  background: none;
+  padding: 0;
+  color: var(--text);
+}
+
+.doc-content code {
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+  background: var(--crust);
+  color: var(--peach);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+.doc-content hr {
+  border: none;
+  border-top: 1px solid var(--surface0);
+  margin: 2em 0;
+}
+
+.doc-content img.theme-cap {
+  max-width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--surface1);
+}
+
+.doc-hub-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.doc-hub-card {
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.doc-hub-card:hover {
+  border-color: var(--surface2);
+  transform: translateY(-2px);
+}
+
+.doc-hub-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  border: none;
+  padding: 0;
+}
+
+.doc-hub-card p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.doc-hub-card a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.doc-hub-card a:hover {
+  text-decoration: none;
+}
+
+.doc-lead {
+  font-size: 1.05rem;
+  color: var(--subtext1);
+  max-width: 640px;
+}

@@ -13,7 +13,7 @@ namespace Ongenet.App.Controls
     /// <summary>
     /// Shared "Create automation track" right-click behaviour for automatable controls. Builds an
     /// <see cref="IAutomationTarget"/> for the control, resolves the owning track from the current
-    /// selection, and pops a one-item flyout that hands the target to the <see cref="IAutomationService"/>.
+    /// selection, and pops a one-item flyout that hands the target to the <see cref="Services.IAutomationService"/>.
     /// </summary>
     public static class AutomationGesture
     {

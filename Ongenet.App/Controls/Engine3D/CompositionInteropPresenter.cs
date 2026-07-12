@@ -10,7 +10,7 @@ namespace Ongenet.App.Controls.Engine3D
     /// <see cref="CompositionDrawingSurface"/> attached as the host element's child visual (so it layers
     /// correctly with the rest of the UI - no airspace). The present-side wiring lives here; the matching
     /// half is the Vulkan backend exporting an external-memory image + sync primitives, which flips a
-    /// session to <see cref="Engine3D.Abstractions.FramePresentKind.SharedHandle"/>. Until that export lands,
+    /// session to <see cref="Ongenet.Engine3D.Abstractions.FramePresentKind.SharedHandle"/>. Until that export lands,
     /// <see cref="Engine3DInterop.CreatePresenter"/> selects the readback presenter instead, so this is never
     /// constructed on a CPU-frame session.
     /// </summary>

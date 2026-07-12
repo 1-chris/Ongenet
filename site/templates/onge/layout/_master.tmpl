@@ -1,0 +1,142 @@
+{{! Ongenet custom DocFX master layout — Catppuccin theme + shared site chrome }}
+<!DOCTYPE html>
+<html lang="en" data-theme="mocha">
+  <head>
+    <meta charset="utf-8">
+    {{#redirect_url}}
+      <meta http-equiv="refresh" content="0;URL='{{redirect_url}}'">
+    {{/redirect_url}}
+    {{^redirect_url}}
+      <title>{{#title}}{{title}}{{/title}}{{^title}}{{>partials/title}}{{/title}}{{#_appTitle}} | {{_appTitle}}{{/_appTitle}}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      {{#_description}}<meta name="description" content="{{_description}}">{{/_description}}
+      {{#description}}<meta name="description" content="{{description}}">{{/description}}
+      <link rel="stylesheet" href="/assets/home.css">
+      <link rel="stylesheet" href="/assets/doc-content.css">
+      <link rel="stylesheet" href="{{_rel}}public/docfx.min.css">
+      <link rel="stylesheet" href="/assets/docfx-theme.css">
+      <meta name="docfx:navrel" content="{{_navRel}}">
+      <meta name="docfx:tocrel" content="{{_tocRel}}">
+      {{#_noindex}}<meta name="searchOption" content="noindex">{{/_noindex}}
+      {{#_enableSearch}}<meta name="docfx:rel" content="{{_rel}}">{{/_enableSearch}}
+      <meta name="loc:inThisArticle" content="{{__global.inThisArticle}}">
+      <meta name="loc:searchResultsCount" content="{{__global.searchResultsCount}}">
+      <meta name="loc:searchNoResults" content="{{__global.searchNoResults}}">
+      <meta name="loc:tocFilter" content="{{__global.tocFilter}}">
+      <meta name="loc:nextArticle" content="{{__global.nextArticle}}">
+      <meta name="loc:prevArticle" content="{{__global.prevArticle}}">
+      <meta name="loc:copy" content="{{__global.copy}}">
+      <script type="module" src="{{_rel}}public/docfx.min.js"></script>
+      <script>
+      (function(){var k='onge-theme',v={mocha:1,macchiato:1,frappe:1,latte:1},s=localStorage.getItem(k);
+      var d=matchMedia('(prefers-color-scheme:light)').matches?'latte':'mocha';
+      var id=s&&v[s]?s:d,b=id==='latte'?'light':'dark';
+      document.documentElement.setAttribute('data-theme',id);
+      document.documentElement.setAttribute('data-bs-theme',b);
+      localStorage.setItem('theme',b);})();
+      </script>
+      <script src="/assets/home.js" defer></script>
+    {{/redirect_url}}
+  </head>
+  {{^redirect_url}}
+  <body class="tex2jax_ignore doc-page" data-layout="{{_layout}}{{layout}}" data-yaml-mime="{{yamlmime}}">
+    <div class="topbar">
+      <div class="wrap topbar-inner">
+        <a class="brand" href="/">Ongenet</a>
+        <nav class="navlinks" aria-label="Site">
+          <a href="/">Home</a>
+          <a href="/articles/guides/">Guides</a>
+          <a href="/dev/">Dev</a>
+          <a href="/api/">API</a>
+          <a href="/app/">Web demo</a>
+          <a href="https://github.com/1-chris/Ongenet/releases">Download</a>
+        </nav>
+        <div class="theme-switcher" id="theme-switcher">
+          <button class="theme-btn" id="theme-btn" type="button"
+                  aria-label="Theme" aria-haspopup="true" aria-expanded="false">
+            <span class="swatch" aria-hidden="true"></span>
+            <span id="theme-btn-label">Mocha</span>
+          </button>
+          <div class="theme-menu" id="theme-menu" role="menu">
+            <button class="theme-option" type="button" role="menuitemradio" data-theme-id="mocha" aria-current="true">
+              <span class="dot-swatch" style="background:#cba6f7" aria-hidden="true"></span> Mocha
+            </button>
+            <button class="theme-option" type="button" role="menuitemradio" data-theme-id="macchiato" aria-current="false">
+              <span class="dot-swatch" style="background:#c6a0f6" aria-hidden="true"></span> Macchiato
+            </button>
+            <button class="theme-option" type="button" role="menuitemradio" data-theme-id="frappe" aria-current="false">
+              <span class="dot-swatch" style="background:#ca9ee6" aria-hidden="true"></span> Frappé
+            </button>
+            <button class="theme-option" type="button" role="menuitemradio" data-theme-id="latte" aria-current="false">
+              <span class="dot-swatch" style="background:#8839ef" aria-hidden="true"></span> Latte
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main class="docfx-main container-xxl">
+      {{^_disableToc}}
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">On this page</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+      {{/_disableToc}}
+
+      <div class="content doc-content">
+        <div class="actionbar">
+          {{^_disableToc}}
+          <button class="btn btn-lg border-0 d-md-none doc-toc-toggle" type="button"
+              data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas"
+              aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            ☰
+          </button>
+          {{/_disableToc}}
+          {{#_enableSearch}}
+          <form class="search doc-search" role="search" id="search">
+            <input class="form-control" id="search-query" type="search" disabled placeholder="Search docs…" autocomplete="off" aria-label="Search">
+          </form>
+          {{/_enableSearch}}
+          {{^_disableBreadcrumb}}
+          <nav id="breadcrumb"></nav>
+          {{/_disableBreadcrumb}}
+        </div>
+
+        <article data-uid="{{uid}}" class="doc-article">
+          {{!body}}
+        </article>
+
+        {{^_disableNextArticle}}
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+        {{/_disableNextArticle}}
+      </div>
+
+      {{^_disableAffix}}
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+      {{/_disableAffix}}
+    </main>
+
+    {{#_enableSearch}}
+    <div class="container-xxl search-results" id="search-results"></div>
+    {{/_enableSearch}}
+
+    <footer>
+      <div class="wrap">
+        Ongenet — free &amp; open source (MIT) · built on Avalonia &amp; .NET 10.
+        &nbsp;·&nbsp; <a href="https://github.com/1-chris/Ongenet">GitHub</a>
+        &nbsp;·&nbsp; <a href="https://github.com/1-chris/Ongenet/releases">Releases</a>
+        &nbsp;·&nbsp; <a href="https://github.com/1-chris/Ongenet/blob/main/LICENSE">License</a>
+      </div>
+    </footer>
+  </body>
+  {{/redirect_url}}
+</html>

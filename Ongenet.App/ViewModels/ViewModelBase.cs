@@ -40,7 +40,7 @@ namespace Ongenet.App.ViewModels
             return true;
         }
 
-        /// <summary>Shorthand for <see cref="Loc.Get"/> in view models.</summary>
+        /// <summary>Shorthand for localized string lookup in view models.</summary>
         protected static string L(string key) => Loc.Get(key);
 
         /// <summary>Shorthand for formatted localized strings.</summary>

@@ -61,7 +61,7 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
         }
     }
 
-    /// <summary>The editable graph. UI edits this then calls <see cref="Recompile"/>.</summary>
+    /// <summary>The editable graph. UI edits this then calls <see cref="Recompile()"/>.</summary>
     public FieldGraph Graph => _graph;
 
     /// <summary>The current compiled snapshot (for the UI to read scope taps etc.). May be null before Prepare.</summary>

@@ -7,7 +7,7 @@ namespace Ongenet.App.Services
     public sealed record HistoryEntry(int Index, string Label, bool IsCurrent);
 
     /// <summary>
-    /// Undo/redo history. <see cref="Capture"/> is called just BEFORE a user action mutates the project;
+    /// Undo/redo history. <see cref="Core.Services.IHistoryCapture.Capture"/> is called just BEFORE a user action mutates the project;
     /// it snapshots the project + transport state so the action can be reverted. Restoring a snapshot swaps
     /// the project back in via <c>IProjectService.SetCurrentProject</c>, which rebuilds the whole UI + audio
     /// engine (the same path project load uses). The history is a single linear timeline with a cursor, so a
