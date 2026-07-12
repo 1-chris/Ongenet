@@ -68,22 +68,24 @@ public sealed class TapeStopModule : FxModule
     public override void Prepare(AudioFormat format)
     {
         _channels = format.Channels < 1 ? 1 : format.Channels;
-        _proc = new TapeStopProcessor[_channels];
-        for (var c = 0; c < _channels; c++) { _proc[c] = new TapeStopProcessor(); _proc[c].Prepare(format.SampleRate); }
+        var proc = new TapeStopProcessor[_channels];
+        for (var c = 0; c < _channels; c++) { proc[c] = new TapeStopProcessor(); proc[c].Prepare(format.SampleRate); }
+        _proc = proc;
     }
 
     public override void Reset() { foreach (var p in _proc) p.Reset(); }
 
     public override void Process(Span<float> buffer)
     {
-        if (_proc.Length == 0) return;
+        var proc = _proc;
+        if (proc.Length == 0) return;
         var stop = Amount(Stop);
-        var channels = _channels;
+        var channels = Math.Min(_channels, proc.Length);
         var frames = buffer.Length / channels;
         for (var f = 0; f < frames; f++)
         {
             var i = f * channels;
-            for (var c = 0; c < channels; c++) buffer[i + c] = _proc[c].Process(buffer[i + c], stop);
+            for (var c = 0; c < channels; c++) buffer[i + c] = proc[c].Process(buffer[i + c], stop);
         }
     }
 
@@ -180,8 +182,9 @@ public sealed class LowPassModule : FxModule
 
     public override void Process(Span<float> buffer)
     {
-        if (_bq.Length == 0) return;
-        var channels = _channels;
+        var bq = _bq;
+        if (bq.Length == 0) return;
+        var channels = Math.Min(_channels, bq.Length);
         // A curve maps 0..1 → 20 Hz..20 kHz (log); otherwise use the static cutoff knob.
         var cutoff = ModulationOverride is { } m ? 20.0 * Math.Pow(1000.0, Math.Clamp(m, 0, 1)) : Cutoff;
         var coeffs = BiquadCoefficients.Compute(FilterMode.LowPass, cutoff, Resonance, _sampleRate);
@@ -190,7 +193,7 @@ public sealed class LowPassModule : FxModule
         {
             var i = f * channels;
             for (var c = 0; c < channels; c++)
-                buffer[i + c] = (float)_bq[c].Process(coeffs, buffer[i + c]);
+                buffer[i + c] = (float)bq[c].Process(coeffs, buffer[i + c]);
         }
     }
 

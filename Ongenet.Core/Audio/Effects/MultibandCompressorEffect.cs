@@ -63,22 +63,30 @@ public sealed class MultibandCompressorEffect : IAudioEffect
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
 
-        _lp = BiquadCoefficients.Compute(FilterMode.LowPass, LowCrossHz, 0.707, _sampleRate);
-        _hp = BiquadCoefficients.Compute(FilterMode.HighPass, HighCrossHz, 0.707, _sampleRate);
+        var lp = BiquadCoefficients.Compute(FilterMode.LowPass, LowCrossHz, 0.707, _sampleRate);
+        var hp = BiquadCoefficients.Compute(FilterMode.HighPass, HighCrossHz, 0.707, _sampleRate);
 
-        _lpState = new Biquad[_channels];
-        _hpState = new Biquad[_channels];
-        _env = new EnvelopeFollower[_channels, 3];
+        var lpState = new Biquad[_channels];
+        var hpState = new Biquad[_channels];
+        var env = new EnvelopeFollower[_channels, 3];
         for (var c = 0; c < _channels; c++)
         {
-            _lpState[c].Reset();
-            _hpState[c].Reset();
+            lpState[c].Reset();
+            hpState[c].Reset();
             for (var b = 0; b < 3; b++)
             {
-                _env[c, b] = new EnvelopeFollower();
-                _env[c, b].SetTimes(2.0, 80.0, _sampleRate);
+                env[c, b] = new EnvelopeFollower();
+                env[c, b].SetTimes(2.0, 80.0, _sampleRate);
             }
         }
+
+        // Publish fully-built state with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio thread (e.g. after "Render clip to new track").
+        _lp = lp;
+        _hp = hp;
+        _lpState = lpState;
+        _hpState = hpState;
+        _env = env;
     }
 
     public IAudioEffect Clone() => new MultibandCompressorEffect
@@ -88,7 +96,15 @@ public sealed class MultibandCompressorEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        var channels = _channels < 1 ? 1 : _channels;
+        var lpState = _lpState;
+        var hpState = _hpState;
+        var env = _env;
+        var channels = Math.Min(_channels < 1 ? 1 : _channels, lpState.Length);
+        if (channels <= 0 || hpState.Length < channels || env.GetLength(0) < channels || env.GetLength(1) < 3)
+            return;
+
+        var lp = _lp;
+        var hp = _hp;
         var depth = (float)Math.Clamp(Depth, 0, 1);
         var highBoost = (float)AudioMath.Db2Lin(HighBoostDb);
 
@@ -101,13 +117,18 @@ public sealed class MultibandCompressorEffect : IAudioEffect
                 var dry = buffer[i + c];
 
                 // Split into three bands (spectral subtraction keeps the sum coherent).
-                var low = (float)_lpState[c].Process(_lp, dry);
-                var high = (float)_hpState[c].Process(_hp, dry);
+                var low = (float)lpState[c].Process(lp, dry);
+                var high = (float)hpState[c].Process(hp, dry);
                 var mid = dry - low - high;
 
-                low = BandGain(low, _env[c, 0]) * low;
-                mid = BandGain(mid, _env[c, 1]) * mid;
-                high = BandGain(high, _env[c, 2]) * high * highBoost;
+                var envLow = env[c, 0];
+                var envMid = env[c, 1];
+                var envHigh = env[c, 2];
+                if (envLow is null || envMid is null || envHigh is null) continue;
+
+                low = BandGain(low, envLow) * low;
+                mid = BandGain(mid, envMid) * mid;
+                high = BandGain(high, envHigh) * high * highBoost;
 
                 var wet = low + mid + high;
                 buffer[i + c] = dry * (1 - depth) + wet * depth;

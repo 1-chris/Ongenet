@@ -54,9 +54,11 @@ public sealed class PhaserEffect : IAudioEffect
     {
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
-        _x1 = new double[_channels][];
-        _y1 = new double[_channels][];
-        for (var c = 0; c < _channels; c++) { _x1[c] = new double[MaxStages]; _y1[c] = new double[MaxStages]; }
+        var x1 = new double[_channels][];
+        var y1 = new double[_channels][];
+        for (var c = 0; c < _channels; c++) { x1[c] = new double[MaxStages]; y1[c] = new double[MaxStages]; }
+        _x1 = x1;
+        _y1 = y1;
         _fb = new double[_channels];
         _lfo.Reset();
     }
@@ -68,8 +70,11 @@ public sealed class PhaserEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        if (_x1.Length == 0) return;
-        var channels = _channels;
+        var x1 = _x1;
+        var y1 = _y1;
+        var fb = _fb;
+        if (x1.Length == 0 || y1.Length == 0 || fb.Length == 0) return;
+        var channels = Math.Min(_channels, Math.Min(x1.Length, Math.Min(y1.Length, fb.Length)));
         var mix = (float)Math.Clamp(Mix, 0, 1);
         var fbAmt = Math.Clamp(Feedback, -0.95, 0.95);
         var depth = Math.Clamp(Depth, 0, 1);
@@ -88,16 +93,19 @@ public sealed class PhaserEffect : IAudioEffect
                 var a = (t - 1.0) / (t + 1.0);
 
                 var dry = buffer[i + c];
-                var x = dry + fbAmt * _fb[c];
+                var x = dry + fbAmt * fb[c];
+                var xStages = x1[c];
+                var yStages = y1[c];
+                if (xStages is null || yStages is null) continue;
                 for (var s = 0; s < stages; s++)
                 {
-                    var y = a * x + _x1[c][s] - a * _y1[c][s];
-                    _x1[c][s] = x;
-                    _y1[c][s] = y;
+                    var y = a * x + xStages[s] - a * yStages[s];
+                    xStages[s] = x;
+                    yStages[s] = y;
                     x = y;
                 }
 
-                _fb[c] = x;
+                fb[c] = x;
                 buffer[i + c] = (float)(dry * (1 - mix) + x * mix);
             }
 

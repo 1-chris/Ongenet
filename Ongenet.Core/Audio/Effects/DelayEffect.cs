@@ -48,9 +48,14 @@ public sealed class DelayEffect : IAudioEffect
     {
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
-        _size = (int)(MaxDelaySeconds * _sampleRate) + 4;
-        _lines = new DelayLine[_channels];
-        for (var c = 0; c < _channels; c++) { _lines[c] = new DelayLine(); _lines[c].Resize(_size); }
+        var size = (int)(MaxDelaySeconds * _sampleRate) + 4;
+        var lines = new DelayLine[_channels];
+        for (var c = 0; c < _channels; c++) { lines[c] = new DelayLine(); lines[c].Resize(size); }
+
+        // Publish fully-built arrays with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _size = size;
+        _lines = lines;
     }
 
     public IAudioEffect Clone() => new DelayEffect
@@ -60,9 +65,12 @@ public sealed class DelayEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        if (_lines.Length == 0) return;
-        var channels = _channels;
-        var delay = Math.Clamp((int)(TimeMs / 1000.0 * _sampleRate), 1, _size - 1);
+        var lines = _lines;
+        if (lines.Length == 0) return;
+        var channels = Math.Min(_channels, lines.Length);
+        var lineSize = lines[0].Size;
+        if (lineSize <= 1) return;
+        var delay = Math.Clamp((int)(TimeMs / 1000.0 * _sampleRate), 1, lineSize - 1);
         var fb = (float)Math.Clamp(Feedback, 0, 0.95);
         var mix = (float)Math.Clamp(Mix, 0, 1);
 
@@ -75,23 +83,23 @@ public sealed class DelayEffect : IAudioEffect
                 var i = frame * channels;
                 var dryL = buffer[i];
                 var dryR = buffer[i + 1];
-                var delL = _lines[0].ReadInt(delay);
-                var delR = _lines[1].ReadInt(delay);
+                var delL = lines[0].ReadInt(delay);
+                var delR = lines[1].ReadInt(delay);
 
                 buffer[i] = dryL * (1 - mix) + delL * mix;
                 buffer[i + 1] = dryR * (1 - mix) + delR * mix;
 
                 // Cross the feedback so repeats hop between the channels.
-                _lines[0].Write(dryL + delR * fb);
-                _lines[1].Write(dryR + delL * fb);
+                lines[0].Write(dryL + delR * fb);
+                lines[1].Write(dryR + delL * fb);
 
                 // Any further channels pass through their own straight delay.
                 for (var c = 2; c < channels; c++)
                 {
                     var dry = buffer[i + c];
-                    var delayed = _lines[c].ReadInt(delay);
+                    var delayed = lines[c].ReadInt(delay);
                     buffer[i + c] = dry * (1 - mix) + delayed * mix;
-                    _lines[c].Write(dry + delayed * fb);
+                    lines[c].Write(dry + delayed * fb);
                 }
             }
 
@@ -104,9 +112,9 @@ public sealed class DelayEffect : IAudioEffect
             for (var c = 0; c < channels; c++)
             {
                 var dry = buffer[i + c];
-                var delayed = _lines[c].ReadInt(delay);
+                var delayed = lines[c].ReadInt(delay);
                 buffer[i + c] = dry * (1 - mix) + delayed * mix;
-                _lines[c].Write(dry + delayed * fb);
+                lines[c].Write(dry + delayed * fb);
             }
         }
     }

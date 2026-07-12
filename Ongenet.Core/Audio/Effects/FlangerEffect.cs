@@ -48,8 +48,9 @@ public sealed class FlangerEffect : IAudioEffect
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
         var size = (int)(MaxMs / 1000.0 * _sampleRate) + 4;
-        _lines = new DelayLine[_channels];
-        for (var c = 0; c < _channels; c++) { _lines[c] = new DelayLine(); _lines[c].Resize(size); }
+        var lines = new DelayLine[_channels];
+        for (var c = 0; c < _channels; c++) { lines[c] = new DelayLine(); lines[c].Resize(size); }
+        _lines = lines;
         _lfo.Reset();
     }
 
@@ -60,8 +61,9 @@ public sealed class FlangerEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        if (_lines.Length == 0) return;
-        var channels = _channels;
+        var lines = _lines;
+        if (lines.Length == 0) return;
+        var channels = Math.Min(_channels, lines.Length);
         var fb = (float)Math.Clamp(Feedback, -0.95, 0.95);
         var mix = (float)Math.Clamp(Mix, 0, 1);
         var depth = Math.Clamp(Depth, 0, 1);
@@ -77,10 +79,10 @@ public sealed class FlangerEffect : IAudioEffect
                 var delayMs = BaseMs + SweepMs * depth * (0.5 + 0.5 * lfo);
                 var delaySamp = delayMs / 1000.0 * _sampleRate;
 
-                var delayed = _lines[c].ReadFrac(delaySamp);
+                var delayed = lines[c].ReadFrac(delaySamp);
                 var dry = buffer[i + c];
                 buffer[i + c] = dry * (1 - mix) + delayed * mix;
-                _lines[c].Write(dry + delayed * fb);
+                lines[c].Write(dry + delayed * fb);
             }
 
             _lfo.Advance();

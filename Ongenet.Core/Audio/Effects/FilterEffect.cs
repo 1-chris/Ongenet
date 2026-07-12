@@ -74,11 +74,11 @@ public sealed class FilterEffect : IAudioEffect, ISpectrumSource
 
     public void Process(Span<float> buffer)
     {
-        var channels = _channels < 1 ? 1 : _channels;
+        var bq = _bq;
+        var channels = Math.Min(_channels < 1 ? 1 : _channels, bq.Length);
+        if (channels <= 0) return;
         var mode = Mode;
         if (mode == FilterMode.Bypass) { _scope.Tap(buffer, channels); return; } // transparent
-
-        if (_bq.Length < channels) Prepare(new AudioFormat((int)_sampleRate, channels));
 
         if (mode != _lastMode || Frequency != _lastFreq || Resonance != _lastQ || _sampleRate != _lastSr)
         {
@@ -86,6 +86,7 @@ public sealed class FilterEffect : IAudioEffect, ISpectrumSource
             _lastMode = mode; _lastFreq = Frequency; _lastQ = Resonance; _lastSr = _sampleRate;
         }
 
+        var coeffs = _coeffs;
         var pre = AudioMath.Db2Lin(PreGainDb);
         var post = AudioMath.Db2Lin(PostGainDb);
 
@@ -95,7 +96,7 @@ public sealed class FilterEffect : IAudioEffect, ISpectrumSource
             var i = frame * channels;
             for (var c = 0; c < channels; c++)
             {
-                var y = _bq[c].Process(_coeffs, buffer[i + c] * pre);
+                var y = bq[c].Process(coeffs, buffer[i + c] * pre);
                 buffer[i + c] = (float)(y * post);
             }
         }

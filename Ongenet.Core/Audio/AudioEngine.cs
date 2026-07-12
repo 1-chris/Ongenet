@@ -114,6 +114,7 @@ public sealed class AudioEngine : IAudioEngine
     private readonly Effects.SidechainBus _sidechain = new();
     private readonly Effects.EffectContext _effectCtx = new();
     private bool _disposed;
+    private volatile bool _rebuildPending;
 
     public AudioEngine(IAudioOutput output, IProjectService project, ITransportService transport,
         IPlaybackModeService playback, IEventAggregator events, IAuditionPlayer audition,
@@ -127,12 +128,12 @@ public sealed class AudioEngine : IAudioEngine
         _midiOut = midiOut ?? new NullMidiOutputService();
         _inputMonitor = inputMonitor ?? new NullInputMonitorService();
         _renderJob = RenderTrackJob;
-        _project.ProjectChanged += RebuildTracks;
+        _project.ProjectChanged += OnProjectChanged;
         _transport.StateChanged += OnTransportStateChanged;
         _playback.ActiveClipsChanged += OnSessionClipsChanged;
         _playback.ModeChanged += OnPlaybackModeChanged;
-        _output.FormatChanged += RebuildTracks; // re-prepare DSP when the device's sample rate changes
-        events.Subscribe<TracksChangedEvent>(_ => RebuildTracks());
+        _output.FormatChanged += OnFormatChanged;
+        events.Subscribe<TracksChangedEvent>(_ => RequestRebuild());
         events.Subscribe<AutomationChangedEvent>(e => e.Track.CommitAutoLanes());
     }
 
@@ -149,6 +150,30 @@ public sealed class AudioEngine : IAudioEngine
     }
 
     public void Stop() => _output.Stop();
+
+    private void OnProjectChanged() => RequestRebuild();
+
+    private void OnFormatChanged() => RequestRebuild();
+
+    /// <summary>
+    /// Schedules a track-graph rebuild. While the audio device is running, preparation runs at the start
+    /// of the next render block so effect <see cref="IAudioEffect.Prepare"/> never races
+    /// <see cref="IAudioEffect.Process"/> on the worker pool (e.g. after "Render clip to new track").
+    /// </summary>
+    private void RequestRebuild()
+    {
+        if (!_output.IsRunning || _disposed)
+            RebuildTracks();
+        else
+            _rebuildPending = true;
+    }
+
+    private void FlushPendingRebuild()
+    {
+        if (!_rebuildPending) return;
+        _rebuildPending = false;
+        RebuildTracks();
+    }
 
     private void RebuildTracks()
     {
@@ -467,6 +492,8 @@ public sealed class AudioEngine : IAudioEngine
 
     private void Render(Span<float> buffer)
     {
+        FlushPendingRebuild();
+
         var blockStart = Stopwatch.GetTimestamp();
         buffer.Clear();
 
@@ -1258,11 +1285,11 @@ public sealed class AudioEngine : IAudioEngine
         if (_disposed) return;
         _disposed = true;
         _playing = false;
-        _project.ProjectChanged -= RebuildTracks;
+        _project.ProjectChanged -= OnProjectChanged;
         _transport.StateChanged -= OnTransportStateChanged;
         _playback.ActiveClipsChanged -= OnSessionClipsChanged;
         _playback.ModeChanged -= OnPlaybackModeChanged;
-        _output.FormatChanged -= RebuildTracks;
+        _output.FormatChanged -= OnFormatChanged;
         _output.Stop();
         _output.Dispose();
         _workers.Dispose();

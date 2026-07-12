@@ -104,15 +104,19 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
 
-        _frozenCap = (int)(_sampleRate * 8.0); // up to ~8 s of captured material (covers a bar at slow tempi)
-        _ring = new CaptureBuffer[_channels];
-        _frozen = new float[_channels][];
+        var frozenCap = (int)(_sampleRate * 8.0); // up to ~8 s of captured material (covers a bar at slow tempi)
+        var ring = new CaptureBuffer[_channels];
+        var frozen = new float[_channels][];
         for (var c = 0; c < _channels; c++)
         {
-            _ring[c] = new CaptureBuffer();
-            _ring[c].Resize(_frozenCap + 8);
-            _frozen[c] = new float[_frozenCap + 8];
+            ring[c] = new CaptureBuffer();
+            ring[c].Resize(frozenCap + 8);
+            frozen[c] = new float[frozenCap + 8];
         }
+
+        _frozenCap = frozenCap;
+        _ring = ring;
+        _frozen = frozen;
 
         _clock = 0;
         _state = State.Idle;
@@ -122,8 +126,9 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
 
     public void Process(Span<float> buffer)
     {
-        if (_ring.Length == 0) return;
-        var channels = _channels;
+        var ring = _ring;
+        if (ring.Length == 0) return;
+        var channels = Math.Min(_channels, ring.Length);
         var frames = buffer.Length / channels;
         if (_wet.Length < buffer.Length) _wet = new float[buffer.Length];
 
@@ -147,7 +152,7 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
             var bi = f * channels;
 
             // Always feed the live ring so Slide/Lock have history available.
-            for (var c = 0; c < channels; c++) _ring[c].Write(buffer[bi + c]);
+            for (var c = 0; c < channels; c++) ring[c].Write(buffer[bi + c]);
 
             if (active)
             {

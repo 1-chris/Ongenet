@@ -119,6 +119,37 @@ public class MasteringEffectsTests
     }
 
     [Fact]
+    public async Task MultibandCompressor_ConcurrentPrepareAndProcess_DoesNotThrow()
+    {
+        var fx = new MultibandCompressorEffect { Depth = 0.8, HighBoostDb = 3.0 };
+        fx.Prepare(new AudioFormat(44100, 2));
+        var buf = SineStereo(700, 512, 44100, 0.05, 0.05);
+        Exception? caught = null;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var audio = Task.Run(() =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                try { fx.Process(buf); }
+                catch (Exception ex) { caught = ex; return; }
+            }
+        }, cts.Token);
+
+        var ui = Task.Run(() =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                fx.Prepare(new AudioFormat(48000, 2));
+                fx.Prepare(new AudioFormat(44100, 2));
+            }
+        }, cts.Token);
+
+        await Task.WhenAll(audio, ui);
+        Assert.Null(caught);
+    }
+
+    [Fact]
     public void PingPongDelayBouncesEnergyToTheOppositeChannel()
     {
         const double sr = 48000;
@@ -146,5 +177,37 @@ public class MasteringEffectsTests
 
         // Ping-pong cross-feeds the echo, so the right channel now receives energy.
         Assert.True(RightTail(Run(pingPong: true)) > 0.1, "ping-pong should bounce the echo across channels");
+    }
+
+    [Fact]
+    public async Task DelayEffect_ConcurrentPrepareAndProcess_DoesNotThrow()
+    {
+        var fx = new DelayEffect { TimeMs = 100, Feedback = 0.4, Mix = 0.5, PingPong = true };
+        fx.Prepare(new AudioFormat(44100, 2));
+        var buf = new float[512 * 2];
+        buf[0] = 1f;
+        Exception? caught = null;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var audio = Task.Run(() =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                try { fx.Process(buf); }
+                catch (Exception ex) { caught = ex; return; }
+            }
+        }, cts.Token);
+
+        var ui = Task.Run(() =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                fx.Prepare(new AudioFormat(48000, 2));
+                fx.Prepare(new AudioFormat(44100, 2));
+            }
+        }, cts.Token);
+
+        await Task.WhenAll(audio, ui);
+        Assert.Null(caught);
     }
 }

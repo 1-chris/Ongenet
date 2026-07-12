@@ -38,8 +38,10 @@ public sealed class BitcrusherEffect : IAudioEffect
     public void Prepare(AudioFormat format)
     {
         _channels = format.Channels < 1 ? 1 : format.Channels;
-        _held = new float[_channels];
-        _counter = new int[_channels];
+        var held = new float[_channels];
+        var counter = new int[_channels];
+        _held = held;
+        _counter = counter;
     }
 
     public IAudioEffect Clone() => new BitcrusherEffect
@@ -49,8 +51,10 @@ public sealed class BitcrusherEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        if (_held.Length == 0) return;
-        var channels = _channels;
+        var held = _held;
+        var counter = _counter;
+        if (held.Length == 0 || counter.Length == 0) return;
+        var channels = Math.Min(_channels, Math.Min(held.Length, counter.Length));
         var mix = (float)Math.Clamp(Mix, 0, 1);
         var levels = Math.Pow(2.0, Math.Clamp(Bits, 1, 16));
         var step = (float)(2.0 / levels);
@@ -62,15 +66,15 @@ public sealed class BitcrusherEffect : IAudioEffect
             var i = frame * channels;
             for (var c = 0; c < channels; c++)
             {
-                if (_counter[c] <= 0)
+                if (counter[c] <= 0)
                 {
                     // Quantise to the bit grid and hold.
-                    _held[c] = (float)(Math.Round(buffer[i + c] / step) * step);
-                    _counter[c] = hold;
+                    held[c] = (float)(Math.Round(buffer[i + c] / step) * step);
+                    counter[c] = hold;
                 }
 
-                _counter[c]--;
-                buffer[i + c] = buffer[i + c] * (1 - mix) + _held[c] * mix;
+                counter[c]--;
+                buffer[i + c] = buffer[i + c] * (1 - mix) + held[c] * mix;
             }
         }
     }

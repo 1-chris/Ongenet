@@ -78,12 +78,13 @@ public sealed class AutoTuneEffect : IAudioEffect
         _channels = format.Channels < 1 ? 1 : format.Channels;
 
         _detector.Configure(_sampleRate, 70.0, 1000.0);
-        _shifters = new PitchShifter[_channels];
+        var shifters = new PitchShifter[_channels];
         for (var ch = 0; ch < _channels; ch++)
         {
-            _shifters[ch] = new PitchShifter();
-            _shifters[ch].Configure(_sampleRate);
+            shifters[ch] = new PitchShifter();
+            shifters[ch].Configure(_sampleRate);
         }
+        _shifters = shifters;
 
         _ratioSmooth.SetSmoothTime(RetuneMs, _sampleRate);
         _ratioSmooth.Reset(1.0);
@@ -96,7 +97,9 @@ public sealed class AutoTuneEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        var channels = _channels < 1 ? 1 : _channels;
+        var shifters = _shifters;
+        var channels = Math.Min(_channels < 1 ? 1 : _channels, shifters.Length);
+        if (channels <= 0) return;
         var frames = buffer.Length / channels;
 
         // Re-detect the pitch and recompute the target correction periodically (every DetectHop
@@ -109,7 +112,7 @@ public sealed class AutoTuneEffect : IAudioEffect
             UpdateCorrection();
         }
 
-        for (var ch = 0; ch < channels; ch++) _shifters[ch].SetPeriod(_lastPeriod);
+        for (var ch = 0; ch < channels; ch++) shifters[ch].SetPeriod(_lastPeriod);
         _ratioSmooth.SetSmoothTime(RetuneMs, _sampleRate);
         var mix = AudioMath.Clamp(Mix, 0.0, 1.0);
 
@@ -126,8 +129,10 @@ public sealed class AutoTuneEffect : IAudioEffect
             {
                 var i = f * channels + ch;
                 var dry = buffer[i];
-                _shifters[ch].SetRatio(ratio);
-                var wet = _shifters[ch].Process(dry);
+                var shifter = shifters[ch];
+                if (shifter is null) continue;
+                shifter.SetRatio(ratio);
+                var wet = shifter.Process(dry);
                 buffer[i] = (float)(dry * (1.0 - mix) + wet * mix);
             }
         }

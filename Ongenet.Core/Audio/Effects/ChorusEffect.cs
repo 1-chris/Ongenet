@@ -49,8 +49,9 @@ public sealed class ChorusEffect : IAudioEffect
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
         var size = (int)(MaxMs / 1000.0 * _sampleRate) + 4;
-        _lines = new DelayLine[_channels];
-        for (var c = 0; c < _channels; c++) { _lines[c] = new DelayLine(); _lines[c].Resize(size); }
+        var lines = new DelayLine[_channels];
+        for (var c = 0; c < _channels; c++) { lines[c] = new DelayLine(); lines[c].Resize(size); }
+        _lines = lines;
         _lfo.Reset();
     }
 
@@ -61,8 +62,9 @@ public sealed class ChorusEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        if (_lines.Length == 0) return;
-        var channels = _channels;
+        var lines = _lines;
+        if (lines.Length == 0) return;
+        var channels = Math.Min(_channels, lines.Length);
         var mix = (float)Math.Clamp(Mix, 0, 1);
         var depth = Math.Clamp(Depth, 0, 1);
         var spread = Math.Clamp(Spread, 0, 1);
@@ -80,13 +82,13 @@ public sealed class ChorusEffect : IAudioEffect
                 {
                     var lfo = _lfo.Value(chanOffset + (double)v / Voices);
                     var delayMs = BaseMs + SweepMs * depth * (0.5 + 0.5 * lfo);
-                    wet += _lines[c].ReadFrac(delayMs / 1000.0 * _sampleRate);
+                    wet += lines[c].ReadFrac(delayMs / 1000.0 * _sampleRate);
                 }
 
                 wet /= Voices;
                 var dry = buffer[i + c];
                 buffer[i + c] = (float)(dry * (1 - mix) + wet * mix);
-                _lines[c].Write(dry);
+                lines[c].Write(dry);
             }
 
             _lfo.Advance();

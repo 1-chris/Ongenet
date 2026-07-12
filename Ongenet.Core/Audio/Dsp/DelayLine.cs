@@ -31,8 +31,14 @@ public sealed class DelayLine
     /// <summary>Reads <paramref name="delaySamples"/> samples back (integer).</summary>
     public float ReadInt(int delaySamples)
     {
+        var size = _buf.Length;
+        if (size <= 0) return 0f;
+        // Index using the live buffer length — Prepare/Resize may run on another thread and briefly
+        // leave _size and _buf out of sync; a torn read must never crash the audio thread.
+        delaySamples = Math.Clamp(delaySamples, 0, size - 1);
         var i = _write - delaySamples;
-        if (i < 0) i += _size;
+        i %= size;
+        if (i < 0) i += size;
         return _buf[i];
     }
 
@@ -55,7 +61,11 @@ public sealed class DelayLine
     /// <summary>Writes the next sample and advances the write position.</summary>
     public void Write(float x)
     {
-        _buf[_write] = x;
-        if (++_write >= _size) _write = 0;
+        var size = _buf.Length;
+        if (size <= 0) return;
+        var w = _write;
+        if (w >= size) w = 0;
+        _buf[w] = x;
+        _write = w + 1 >= size ? 0 : w + 1;
     }
 }
