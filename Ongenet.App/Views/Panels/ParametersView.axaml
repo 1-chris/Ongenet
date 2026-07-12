@@ -31,7 +31,7 @@
                 <StackPanel Width="120" Margin="2,4">
                     <TextBlock Text="{Binding Name}" FontSize="10"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <ComboBox ItemsSource="{Binding Options}" SelectedIndex="{Binding SelectedIndex}"
+                    <ComboBox Classes="stretch" ItemsSource="{Binding Options}" SelectedIndex="{Binding SelectedIndex}"
                               HorizontalAlignment="Stretch"/>
                 </StackPanel>
             </DataTemplate>

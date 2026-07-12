@@ -14,8 +14,8 @@
                 <StackPanel Spacing="8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Content="{Binding Status}" Command="{Binding ToggleCommand}" Padding="8,2"/>
-                            <Button Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}" Padding="8,2"/>
+                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
+                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
                         </StackPanel>
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
                     </DockPanel>
@@ -35,8 +35,8 @@
                 <StackPanel Spacing="8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Content="{Binding Status}" Command="{Binding ToggleCommand}" Padding="8,2"/>
-                            <Button Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}" Padding="8,2"/>
+                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
+                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
                         </StackPanel>
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
                     </DockPanel>
@@ -51,8 +51,8 @@
                 <StackPanel Spacing="8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Content="{Binding Status}" Command="{Binding ToggleCommand}" Padding="8,2"/>
-                            <Button Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}" Padding="8,2"/>
+                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
+                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
                         </StackPanel>
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
                     </DockPanel>
@@ -67,8 +67,8 @@
                 <StackPanel Spacing="8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Content="{Binding Status}" Command="{Binding ToggleCommand}" Padding="8,2"/>
-                            <Button Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}" Padding="8,2"/>
+                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
+                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
                         </StackPanel>
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
                     </DockPanel>
@@ -95,8 +95,8 @@
                 <StackPanel Spacing="8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Content="{Binding Status}" Command="{Binding ToggleCommand}" Padding="8,2"/>
-                            <Button Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}" Padding="8,2"/>
+                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
+                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
                         </StackPanel>
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
                     </DockPanel>
@@ -110,8 +110,8 @@
             <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" Background="{StaticResource CatppuccinSurface0}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                        <Button Content="{Binding Status}" Command="{Binding ToggleCommand}" Padding="8,2"/>
-                        <Button Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}" Padding="8,2"/>
+                        <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
+                        <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
                     </StackPanel>
                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
                 </DockPanel>
@@ -137,11 +137,11 @@
                            Foreground="{StaticResource CatppuccinSubtext0}"/>
 
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Button Content="{DynamicResource MidiFx_Scale}" Command="{Binding AddScaleCommand}" Padding="8,4"/>
-                    <Button Content="{DynamicResource MidiFx_Chord}" Command="{Binding AddChordCommand}" Padding="8,4"/>
-                    <Button Content="{DynamicResource MidiFx_Arp}" Command="{Binding AddArpCommand}" Padding="8,4"/>
-                    <Button Content="{DynamicResource MidiFx_Echo}" Command="{Binding AddEchoCommand}" Padding="8,4"/>
-                    <Button Content="{DynamicResource MidiFx_Random}" Command="{Binding AddRandomCommand}" Padding="8,4"/>
+                    <Button Classes="compact" Content="{DynamicResource MidiFx_Scale}" Command="{Binding AddScaleCommand}"/>
+                    <Button Classes="compact" Content="{DynamicResource MidiFx_Chord}" Command="{Binding AddChordCommand}"/>
+                    <Button Classes="compact" Content="{DynamicResource MidiFx_Arp}" Command="{Binding AddArpCommand}"/>
+                    <Button Classes="compact" Content="{DynamicResource MidiFx_Echo}" Command="{Binding AddEchoCommand}"/>
+                    <Button Classes="compact" Content="{DynamicResource MidiFx_Random}" Command="{Binding AddRandomCommand}"/>
                 </StackPanel>
 
                 <ItemsControl ItemsSource="{Binding Effects}" ItemTemplate="{StaticResource FxTemplateSelector}"/>

@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:controls="using:Ongenet.App.Controls">
+                    xmlns:controls="using:Ongenet.App.Controls"
+                    xmlns:converters="using:Avalonia.Controls.Converters">
 
     <!-- ============================================================================================
          IconButton — a vector-glyph button with hover/press feedback and emphasis variants. Every
@@ -124,6 +125,698 @@
             <Setter Property="Height" Value="44"/>
             <Setter Property="CornerRadius" Value="22"/>
             <Setter Property="IconSize" Value="24"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- ============================================================================================
+         Form controls — Catppuccin-themed replacements for Fluent ComboBox, NumericUpDown, TextBox.
+         Brushes use {StaticResource Catppuccin...} so ThemeService live re-theming applies.
+         ============================================================================================ -->
+
+    <converters:MarginMultiplierConverter x:Key="SpinnerLeftThickness" Indent="1" Left="True"/>
+    <converters:MarginMultiplierConverter x:Key="SpinnerRightThickness" Indent="1" Right="True"/>
+
+    <!-- ComboBoxItem — dropdown list rows -->
+    <ControlTheme x:Key="{x:Type ComboBoxItem}" TargetType="ComboBoxItem">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter Name="PART_ContentPresenter"
+                                  Foreground="{TemplateBinding Foreground}"
+                                  Background="{TemplateBinding Background}"
+                                  CornerRadius="{TemplateBinding CornerRadius}"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Content="{TemplateBinding Content}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                  Padding="{TemplateBinding Padding}"/>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+        <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinOverlay0}"/>
+            <Setter Property="Opacity" Value="0.5"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- ComboBox — rounded surface with custom chevron -->
+    <ControlTheme x:Key="{x:Type ComboBox}" TargetType="ComboBox">
+        <Setter Property="Padding" Value="10,0,0,0"/>
+        <Setter Property="FocusAdorner" Value="{x:Null}"/>
+        <Setter Property="MaxDropDownHeight" Value="300"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="PlaceholderForeground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DataValidationErrors>
+                    <Grid ColumnDefinitions="*,28">
+                        <Border x:Name="Background"
+                                Grid.Column="0"
+                                Grid.ColumnSpan="2"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"/>
+                        <TextBlock x:Name="PlaceholderTextBlock"
+                                   Grid.Column="0"
+                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                   Margin="{TemplateBinding Padding}"
+                                   Text="{TemplateBinding PlaceholderText}"
+                                   Foreground="{TemplateBinding PlaceholderForeground}">
+                            <TextBlock.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="SelectionBoxItem" RelativeSource="{RelativeSource TemplatedParent}" Converter="{x:Static ObjectConverters.IsNull}"/>
+                                    <Binding Path="!IsEditable" RelativeSource="{RelativeSource TemplatedParent}"/>
+                                </MultiBinding>
+                            </TextBlock.IsVisible>
+                        </TextBlock>
+                        <ContentControl x:Name="ContentPresenter"
+                                        Content="{TemplateBinding SelectionBoxItem}"
+                                        Grid.Column="0"
+                                        Margin="{TemplateBinding Padding}"
+                                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                        ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                        IsVisible="{TemplateBinding IsEditable, Converter={x:Static BoolConverters.Not}}"/>
+                        <TextBox Name="PART_EditableTextBox"
+                                 Grid.Column="0"
+                                 Padding="{TemplateBinding Padding}"
+                                 HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                 Foreground="{TemplateBinding Foreground}"
+                                 Background="Transparent"
+                                 Text="{TemplateBinding Text, Mode=TwoWay}"
+                                 PlaceholderText="{TemplateBinding PlaceholderText}"
+                                 BorderThickness="0"
+                                 IsVisible="{TemplateBinding IsEditable}"/>
+                        <Viewbox Grid.Column="1"
+                                 Width="12" Height="12"
+                                 Margin="0,0,8,0"
+                                 IsHitTestVisible="False"
+                                 HorizontalAlignment="Right"
+                                 VerticalAlignment="Center">
+                            <Canvas Width="24" Height="24">
+                                <Path x:Name="DropDownGlyph"
+                                      Data="{StaticResource IconChevronDown}"
+                                      Fill="{StaticResource CatppuccinSubtext1}"/>
+                            </Canvas>
+                        </Viewbox>
+                        <Popup Name="PART_Popup"
+                               WindowManagerAddShadowHint="False"
+                               IsOpen="{TemplateBinding IsDropDownOpen, Mode=TwoWay}"
+                               MinWidth="{Binding Bounds.Width, RelativeSource={RelativeSource TemplatedParent}}"
+                               MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                               PlacementTarget="{Binding #Background}"
+                               IsLightDismissEnabled="True"
+                               InheritsTransform="True">
+                            <Border x:Name="PopupBorder"
+                                    Background="{StaticResource CatppuccinSurface0}"
+                                    BorderBrush="{StaticResource CatppuccinSurface2}"
+                                    BorderThickness="1"
+                                    Padding="6"
+                                    CornerRadius="8">
+                                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"
+                                              IsScrollChainingEnabled="False">
+                                    <ItemsPresenter Name="PART_ItemsPresenter"
+                                                    ItemsPanel="{TemplateBinding ItemsPanel}"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </DataValidationErrors>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Background">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#Background">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinMauve}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="^:focus-visible /template/ Path#DropDownGlyph">
+            <Setter Property="Fill" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+        <Style Selector="^[IsEditable=true]">
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="KeyboardNavigation.TabNavigation" Value="Local"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- Spinner repeat buttons for NumericUpDown -->
+    <ControlTheme x:Key="OngenetSpinnerRepeatButton" TargetType="RepeatButton">
+        <Setter Property="MinWidth" Value="26"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext1}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter x:Name="PART_ContentPresenter"
+                                  Background="{TemplateBinding Background}"
+                                  Content="{TemplateBinding Content}"
+                                  Padding="4,2"
+                                  HorizontalContentAlignment="Center"
+                                  VerticalContentAlignment="Center"/>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface2}"/>
+        </Style>
+        <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Opacity" Value="0.35"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- ButtonSpinner — used inside NumericUpDown -->
+    <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DataValidationErrors>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            MinHeight="{TemplateBinding MinHeight}">
+                        <DockPanel>
+                            <StackPanel Name="PART_SpinnerPanel"
+                                        TabIndex="2"
+                                        DockPanel.Dock="Right"
+                                        Orientation="Horizontal"
+                                        IsVisible="{TemplateBinding ShowButtonSpinner}">
+                                <RepeatButton Name="PART_IncreaseButton"
+                                              IsTabStop="{TemplateBinding IsTabStop}"
+                                              Theme="{StaticResource OngenetSpinnerRepeatButton}"
+                                              VerticalAlignment="Stretch"
+                                              VerticalContentAlignment="Center"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              MinWidth="26">
+                                    <Viewbox Width="10" Height="10" Stretch="Uniform">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Data="{StaticResource IconChevronUp}" Fill="{StaticResource CatppuccinSubtext1}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </RepeatButton>
+                                <RepeatButton Name="PART_DecreaseButton"
+                                              IsTabStop="{TemplateBinding IsTabStop}"
+                                              Theme="{StaticResource OngenetSpinnerRepeatButton}"
+                                              VerticalAlignment="Stretch"
+                                              VerticalContentAlignment="Center"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              MinWidth="26">
+                                    <Viewbox Width="10" Height="10" Stretch="Uniform">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Data="{StaticResource IconChevronDown}" Fill="{StaticResource CatppuccinSubtext1}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </RepeatButton>
+                            </StackPanel>
+                            <ContentPresenter Name="PART_ContentPresenter"
+                                              TabIndex="1"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Content="{TemplateBinding Content}"
+                                              HorizontalContentAlignment="Stretch"
+                                              VerticalContentAlignment="Center"
+                                              Padding="{TemplateBinding Padding}"/>
+                        </DockPanel>
+                    </Border>
+                </DataValidationErrors>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:left /template/ StackPanel#PART_SpinnerPanel">
+            <Setter Property="DockPanel.Dock" Value="Left"/>
+        </Style>
+        <Style Selector="^:pointerover">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:focus-within">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinMauve}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- NumericUpDown — rounded spinner field -->
+    <ControlTheme x:Key="{x:Type NumericUpDown}" TargetType="NumericUpDown">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="PlaceholderForeground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DataValidationErrors>
+                    <ButtonSpinner Name="PART_Spinner"
+                                   Background="{TemplateBinding Background}"
+                                   BorderThickness="{TemplateBinding BorderThickness}"
+                                   BorderBrush="{TemplateBinding BorderBrush}"
+                                   CornerRadius="{TemplateBinding CornerRadius}"
+                                   IsTabStop="False"
+                                   Padding="0"
+                                   MinWidth="0"
+                                   HorizontalContentAlignment="Stretch"
+                                   VerticalContentAlignment="Center"
+                                   AllowSpin="{TemplateBinding AllowSpin}"
+                                   ShowButtonSpinner="{TemplateBinding ShowButtonSpinner}"
+                                   ButtonSpinnerLocation="{TemplateBinding ButtonSpinnerLocation}">
+                        <TextBox Name="PART_TextBox"
+                                 Background="Transparent"
+                                 BorderBrush="Transparent"
+                                 Padding="{TemplateBinding Padding}"
+                                 MinWidth="0"
+                                 MinHeight="0"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Stretch"
+                                 Foreground="{TemplateBinding Foreground}"
+                                 PlaceholderText="{TemplateBinding PlaceholderText}"
+                                 PlaceholderForeground="{TemplateBinding PlaceholderForeground}"
+                                 IsReadOnly="{TemplateBinding IsReadOnly}"
+                                 VerticalContentAlignment="Center"
+                                 HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                 Text="{TemplateBinding Text}"
+                                 TextAlignment="{TemplateBinding TextAlignment}"
+                                 AcceptsReturn="False"
+                                 TextWrapping="NoWrap"
+                                 InnerLeftContent="{Binding InnerLeftContent, RelativeSource={RelativeSource TemplatedParent}}"
+                                 InnerRightContent="{Binding InnerRightContent, RelativeSource={RelativeSource TemplatedParent}}"/>
+                    </ButtonSpinner>
+                </DataValidationErrors>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <!-- TextBox — default field styling (Fluent template retained via property/state overrides) -->
+    <ControlTheme x:Key="{x:Type TextBox}" TargetType="TextBox">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="CaretBrush" Value="{StaticResource CatppuccinMauve}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="SelectionBrush" Value="{StaticResource CatppuccinMauve}"/>
+        <Setter Property="SelectionForegroundBrush" Value="{StaticResource CatppuccinCrust}"/>
+        <Setter Property="PlaceholderForeground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="FocusAdorner" Value="{x:Null}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DataValidationErrors>
+                    <Panel>
+                        <Border Name="PART_BorderElement"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                MinWidth="{TemplateBinding MinWidth}"
+                                MinHeight="{TemplateBinding MinHeight}"/>
+                        <Border Margin="{TemplateBinding BorderThickness}">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <ContentPresenter Grid.Column="0"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  Content="{TemplateBinding InnerLeftContent}"/>
+                                <DockPanel x:Name="PART_InnerDockPanel"
+                                           Grid.Column="1"
+                                           Margin="{TemplateBinding Padding}">
+                                    <TextBlock Name="PART_FloatingPlaceholder"
+                                               Foreground="{TemplateBinding PlaceholderForeground}"
+                                               IsVisible="False"
+                                               Text="{TemplateBinding PlaceholderText}"
+                                               DockPanel.Dock="Top"/>
+                                    <ScrollViewer Name="PART_ScrollViewer"
+                                                    HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                                                    VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}"
+                                                    IsScrollChainingEnabled="{TemplateBinding (ScrollViewer.IsScrollChainingEnabled)}">
+                                        <Panel>
+                                            <TextBlock Name="PART_Placeholder"
+                                                       Foreground="{TemplateBinding PlaceholderForeground}"
+                                                       Text="{TemplateBinding PlaceholderText}"
+                                                       TextAlignment="{TemplateBinding TextAlignment}"
+                                                       TextWrapping="{TemplateBinding TextWrapping}"
+                                                       HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                       VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
+                                                <TextBlock.IsVisible>
+                                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                        <Binding ElementName="PART_TextPresenter" Path="PreeditText" Converter="{x:Static StringConverters.IsNullOrEmpty}"/>
+                                                        <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Text" Converter="{x:Static StringConverters.IsNullOrEmpty}"/>
+                                                    </MultiBinding>
+                                                </TextBlock.IsVisible>
+                                            </TextBlock>
+                                            <TextPresenter Name="PART_TextPresenter"
+                                                           Text="{TemplateBinding Text, Mode=TwoWay}"
+                                                           CaretBlinkInterval="{TemplateBinding CaretBlinkInterval}"
+                                                           CaretIndex="{TemplateBinding CaretIndex}"
+                                                           SelectionStart="{TemplateBinding SelectionStart}"
+                                                           SelectionEnd="{TemplateBinding SelectionEnd}"
+                                                           TextAlignment="{TemplateBinding TextAlignment}"
+                                                           TextWrapping="{TemplateBinding TextWrapping}"
+                                                           LineHeight="{TemplateBinding LineHeight}"
+                                                           LetterSpacing="{TemplateBinding LetterSpacing}"
+                                                           PasswordChar="{TemplateBinding PasswordChar}"
+                                                           RevealPassword="{TemplateBinding RevealPassword}"
+                                                           SelectionBrush="{TemplateBinding SelectionBrush}"
+                                                           SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                                                           CaretBrush="{TemplateBinding CaretBrush}"
+                                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                        </Panel>
+                                    </ScrollViewer>
+                                </DockPanel>
+                                <ContentPresenter Grid.Column="2"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  Content="{TemplateBinding InnerRightContent}"/>
+                            </Grid>
+                        </Border>
+                    </Panel>
+                </DataValidationErrors>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinMauve}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+        <Style Selector="^:error /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinRed}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- ============================================================================================
+         Button — default pill surface; accent/compact/ghost/flat variants in AppStyles.axaml.
+         ============================================================================================ -->
+    <ControlTheme x:Key="{x:Type Button}" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="RenderTransform" Value="none"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+            </Transitions>
+        </Setter>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter x:Name="PART_ContentPresenter"
+                                  Background="{TemplateBinding Background}"
+                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                  CornerRadius="{TemplateBinding CornerRadius}"
+                                  Content="{TemplateBinding Content}"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Padding="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="RecognizesAccessKey" Value="True"/>
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.98)"/>
+        </Style>
+        <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface2}"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- ============================================================================================
+         ToggleButton — default pill toggle; toggle/tab/strip variants in AppStyles.axaml.
+         ============================================================================================ -->
+    <ControlTheme x:Key="{x:Type ToggleButton}" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="12,7"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="RenderTransform" Value="none"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+            </Transitions>
+        </Setter>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter x:Name="PART_ContentPresenter"
+                                  Background="{TemplateBinding Background}"
+                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                  CornerRadius="{TemplateBinding CornerRadius}"
+                                  Content="{TemplateBinding Content}"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Padding="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="RecognizesAccessKey" Value="True"/>
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.98)"/>
+        </Style>
+        <Style Selector="^:checked">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+        </Style>
+        <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+        <Style Selector="^:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource CatppuccinLavender}"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+    </ControlTheme>
+
+    <!-- ============================================================================================
+         Slider — Catppuccin track + smaller thumb; compact/fader variants in AppStyles.axaml.
+         ============================================================================================ -->
+    <GridLength x:Key="SliderPreContentMargin">0</GridLength>
+    <GridLength x:Key="SliderPostContentMargin">0</GridLength>
+    <x:Double x:Key="SliderHorizontalHeight">16</x:Double>
+    <x:Double x:Key="SliderVerticalWidth">16</x:Double>
+    <CornerRadius x:Key="SliderThumbCornerRadius">6</CornerRadius>
+    <x:Double x:Key="SliderHorizontalThumbWidth">12</x:Double>
+    <x:Double x:Key="SliderHorizontalThumbHeight">12</x:Double>
+    <x:Double x:Key="SliderVerticalThumbWidth">12</x:Double>
+    <x:Double x:Key="SliderVerticalThumbHeight">12</x:Double>
+    <x:Double x:Key="SliderTrackThemeHeight">4</x:Double>
+
+    <ControlTheme x:Key="OngenetSliderThumbTheme" TargetType="Thumb">
+        <Setter Property="Background" Value="{StaticResource CatppuccinText}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{StaticResource SliderThumbCornerRadius}"/>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSubtext1}"/>
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="OngenetSliderHorizontalRepeatButton" TargetType="RepeatButton">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="TrackBackground"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="2"
+                        Height="{StaticResource SliderTrackThemeHeight}"
+                        VerticalAlignment="Center"/>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <ControlTheme x:Key="OngenetSliderVerticalRepeatButton" TargetType="RepeatButton">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="TrackBackground"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="2"
+                        Width="{StaticResource SliderTrackThemeHeight}"
+                        HorizontalAlignment="Center"/>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <ControlTheme x:Key="{x:Type Slider}" TargetType="Slider">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinMauve}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="MinHeight" Value="16"/>
+        <Setter Property="MinWidth" Value="16"/>
+        <Style Selector="^:horizontal">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <DataValidationErrors>
+                        <Border BorderThickness="0">
+                            <Grid x:Name="SliderContainer" Margin="{TemplateBinding Padding}">
+                                <Grid x:Name="HorizontalTemplate"
+                                      MinHeight="{StaticResource SliderHorizontalHeight}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="{StaticResource SliderPreContentMargin}"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="{StaticResource SliderPostContentMargin}"/>
+                                    </Grid.RowDefinitions>
+                                    <Track Name="PART_Track"
+                                           Grid.Row="1"
+                                           Minimum="{TemplateBinding Minimum}"
+                                           Maximum="{TemplateBinding Maximum}"
+                                           Value="{TemplateBinding Value, Mode=TwoWay}"
+                                           IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
+                                           Orientation="Horizontal">
+                                        <Track.DecreaseButton>
+                                            <RepeatButton Name="PART_DecreaseButton"
+                                                          Theme="{StaticResource OngenetSliderHorizontalRepeatButton}"
+                                                          Background="{TemplateBinding Foreground}"
+                                                          Focusable="False"/>
+                                        </Track.DecreaseButton>
+                                        <Track.IncreaseButton>
+                                            <RepeatButton Name="PART_IncreaseButton"
+                                                          Theme="{StaticResource OngenetSliderHorizontalRepeatButton}"
+                                                          Background="{TemplateBinding Background}"
+                                                          Focusable="False"/>
+                                        </Track.IncreaseButton>
+                                        <Thumb Name="thumb"
+                                               Width="{StaticResource SliderHorizontalThumbWidth}"
+                                               Height="{StaticResource SliderHorizontalThumbHeight}"
+                                               Theme="{StaticResource OngenetSliderThumbTheme}"/>
+                                    </Track>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataValidationErrors>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="^:vertical">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <DataValidationErrors>
+                        <Border BorderThickness="0">
+                            <Grid x:Name="SliderContainer" Margin="{TemplateBinding Padding}">
+                                <Grid x:Name="VerticalTemplate"
+                                      MinWidth="{StaticResource SliderVerticalWidth}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="{StaticResource SliderPreContentMargin}"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="{StaticResource SliderPostContentMargin}"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Track Name="PART_Track"
+                                           Grid.Column="1"
+                                           Minimum="{TemplateBinding Minimum}"
+                                           Maximum="{TemplateBinding Maximum}"
+                                           Value="{TemplateBinding Value, Mode=TwoWay}"
+                                           IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
+                                           Orientation="Vertical">
+                                        <Track.DecreaseButton>
+                                            <RepeatButton Name="PART_DecreaseButton"
+                                                          Theme="{StaticResource OngenetSliderVerticalRepeatButton}"
+                                                          Background="{TemplateBinding Foreground}"
+                                                          Focusable="False"/>
+                                        </Track.DecreaseButton>
+                                        <Track.IncreaseButton>
+                                            <RepeatButton Name="PART_IncreaseButton"
+                                                          Theme="{StaticResource OngenetSliderVerticalRepeatButton}"
+                                                          Background="{TemplateBinding Background}"
+                                                          Focusable="False"/>
+                                        </Track.IncreaseButton>
+                                        <Thumb Name="SliderThumb"
+                                               Width="{StaticResource SliderVerticalThumbWidth}"
+                                               Height="{StaticResource SliderVerticalThumbHeight}"
+                                               Theme="{StaticResource OngenetSliderThumbTheme}"/>
+                                    </Track>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataValidationErrors>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="^:focus-visible /template/ Thumb">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinMauve}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.45"/>
         </Style>
     </ControlTheme>
 

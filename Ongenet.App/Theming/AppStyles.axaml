@@ -141,6 +141,23 @@
         <Setter Property="FontSize" Value="11"/>
     </Style>
 
+    <!-- flat: rounded-square toolbar hit target (transport punch/marker buttons). -->
+    <Style Selector="Button.flat">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Button.flat /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+    </Style>
+
     <!-- ghost: subtle, fills only on hover. -->
     <Style Selector="Button.ghost">
         <Setter Property="Background" Value="Transparent"/>
@@ -241,6 +258,39 @@
         <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
     </Style>
 
+    <Style Selector="ToggleButton:checked TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+    </Style>
+
+    <!-- strip: compact M/S/R toggles on track headers and mixer strips. -->
+    <Style Selector="ToggleButton.strip">
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="Height" Value="18"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="ToggleButton.strip /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+    </Style>
+    <Style Selector="ToggleButton.strip:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinSurface2}"/>
+    </Style>
+    <Style Selector="ToggleButton.strip:checked">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+    </Style>
+    <Style Selector="ToggleButton.strip:checked TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+    </Style>
+    <Style Selector="ToggleButton.strip.record:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CatppuccinRed}"/>
+    </Style>
+    <Style Selector="ToggleButton.strip.record:checked">
+        <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+    </Style>
+
     <!-- ── Nav rail (ListBox.nav) ────────────────────────────────────────────────────────────── -->
     <Style Selector="ListBox.nav">
         <Setter Property="Background" Value="Transparent"/>
@@ -283,6 +333,8 @@
     </Style>
 
     <!-- ── Text fields ───────────────────────────────────────────────────────────────────────── -->
+    <!-- Default field look is now in ControlThemes.axaml ({x:Type TextBox}). Variants below. -->
+
     <Style Selector="TextBox.search">
         <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
         <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
@@ -309,6 +361,70 @@
     <Style Selector="TextBox.field /template/ Border#PART_BorderElement">
         <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
         <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+
+    <!-- ── Form control size variants ────────────────────────────────────────────────────────── -->
+    <Style Selector="ComboBox.compact">
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Padding" Value="8,0,0,0"/>
+        <Setter Property="CornerRadius" Value="7"/>
+    </Style>
+    <Style Selector="ComboBox.compact /template/ Border#Background">
+        <Setter Property="CornerRadius" Value="7"/>
+    </Style>
+
+    <Style Selector="NumericUpDown.compact">
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Padding" Value="8,0"/>
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="NumericUpDown.compact /template/ ButtonSpinner#PART_Spinner">
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="CornerRadius" Value="7"/>
+    </Style>
+
+    <Style Selector="TextBox.compact">
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Padding" Value="8,0"/>
+        <Setter Property="CornerRadius" Value="7"/>
+    </Style>
+    <Style Selector="TextBox.compact /template/ Border#PART_BorderElement">
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="MinHeight" Value="28"/>
+    </Style>
+
+    <Style Selector="ComboBox.stretch">
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- ComboBox popup items (also used by instrument preset lists) -->
+    <Style Selector="ComboBoxItem">
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="Padding" Value="10,7"/>
+    </Style>
+
+    <!-- ── Slider variants ───────────────────────────────────────────────────────────────────── -->
+    <Style Selector="Slider.compact /template/ Thumb">
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="Height" Value="10"/>
+    </Style>
+    <Style Selector="Slider.compact:horizontal /template/ Grid#HorizontalTemplate">
+        <Setter Property="MinHeight" Value="14"/>
+    </Style>
+    <Style Selector="Slider.compact:vertical /template/ Grid#VerticalTemplate">
+        <Setter Property="MinWidth" Value="14"/>
+    </Style>
+
+    <Style Selector="Slider.fader /template/ Thumb">
+        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+    </Style>
+    <Style Selector="Slider.fader:vertical /template/ Grid#VerticalTemplate">
+        <Setter Property="MinWidth" Value="18"/>
     </Style>
 
     <!-- ── Menus ─────────────────────────────────────────────────────────────────────────────── -->

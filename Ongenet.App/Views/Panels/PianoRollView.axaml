@@ -14,28 +14,6 @@
         <x:Double x:Key="PrRulerHeight">22</x:Double>
     </UserControl.Resources>
 
-    <UserControl.Styles>
-        <Style Selector="Button.PrTool">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
-            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
-        </Style>
-        <Style Selector="Button.PrTool:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
-        </Style>
-        <Style Selector="ToggleButton.PrToolToggle">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
-            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
-        </Style>
-        <Style Selector="ToggleButton.PrToolToggle:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
-            <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
-        </Style>
-    </UserControl.Styles>
-
     <Border Background="{StaticResource CatppuccinCrust}"
             BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,1,0,0">
         <Grid RowDefinitions="Auto,Auto,*,Auto" ColumnDefinitions="Auto,*">
@@ -46,37 +24,37 @@
                     BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"
                     Padding="4,3">
                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <Button Classes="PrTool" Content="{DynamicResource PianoRoll_Import_MIDI}" Click="Import_Click"
+                    <Button Classes="compact" Content="{DynamicResource PianoRoll_Import_MIDI}" Click="Import_Click"
                             ToolTip.Tip="{DynamicResource PianoRoll_Import_a_mid_file_into_this_clip_Tip}"/>
-                    <Button Classes="PrTool" Content="{DynamicResource PianoRoll_Export_MIDI}" Click="Export_Click"
+                    <Button Classes="compact" Content="{DynamicResource PianoRoll_Export_MIDI}" Click="Export_Click"
                             ToolTip.Tip="{DynamicResource PianoRoll_Export_this_clips_notes_to_a_mid_file_Tip}"/>
-                    <Button Classes="PrTool" Content="{DynamicResource PianoRoll_Generator}" Click="Generator_Click"
+                    <Button Classes="compact" Content="{DynamicResource PianoRoll_Generator}" Click="Generator_Click"
                             ToolTip.Tip="{DynamicResource PianoRoll_Generate_randomized_chords_chord_progressions_Tip}"/>
                     <Border Width="1" Margin="3,1" Background="{StaticResource CatppuccinSurface0}"/>
-                    <ToggleButton Classes="PrToolToggle" Content="{DynamicResource PianoRoll_Edit}" IsChecked="{Binding IsEditMode}"
+                    <ToggleButton Classes="toggle compact" Content="{DynamicResource PianoRoll_Edit}" IsChecked="{Binding IsEditMode}"
                                   ToolTip.Tip="{DynamicResource PianoRoll_Edit_tool_draw_move_resize_With_several_selected_Tip}"/>
-                    <ToggleButton Classes="PrToolToggle" Content="{DynamicResource PianoRoll_Select}" IsChecked="{Binding IsSelectMode}"
+                    <ToggleButton Classes="toggle compact" Content="{DynamicResource PianoRoll_Select}" IsChecked="{Binding IsSelectMode}"
                                   ToolTip.Tip="{DynamicResource PianoRoll_Multi_select_tool_click_drag_a_rubber_band_over__Tip}"/>
-                    <ToggleButton Classes="PrToolToggle" Content="{DynamicResource PianoRoll_Slice}" IsChecked="{Binding IsSliceMode}"
+                    <ToggleButton Classes="toggle compact" Content="{DynamicResource PianoRoll_Slice}" IsChecked="{Binding IsSliceMode}"
                                   ToolTip.Tip="{DynamicResource PianoRoll_Slice_tool_click_drag_a_line_to_cut_through_one__Tip}"/>
                     <Border Width="1" Margin="3,1" Background="{StaticResource CatppuccinSurface0}"/>
-                    <Button Classes="PrTool" Content="{DynamicResource PianoRoll_Arpeggio}" Click="Arp_Click"
+                    <Button Classes="compact" Content="{DynamicResource PianoRoll_Arpeggio}" Click="Arp_Click"
                             ToolTip.Tip="{DynamicResource PianoRoll_Convert_the_selected_notes_into_an_arpeggio_Tip}"/>
-                    <Button Classes="PrTool" Content="{DynamicResource PianoRoll_Quantize}" Command="{Binding QuantizeClipCommand}"
+                    <Button Classes="compact" Content="{DynamicResource PianoRoll_Quantize}" Command="{Binding QuantizeClipCommand}"
                             ToolTip.Tip="{DynamicResource PianoRoll_Quantize_note_starts_and_lengths_to_the_current__Tip}"/>
-                    <Button Classes="PrTool" Content="{DynamicResource PianoRoll_Groove}" Command="{Binding ApplyGrooveCommand}"
+                    <Button Classes="compact" Content="{DynamicResource PianoRoll_Groove}" Command="{Binding ApplyGrooveCommand}"
                             ToolTip.Tip="{DynamicResource PianoRoll_Apply_the_projects_active_groove_to_note_timing_Tip}"/>
-                    <ToggleButton Classes="PrToolToggle" Content="{DynamicResource PianoRoll_MPE}" IsChecked="{Binding ShowExpressionLane}"
+                    <ToggleButton Classes="toggle compact" Content="{DynamicResource PianoRoll_MPE}" IsChecked="{Binding ShowExpressionLane}"
                                   ToolTip.Tip="{DynamicResource PianoRoll_Show_the_per_beat_CC74_pressure_expression_lane_Tip}"/>
                     <Border Width="1" Margin="3,1" Background="{StaticResource CatppuccinSurface0}"/>
                     <CheckBox Content="{DynamicResource PianoRoll_Scale_snap}" IsChecked="{Binding ScaleSnapEnabled}"
                               FontSize="11" VerticalAlignment="Center"
                               ToolTip.Tip="{DynamicResource PianoRoll_Snap_drawn_and_moved_notes_to_the_selected_key_s_Tip}"/>
-                    <ComboBox ItemsSource="{Binding ScaleRootNotes}" SelectedIndex="{Binding ScaleRootIndex}"
-                              Width="52" FontSize="11" VerticalAlignment="Center"
+                    <ComboBox Classes="compact" ItemsSource="{Binding ScaleRootNotes}" SelectedIndex="{Binding ScaleRootIndex}"
+                              Width="52" VerticalAlignment="Center"
                               IsEnabled="{Binding ScaleSnapEnabled}"/>
-                    <ComboBox ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}"
-                              Width="120" FontSize="11" VerticalAlignment="Center"
+                    <ComboBox Classes="compact" ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}"
+                              Width="120" VerticalAlignment="Center"
                               IsEnabled="{Binding ScaleSnapEnabled}"/>
                 </StackPanel>
             </Border>

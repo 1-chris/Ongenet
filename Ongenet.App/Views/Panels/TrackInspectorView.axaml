@@ -10,15 +10,6 @@
              x:Class="Ongenet.App.Views.Panels.TrackInspectorView"
              x:DataType="vm:TrackInspectorViewModel">
 
-    <UserControl.Resources>
-        <!-- Fluent reserves 15px above/below the slider thumb for tick bars we don't use,
-             which both wastes space and clips the thumb when the control is made compact.
-             Zero the reservations so sliders collapse to the thumb's natural 20px height. -->
-        <GridLength x:Key="SliderPreContentMargin">0</GridLength>
-        <GridLength x:Key="SliderPostContentMargin">0</GridLength>
-        <x:Double x:Key="SliderHorizontalHeight">20</x:Double>
-    </UserControl.Resources>
-
     <Border Background="{StaticResource CatppuccinMantle}" Padding="10,8">
         <Grid>
             <!-- Empty state -->
@@ -109,21 +100,21 @@
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource TrackInspector_C_LFE}" FontSize="10"
                                                ToolTip.Tip="{DynamicResource TrackInspector_Center_and_subwoofer_LFE_gains_Tip}"/>
                                     <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundCenter}" Width="80"
+                                        <Slider Classes="compact" Minimum="0" Maximum="2" Value="{Binding SurroundCenter}" Width="80"
                                                 ToolTip.Tip="{DynamicResource TrackInspector_Center_channel_level_0200_Tip}"/>
-                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundLfe}" Width="80"
+                                        <Slider Classes="compact" Minimum="0" Maximum="2" Value="{Binding SurroundLfe}" Width="80"
                                                 ToolTip.Tip="{DynamicResource TrackInspector_Low_frequency_effects_subwoofer_level_0200_Tip}"/>
                                     </StackPanel>
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource TrackInspector_SL_SR_RL_RR}" FontSize="10"
                                                ToolTip.Tip="{DynamicResource TrackInspector_Side_and_rear_surround_channel_gains_Tip}"/>
                                     <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundSideLeft}" Width="48"
+                                        <Slider Classes="compact" Minimum="0" Maximum="2" Value="{Binding SurroundSideLeft}" Width="48"
                                                 ToolTip.Tip="{DynamicResource TrackInspector_Side_left_level_0200_Tip}"/>
-                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundSideRight}" Width="48"
+                                        <Slider Classes="compact" Minimum="0" Maximum="2" Value="{Binding SurroundSideRight}" Width="48"
                                                 ToolTip.Tip="{DynamicResource TrackInspector_Side_right_level_0200_Tip}"/>
-                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundRearLeft}" Width="48"
+                                        <Slider Classes="compact" Minimum="0" Maximum="2" Value="{Binding SurroundRearLeft}" Width="48"
                                                 ToolTip.Tip="{DynamicResource TrackInspector_Rear_left_level_0200_Tip}"/>
-                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundRearRight}" Width="48"
+                                        <Slider Classes="compact" Minimum="0" Maximum="2" Value="{Binding SurroundRearRight}" Width="48"
                                                 ToolTip.Tip="{DynamicResource TrackInspector_Rear_right_level_0200_Tip}"/>
                                     </StackPanel>
                                 </Grid>
@@ -134,7 +125,7 @@
                     <StackPanel Spacing="1">
                         <TextBlock Text="{DynamicResource TrackInspector_Colour}" Foreground="{StaticResource CatppuccinSubtext0}"
                                    ToolTip.Tip="{DynamicResource TrackInspector_Timeline_colour_helps_you_visually_group_related_Tip}"/>
-                        <ComboBox ItemsSource="{Binding ColorKeys}"
+                        <ComboBox Classes="stretch" ItemsSource="{Binding ColorKeys}"
                                   SelectedItem="{Binding ColorKey}"
                                   HorizontalAlignment="Stretch"
                                   ToolTip.Tip="{DynamicResource TrackInspector_Choose_an_accent_colour_for_this_tracks_header_a_Tip}">
@@ -158,7 +149,7 @@
                         <TextBlock Text="{DynamicResource TrackInspector_DRUM_MAP}" FontWeight="Bold" FontSize="11"
                                    Foreground="{StaticResource CatppuccinOverlay1}"
                                    ToolTip.Tip="{DynamicResource TrackInspector_Drum_maps_translate_MIDI_note_numbers_into_reada_Tip}"/>
-                        <ComboBox ItemsSource="{Binding DrumMaps}" SelectedValue="{Binding DrumMapId}"
+                        <ComboBox Classes="stretch" ItemsSource="{Binding DrumMaps}" SelectedValue="{Binding DrumMapId}"
                                   SelectedValueBinding="{Binding Id}" PlaceholderText="{DynamicResource TrackInspector_none}"
                                   ToolTip.Tip="{DynamicResource TrackInspector_Select_which_drum_map_labels_this_tracks_MIDI_no_Tip}">
                             <ComboBox.ItemTemplate>
@@ -245,7 +236,7 @@
                             <StackPanel Spacing="1">
                                 <TextBlock Text="{DynamicResource TrackInspector_Wave}" Foreground="{StaticResource CatppuccinSubtext0}"
                                            ToolTip.Tip="{DynamicResource TrackInspector_LFO_waveform_determines_the_shape_of_each_cycle__Tip}"/>
-                                <ComboBox ItemsSource="{Binding LfoWaveNames}"
+                                <ComboBox Classes="stretch" ItemsSource="{Binding LfoWaveNames}"
                                           SelectedIndex="{Binding VolumeLfoWave}"
                                           ToolTip.Tip="{DynamicResource TrackInspector_Pick_the_LFO_shape_sine_triangle_for_smooth_swel_Tip}"/>
                             </StackPanel>

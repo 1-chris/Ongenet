@@ -58,10 +58,10 @@
                                 <Button Classes="step" Classes.active="{Binding IsActive}"
                                         Command="{Binding ToggleCommand}"
                                         Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
-                                <Slider Minimum="0" Maximum="1" Value="{Binding Velocity, Mode=TwoWay}"
+                                <Slider Classes="fader" Minimum="0" Maximum="1" Value="{Binding Velocity, Mode=TwoWay}"
                                         Height="40" Orientation="Vertical"
                                         IsEnabled="{Binding IsActive}"/>
-                                <Slider Minimum="-1" Maximum="1" Value="{Binding Pan, Mode=TwoWay}"
+                                <Slider Classes="fader" Minimum="-1" Maximum="1" Value="{Binding Pan, Mode=TwoWay}"
                                         Height="28" Orientation="Vertical"
                                         IsEnabled="{Binding IsActive}"
                                         ToolTip.Tip="{DynamicResource StepSeq_Step_pan_Tip}"/>

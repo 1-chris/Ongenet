@@ -39,7 +39,7 @@
                                     <Grid ColumnDefinitions="6,8,28" Height="120">
                                         <controls:LevelMeterControl Grid.Column="0" Width="6" Height="120"
                                                                     Level="{Binding MeterLevel}"/>
-                                        <Slider Grid.Column="2" Minimum="0" Maximum="1"
+                                        <Slider Classes="fader" Grid.Column="2" Minimum="0" Maximum="1"
                                                 Value="{Binding Volume, Mode=TwoWay}"
                                                 Orientation="Vertical" Height="120" Width="28"
                                                 HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
@@ -49,12 +49,12 @@
                                 <Slider Minimum="-1" Maximum="1" Value="{Binding Pan, Mode=TwoWay}"/>
 
                                 <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
-                                    <ToggleButton Content="{DynamicResource Mixer_M}" IsChecked="{Binding IsMuted, Mode=TwoWay}"
-                                                  Width="24" Padding="2" ToolTip.Tip="{DynamicResource Mixer_Mute_Tip}"/>
-                                    <ToggleButton Content="{DynamicResource Mixer_S}" IsChecked="{Binding IsSoloed, Mode=TwoWay}"
-                                                  Width="24" Padding="2" ToolTip.Tip="{DynamicResource Mixer_Solo_Tip}"/>
-                                    <ToggleButton Content="{DynamicResource Mixer_R}" IsChecked="{Binding IsArmed, Mode=TwoWay}"
-                                                  Width="24" Padding="2" IsVisible="{Binding IsArmVisible}"
+                                    <ToggleButton Classes="strip" Content="{DynamicResource Mixer_M}" IsChecked="{Binding IsMuted, Mode=TwoWay}"
+                                                  ToolTip.Tip="{DynamicResource Mixer_Mute_Tip}"/>
+                                    <ToggleButton Classes="strip" Content="{DynamicResource Mixer_S}" IsChecked="{Binding IsSoloed, Mode=TwoWay}"
+                                                  ToolTip.Tip="{DynamicResource Mixer_Solo_Tip}"/>
+                                    <ToggleButton Classes="strip record" Content="{DynamicResource Mixer_R}" IsChecked="{Binding IsArmed, Mode=TwoWay}"
+                                                  IsVisible="{Binding IsArmVisible}"
                                                   ToolTip.Tip="{DynamicResource Mixer_Arm_for_recording_Tip}"/>
                                 </StackPanel>
 
@@ -91,7 +91,7 @@
                                                 <TextBlock Text="{Binding TargetName}" FontSize="8"
                                                            TextTrimming="CharacterEllipsis"
                                                            Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                                <Slider Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
+                                                <Slider Classes="compact" Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
                                                         Height="16"/>
                                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                                     <CheckBox Content="{DynamicResource Mixer_Pre}" IsChecked="{Binding PreFader, Mode=TwoWay}"

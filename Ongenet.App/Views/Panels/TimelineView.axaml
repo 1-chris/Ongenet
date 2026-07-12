@@ -97,24 +97,6 @@
                         <Style Selector="Border.selected">
                             <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
                         </Style>
-                        <Style Selector="ToggleButton.ms">
-                            <Setter Property="Width" Value="22"/>
-                            <Setter Property="Height" Value="18"/>
-                            <Setter Property="Padding" Value="0"/>
-                            <Setter Property="FontSize" Value="10"/>
-                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                            <Setter Property="VerticalContentAlignment" Value="Center"/>
-                            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
-                        </Style>
-                        <Style Selector="ToggleButton.ms:checked /template/ ContentPresenter#PART_ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource CatppuccinSurface2}"/>
-                        </Style>
-                        <Style Selector="ToggleButton.rec:checked /template/ ContentPresenter#PART_ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource CatppuccinRed}"/>
-                        </Style>
-                        <Style Selector="ToggleButton.rec:checked">
-                            <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
-                        </Style>
                         <Style Selector="Button.chev">
                             <Setter Property="Width" Value="16"/>
                             <Setter Property="Height" Value="16"/>
@@ -190,13 +172,13 @@
                                                        TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <ToggleButton Classes="ms" Content="{DynamicResource Timeline_M}" ToolTip.Tip="{DynamicResource Timeline_Mute_Tip}"
+                                            <ToggleButton Classes="strip" Content="{DynamicResource Timeline_M}" ToolTip.Tip="{DynamicResource Timeline_Mute_Tip}"
                                                           IsChecked="{Binding IsMuted, Mode=TwoWay}"
                                                           Foreground="{StaticResource CatppuccinRed}"/>
-                                            <ToggleButton Classes="ms" Content="{DynamicResource Timeline_S}" ToolTip.Tip="{DynamicResource Timeline_Solo_Tip}"
+                                            <ToggleButton Classes="strip" Content="{DynamicResource Timeline_S}" ToolTip.Tip="{DynamicResource Timeline_Solo_Tip}"
                                                           IsChecked="{Binding IsSoloed, Mode=TwoWay}"
                                                           Foreground="{StaticResource CatppuccinYellow}"/>
-                                            <ToggleButton Classes="ms rec" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_for_recording_Tip}"
+                                            <ToggleButton Classes="strip record" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_for_recording_Tip}"
                                                           IsChecked="{Binding IsArmed, Mode=TwoWay}"
                                                           IsVisible="{Binding !IsBus}"
                                                           Foreground="{StaticResource CatppuccinRed}"/>
@@ -234,7 +216,7 @@
                                         <TextBlock Text="{Binding Name}" FontSize="11"
                                                    Foreground="{StaticResource CatppuccinSubtext0}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <ToggleButton Classes="ms rec" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_to_record_control_moves_Tip}"
+                                        <ToggleButton Classes="strip record" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_to_record_control_moves_Tip}"
                                                       IsChecked="{Binding IsArmed, Mode=TwoWay}"
                                                       Foreground="{StaticResource CatppuccinRed}"
                                                       HorizontalAlignment="Left"/>

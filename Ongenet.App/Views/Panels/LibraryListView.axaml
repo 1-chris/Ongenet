@@ -10,11 +10,8 @@
     <Border Background="{StaticResource CatppuccinMantle}">
         <DockPanel>
             <!-- Instant search box (filters the tree below as you type). -->
-            <TextBox DockPanel.Dock="Top" Text="{Binding SearchText, Mode=TwoWay}"
-                     PlaceholderText="{DynamicResource LibraryList_Search}" FontSize="12" Margin="6,6,6,2" Padding="6,4"
-                     MinHeight="0"
-                     Background="{StaticResource CatppuccinSurface0}"
-                     BorderBrush="{StaticResource CatppuccinSurface1}"/>
+            <TextBox Classes="search" DockPanel.Dock="Top" Text="{Binding SearchText, Mode=TwoWay}"
+                     PlaceholderText="{DynamicResource LibraryList_Search}" Margin="6,6,6,2"/>
 
             <Panel>
                 <TextBlock Text="{Binding EmptyHint}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"

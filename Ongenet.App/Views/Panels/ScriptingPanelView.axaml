@@ -5,20 +5,20 @@
              x:DataType="vm:ScriptingPanelViewModel">
     <Grid RowDefinitions="Auto, *, Auto" Margin="8" RowSpacing="8">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
-            <Button Content="{DynamicResource Scripts_Load}" Click="LoadScript_Click" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripting_New}" Command="{Binding NewScriptCommand}" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripting_Save}" Command="{Binding SaveCommand}" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripting_ExportProject}" Command="{Binding ExportProjectCommand}" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripting_ExportPreset}" Command="{Binding ExportPresetCommand}" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripts_Save_as}" Click="SaveScriptAs_Click" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripts_Reload}" Command="{Binding ReloadCommand}" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripts_Unload}" Command="{Binding UnloadCommand}" FontSize="11" Padding="10,4"/>
+            <Button Classes="compact" Content="{DynamicResource Scripts_Load}" Click="LoadScript_Click"/>
+            <Button Classes="compact" Content="{DynamicResource Scripting_New}" Command="{Binding NewScriptCommand}"/>
+            <Button Classes="compact" Content="{DynamicResource Scripting_Save}" Command="{Binding SaveCommand}"/>
+            <Button Classes="compact" Content="{DynamicResource Scripting_ExportProject}" Command="{Binding ExportProjectCommand}"/>
+            <Button Classes="compact" Content="{DynamicResource Scripting_ExportPreset}" Command="{Binding ExportPresetCommand}"/>
+            <Button Classes="compact" Content="{DynamicResource Scripts_Save_as}" Click="SaveScriptAs_Click"/>
+            <Button Classes="compact" Content="{DynamicResource Scripts_Reload}" Command="{Binding ReloadCommand}"/>
+            <Button Classes="compact" Content="{DynamicResource Scripts_Unload}" Command="{Binding UnloadCommand}"/>
             <Separator Width="1" Height="18" Background="{StaticResource CatppuccinSurface1}"/>
-            <Button Content="{DynamicResource Scripts_Run}" Command="{Binding RunCommand}" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripts_Start_live}" Command="{Binding StartLiveCommand}" FontSize="11" Padding="10,4"/>
-            <Button Content="{DynamicResource Scripts_Stop_live}" Command="{Binding StopLiveCommand}" FontSize="11" Padding="10,4"/>
+            <Button Classes="compact" Content="{DynamicResource Scripts_Run}" Command="{Binding RunCommand}"/>
+            <Button Classes="compact" Content="{DynamicResource Scripts_Start_live}" Command="{Binding StartLiveCommand}"/>
+            <Button Classes="compact" Content="{DynamicResource Scripts_Stop_live}" Command="{Binding StopLiveCommand}"/>
             <Separator Width="1" Height="18" Background="{StaticResource CatppuccinSurface1}"/>
-            <Button Content="{DynamicResource Scripting_Pop_out}" Command="{Binding PopOutCommand}" FontSize="11" Padding="10,4"/>
+            <Button Classes="compact" Content="{DynamicResource Scripting_Pop_out}" Command="{Binding PopOutCommand}"/>
         </StackPanel>
 
         <Grid Grid.Row="1" ColumnDefinitions="220, *, 220" ColumnSpacing="8">
@@ -53,8 +53,8 @@
                              TextWrapping="Wrap" FontFamily="Consolas, Menlo, monospace" FontSize="11"
                              Background="Transparent" BorderThickness="0" Padding="8"/>
                 </ScrollViewer>
-                <Button Grid.Row="2" Content="{DynamicResource Scripts_Clear_output}" HorizontalAlignment="Right"
-                        Command="{Binding ClearOutputCommand}" FontSize="10" Padding="8,2"/>
+                <Button Classes="compact" Grid.Row="2" Content="{DynamicResource Scripts_Clear_output}" HorizontalAlignment="Right"
+                        Command="{Binding ClearOutputCommand}"/>
             </Grid>
         </Grid>
 
