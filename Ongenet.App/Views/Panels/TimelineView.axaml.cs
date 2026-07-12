@@ -56,6 +56,7 @@ namespace Ongenet.App.Views.Panels
         private Point _bandStart;
         private bool _bandMoved;     // whether the rubber band actually dragged (vs. a plain empty-space click)
         private int _bandPressRow;   // row under the press, used to select the track on a no-drag click
+        private bool _redirectingLaneSelection;
 
         public TimelineView()
         {
@@ -69,6 +70,8 @@ namespace Ongenet.App.Views.Panels
 
             // Tunnel so we act before the ListBox handles selection/scroll for clip gestures.
             LanesList.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
+            LanesList.SelectionChanged += OnLanesSelectionChanged;
+            LanesList.ContainerPrepared += OnLaneContainerPrepared;
             LanesList.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
             LanesList.AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
             LanesList.AddHandler(PointerWheelChangedEvent, OnLanesPointerWheel, RoutingStrategies.Tunnel);
@@ -686,6 +689,36 @@ namespace Ongenet.App.Views.Panels
             return (index, beat);
         }
 
+        private void OnLanesSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (_redirectingLaneSelection) return;
+            if (DataContext is not TimelineViewModel vm) return;
+            if (LanesList.SelectedItem is not AutomationLaneViewModel auto) return;
+
+            var owner = vm.Lanes.OfType<TrackLaneViewModel>()
+                .FirstOrDefault(l => ReferenceEquals(l.Model, auto.OwnerTrack));
+            if (owner is null) return;
+
+            _redirectingLaneSelection = true;
+            try
+            {
+                LanesList.SelectedItem = owner;
+            }
+            finally
+            {
+                _redirectingLaneSelection = false;
+            }
+        }
+
+        private void OnLaneContainerPrepared(object? sender, ContainerPreparedEventArgs e)
+        {
+            if (e.Container is not ListBoxItem item) return;
+            if (item.DataContext is not AutomationLaneViewModel) return;
+
+            // Keep keyboard focus off automation rows so the ListBox doesn't treat them as selectable chrome.
+            item.Focusable = false;
+        }
+
         // --- Clip gestures: select / move / resize / cross-track / create / zoom ---
 
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -731,7 +764,9 @@ namespace Ongenet.App.Views.Panels
 
             var (rowIndex, beat) = LocatePoint(pos, vm);
 
-            // Automation rows: don't intercept — let the curve control handle the pointer.
+            // Automation rows: don't intercept — let the curve control handle the pointer. Selection is
+            // kept off the automation row by OnLanesSelectionChanged, so we don't touch it here (setting
+            // it on every press caused scroll/layout side effects that broke point editing).
             if (vm.IsAutomationRow(rowIndex)) return;
 
             var hit = ResolveClipOrSummary(e);

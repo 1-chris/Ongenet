@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Modulation;
@@ -19,7 +20,7 @@ namespace Ongenet.App.Controls
     /// Evaluation/segment shaping is shared with <see cref="AutomationLane.Shape"/> so the drawn line
     /// matches playback. Edits mutate the bound curve in place (the same instance the engine reads).
     /// </summary>
-    public sealed class CurveEditorControl : ThemedControl
+    public sealed class CurveEditorControl : ThemedControl, ICustomHitTest
     {
         public static readonly StyledProperty<ModulationCurve?> CurveProperty =
             AvaloniaProperty.Register<CurveEditorControl, ModulationCurve?>(nameof(Curve));
@@ -35,10 +36,9 @@ namespace Ongenet.App.Controls
         private const double Pad = 8.0;
         private const double HandleRadius = 4.0;
         private const double HitRadius = 8.0;
-        private const double OnLineSlack = 6.0;
+        private const double LineHitRadius = 20.0;
         private const double BendThreshold = 3.0;
-        private const double DoubleClickMs = 400.0;
-        private const double DoubleClickSlop = 8.0;
+        private const double ClickMoveTolerance = 5.0;
 
         private IPen _linePen = new Pen(Brushes.Gray, 1.6);
         private IPen _gridPen = new Pen(Brushes.DimGray, 1);
@@ -55,8 +55,22 @@ namespace Ongenet.App.Controls
         private int _bendIndex = -1;
         private double _bendStartCurve;
         private double _bendStartY;
-        private long _lastPressTick;
-        private Point _lastPressPos;
+        private Point _pressPos;
+        private bool _pendingAdd;
+        private bool _dragged;
+        private bool _dragHistoryTaken;
+
+        public CurveEditorControl()
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
+        }
+
+        protected override Size MeasureOverride(Size availableSize) => availableSize;
+
+        protected override Size ArrangeOverride(Size finalSize) => finalSize;
+
+        bool ICustomHitTest.HitTest(Point point) => new Rect(Bounds.Size).Contains(point);
 
         static CurveEditorControl()
         {
@@ -177,58 +191,48 @@ namespace Ongenet.App.Controls
             e.Handled = true;
             e.Pointer.Capture(this);
 
-            var now = Environment.TickCount64;
-            var isDouble = now - _lastPressTick <= DoubleClickMs && Distance(pos, _lastPressPos) <= DoubleClickSlop;
-            _lastPressTick = isDouble ? 0 : now;
-            _lastPressPos = pos;
+            _pressPos = pos;
+            _pendingAdd = true;
+            _dragged = false;
+            _dragHistoryTaken = false;
 
             var hit = HitPoint(pos, curve, w, h);
             if (hit is not null)
             {
-                History?.Capture("Move curve point");
                 _drag = Drag.Move;
                 _dragPoint = hit;
-                return;
-            }
-
-            if (isDouble)
-            {
-                var phase = SnapPhase(XToPhase(pos.X, w));
-                var value = YToValue(pos.Y, h);
-                var lineY = ValueToY(curve.Evaluate(XToPhase(pos.X, w)), h);
-                if (Math.Abs(lineY - pos.Y) <= OnLineSlack) value = curve.Evaluate(phase);
-
-                History?.Capture("Add curve point");
-                var point = new AutomationPoint(phase, value);
-                curve.Points.Add(point);
-                curve.Sort();
-                _drag = Drag.Move;
-                _dragPoint = point;
-                InvalidateVisual();
+                _pendingAdd = false;
                 return;
             }
 
             var idx = SegmentIndexAt(XToPhase(pos.X, w), curve);
             if (idx >= 0)
             {
-                History?.Capture("Bend curve");
                 _drag = Drag.Bend;
                 _bendIndex = idx;
                 _bendStartCurve = curve.Points[idx].Curve;
                 _bendStartY = pos.Y;
+            }
+            else
+            {
+                _drag = Drag.None;
             }
         }
 
         protected override void OnPointerMoved(PointerEventArgs e)
         {
             var curve = Curve;
-            if (_drag == Drag.None || curve is null) { base.OnPointerMoved(e); return; }
+            if (curve is null) { base.OnPointerMoved(e); return; }
+            if (_drag == Drag.None && !_pendingAdd) { base.OnPointerMoved(e); return; }
             var w = Bounds.Width;
             var h = Bounds.Height;
             var pos = e.GetPosition(this);
 
             if (_drag == Drag.Move && _dragPoint is not null)
             {
+                _dragged = true;
+                _pendingAdd = false;
+                if (!_dragHistoryTaken) { History?.Capture("Move curve point"); _dragHistoryTaken = true; }
                 _dragPoint.Beat = SnapPhase(XToPhase(pos.X, w));
                 _dragPoint.Value = YToValue(pos.Y, h);
                 curve.Sort();
@@ -238,10 +242,18 @@ namespace Ongenet.App.Controls
             else if (_drag == Drag.Bend && _bendIndex >= 0 && _bendIndex < curve.Points.Count)
             {
                 if (Math.Abs(pos.Y - _bendStartY) < BendThreshold) return;
+                _dragged = true;
+                _pendingAdd = false;
+                if (!_dragHistoryTaken) { History?.Capture("Bend curve"); _dragHistoryTaken = true; }
                 var delta = (_bendStartY - pos.Y) / Math.Max(1.0, h) * 2.0;
                 curve.Points[_bendIndex].Curve = Math.Clamp(_bendStartCurve + delta, -1, 1);
                 InvalidateVisual();
                 e.Handled = true;
+            }
+            else if (_pendingAdd && Distance(pos, _pressPos) > ClickMoveTolerance)
+            {
+                _dragged = true;
+                _pendingAdd = false;
             }
         }
 
@@ -249,14 +261,44 @@ namespace Ongenet.App.Controls
         {
             if (ReferenceEquals(e.Pointer.Captured, this))
             {
+                if (_pendingAdd && !_dragged)
+                    AddPointAt(_pressPos);
+
                 _drag = Drag.None;
                 _dragPoint = null;
                 _bendIndex = -1;
+                _pendingAdd = false;
                 e.Pointer.Capture(null);
                 e.Handled = true;
             }
 
             base.OnPointerReleased(e);
+        }
+
+        private void AddPointAt(Point pos)
+        {
+            var curve = Curve;
+            if (curve is null) return;
+            var w = Bounds.Width;
+            var h = Bounds.Height;
+
+            double phase;
+            double value;
+            if (TryNearestOnCurve(pos, curve, w, h, out var nearestPhase, out var nearestValue))
+            {
+                phase = nearestPhase;
+                value = nearestValue;
+            }
+            else
+            {
+                phase = SnapPhase(XToPhase(pos.X, w));
+                value = YToValue(pos.Y, h);
+            }
+
+            History?.Capture("Add curve point");
+            curve.Points.Add(new AutomationPoint(phase, value));
+            curve.Sort();
+            InvalidateVisual();
         }
 
         // --- mapping helpers ---
@@ -296,14 +338,104 @@ namespace Ongenet.App.Controls
 
         private static AutomationPoint? HitPoint(Point pos, ModulationCurve curve, double w, double h)
         {
+            AutomationPoint? best = null;
+            var bestDist = HitRadius;
             foreach (var p in curve.Points)
             {
-                var cx = PhaseToX(p.Beat, w);
-                var cy = ValueToY(p.Value, h);
-                if (Math.Abs(cx - pos.X) <= HitRadius && Math.Abs(cy - pos.Y) <= HitRadius) return p;
+                var d = Distance(pos, HandleCenter(p, w, h));
+                if (d <= bestDist)
+                {
+                    bestDist = d;
+                    best = p;
+                }
             }
 
-            return null;
+            return best;
+        }
+
+        private static Point HandleCenter(AutomationPoint p, double w, double h)
+            => new(PhaseToX(p.Beat, w), ValueToY(p.Value, h));
+
+        private static double DistanceToCurve(Point pos, ModulationCurve curve, double w, double h, out Point closest)
+        {
+            closest = default;
+            BuildCurvePolyline(curve, w, h, out var polyline);
+            if (polyline.Count < 2) return double.PositiveInfinity;
+
+            var bestDist = double.PositiveInfinity;
+            for (var i = 1; i < polyline.Count; i++)
+            {
+                var d = DistanceToSegment(pos, polyline[i - 1], polyline[i], out var c);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    closest = c;
+                }
+            }
+
+            return bestDist;
+        }
+
+        private bool TryNearestOnCurve(Point pos, ModulationCurve curve, double w, double h,
+            out double phase, out double value)
+        {
+            phase = 0;
+            value = 0;
+            var dist = DistanceToCurve(pos, curve, w, h, out var closest);
+            if (dist > LineHitRadius) return false;
+
+            phase = SnapPhase(XToPhase(closest.X, w));
+            value = curve.Evaluate(phase);
+            return true;
+        }
+
+        private static void BuildCurvePolyline(ModulationCurve curve, double w, double h,
+            out System.Collections.Generic.List<Point> polyline)
+        {
+            polyline = new System.Collections.Generic.List<Point>();
+            var pts = curve.Points;
+            if (pts.Count == 0) return;
+
+            var first = pts[0];
+            var startY = ValueToY(first.Value, h);
+            polyline.Add(new Point(0, startY));
+            polyline.Add(new Point(PhaseToX(first.Beat, w), startY));
+
+            for (var i = 0; i < pts.Count - 1; i++)
+            {
+                var p0 = pts[i];
+                var p1 = pts[i + 1];
+                var x0 = PhaseToX(p0.Beat, w);
+                var x1 = PhaseToX(p1.Beat, w);
+                var steps = p0.Curve == 0 ? 1 : (int)Math.Clamp(Math.Abs(x1 - x0) / 6.0, 2, 48);
+                for (var s = 1; s <= steps; s++)
+                {
+                    var f = (double)s / steps;
+                    var val = p0.Value + (p1.Value - p0.Value) * AutomationLane.Shape(f, p0.Curve);
+                    polyline.Add(new Point(x0 + (x1 - x0) * f, ValueToY(val, h)));
+                }
+            }
+
+            var last = pts[pts.Count - 1];
+            var lastY = ValueToY(last.Value, h);
+            polyline.Add(new Point(PhaseToX(last.Beat, w), lastY));
+            polyline.Add(new Point(w, lastY));
+        }
+
+        private static double DistanceToSegment(Point p, Point a, Point b, out Point closest)
+        {
+            var dx = b.X - a.X;
+            var dy = b.Y - a.Y;
+            var lenSq = dx * dx + dy * dy;
+            if (lenSq <= 0)
+            {
+                closest = a;
+                return Distance(p, a);
+            }
+
+            var t = Math.Clamp(((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lenSq, 0, 1);
+            closest = new Point(a.X + t * dx, a.Y + t * dy);
+            return Distance(p, closest);
         }
 
         private static int SegmentIndexAt(double phase, ModulationCurve curve)

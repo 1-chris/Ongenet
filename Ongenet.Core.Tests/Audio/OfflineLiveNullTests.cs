@@ -41,9 +41,11 @@ public sealed class OfflineLiveNullTests
             var projectSvc = new ProjectService(instruments);
             projectSvc.SetCurrentProject(project);
             var transport = new TransportService();
-            var playback = new PlaybackModeService(projectSvc, transport);
             var events = new EventAggregator();
-            var engine = new AudioEngine(output, projectSvc, transport, playback, events, new AuditionPlayer());
+            var capture = new SessionCaptureService(projectSvc, transport, events);
+            var playback = new PlaybackModeService(projectSvc, transport, capture);
+            var engineEvents = new EventAggregator();
+            var engine = new AudioEngine(output, projectSvc, transport, playback, engineEvents, new AuditionPlayer());
 
             engine.Start();
             transport.StartBeat = 0;

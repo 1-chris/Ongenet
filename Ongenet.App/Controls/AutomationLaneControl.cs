@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.App.Services;
@@ -14,11 +15,11 @@ namespace Ongenet.App.Controls
     /// The editable automation curve drawn on an automation row. Bound (via DataContext) to an
     /// <see cref="AutomationLaneViewModel"/>, it draws the value polyline (x = beat·PixelsPerBeat,
     /// y from value↔min/max) with point handles, and edits the underlying <see cref="AutomationLane"/>:
-    /// double-click adds a point, dragging a handle moves it, dragging a segment bends its curve
+    /// click adds a point, dragging a handle moves it, dragging a segment bends its curve
     /// (tension), and right-click deletes a handle. Curve evaluation is shared with
     /// <see cref="AutomationLane.Evaluate"/> so the drawn line matches playback exactly.
     /// </summary>
-    public sealed class AutomationLaneControl : ThemedControl
+    public sealed class AutomationLaneControl : ThemedControl, ICustomHitTest
     {
         /// <summary>Bump to force a repaint when the lane's points mutate in place (e.g. while recording).</summary>
         public static readonly StyledProperty<int> RevisionProperty =
@@ -26,9 +27,10 @@ namespace Ongenet.App.Controls
 
         private const double Pad = 8.0;        // vertical inset so end values aren't clipped
         private const double HandleRadius = 4.0;
-        private const double HitRadius = 7.0;
-        private const double OnLineSlack = 6.0; // double-clicking within this of the curve drops the point onto it
-        private const double BendThreshold = 3.0; // px of vertical travel before a segment actually bends
+        private const double HitRadius = 8.0;         // grab radius for moving an existing handle
+        private const double LineHitRadius = 20.0;    // snap a click this close to the stroke onto the curve
+        private const double BendThreshold = 3.0;     // px of vertical travel before a segment bends
+        private const double ClickMoveTolerance = 5.0; // px before a plain click becomes a drag (not an add)
 
         private IPen _linePen = new Pen(Brushes.Gray, 1.6);       // accent (mauve)
         private IBrush _handleFill = Brushes.Gray;                // text
@@ -51,13 +53,24 @@ namespace Ongenet.App.Controls
         private double _bendStartCurve;
         private double _bendStartY;
 
-        // Manual double-click detection — the framework's ClickCount is unreliable here because the
-        // lane lives inside a ListBox whose selection handling resets the OS click counter between
-        // clicks. We track the previous left-press time/position ourselves instead.
-        private const double DoubleClickMs = 400.0;
-        private const double DoubleClickSlop = 8.0; // px the second click may stray from the first
-        private long _lastPressTick;
-        private Point _lastPressPos;
+        // A plain click (press + release without dragging) adds a point.
+        private Point _pressPos;
+        private bool _pendingAdd;
+        private bool _dragged;
+        private bool _dragHistoryTaken;
+
+        public AutomationLaneControl()
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
+        }
+
+        // Custom-rendered controls only hit-test drawn pixels by default (our stroke is 1.6px wide).
+        protected override Size MeasureOverride(Size availableSize) => availableSize;
+
+        protected override Size ArrangeOverride(Size finalSize) => finalSize;
+
+        bool ICustomHitTest.HitTest(Point point) => new Rect(Bounds.Size).Contains(point);
 
         static AutomationLaneControl()
         {
@@ -155,56 +168,36 @@ namespace Ongenet.App.Controls
             if (!props.IsLeftButtonPressed) { base.OnPointerPressed(e); return; }
 
             // Always own left clicks on the lane and capture the pointer, so the surrounding ListBox
-            // never intercepts them (its selection handling was eating clicks and breaking double-click
-            // detection — especially in the flat regions where the curve had nothing under the cursor).
+            // never intercepts them (its selection handling otherwise eats clicks in the flat regions).
             e.Handled = true;
             e.Pointer.Capture(this);
 
-            // Manual double-click test against the previous press.
-            var now = Environment.TickCount64;
-            var isDouble = now - _lastPressTick <= DoubleClickMs && Distance(pos, _lastPressPos) <= DoubleClickSlop;
-            _lastPressTick = isDouble ? 0 : now; // consume, so a triple-click doesn't re-fire
-            _lastPressPos = pos;
+            _pressPos = pos;
+            _pendingAdd = true;
+            _dragged = false;
+            _dragHistoryTaken = false;
 
-            // A handle under the cursor is always a move (or, on the second click, lets you re-grab it).
-            var hit = HitPoint(pos, lane, m, h);
-            if (hit is not null)
+            var handle = HitPoint(pos, lane, m, h);
+            if (handle is not null)
             {
-                History?.Capture("Move automation point");
                 _drag = Drag.Move;
-                _dragPoint = hit;
+                _dragPoint = handle;
+                _pendingAdd = false;
                 return;
             }
 
-            if (isDouble)
-            {
-                // Add a point (snapped in time, value from Y). If the click is within a few pixels of the
-                // existing curve, drop it ONTO the line so extending the curve doesn't need precise aim.
-                var beat = Math.Max(0, m.Snap(XToBeat(pos.X, m)));
-                var value = YToValue(pos.Y, lane, h);
-                var lineY = ValueToY(lane.Evaluate(XToBeat(pos.X, m)), lane, h);
-                if (Math.Abs(lineY - pos.Y) <= OnLineSlack) value = lane.Evaluate(beat);
-
-                History?.Capture("Add automation point");
-                var point = new AutomationPoint(beat, value);
-                lane.AddPoint(point);
-                vm.CommitEdits();
-                _drag = Drag.Move; // let the user keep dragging the new point
-                _dragPoint = point;
-                InvalidateVisual();
-                return;
-            }
-
-            // Single click on a segment: drag vertically to bend its curve (tension). In the flat end
-            // regions there's no segment — the click is still owned (so a following click double-fires).
+            // Click on a segment: drag vertically to bend; a plain click still adds a point on release.
             var idx = SegmentIndexAt(XToBeat(pos.X, m), lane);
             if (idx >= 0)
             {
-                History?.Capture("Bend automation");
                 _drag = Drag.Bend;
                 _bendIndex = idx;
                 _bendStartCurve = lane.Points[idx].Curve;
                 _bendStartY = pos.Y;
+            }
+            else
+            {
+                _drag = Drag.None;
             }
         }
 
@@ -218,7 +211,8 @@ namespace Ongenet.App.Controls
         protected override void OnPointerMoved(PointerEventArgs e)
         {
             var vm = Vm;
-            if (_drag == Drag.None || vm is null) { base.OnPointerMoved(e); return; }
+            if (vm is null) { base.OnPointerMoved(e); return; }
+            if (_drag == Drag.None && !_pendingAdd) { base.OnPointerMoved(e); return; }
             var lane = vm.Lane;
             var m = vm.Metrics;
             var h = Bounds.Height;
@@ -226,6 +220,9 @@ namespace Ongenet.App.Controls
 
             if (_drag == Drag.Move && _dragPoint is not null)
             {
+                _dragged = true;
+                _pendingAdd = false;
+                if (!_dragHistoryTaken) { History?.Capture("Move automation point"); _dragHistoryTaken = true; }
                 _dragPoint.Beat = Math.Max(0, m.Snap(XToBeat(pos.X, m)));
                 _dragPoint.Value = YToValue(pos.Y, lane, h);
                 lane.Sort();
@@ -235,31 +232,67 @@ namespace Ongenet.App.Controls
             }
             else if (_drag == Drag.Bend && _bendIndex >= 0 && _bendIndex < lane.Points.Count)
             {
-                // Ignore tiny travel so a quick double-click (or stray click) doesn't bend the segment.
                 if (Math.Abs(pos.Y - _bendStartY) < BendThreshold) return;
-                // Dragging up increases tension toward ease-out; down toward ease-in.
+                _dragged = true;
+                _pendingAdd = false;
+                if (!_dragHistoryTaken) { History?.Capture("Bend automation"); _dragHistoryTaken = true; }
                 var delta = (_bendStartY - pos.Y) / Math.Max(1.0, h) * 2.0;
                 lane.Points[_bendIndex].Curve = Math.Clamp(_bendStartCurve + delta, -1, 1);
                 vm.CommitEdits();
                 InvalidateVisual();
                 e.Handled = true;
             }
+            else if (_pendingAdd && Distance(pos, _pressPos) > ClickMoveTolerance)
+            {
+                _dragged = true;
+                _pendingAdd = false;
+            }
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
-            // We capture on every left press (including no-op clicks in the flat regions), so always
-            // release here — not just when a drag was in progress — or the pointer stays captured.
             if (ReferenceEquals(e.Pointer.Captured, this))
             {
+                if (_pendingAdd && !_dragged)
+                    AddPointAt(_pressPos);
+
                 _drag = Drag.None;
                 _dragPoint = null;
                 _bendIndex = -1;
+                _pendingAdd = false;
                 e.Pointer.Capture(null);
                 e.Handled = true;
             }
 
             base.OnPointerReleased(e);
+        }
+
+        private void AddPointAt(Point pos)
+        {
+            var vm = Vm;
+            if (vm is null) return;
+            var lane = vm.Lane;
+            var m = vm.Metrics;
+            var h = Bounds.Height;
+
+            // Snap onto the drawn curve when the click is near it, so extending the line needs no precise aim.
+            double beat;
+            double value;
+            if (TryNearestOnCurve(pos, lane, m, h, w: Bounds.Width, out var nearestBeat, out var nearestValue))
+            {
+                beat = nearestBeat;
+                value = nearestValue;
+            }
+            else
+            {
+                beat = Math.Max(0, m.Snap(XToBeat(pos.X, m)));
+                value = YToValue(pos.Y, lane, h);
+            }
+
+            History?.Capture("Add automation point");
+            lane.AddPoint(new AutomationPoint(beat, value));
+            vm.CommitEdits();
+            InvalidateVisual();
         }
 
         // --- mapping helpers ---
@@ -287,14 +320,110 @@ namespace Ongenet.App.Controls
 
         private static AutomationPoint? HitPoint(Point pos, AutomationLane lane, TimelineMetrics m, double height)
         {
+            AutomationPoint? best = null;
+            var bestDist = HitRadius;
             foreach (var p in lane.Points)
             {
-                var cx = BeatToX(p.Beat, m);
-                var cy = ValueToY(p.Value, lane, height);
-                if (Math.Abs(cx - pos.X) <= HitRadius && Math.Abs(cy - pos.Y) <= HitRadius) return p;
+                var d = Distance(pos, HandleCenter(p, lane, m, height));
+                if (d <= bestDist)
+                {
+                    bestDist = d;
+                    best = p;
+                }
             }
 
-            return null;
+            return best;
+        }
+
+        private static Point HandleCenter(AutomationPoint p, AutomationLane lane, TimelineMetrics m, double height)
+            => new(BeatToX(p.Beat, m), ValueToY(p.Value, lane, height));
+
+        /// <summary>Minimum distance from <paramref name="pos"/> to the drawn curve polyline.</summary>
+        private static double DistanceToCurve(Point pos, AutomationLane lane, TimelineMetrics m, double height,
+            double w, out Point closest)
+        {
+            closest = default;
+            BuildCurvePolyline(lane, m, height, w, out var polyline);
+            if (polyline.Count < 2) return double.PositiveInfinity;
+
+            var bestDist = double.PositiveInfinity;
+            for (var i = 1; i < polyline.Count; i++)
+            {
+                var d = DistanceToSegment(pos, polyline[i - 1], polyline[i], out var c);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    closest = c;
+                }
+            }
+
+            return bestDist;
+        }
+
+        /// <summary>
+        /// Finds the nearest point on the drawn curve polyline (same sampling as <see cref="Render"/>).
+        /// Returns true when within <see cref="LineHitRadius"/> of the stroke.
+        /// </summary>
+        private static bool TryNearestOnCurve(Point pos, AutomationLane lane, TimelineMetrics m, double height,
+            double w, out double beat, out double value)
+        {
+            beat = 0;
+            value = 0;
+            var dist = DistanceToCurve(pos, lane, m, height, w, out var closest);
+            if (dist > LineHitRadius) return false;
+
+            beat = Math.Max(0, m.Snap(XToBeat(closest.X, m)));
+            value = lane.Evaluate(beat);
+            return true;
+        }
+
+        private static void BuildCurvePolyline(AutomationLane lane, TimelineMetrics m, double height, double w,
+            out System.Collections.Generic.List<Point> polyline)
+        {
+            polyline = new System.Collections.Generic.List<Point>();
+            var pts = lane.Points;
+            if (pts.Count == 0) return;
+
+            var first = pts[0];
+            var startY = ValueToY(first.Value, lane, height);
+            polyline.Add(new Point(0, startY));
+            polyline.Add(new Point(BeatToX(first.Beat, m), startY));
+
+            for (var i = 0; i < pts.Count - 1; i++)
+            {
+                var p0 = pts[i];
+                var p1 = pts[i + 1];
+                var x0 = BeatToX(p0.Beat, m);
+                var x1 = BeatToX(p1.Beat, m);
+                var steps = p0.Curve == 0 ? 1 : (int)Math.Clamp(Math.Abs(x1 - x0) / 6.0, 2, 48);
+                for (var s = 1; s <= steps; s++)
+                {
+                    var f = (double)s / steps;
+                    var val = p0.Value + (p1.Value - p0.Value) * AutomationLane.Shape(f, p0.Curve);
+                    polyline.Add(new Point(x0 + (x1 - x0) * f, ValueToY(val, lane, height)));
+                }
+            }
+
+            var last = pts[pts.Count - 1];
+            var lastY = ValueToY(last.Value, lane, height);
+            polyline.Add(new Point(BeatToX(last.Beat, m), lastY));
+            polyline.Add(new Point(w, lastY));
+        }
+
+        private static double DistanceToSegment(Point p, Point a, Point b, out Point closest)
+        {
+            var dx = b.X - a.X;
+            var dy = b.Y - a.Y;
+            var lenSq = dx * dx + dy * dy;
+            if (lenSq <= 0)
+            {
+                closest = a;
+                return Distance(p, a);
+            }
+
+            var t = Math.Clamp(((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lenSq, 0, 1);
+            closest = new Point(a.X + t * dx, a.Y + t * dy);
+            return Distance(p, closest);
         }
 
         // Index of the segment (point i → i+1) covering the given beat, or -1 in the flat end regions.

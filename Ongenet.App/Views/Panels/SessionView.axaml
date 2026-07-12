@@ -22,6 +22,11 @@
         <Style Selector="Button.slot.empty">
             <Setter Property="Opacity" Value="0.45"/>
         </Style>
+        <Style Selector="Button.slot.empty.assignable">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinBlue}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
         <Style Selector="Button.slot.playing">
             <Setter Property="BorderBrush" Value="{StaticResource CatppuccinGreen}"/>
             <Setter Property="BorderThickness" Value="2"/>
@@ -50,8 +55,8 @@
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,8,12,4" Spacing="8">
                 <TextBlock Text="{DynamicResource Session_Session}" FontSize="13" FontWeight="SemiBold"
                            Foreground="{StaticResource CatppuccinText}" VerticalAlignment="Center"/>
-                <Button Content="{DynamicResource Session_Stop_All}" Command="{Binding StopAllCommand}" Padding="10,4" FontSize="11"/>
-                <Button Content="{DynamicResource Session_Capture}" Command="{Binding CaptureCommand}" Padding="10,4" FontSize="11"
+                <Button Classes="compact" Content="{DynamicResource Session_Stop_All}" Command="{Binding StopAllCommand}"/>
+                <Button Classes="compact" Content="{DynamicResource Session_Capture}" Command="{Binding CaptureCommand}"
                         ToolTip.Tip="{DynamicResource Session_Materialize_session_launches_to_the_arrangement_Tip}"/>
                 <TextBlock Text="{Binding PendingCaptureCount, StringFormat='({0} pending)'}"
                            FontSize="10" VerticalAlignment="Center"
@@ -64,7 +69,7 @@
                            Foreground="{StaticResource CatppuccinOverlay1}"/>
                 <TextBlock Text="{DynamicResource Session_Arr}" FontSize="9" VerticalAlignment="Center"
                            Foreground="{StaticResource CatppuccinOverlay0}"/>
-                <Slider Minimum="0" Maximum="1" Width="140" Value="{Binding SessionCrossfader}"
+                <Slider Classes="compact" Minimum="0" Maximum="1" Width="140" Value="{Binding SessionCrossfader}"
                         TickFrequency="0.25" IsSnapToTickEnabled="True"/>
                 <TextBlock Text="{DynamicResource Session_Ses}" FontSize="9" VerticalAlignment="Center"
                            Foreground="{StaticResource CatppuccinOverlay0}"/>
@@ -132,9 +137,11 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:SessionSlotViewModel">
                                                 <controls:SessionSlotButton Classes="slot" Classes.empty="{Binding IsEmpty}"
+                                                        Classes.assignable="{Binding CanAssignSource}"
                                                         Classes.playing="{Binding IsPlaying}"
                                                         Classes.queued="{Binding IsQueued}"
-                                                        Classes.selected="{Binding IsSelected}">
+                                                        Classes.selected="{Binding IsSelected}"
+                                                        ToolTip.Tip="{DynamicResource Session_Shift_click_inspect_Tip}">
                                                     <Button.ContextMenu>
                                                         <ContextMenu>
                                                             <MenuItem Header="{DynamicResource Session_Launch}" Command="{Binding LaunchCommand}"
@@ -148,16 +155,18 @@
                                                                       IsVisible="{Binding !IsEmpty}"/>
                                                             <MenuItem Header="{DynamicResource Session_Inspect}" Command="{Binding SelectCommand}"
                                                                       IsVisible="{Binding !IsEmpty}"/>
+                                                            <MenuItem Header="{DynamicResource Session_Clear_slot}" Command="{Binding ClearSlotCommand}"
+                                                                      IsVisible="{Binding !IsEmpty}"/>
                                                         </ContextMenu>
                                                     </Button.ContextMenu>
                                                     <StackPanel Spacing="2">
                                                         <TextBlock Text="{Binding DisplayName}" FontSize="10"
                                                                    TextTrimming="CharacterEllipsis"
-                                                                   Foreground="{StaticResource CatppuccinCrust}"/>
+                                                                   Foreground="{StaticResource CatppuccinText}"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="4"
                                                                     IsVisible="{Binding !IsEmpty}">
                                                             <TextBlock Text="▶" FontSize="9" Opacity="0.7"
-                                                                       Foreground="{StaticResource CatppuccinCrust}"/>
+                                                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
                                                             <TextBlock Text="{DynamicResource Session_Q}" FontSize="9"
                                                                        IsVisible="{Binding IsQueued}"
                                                                        Foreground="{StaticResource CatppuccinYellow}"/>
@@ -188,6 +197,16 @@
                     <TextBox Text="{Binding InspectorName}" FontSize="11"/>
                 </StackPanel>
                 <StackPanel Spacing="4">
+                    <TextBlock Text="{DynamicResource Session_Source}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    <TextBlock Text="{Binding InspectorSourceName}" FontSize="11"
+                               Foreground="{StaticResource CatppuccinText}" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{DynamicResource Session_Length}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    <NumericUpDown Value="{Binding InspectorLengthBeats}" Minimum="0.25" Increment="0.25"
+                                     FormatString="0.##" FontSize="11"/>
+                </StackPanel>
+                <StackPanel Spacing="4">
                     <TextBlock Text="{DynamicResource Session_Launch_mode}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
                     <ComboBox ItemsSource="{Binding LaunchModes}" SelectedItem="{Binding LaunchMode}"
                               HorizontalAlignment="Stretch" FontSize="11"/>
@@ -208,6 +227,8 @@
                     <ComboBox ItemsSource="{Binding FollowActions}" SelectedItem="{Binding FollowAction}"
                               HorizontalAlignment="Stretch" FontSize="11"/>
                 </StackPanel>
+                <Button Classes="compact" Content="{DynamicResource Session_Clear_slot}"
+                        Command="{Binding ClearSelectedSlotCommand}" HorizontalAlignment="Stretch"/>
             </StackPanel>
         </Border>
     </Grid>

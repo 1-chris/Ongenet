@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
+using Ongenet.App.Services;
 using Ongenet.Core.Audio.Scheduling;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
@@ -25,18 +26,21 @@ public sealed class SessionViewModel : ViewModelBase
     private readonly ISessionCaptureService _capture;
     private readonly ISelectionService _selection;
     private readonly IEventAggregator _events;
+    private readonly IHistoryService _history;
     private SessionSlotViewModel? _selectedSlot;
 
     public SessionViewModel(IProjectService project, IPlaybackModeService playback, ISessionCaptureService capture,
-        ISelectionService selection, IEventAggregator events)
+        ISelectionService selection, IEventAggregator events, IHistoryService history)
     {
         _project = project;
         _playback = playback;
         _capture = capture;
         _selection = selection;
         _events = events;
+        _history = history;
         StopAllCommand = new RelayCommand(_playback.StopAll);
         CaptureCommand = new RelayCommand(() => _capture.Capture(), () => _capture.PendingLaunchCount > 0);
+        ClearSelectedSlotCommand = new RelayCommand(ClearSelectedSlot, () => HasSelection);
         _project.ProjectChanged += Rebuild;
         _playback.ActiveClipsChanged += RefreshSlotStates;
         _capture.PendingChanged += OnCapturePendingChanged;
@@ -50,6 +54,7 @@ public sealed class SessionViewModel : ViewModelBase
 
     public ICommand StopAllCommand { get; }
     public ICommand CaptureCommand { get; }
+    public ICommand ClearSelectedSlotCommand { get; }
 
     public int SceneCount => SceneColumns.Count;
 
@@ -63,10 +68,13 @@ public sealed class SessionViewModel : ViewModelBase
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasSelection));
             OnPropertyChanged(nameof(InspectorName));
+            OnPropertyChanged(nameof(InspectorSourceName));
+            OnPropertyChanged(nameof(InspectorLengthBeats));
             OnPropertyChanged(nameof(LaunchMode));
             OnPropertyChanged(nameof(FollowAction));
             OnPropertyChanged(nameof(LaunchQuantizeBeats));
             OnPropertyChanged(nameof(LaunchQuantizeIndex));
+            (ClearSelectedSlotCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
     }
 
@@ -82,6 +90,30 @@ public sealed class SessionViewModel : ViewModelBase
             clip.Name = value;
             OnPropertyChanged();
             SelectedSlot?.RefreshDisplay();
+            PublishSessionClipChanged();
+        }
+    }
+
+    public string InspectorSourceName
+    {
+        get
+        {
+            if (SelectedClip?.SourceClipId is not { } sourceId) return "";
+            var track = _project.Current.Tracks.FirstOrDefault(t => t.Id == SelectedClip.TrackId);
+            var source = track?.Clips.FirstOrDefault(c => c.Id == sourceId);
+            return source?.Name ?? "(missing)";
+        }
+    }
+
+    public double InspectorLengthBeats
+    {
+        get => SelectedClip?.LengthBeats ?? 0;
+        set
+        {
+            if (SelectedClip is not { } clip || Math.Abs(clip.LengthBeats - value) < 1e-9) return;
+            clip.LengthBeats = Math.Max(0.25, value);
+            OnPropertyChanged();
+            PublishSessionClipChanged();
         }
     }
 
@@ -97,6 +129,7 @@ public sealed class SessionViewModel : ViewModelBase
             if (SelectedClip is not { } clip || clip.LaunchMode == value) return;
             clip.LaunchMode = value;
             OnPropertyChanged();
+            PublishSessionClipChanged();
         }
     }
 
@@ -108,6 +141,7 @@ public sealed class SessionViewModel : ViewModelBase
             if (SelectedClip is not { } clip || clip.FollowAction == value) return;
             clip.FollowAction = value;
             OnPropertyChanged();
+            PublishSessionClipChanged();
         }
     }
 
@@ -120,6 +154,7 @@ public sealed class SessionViewModel : ViewModelBase
             clip.LaunchQuantizeBeats = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(LaunchQuantizeIndex));
+            PublishSessionClipChanged();
         }
     }
 
@@ -190,6 +225,8 @@ public sealed class SessionViewModel : ViewModelBase
         if (_project.Current.Tracks.FirstOrDefault(t => t.Id == trackId) is null)
             return false;
 
+        _history.Capture("Assign session slot");
+
         var existing = _project.Current.SessionClips
             .FirstOrDefault(c => c.TrackId == trackId && c.SceneIndex == sceneIndex);
         if (existing is not null)
@@ -208,6 +245,28 @@ public sealed class SessionViewModel : ViewModelBase
         _events.Publish(new SessionClipsChangedEvent());
         return true;
     }
+
+    /// <summary>Removes the session clip in the given slot.</summary>
+    public bool TryClearSlot(int sceneIndex, Guid trackId)
+    {
+        var clip = _project.Current.SessionClips
+            .FirstOrDefault(c => c.TrackId == trackId && c.SceneIndex == sceneIndex);
+        if (clip is null) return false;
+
+        _history.Capture("Clear session slot");
+        _playback.StopClip(clip.Id);
+        _project.Current.SessionClips.Remove(clip);
+        _events.Publish(new SessionClipsChangedEvent());
+        return true;
+    }
+
+    private void ClearSelectedSlot()
+    {
+        if (SelectedSlot is not { } slot || slot.Clip is null) return;
+        TryClearSlot(slot.SceneIndex, slot.TrackId);
+    }
+
+    private void PublishSessionClipChanged() => _events.Publish(new SessionClipChangedEvent());
 
     private int FindFirstEmptyScene(Guid trackId)
     {
@@ -346,11 +405,12 @@ public sealed class SessionSlotViewModel : ViewModelBase
         QueueCommand = new RelayCommand(Queue, () => _clip is not null && !IsPlaying);
         SelectCommand = new RelayCommand(() => _owner.SelectSlot(this), () => _clip is not null);
         AssignFromSelectedCommand = new RelayCommand(AssignFromSelected, CanAssignFromSelected);
-        PickSourceCommand = new RelayCommand(AssignFromSelected, CanAssignFromSelected);
-        SlotActionCommand = new RelayCommand(SlotAction, () => _clip is not null || CanAssignFromSelected());
+        ClearSlotCommand = new RelayCommand(ClearSlot, () => _clip is not null);
     }
 
     public SessionClip? Clip => _clip;
+    public Guid TrackId => _trackId;
+    public int SceneIndex => _sceneIndex;
     public bool HasClip => _clip is not null;
     public string DisplayName => _clip?.Name ?? "+";
     public string TrackColorKey { get; }
@@ -367,13 +427,12 @@ public sealed class SessionSlotViewModel : ViewModelBase
     public ICommand QueueCommand { get; }
     public ICommand SelectCommand { get; }
     public ICommand AssignFromSelectedCommand { get; }
-    public ICommand PickSourceCommand { get; }
-    public ICommand SlotActionCommand { get; }
+    public ICommand ClearSlotCommand { get; }
 
-    private void SlotAction()
+    public void SelectForInspector()
     {
-        if (_clip is not null) Launch();
-        else AssignFromSelected();
+        if (_clip is not null)
+            _owner.SelectSlot(this);
     }
 
     private void Launch()
@@ -415,6 +474,8 @@ public sealed class SessionSlotViewModel : ViewModelBase
         if (_clip is not null) _playback.StopClip(_clip.Id);
     }
 
+    private void ClearSlot() => _owner.TryClearSlot(_sceneIndex, _trackId);
+
     private bool CanAssignFromSelected()
         => IsEmpty && _selection.SelectedClip is { } clip
            && _selection.SelectedTrack?.Id == _trackId
@@ -433,6 +494,7 @@ public sealed class SessionSlotViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSelected));
         (StopCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (QueueCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (ClearSlotCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
     public void RefreshAssignable()
@@ -442,7 +504,6 @@ public sealed class SessionSlotViewModel : ViewModelBase
         CanAssignSource = canAssign;
         OnPropertyChanged(nameof(CanAssignSource));
         (AssignFromSelectedCommand as RelayCommand)?.RaiseCanExecuteChanged();
-        (PickSourceCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
     public void RefreshDisplay() => OnPropertyChanged(nameof(DisplayName));

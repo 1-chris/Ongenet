@@ -13,6 +13,7 @@ public sealed class PlaybackModeService : IPlaybackModeService
 {
     private readonly IProjectService _project;
     private readonly ITransportService _transport;
+    private readonly ISessionCaptureService _capture;
     private readonly Dictionary<Guid, SessionClipLaunchState> _launches = new();
     private readonly HashSet<Guid> _queued = new();
     private readonly HashSet<Guid> _gated = new();
@@ -22,10 +23,12 @@ public sealed class PlaybackModeService : IPlaybackModeService
     private double _lastProcessedBeat = double.NegativeInfinity;
     private bool _syncingProject;
 
-    public PlaybackModeService(IProjectService project, ITransportService transport)
+    public PlaybackModeService(IProjectService project, ITransportService transport,
+        ISessionCaptureService capture)
     {
         _project = project;
         _transport = transport;
+        _capture = capture;
         _project.ProjectChanged += OnProjectChanged;
         _transport.StateChanged += OnTransportStateChanged;
         SyncFromProject();
@@ -285,6 +288,7 @@ public sealed class PlaybackModeService : IPlaybackModeService
         _launches[sessionClipId] = new SessionClipLaunchState { Clip = clip, LaunchBeat = launchBeat };
         clip.IsPlaying = true;
         clip.IsQueued = false;
+        _capture.LogLaunch(sessionClipId, launchBeat);
         NotifyActiveChanged();
     }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ongenet.Core.Audio.Scheduling;
 using Ongenet.Core.Models.Audio;
+using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services;
 
 namespace Ongenet.Scripting;
@@ -108,6 +109,7 @@ public sealed partial class ScriptingApi
             {
                 SessionLaunchMode.Gate => ScriptSessionLaunchMode.Gate,
                 SessionLaunchMode.Toggle => ScriptSessionLaunchMode.Toggle,
+                SessionLaunchMode.Repeat => ScriptSessionLaunchMode.Repeat,
                 _ => ScriptSessionLaunchMode.Trigger
             },
             c.FollowAction switch
@@ -136,6 +138,7 @@ public sealed partial class ScriptingApi
             {
                 ScriptSessionLaunchMode.Gate => SessionLaunchMode.Gate,
                 ScriptSessionLaunchMode.Toggle => SessionLaunchMode.Toggle,
+                ScriptSessionLaunchMode.Repeat => SessionLaunchMode.Repeat,
                 _ => SessionLaunchMode.Trigger
             },
             FollowAction = clip.FollowAction switch
@@ -150,5 +153,6 @@ public sealed partial class ScriptingApi
             LaunchQuantizeBeats = clip.LaunchQuantizeBeats,
             SourceClipId = clip.SourceClipId
         });
+        _events.Publish(new SessionClipsChangedEvent());
     }
 }

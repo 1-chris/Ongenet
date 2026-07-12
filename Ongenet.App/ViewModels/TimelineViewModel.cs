@@ -655,7 +655,6 @@ namespace Ongenet.App.ViewModels
 
         public void SendClipToSessionSlot(ClipViewModel clip)
         {
-            _history.Capture("Send to session slot");
             _session.TryCreateSessionClipFromArrangement(clip.Model, clip.Owner);
         }
 
@@ -1518,12 +1517,16 @@ namespace Ongenet.App.ViewModels
             get => _selectedLane;
             set
             {
+                // Automation rows are not selectable lanes — keep the owner track selected so the
+                // ListBox never enters the state that swallows curve-editing pointer events.
+                if (value is AutomationLaneViewModel auto)
+                    value = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, auto.OwnerTrack));
+
                 if (!SetField(ref _selectedLane, value)) return;
                 if (_syncingSelection) return;
                 var track = value switch
                 {
                     TrackLaneViewModel t => t.Model,
-                    AutomationLaneViewModel a => a.OwnerTrack,
                     _ => null
                 };
                 _selection.SelectTrack(track);

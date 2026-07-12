@@ -554,18 +554,21 @@
                     </DataTemplate>
                     <!-- Automation lane (the editable curve) -->
                     <DataTemplate DataType="tl:AutomationLaneViewModel">
-                        <Border Width="{Binding LaneWidth}" Height="{Binding Height}" HorizontalAlignment="Left"
-                                Background="{StaticResource CatppuccinMantle}"
-                                BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1">
+                        <Grid Width="{Binding LaneWidth}" Height="{Binding Height}" HorizontalAlignment="Left">
+                            <Border Background="{StaticResource CatppuccinMantle}"
+                                    BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"
+                                    IsHitTestVisible="False"/>
                             <Grid>
                                 <controls:TimelineGridControl IsHitTestVisible="False" Opacity="0.5"
                                                               PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
                                                               TotalBeats="{Binding Metrics.TotalBeats}"
                                                               BeatsPerBar="{Binding Metrics.BeatsPerBar}"
                                                               HorizontalOffset="{Binding Metrics.HorizontalOffset}"/>
-                                <controls:AutomationLaneControl Revision="{Binding Revision}"/>
+                                <controls:AutomationLaneControl Revision="{Binding Revision}"
+                                                                  HorizontalAlignment="Stretch"
+                                                                  VerticalAlignment="Stretch"/>
                             </Grid>
-                        </Border>
+                        </Grid>
                     </DataTemplate>
                     <!-- Take lane -->
                     <DataTemplate DataType="tl:TakeLaneViewModel">

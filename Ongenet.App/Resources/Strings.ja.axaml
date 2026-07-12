@@ -588,6 +588,7 @@
     <system:String x:Key="Session_Arr">Arr</system:String>
     <system:String x:Key="Session_Assign_selected_clip">Assign 選択 クリップ</system:String>
     <system:String x:Key="Session_Capture">Capture</system:String>
+    <system:String x:Key="Session_Clear_slot">Clear slot</system:String>
     <system:String x:Key="Session_Clip">クリップ</system:String>
     <system:String x:Key="Session_Crossfader">Crossフェードr</system:String>
     <system:String x:Key="Session_Follow_action">Follow action</system:String>
@@ -595,6 +596,7 @@
     <system:String x:Key="Session_Launch">Launch</system:String>
     <system:String x:Key="Session_Launch_mode">Launch mode</system:String>
     <system:String x:Key="Session_Launch_scene_Tip">Launch scene</system:String>
+    <system:String x:Key="Session_Length">Length (beats)</system:String>
     <system:String x:Key="Session_Materialize_session_launches_to_the_arrangement_Tip">Materialize session launches to the arrangement</system:String>
     <system:String x:Key="Session_N1_16">1/16</system:String>
     <system:String x:Key="Session_N1_16_note">1/16 ノート</system:String>
@@ -647,6 +649,8 @@
     <system:String x:Key="Scripts_Unloaded">{0} をアンロードしました</system:String>
     <system:String x:Key="Session_Queue">Queue</system:String>
     <system:String x:Key="Session_Scenes">シーン</system:String>
+    <system:String x:Key="Session_Shift_click_inspect_Tip">Click to launch; Shift+click to inspect</system:String>
+    <system:String x:Key="Session_Source">Source clip</system:String>
     <system:String x:Key="Session_Ses">Ses</system:String>
     <system:String x:Key="Session_Session">セッション</system:String>
     <system:String x:Key="Session_Stop">停止</system:String>

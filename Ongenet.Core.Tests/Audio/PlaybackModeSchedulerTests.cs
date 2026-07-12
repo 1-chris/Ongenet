@@ -60,7 +60,9 @@ public sealed class PlaybackModeSchedulerTests
         var instruments = new InstrumentRegistry();
         var projectSvc = new ProjectService(instruments);
         var transport = new TransportService();
-        var playback = new PlaybackModeService(projectSvc, transport);
+        var events = new EventAggregator();
+        var capture = new SessionCaptureService(projectSvc, transport, events);
+        var playback = new PlaybackModeService(projectSvc, transport, capture);
 
         var track = projectSvc.Current.Tracks.First(t => t.Kind == TrackKind.Instrument);
         var src = new Clip

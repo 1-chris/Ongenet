@@ -92,7 +92,8 @@ public enum ScriptSessionLaunchMode
 {
     Trigger,
     Gate,
-    Toggle
+    Toggle,
+    Repeat
 }
 
 /// <summary>Chord quality exposed to scripts.</summary>
