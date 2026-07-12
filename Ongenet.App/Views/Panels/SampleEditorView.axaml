@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Ongenet.App.Controls"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             x:Class="Ongenet.App.Views.Panels.SampleEditorView"
+             x:DataType="vm:SampleEditorCoreViewModel"
+             Focusable="True">
+    <StackPanel Spacing="8">
+        <Border Background="{StaticResource CatppuccinYellow}" CornerRadius="4" Padding="8,4"
+                IsVisible="{Binding IsSharedSample}" Opacity="0.85">
+            <TextBlock Text="{Binding SharedWarning}" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{StaticResource CatppuccinCrust}"/>
+        </Border>
+
+        <StackPanel Spacing="2">
+            <TextBlock Text="{Binding SampleName}" FontSize="14" FontWeight="SemiBold"
+                       Foreground="{StaticResource CatppuccinText}" TextTrimming="CharacterEllipsis"/>
+            <TextBlock Text="{Binding SourceInfo}" FontSize="11"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+        </StackPanel>
+
+        <Border Height="158" CornerRadius="4" ClipToBounds="True" Background="{StaticResource CatppuccinCrust}">
+            <ScrollViewer x:Name="WaveScroll" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+                <controls:SampleWaveformEditorControl x:Name="WaveEditor"
+                    Width="{Binding ContentWidth}" Height="158"
+                    Waveform="{Binding Waveform}" Revision="{Binding WaveRevision}"
+                    DurationSeconds="{Binding DurationSeconds}"
+                    SecondsPerBeat="{Binding GridSecondsPerBeat}"
+                    BeatsPerBar="{Binding GridBeatsPerBar}"
+                    ViewportWidth="{Binding ViewportWidth}"
+                    ContentWidth="{Binding ContentWidth}"
+                    TrimStartSeconds="{Binding TrimStartSeconds, Mode=TwoWay}"
+                    TrimEndSeconds="{Binding TrimEndSeconds, Mode=TwoWay}"
+                    HighlightStartSeconds="{Binding HighlightStartSeconds}"
+                    HighlightEndSeconds="{Binding HighlightEndSeconds}"
+                    SelectionStartSeconds="{Binding SelectionStartSeconds, Mode=TwoWay}"
+                    SelectionEndSeconds="{Binding SelectionEndSeconds, Mode=TwoWay}"
+                    HoverSeconds="{Binding HoverSeconds, Mode=TwoWay}"
+                    PlayheadSeconds="{Binding PlayheadSeconds}"
+                    SnapEnabled="{Binding SnapEnabled, Mode=TwoWay}"
+                    SpectralOverlayEnabled="{Binding SpectralViewEnabled, Mode=TwoWay}"
+                    SpectralMagnitudes="{Binding SpectralMagnitudes}"
+                    SpectralRevision="{Binding SpectralRevision}"/>
+            </ScrollViewer>
+        </Border>
+
+        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto">
+            <Button Grid.Column="0" Content="{Binding PlayButtonText}" Command="{Binding PlayStopCommand}"
+                    MinWidth="56" Margin="0,0,10,0" Padding="10,4"/>
+            <Button Grid.Column="1" Content="{DynamicResource SampleInspector_Cut}" Command="{Binding CutCommand}" Margin="0,0,6,0" Padding="10,4"/>
+            <Button Grid.Column="2" Content="{DynamicResource SampleInspector_Copy}" Command="{Binding CopyCommand}" Margin="0,0,6,0" Padding="10,4"/>
+            <Button Grid.Column="3" Content="{DynamicResource SampleInspector_Paste}" Command="{Binding PasteCommand}" Margin="0,0,6,0" Padding="10,4"/>
+            <Button Grid.Column="4" Content="{DynamicResource SampleInspector_Delete}" Command="{Binding DeleteCommand}" Margin="0,0,6,0" Padding="10,4"/>
+            <ToggleButton Grid.Column="5" Content="{DynamicResource SampleInspector_Snap}" IsChecked="{Binding SnapEnabled, Mode=TwoWay}"
+                          Margin="0,0,6,0" Padding="10,4"/>
+            <ToggleButton Grid.Column="6" Content="{DynamicResource SampleInspector_Spectral}" IsChecked="{Binding SpectralViewEnabled, Mode=TwoWay}"
+                          Margin="0,0,6,0" Padding="10,4"/>
+            <TextBlock Grid.Column="7" Text="{Binding HoverInfo}" VerticalAlignment="Center"
+                       FontSize="11" Foreground="{StaticResource CatppuccinSubtext1}" Margin="0,0,12,0"/>
+            <TextBlock Grid.Column="8" Text="{Binding SelectionInfo}" VerticalAlignment="Center"
+                       FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
+        </Grid>
+
+        <Border CornerRadius="4" Padding="8,6" Background="{StaticResource CatppuccinSurface0}"
+                IsVisible="{Binding HasSelection}">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <TextBlock Text="{DynamicResource SampleInspector_Region_edit}" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,0,4,0"/>
+                <StackPanel Width="58" HorizontalAlignment="Center">
+                    <controls:Knob x:Name="GainKnob" Width="40" Height="40" HorizontalAlignment="Center"
+                                   Minimum="-24" Maximum="24" Skew="1"
+                                   Value="{Binding SelectionGainDb, Mode=TwoWay}"/>
+                    <TextBlock Text="{DynamicResource SampleInspector_Gain}" FontSize="10" HorizontalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,2,0,0"/>
+                    <TextBlock Text="{Binding SelectionGainText}" FontSize="9" HorizontalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext1}"/>
+                </StackPanel>
+                <StackPanel Width="58" HorizontalAlignment="Center" IsVisible="{Binding CanEditSelectionPan}">
+                    <controls:Knob x:Name="PanKnob" Width="40" Height="40" HorizontalAlignment="Center"
+                                   Minimum="-1" Maximum="1" Skew="1"
+                                   Value="{Binding SelectionPan, Mode=TwoWay}"/>
+                    <TextBlock Text="{DynamicResource SampleInspector_Pan}" FontSize="10" HorizontalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,2,0,0"/>
+                    <TextBlock Text="{Binding SelectionPanText}" FontSize="9" HorizontalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext1}"/>
+                </StackPanel>
+                <Button Content="{DynamicResource SampleInspector_Swap_L_R}" Command="{Binding SwapChannelsCommand}"
+                        VerticalAlignment="Center" Padding="10,4" IsVisible="{Binding CanSwapChannels}"/>
+                <Button Content="{DynamicResource SampleInspector_Reverse}" Command="{Binding ReverseSelectionCommand}"
+                        VerticalAlignment="Center" Padding="10,4"/>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Content="{DynamicResource SampleInspector_Normalize}" Command="{Binding NormalizeCommand}" Padding="10,4"/>
+            <Button Content="{DynamicResource SampleInspector_Fade_in}" Command="{Binding FadeInSelectionCommand}" Padding="10,4"/>
+            <Button Content="{DynamicResource SampleInspector_Fade_out}" Command="{Binding FadeOutSelectionCommand}" Padding="10,4"/>
+            <Button Content="{DynamicResource SampleInspector_Stretch_selection}" Command="{Binding StretchSelectionCommand}" Padding="10,4"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

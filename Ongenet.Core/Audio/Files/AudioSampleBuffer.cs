@@ -1,3 +1,5 @@
+using System;
+
 namespace Ongenet.Core.Audio.Files;
 
 /// <summary>
@@ -14,7 +16,17 @@ public sealed class AudioSampleBuffer
     }
 
     /// <summary>Interleaved samples (frame-major: frame f, channel c is at f*Channels + c).</summary>
-    public float[] Samples { get; }
+    public float[] Samples { get; private set; }
+
+    /// <summary>Grows the backing array to hold at least <paramref name="frameCount"/> frames.</summary>
+    public void EnsureFrames(long frameCount)
+    {
+        var needed = frameCount * Channels;
+        if (Samples.Length >= needed) return;
+        var grown = new float[needed];
+        Array.Copy(Samples, grown, Samples.Length);
+        Samples = grown;
+    }
 
     public int Channels { get; }
 

@@ -95,6 +95,7 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
                 case MidiMessageKind.NoteOff: compiled.NoteOff(m.Note); break;
                 case MidiMessageKind.PitchBend: compiled.PitchBend((m.PitchBend14 - 8192) / 8192.0 * 2.0); break;
                 case MidiMessageKind.ControlChange when m.Controller == 123: compiled.AllNotesOff(); break;
+                case MidiMessageKind.ControlChange: compiled.ControlChange(m.Controller, m.Data2); break;
             }
         }
 

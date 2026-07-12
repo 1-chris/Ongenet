@@ -22,6 +22,7 @@ public static unsafe class ClapApi
     public const string ExtNotePorts = "clap.note-ports";
     public const string ExtTimerSupport = "clap.timer-support";
     public const string ExtPosixFdSupport = "clap.posix-fd-support";
+    public const string ExtLatency = "clap.latency";
     public const string ExtLog = "clap.log";
     public const string ExtThreadCheck = "clap.thread-check";
     public const string FeatureInstrument = "instrument";
@@ -149,6 +150,12 @@ public static unsafe class ClapApi
     {
         public void* Ctx;
         public delegate* unmanaged[Cdecl]<ClapOutputEvents*, ClapEventHeader*, byte> TryPush;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ClapPluginLatency
+    {
+        public delegate* unmanaged[Cdecl]<ClapPlugin*, uint> Get;
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -44,5 +44,36 @@
         <ProjectReference Include="..\Ongenet.Lv2\Ongenet.Lv2.csproj" />
         <ProjectReference Include="..\Ongenet.Vst\Ongenet.Vst.csproj" />
         <ProjectReference Include="..\Ongenet.Au\Ongenet.Au.csproj" />
+        <ProjectReference Include="..\Ongenet.Link\Ongenet.Link.csproj" />
+        <ProjectReference Include="..\Ongenet.Ara\Ongenet.Ara.csproj" />
+        <ProjectReference Include="..\Ongenet.Scripting\Ongenet.Scripting.csproj" />
+        <ProjectReference Include="..\Ongenet.PluginHost\Ongenet.PluginHost.csproj">
+            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+        </ProjectReference>
     </ItemGroup>
+
+    <Target Name="CopyPluginHost" AfterTargets="Build">
+        <MSBuild Projects="..\Ongenet.PluginHost\Ongenet.PluginHost.csproj"
+                 Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)"
+                 Targets="Build" />
+        <ItemGroup>
+            <PluginHostOutput Include="..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost*" />
+            <PluginHostOutput Include="..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost.runtimeconfig.json" Condition="Exists('..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost.runtimeconfig.json')" />
+            <PluginHostOutput Include="..\Ongenet.PluginHost\bin\$(Configuration)\$(TargetFramework)\Ongenet.PluginHost.deps.json" />
+        </ItemGroup>
+        <Copy SourceFiles="@(PluginHostOutput)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+    </Target>
+
+    <!-- Copy libabl-link next to the executable when auto-detected at build time. -->
+    <ItemGroup Condition="'$(OngenetLinkNative)' == 'true'">
+        <NativeLinkLib Include="$(MSBuildThisFileDirectory)..\third_party\link\build\libabl-link.dylib" Condition="Exists('$(MSBuildThisFileDirectory)..\third_party\link\build\libabl-link.dylib')" />
+        <NativeLinkLib Include="$(MSBuildThisFileDirectory)..\third_party\link\build\libabl-link.so" Condition="Exists('$(MSBuildThisFileDirectory)..\third_party\link\build\libabl-link.so')" />
+        <NativeLinkLib Include="$(MSBuildThisFileDirectory)..\third_party\link\build\abl-link.dll" Condition="Exists('$(MSBuildThisFileDirectory)..\third_party\link\build\abl-link.dll')" />
+        <NativeLinkLib Include="$(MSBuildThisFileDirectory)..\build\link\libabl-link.dylib" Condition="Exists('$(MSBuildThisFileDirectory)..\build\link\libabl-link.dylib')" />
+        <NativeLinkLib Include="$(MSBuildThisFileDirectory)..\build\link\libabl-link.so" Condition="Exists('$(MSBuildThisFileDirectory)..\build\link\libabl-link.so')" />
+        <NativeLinkLib Include="$(MSBuildThisFileDirectory)..\build\link\abl-link.dll" Condition="Exists('$(MSBuildThisFileDirectory)..\build\link\abl-link.dll')" />
+    </ItemGroup>
+    <Target Name="CopyNativeLinkLib" AfterTargets="Build" Condition="'$(OngenetLinkNative)' == 'true' and '@(NativeLinkLib)' != ''">
+        <Copy SourceFiles="@(NativeLinkLib)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+    </Target>
 </Project>

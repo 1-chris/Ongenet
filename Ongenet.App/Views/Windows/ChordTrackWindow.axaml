@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        x:Class="Ongenet.App.Views.Windows.ChordTrackWindow"
+        x:DataType="vm:ChordTrackViewModel"
+        Title="{DynamicResource ChordTrack_Chord_Track_Title}" Width="460" Height="420">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+            <CheckBox Content="{DynamicResource ChordTrack_Enable_global_chord_track}" IsChecked="{Binding Enabled}"/>
+            <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="6">
+                <TextBlock Text="{DynamicResource ChordTrack_Start}" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Column="1" Value="{Binding NewStartBeat}" Minimum="0" Increment="0.25"/>
+                <TextBlock Grid.Column="2" Text="{DynamicResource ChordTrack_Len}" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Column="3" Value="{Binding NewLengthBeats}" Minimum="0.25" Increment="0.25"/>
+                <TextBlock Grid.Column="4" Text="{DynamicResource ChordTrack_Chord}" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="5" Text="{Binding NewSymbol}"/>
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="{DynamicResource ChordTrack_Add_region}" Command="{Binding AddRegionCommand}"/>
+                <Button Content="{DynamicResource ChordTrack_Apply_to_selected_MIDI_clip}" Command="{Binding ApplyToSelectedClipCommand}"/>
+            </StackPanel>
+        </StackPanel>
+        <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Regions}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChordRegionRow">
+                        <Border Margin="0,3" Padding="8" Background="{StaticResource CatppuccinSurface0}" CornerRadius="4">
+                            <Grid ColumnDefinitions="*,*,*,Auto" ColumnSpacing="6">
+                                <NumericUpDown Value="{Binding StartBeat}" Minimum="0" Increment="0.25"/>
+                                <NumericUpDown Grid.Column="1" Value="{Binding LengthBeats}" Minimum="0.25" Increment="0.25"/>
+                                <TextBox Grid.Column="2" Text="{Binding Symbol}"/>
+                                <Button Grid.Column="3" Content="{DynamicResource ChordTrack_Remove}" Command="{Binding RemoveCommand}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -22,6 +22,10 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 | [Main window layout & controls](docs/main-window-layout.md) | A tour of the UI: every region of the main window, the transport, timeline, piano roll, mixer, library and inspectors, plus the full keyboard-shortcut list. |
 | [The theming system](docs/theming.md) | How live theming works: the semantic colour tokens, in-place brush mutation, `ThemedControl`, JSON import/export, and how to add tokens, themes and theme-aware controls. |
 | [The audio engine & OS audio APIs](docs/audio-engine.md) | How the engine renders a block, the signal flow (instruments → effects → buses → master), real-time safety, and how the device layer hooks into PipeWire/PulseAudio/JACK/ALSA, CoreAudio and WASAPI. |
+| [Audio Editor](docs/audio-editor.md) | Standalone multitrack sample editor — waveform tools, lanes, relationship to Sample Inspector. |
+| [Scripting](docs/scripting.md) | C# automation scripts, `IScriptingApi`, factory scripts, security limits. |
+| [Polyphonic pitch editing](docs/polyphonic-pitch.md) | Built-in VariAudio-class editor — analyze, edit segments, playback and flatten. |
+| [Plugin crash isolation](docs/plugin-isolation.md) | Optional out-of-process VST3 effect hosting via `Ongenet.PluginHost`. |
 
 ---
 
@@ -33,7 +37,19 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 | `wasm-tools` workload | Building/running `Ongenet.Web` | One-time `dotnet workload install wasm-tools`. Not needed for the desktop app. |
 | `android` workload + Android SDK + **JDK 21** | Building `Ongenet.Android` | One-time `dotnet workload install android`, then provision the SDK once and install a full JDK 21 — see [§6](#6-the-android-head-tablets). **Not** needed for the desktop or web heads. Android Studio is **not** required (we sideload an APK). |
 | `zip` | Packaging releases | Used by `publish-desktop.sh`; it falls back to `tar.gz` if absent. |
-| `ffmpeg` (runtime) | Importing non-WAV audio | The desktop app shells out to `ffmpeg` to transcode imported audio. Optional — WAV works without it. |
+| `ffmpeg` (runtime) | Importing non-WAV audio, stem separation (demucs path), video mux | The desktop app shells out to `ffmpeg` to transcode imported audio. Optional — WAV works without it. |
+| `demucs` (runtime) | High-quality 4-stem separation | Optional; without it, **Export → Separate stems** uses a built-in heuristic splitter. |
+| ARA SDK + `ENABLE_ARA` | Melodyne-class ARA2 plugins | Optional; default build uses monophonic pitch offset + stub host. |
+| Vulkan / MoltenVK | 3D Scope and Field visualizers | Optional; controls show placeholders when no GPU backend is available. |
+
+### Automation design (v1)
+
+Ongenet uses **automation lanes** under tracks (right-click a control → *Automate*), not Bitwig-style
+**automation clips** as first-class timeline objects. Lanes record and playback curves during arrange
+and offline export. Linked clip groups (`LinkedClipGroupId`) cover pattern reuse; alias-style editing is
+via **Clip → Link clones** in the timeline context menu.
+
+via **Clip → Link clones** in the timeline context menu.
 
 Everything else — the audio backend, MIDI, and all plugin hosting (CLAP/LV2/VST2/VST3) — is reached by
 P/Invoke to libraries the OS already ships, so there is **nothing native to compile or install** for a
@@ -60,6 +76,121 @@ dotnet --version    # should print 10.x
 The project is developed in **JetBrains Rider** (an `Ongenet.sln` + `.idea/` are checked in), but nothing
 is IDE-specific. Visual Studio 2022+, VS Code with the C# Dev Kit, or a plain terminal all work — the CLI
 commands below are the source of truth.
+
+### Avalonia UI conventions
+
+- Use **`PlaceholderText`** on `TextBox` (and `ComboBox`) for hint text — **`Watermark` is obsolete** and
+  triggers AVLN5001 build warnings. Grep for `Watermark=` before committing UI changes.
+
+### Pattern tracks (FL-style)
+
+1. Right-click the arrangement → **Add Pattern Track** (or use the track header context menu).
+2. Add instrument tracks with your drum/synth sounds, then in **Track Controls** add them as pattern rows
+   (or add audio samples as sampler-backed rows).
+3. Double-click empty space on the pattern track lane to create a **pattern clip**.
+4. Edit steps in the bottom **Pattern** tab; reorder rows in Track Controls — step data follows each row.
+
+### Comping (take lanes)
+
+1. Enable **Loop rec** on the transport for loop comping — each pass creates a new take lane automatically.
+2. Click comp regions in take lanes to toggle which takes are audible (multi-select supported).
+3. Arm a take lane for the next recording pass from the lane header.
+4. **Flatten comp** bakes selected regions (warp-aware, with crossfades) into one audio clip.
+
+### Control surfaces
+
+Choose **MCU Transport**, **Launchpad Session**, **HUI Transport**, **Push 2**, or **APC40** under
+**Settings → Control Surface**. Learnable mixer CC mappings are stored per profile. When no profile
+is selected, the legacy combined MCU + Launchpad behaviour remains for backward compatibility.
+
+### Windows low-latency audio
+
+Enable **WASAPI exclusive mode** under **Settings → Audio** on Windows for lower output latency.
+
+### Groove pool
+
+Import user grooves as `.ongenet-groove` JSON files from **Track Controls → Groove**, or extract
+swing from a MIDI clip. User grooves are saved with the project.
+
+### Window layouts
+
+Use **View → Save layout** / **Load layout** in the main window menu to persist multi-monitor
+workspace bounds.
+
+### Collaboration sync
+
+Use **File → Share to sync folder** to export a read-only project manifest and copy for folder-based
+collaboration (configure the sync folder in settings).
+
+### Accessibility
+
+Core UI regions (transport, timeline, mixer, settings) expose screen-reader names via Avalonia
+automation properties. See [docs/main-window-layout.md](docs/main-window-layout.md) for shortcuts.
+
+### Input monitoring
+
+On audio tracks, set **Input monitoring** on the mixer strip to **Off**, **Auto** (when armed), or **On**.
+Software monitoring mixes the live input device into the master output so you can hear what you are recording.
+
+### Tap tempo & MIDI clock
+
+Use the transport-bar **Tap** button to set project BPM from your tap rhythm. Enable **MIDI clock output**
+under **Settings → Audio** to send 24 ppqn clock to an external MIDI output device while playing.
+
+### Piano-roll quantize & groove
+
+In the piano roll toolbar, **Quantize** snaps the selected clip's notes to the current grid; **Groove**
+applies the project's active groove template. The **Expression** toggle shows an MPE expression lane.
+
+### Tempo map & section playlist
+
+**View → Tempo Map** opens a window to add and edit master-track tempo automation points at the playhead.
+**View → Section Playlist** builds an ordered song-structure playlist from arrangement markers and steps
+through sections during playback.
+
+### Routing matrix
+
+Open **Routing Matrix** from the mixer to edit track output targets, send levels, and multi-out plugin routes.
+
+### Notation PDF
+
+In the **Notation** tab, **Export PDF…** renders the current staff view to a PDF file (alongside MusicXML import/export).
+
+### Automation (lane-only design)
+
+Ongenet does **not** use separate automation clip regions on the timeline. Parameter automation lives on
+**indented automation lanes** under each track (right-click an automatable control → **Create automation
+track**). Points are stored per-lane in beats; the engine evaluates them during playback and defers to
+manual input while recording is armed on that lane. This keeps automation co-located with the track it
+modulates and avoids a second clip-editing paradigm.
+
+### Stem separation
+
+Right-click an audio clip → **Separate stems (4-way)** to split into vocals/drums/bass/other tracks
+(offline). The export dialog also exposes stem separation for the selected clip. When the external
+**demucs** CLI and **ffmpeg** are installed, separation quality improves; otherwise a built-in heuristic
+is used.
+
+### Retrospective MIDI capture
+
+Use **Cap MIDI** on the transport bar to capture notes from the retrospective buffer (keyboard, preview, or hardware
+MIDI) into a new MIDI clip at the playhead without pressing Record first.
+
+### Linked clips
+
+**Create linked copy** on a clip context menu duplicates placement while sharing note/audio content.
+Linked clips show a 🔗 suffix; **Unlink** breaks the group without changing shared data until **Make
+unique** is used.
+
+### Global key & scale
+
+Set **Key** and scale on the transport bar; the piano roll scale snap controls follow the same project
+settings.
+
+### Audio to MIDI
+
+**Convert to MIDI…** on an audio clip opens a guided wizard (analyze → create track) for monophonic or
+polyphonic detection.
 
 ---
 
@@ -193,7 +324,7 @@ emulator needed.
 The platform pieces are wired in `Ongenet.Android`: `AndroidApp` (the `[Application]` class that boots
 Avalonia) and `AndroidPlatform : IPlatformServices` (registers the AAudio backend and Android-safe service
 stubs for settings/library/preset/MIDI). MIDI input, audio capture, and on-device file import are stubbed
-for now (the library/preset tabs start empty); the built-in instruments and effects work.
+(the library/preset tabs start empty); the built-in instruments and effects work.
 
 ### One-time setup
 
@@ -370,10 +501,73 @@ To build an audio-modulated 3D visual of your own, follow
 | `Ongenet.Android` | `net10.0-android` | Android (tablet) head (AAudio backend, Android-safe stubs, single-view shell). Sideloaded APK. |
 | `Ongenet.Audio` | `net10.0` | Native audio + MIDI backends (ALSA/CoreAudio/WASAPI/**AAudio**; ALSA seq/WinMM/CoreMIDI). |
 | `Ongenet.Clap` / `Ongenet.Lv2` / `Ongenet.Vst` | `net10.0` | Plugin hosting (CLAP / LV2 / VST2+VST3). |
+| `Ongenet.Link` | `net10.0` | Ableton Link tempo/phase sync (GPL isolated assembly). |
+| `Ongenet.Ara` | `net10.0` | Celemony ARA2 hosting seam (stub without SDK). |
 | `Ongenet.Core.Tests` | `net10.0` | xUnit tests for Core + LV2. |
 
 Each head plugs its platform pieces into the shared `App` through
 `Ongenet.App.Platform.IPlatformServices` (`DesktopPlatform` / `WebPlatform` / `AndroidPlatform`).
+
+### Ableton Link (optional native)
+
+`Ongenet.Link` wraps [libabl-link](https://github.com/Ableton/link/tree/master/extensions/abl_link)
+(the plain-C Ableton Link wrapper). Without the native library the desktop head registers
+`NullLinkSession` and the transport Link toggle stays hidden.
+
+Build and enable the native session:
+
+```bash
+git clone https://github.com/Ableton/link.git third_party/link
+cmake -S third_party/link -B build/link -DCMAKE_BUILD_TYPE=Release
+cmake --build build/link --target abl_link
+# macOS: libabl-link.dylib  Linux: libabl-link.so  Windows: abl-link.dll
+```
+
+Copy or symlink the shared library next to the `Ongenet` executable (or onto the loader path). When
+`libabl-link` is present under `third_party/link/build` or `build/link`, MSBuild auto-enables native Link
+via `Directory.Build.props` (`OngenetLinkNative=true`) and copies the library into the output folder.
+You can also build manually with the compile flag:
+
+```bash
+dotnet build Ongenet.Desktop/Ongenet.Desktop.csproj -p:DefineConstants=ONGENET_LINK_NATIVE
+```
+
+At runtime `LinkSessionFactory` probes `NativeLibrary.TryLoad("abl-link")` and falls back to
+`NullLinkSession` when the library is missing. When enabled, the transport bar syncs tempo, play/stop, and
+maps the start marker to the shared Link phase on play.
+
+### Celemony ARA (optional SDK)
+
+`Ongenet.Ara` compiles without the Celemony ARA SDK. VST3 ARA plug-ins are detected via the
+`ARA Main Factory Class` category (see Celemony `ARAVST3.h`); binding and editor hosting are stubbed
+until you opt in:
+
+1. Clone the [ARA SDK](https://github.com/Celemony/ARA_API) and set `ARA_SDK_PATH` to its root
+   (the folder containing `ARA_API/` and `ARA_Library/`).
+2. Add SDK references to `Ongenet.Ara.csproj` (example — adjust paths for your platform):
+
+   ```xml
+   <PropertyGroup Condition="'$(ARA_SDK_PATH)' != ''">
+     <DefineConstants>$(DefineConstants);ENABLE_ARA</DefineConstants>
+   </PropertyGroup>
+   <ItemGroup Condition="'$(DefineConstants)' != '' and $(DefineConstants.Contains('ENABLE_ARA'))">
+     <Compile Include="$(ARA_SDK_PATH)/ARA_Library/Dispatch/ARAHostDispatch.cpp" Link="ara/ARAHostDispatch.cpp" />
+     <None Include="$(ARA_SDK_PATH)/ARA_API/**" Link="ara-sdk/%(RecursiveDir)%(Filename)%(Extension)" />
+   </ItemGroup>
+   ```
+
+3. Build with the SDK path and flag:
+
+   ```bash
+   export ARA_SDK_PATH=/path/to/ARA_API
+   dotnet build Ongenet.Desktop/Ongenet.Desktop.csproj -p:DefineConstants=ENABLE_ARA
+   ```
+
+4. Wire real document controllers in `AraHost.CreateSdkDocument` / `OpenSdkEditor` (the `#if ENABLE_ARA`
+   seam is structured; today it still returns `StubAraDocument` until SDK bindings are added).
+
+The clip context menu **Open ARA Editor** appears when the track hosts an ARA-capable VST3; an **ARA**
+badge marks clips with an active ARA region.
 
 ---
 
@@ -381,7 +575,7 @@ Each head plugs its platform pieces into the shared `App` through
 
 The engine exposes lightweight diagnostics via `Ongenet.Core.Audio.AudioDiagnostics`:
 
-- `LastBlockMicroseconds` — most recent render block duration
+- `LastBlockMicroseconds` — duration of the last completed render block
 - `Snapshot()` — block count, average/max block time, macOS ring underrun count, ring fill level
 
 On macOS, `MacAudioOutput` increments the underrun counter when the CoreAudio consumer reads
@@ -398,3 +592,42 @@ past the end of the producer ring (audible crackle/dropout).
 5. Toggle **F8** in the main window to overlay UI frame/render timing and confirm the timeline stays smooth.
 
 Re-run after performance changes and compare average/max block time and underrun count.
+
+---
+
+## Completeness checklist
+
+Ongenet targets a **feature-complete open-source DAW**.
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| **1 — Polish** | Section playlist UI, export naming, video/ffmpeg fallback, stem separation UX | **Done** |
+| **2 — Producer parity** | ASIO enumeration, instrument/drum rack, piano-roll operators, accessibility | **Done** |
+| **3 — Specialist** | Chord track, expression maps, LTC, hybrid tracks, audio editor, LV2 UI seam | **Done** |
+| **4 — Pro hardening** | Plugin isolation (`Ongenet.PluginHost`), AAF/OMF handoff, collab sync | **Done** |
+| **5 — Broadcast** | Control Room, ADM BWF immersive export | **Done** |
+| **6 — Ecosystem** | Roslyn scripting host, library templates, stem separation presets | **Done** |
+| **7 — Parity gaps** | Edison-class Audio Editor, polyphonic pitch editor, scripting UI, plugin sandbox | **Done** |
+
+### Parity features
+
+- **Audio Editor** — standalone multitrack window ([docs/audio-editor.md](docs/audio-editor.md))
+- **Polyphonic pitch** — built-in note-segment editor ([docs/polyphonic-pitch.md](docs/polyphonic-pitch.md))
+- **Scripting** — Tools → Scripts, Roslyn host ([docs/scripting.md](docs/scripting.md))
+- **Plugin isolation** — optional VST3 effect sandbox ([docs/plugin-isolation.md](docs/plugin-isolation.md))
+
+### Competitor glossary
+
+| Competitor term | Ongenet equivalent |
+| --- | --- |
+| Bitwig **Grid** / FL **Patcher** | **Field** |
+| FL **Factory** | **Library** (Projects + presets) |
+| Ableton **Session View** | **Session** tab |
+| FL **Channel Rack / Patterns** | **Channel Rack** + pattern tracks |
+| Ableton **Instrument/Drum Rack** | **Instrument rack** + drum pad grid |
+
+### Interchange & licensing
+
+- **Immersive delivery** — **ADM BWF** export (ITU-R BS.2076) with XML sidecar for broadcast handoff
+- **Post interchange** — structured **AAF/OMF XML** and custom timeline XML for Nuendo/Pro Tools pipelines
+- **Collaboration** — self-hosted versioned folder sync (File → Collaboration)

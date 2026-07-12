@@ -82,6 +82,19 @@ public sealed class SamplerInstrument : IInstrument, IInstrumentVoiceState, IPro
     /// <summary>The loaded regions (for the zone-map UI). Empty until a patch is loaded.</summary>
     public IReadOnlyList<SamplerRegion> Regions => _regions;
 
+    /// <summary>Replaces runtime regions (e.g. after zone-map edits). Stops active voices first.</summary>
+    public void ReplaceRegions(IReadOnlyList<SamplerRegion> regions)
+    {
+        var copy = regions as SamplerRegion[] ?? regions.ToArray();
+        lock (_lock)
+        {
+            foreach (var v in _voices) v.Stop();
+            _roundRobin.Reset();
+            _regions = copy;
+            ConfigureArticulation();
+        }
+    }
+
     /// <summary>Absolute path of the loaded <c>.sfz</c>/<c>.sf2</c>, or empty.</summary>
     public string SourcePath => _sourcePath;
 

@@ -2,14 +2,16 @@ using System;
 using System.Collections.Generic;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Parameters;
+using Ongenet.Core.Persistence;
 
 namespace Ongenet.Core.Audio.Effects;
 
 /// <summary>
 /// A stereo-linked feed-forward compressor: a peak envelope follower drives gain reduction above
-/// the threshold by the given ratio, with attack/release ballistics and makeup gain.
+/// the threshold by the given ratio, with attack/release ballistics and makeup gain. Optional
+/// external sidechain input ducks from another track's output.
 /// </summary>
-public sealed class CompressorEffect : IAudioEffect
+public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceTrackEffect, IProjectStatefulComponent
 {
     public const string TypeId = "compressor";
 
@@ -23,9 +25,19 @@ public sealed class CompressorEffect : IAudioEffect
     public double ReleaseMs { get; set; } = 120.0;
     public double MakeupDb { get; set; }
 
+    /// <summary>Source track whose output drives the detector; null = use this track's input.</summary>
+    public Guid? SidechainSourceTrackId { get; set; }
+
+    Guid? ISourceTrackEffect.SourceTrackId
+    {
+        get => SidechainSourceTrackId;
+        set => SidechainSourceTrackId = value;
+    }
+
     private int _channels = 2;
     private double _sampleRate = 44100.0;
     private readonly EnvelopeFollower _follower = new();
+    private EffectContext? _ctx;
 
     public string Name => "Compressor";
 
@@ -40,6 +52,8 @@ public sealed class CompressorEffect : IAudioEffect
         new FloatParameter("Makeup", 0.0, 24.0, () => MakeupDb, v => MakeupDb = v, "0.#", "dB")
     };
 
+    public void SetContext(EffectContext context) => _ctx = context;
+
     public void Prepare(AudioFormat format)
     {
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
@@ -50,7 +64,8 @@ public sealed class CompressorEffect : IAudioEffect
     public IAudioEffect Clone() => new CompressorEffect
     {
         Enabled = Enabled, ThresholdDb = ThresholdDb, Ratio = Ratio,
-        AttackMs = AttackMs, ReleaseMs = ReleaseMs, MakeupDb = MakeupDb
+        AttackMs = AttackMs, ReleaseMs = ReleaseMs, MakeupDb = MakeupDb,
+        SidechainSourceTrackId = SidechainSourceTrackId
     };
 
     public void Process(Span<float> buffer)
@@ -61,16 +76,40 @@ public sealed class CompressorEffect : IAudioEffect
         var slope = 1.0 - 1.0 / Math.Max(1.0, Ratio);
         var makeup = AudioMath.Db2Lin(MakeupDb);
 
+        ReadOnlySpan<float> sidechain = ReadOnlySpan<float>.Empty;
+        var sidechainChannels = 1;
+        if (_ctx is not null && SidechainSourceTrackId is { } srcId)
+        {
+            _ctx.Sidechain.Request(srcId);
+            sidechain = _ctx.Sidechain.Read(srcId, out sidechainChannels);
+        }
+
+        var useSidechain = SidechainSourceTrackId.HasValue;
+        var sidechainFrames = sidechainChannels > 0 ? sidechain.Length / sidechainChannels : 0;
         var frames = buffer.Length / channels;
         for (var frame = 0; frame < frames; frame++)
         {
             var i = frame * channels;
             float detect = 0;
-            for (var c = 0; c < channels; c++)
+
+            if (useSidechain && frame < sidechainFrames)
             {
-                var a = buffer[i + c];
-                if (a < 0) a = -a;
-                if (a > detect) detect = a;
+                var si = frame * sidechainChannels;
+                for (var c = 0; c < sidechainChannels; c++)
+                {
+                    var a = sidechain[si + c];
+                    if (a < 0) a = -a;
+                    if (a > detect) detect = a;
+                }
+            }
+            else
+            {
+                for (var c = 0; c < channels; c++)
+                {
+                    var a = buffer[i + c];
+                    if (a < 0) a = -a;
+                    if (a > detect) detect = a;
+                }
             }
 
             var env = _follower.Process(detect);
@@ -80,5 +119,18 @@ public sealed class CompressorEffect : IAudioEffect
 
             for (var c = 0; c < channels; c++) buffer[i + c] *= gain;
         }
+    }
+
+    public void WriteProjectState(OngenWriter writer)
+    {
+        writer.WriteBool(SidechainSourceTrackId.HasValue);
+        writer.WriteGuid(SidechainSourceTrackId ?? Guid.Empty);
+    }
+
+    public void ReadProjectState(OngenReader reader)
+    {
+        var has = reader.ReadBool();
+        var id = reader.ReadGuid();
+        SidechainSourceTrackId = has ? id : null;
     }
 }

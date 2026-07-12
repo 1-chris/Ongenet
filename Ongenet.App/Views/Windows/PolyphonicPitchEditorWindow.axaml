@@ -1,0 +1,63 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:controls="using:Ongenet.App.Controls"
+        x:Class="Ongenet.App.Views.Windows.PolyphonicPitchEditorWindow"
+        x:DataType="vm:PolyphonicPitchEditorViewModel"
+        Title="{DynamicResource PolyPitch_Pitch_Editor_Title}"
+        Width="720" Height="480"
+        WindowStartupLocation="CenterOwner">
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+        <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8">
+            <StackPanel Grid.Row="0" Spacing="4">
+                <TextBlock Text="{DynamicResource PolyPitch_Polyphonic_pitch_editor}"
+                           FontWeight="SemiBold" FontSize="14"/>
+                <TextBlock Text="{Binding ClipName, StringFormat='Source: {0}'}"
+                           FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
+            </StackPanel>
+
+            <controls:PolyphonicPitchEditorControl Grid.Row="1"
+                                                   DataContext="{Binding}"
+                                                   Waveform="{Binding Waveform}"
+                                                   TotalFrames="{Binding TotalFrames}"
+                                                   Segments="{Binding PitchSegments}"
+                                                   SelectedIndex="{Binding SelectedIndex, Mode=TwoWay}"
+                                                   Revision="{Binding SegmentRevision}"
+                                                   MinHeight="160"/>
+
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <ListBox ItemsSource="{Binding Segments}"
+                         SelectedItem="{Binding SelectedSegment, Mode=TwoWay}"
+                         MinHeight="100" MaxHeight="140">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PitchSegmentItemViewModel">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <Slider Grid.Column="1" Minimum="-2400" Maximum="2400"
+                                        Value="{Binding PitchCents, Mode=TwoWay}"
+                                        VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding PitchCents, StringFormat='{}{0:0} ¢'}"
+                                           VerticalAlignment="Center" MinWidth="48"
+                                           Foreground="{StaticResource CatppuccinSubtext1}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top">
+                    <Button Content="{DynamicResource PolyPitch_Analyze}" Command="{Binding AnalyzeCommand}"
+                            Padding="12,6" MinWidth="100"/>
+                    <TextBlock Text="{Binding Status}" TextWrapping="Wrap" MaxWidth="160"
+                               FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="3" FontSize="10"
+                       Foreground="{StaticResource CatppuccinOverlay1}"
+                       Text="{DynamicResource PolyPitch_Drag_segments_vertically_or_use_sliders}"
+                       TextWrapping="Wrap"/>
+        </Grid>
+    </Border>
+</Window>

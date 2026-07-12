@@ -38,6 +38,86 @@ public sealed class NoteInNode : FieldNode
     }
 }
 
+/// <summary>
+/// Host MIDI note source for effect graphs (and instruments): emits pitch/gate/velocity from the raw note
+/// stream rather than the Field voice allocator. Updated by <see cref="CompiledGraph"/> on each note event.
+/// </summary>
+public sealed class MidiInNode : FieldNode
+{
+    public const string Type = "io.midi_in";
+    public override string TypeId => Type;
+    public override string DisplayName => "MIDI In";
+    public override string Category => FieldNodeCategories.Io;
+    public override bool IsNoteSource => true;
+
+    private float _pitch;
+    private float _gate;
+    private float _velocity;
+
+    public MidiInNode()
+    {
+        AddOutput("pitch", "Pitch", FieldSignalKind.Note);
+        AddOutput("gate", "Gate", FieldSignalKind.Note);
+        AddOutput("vel", "Velocity", FieldSignalKind.Note);
+        Build();
+    }
+
+    internal void NoteOn(int midiNote, float velocity)
+    {
+        _pitch = (float)MusicalMath.NoteToFrequency(midiNote);
+        _gate = 1f;
+        _velocity = velocity;
+    }
+
+    internal void NoteOff(int midiNote)
+    {
+        _ = midiNote;
+        _gate = 0f;
+    }
+
+    internal void AllNotesOff() => _gate = 0f;
+
+    public override void ProcessBlock(FieldRenderContext ctx)
+    {
+        var pitch = ctx.Output(0);
+        var g = ctx.Output(1);
+        var vv = ctx.Output(2);
+        for (var i = 0; i < ctx.Frames; i++) { pitch[i] = _pitch; g[i] = _gate; vv[i] = _velocity; }
+    }
+}
+
+/// <summary>Emits a normalized CV (0..1) for a chosen MIDI CC number from the host stream.</summary>
+public sealed class CcInNode : FieldNode
+{
+    public const string Type = "io.cc_in";
+    public override string TypeId => Type;
+    public override string DisplayName => "CC In";
+    public override string Category => FieldNodeCategories.Io;
+    public override bool ForceGlobal => true;
+
+    public int Controller { get; set; } = 1;
+
+    private float _value;
+
+    public CcInNode()
+    {
+        AddOutput("value", "Value", FieldSignalKind.Cv);
+        Build();
+    }
+
+    internal void ControlChange(int controller, int value14)
+    {
+        if (controller != Controller) return;
+        _value = Math.Clamp(value14 / 127f, 0f, 1f);
+    }
+
+    public override void ProcessBlock(FieldRenderContext ctx)
+    {
+        var o = ctx.Output(0);
+        for (var i = 0; i < ctx.Frames; i++) o[i] = _value;
+    }
+}
+
 /// <summary>Feeds the graph's incoming audio (effect mode) as a stereo pair.</summary>
 public sealed class AudioInNode : FieldNode
 {

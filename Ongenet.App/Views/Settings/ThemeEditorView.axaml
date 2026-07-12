@@ -25,7 +25,7 @@
         <!-- Built-in flavour + variant -->
         <StackPanel Grid.Row="0" Spacing="10">
             <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="Preset" VerticalAlignment="Center" Width="60"
+                <TextBlock Text="{DynamicResource SettingsTheme_Preset}" VerticalAlignment="Center" Width="60"
                            Foreground="{StaticResource CatppuccinSubtext1}"/>
                 <ComboBox Width="220" ItemsSource="{Binding BuiltIns}"
                           SelectedItem="{Binding SelectedBuiltIn, Mode=TwoWay}">
@@ -37,13 +37,13 @@
                 </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="Variant" VerticalAlignment="Center" Width="60"
+                <TextBlock Text="{DynamicResource SettingsTheme_Variant}" VerticalAlignment="Center" Width="60"
                            Foreground="{StaticResource CatppuccinSubtext1}"/>
-                <ToggleSwitch IsChecked="{Binding IsLight, Mode=TwoWay}" OnContent="Light" OffContent="Dark"/>
+                <ToggleSwitch IsChecked="{Binding IsLight, Mode=TwoWay}" OnContent="{DynamicResource SettingsTheme_Light}" OffContent="{DynamicResource SettingsTheme_Dark}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
-                <Button Content="Import JSON…" Classes="Action" Click="Import_Click"/>
-                <Button Content="Export JSON…" Classes="Action" Click="Export_Click"/>
+                <Button Content="{DynamicResource SettingsTheme_Import_JSON}" Classes="Action" Click="Import_Click"/>
+                <Button Content="{DynamicResource SettingsTheme_Export_JSON}" Classes="Action" Click="Export_Click"/>
             </StackPanel>
         </StackPanel>
 

@@ -14,6 +14,8 @@ public static class FieldNodeCatalog
     {
         // I/O
         yield return new FieldNodeInfo(NoteInNode.Type, "Note In", FieldNodeCategories.Io, () => new NoteInNode());
+        yield return new FieldNodeInfo(MidiInNode.Type, "MIDI In", FieldNodeCategories.Io, () => new MidiInNode());
+        yield return new FieldNodeInfo(CcInNode.Type, "CC In", FieldNodeCategories.Io, () => new CcInNode());
         yield return new FieldNodeInfo(AudioInNode.Type, "Audio In", FieldNodeCategories.Io, () => new AudioInNode());
         yield return new FieldNodeInfo(SidechainInNode.Type, "Sidechain In", FieldNodeCategories.Io, () => new SidechainInNode());
         yield return new FieldNodeInfo(AudioOutNode.Type, "Audio Out", FieldNodeCategories.Io, () => new AudioOutNode());
@@ -77,5 +79,9 @@ public static class FieldNodeCatalog
         yield return new FieldNodeInfo(ComparatorNode.Type, "Comparator", FieldNodeCategories.Logic, () => new ComparatorNode());
         yield return new FieldNodeInfo(QuantizeNode.Type, "Quantize", FieldNodeCategories.Logic, () => new QuantizeNode());
         yield return new FieldNodeInfo(SampleHoldNode.Type, "Sample & Hold", FieldNodeCategories.Logic, () => new SampleHoldNode());
+
+        // Music theory
+        yield return new FieldNodeInfo(ScaleQuantizeNode.Type, "Scale Quantize", FieldNodeCategories.Music, () => new ScaleQuantizeNode());
+        yield return new FieldNodeInfo(KeyRootNode.Type, "Key Root", FieldNodeCategories.Music, () => new KeyRootNode());
     }
 }

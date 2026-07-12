@@ -46,6 +46,8 @@ public sealed class CompiledGraph
 
     private readonly CompiledNode[] _order;
     private readonly List<IFieldNoteReceiver> _receivers = new();
+    private readonly List<Nodes.MidiInNode> _midiIns = new();
+    private readonly List<Nodes.CcInNode> _ccIns = new();
     private readonly float[][] _outBuf;   // per (node,outputPort,voice) slot
     private readonly float[][] _scratch;  // shared input-summation scratch, indexed by input-port position
     private readonly float[] _zero;
@@ -82,7 +84,11 @@ public sealed class CompiledGraph
         _outR = new float[maxBlock];
 
         foreach (var cn in order)
+        {
             if (cn.Node is IFieldNoteReceiver receiver) _receivers.Add(receiver);
+            if (cn.Node is Nodes.MidiInNode midiIn) _midiIns.Add(midiIn);
+            if (cn.Node is Nodes.CcInNode ccIn) _ccIns.Add(ccIn);
+        }
     }
 
     /// <summary>Allocates a voice for a note and resets every per-voice node's state for that voice.</summary>
@@ -92,19 +98,27 @@ public sealed class CompiledGraph
         var v = _voices.NoteOn(note, velocity, freq);
         foreach (var cn in _order)
             if (cn.PerVoice) cn.Node.ResetVoice(v);
+        foreach (var m in _midiIns) m.NoteOn(note, velocity);
         foreach (var r in _receivers) r.NoteOn(note, velocity);
     }
 
     public void NoteOff(int note)
     {
         _voices.NoteOff(note);
+        foreach (var m in _midiIns) m.NoteOff(note);
         foreach (var r in _receivers) r.NoteOff(note);
     }
 
     public void AllNotesOff()
     {
         _voices.AllNotesOff();
+        foreach (var m in _midiIns) m.AllNotesOff();
         foreach (var r in _receivers) r.AllNotesOff();
+    }
+
+    public void ControlChange(int controller, int value14)
+    {
+        foreach (var c in _ccIns) c.ControlChange(controller, value14);
     }
 
     public void PitchBend(double semitones)

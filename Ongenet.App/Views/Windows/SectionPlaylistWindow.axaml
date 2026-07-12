@@ -1,0 +1,61 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:audio="using:Ongenet.Core.Models.Audio"
+        x:Class="Ongenet.App.Views.Windows.SectionPlaylistWindow"
+        x:DataType="vm:SectionPlaylistViewModel"
+        Width="480" Height="460" Title="{DynamicResource SectionPlaylist_Section_Playlist_Title}">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="{DynamicResource SectionPlaylist_Add_section}" Command="{Binding AddSectionCommand}"/>
+                <CheckBox Content="{DynamicResource SectionPlaylist_Play_playlist}" IsChecked="{Binding IsEnabled}" VerticalAlignment="Center"/>
+            </StackPanel>
+            <TextBlock Text="{Binding CurrentSectionDisplay}" FontSize="11"
+                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+        </StackPanel>
+        <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Sections}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SectionRow">
+                        <Border Margin="0,3" Padding="8" CornerRadius="4"
+                                Classes.playing="{Binding IsPlaying}"
+                                Background="{StaticResource CatppuccinSurface0}">
+                            <Border.Styles>
+                                <Style Selector="Border.playing">
+                                    <Setter Property="BorderBrush" Value="{StaticResource CatppuccinLavender}"/>
+                                    <Setter Property="BorderThickness" Value="2"/>
+                                </Style>
+                            </Border.Styles>
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                                <TextBlock Grid.Column="0" Text="{Binding RowIndex, StringFormat='{}{0}.'}"
+                                           VerticalAlignment="Center" Width="24"
+                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding Markers}"
+                                          SelectedItem="{Binding Marker}" MinWidth="160">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="audio:ArrangementMarker">
+                                            <TextBlock>
+                                                <Run Text="{Binding Name}"/>
+                                                <Run Text="{DynamicResource SectionPlaylist_Text}"/>
+                                                <Run Text="{Binding Beat, StringFormat='{}{0:0.##}'}"/>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="2" Content="▲" Command="{Binding MoveUpCommand}"
+                                        Padding="6,2" ToolTip.Tip="{DynamicResource SectionPlaylist_Move_up_Tip}"/>
+                                <Button Grid.Column="3" Content="▼" Command="{Binding MoveDownCommand}"
+                                        Padding="6,2" ToolTip.Tip="{DynamicResource SectionPlaylist_Move_down_Tip}"/>
+                                <Button Grid.Column="4" Content="{DynamicResource SectionPlaylist_Dup}" Command="{Binding DuplicateCommand}"
+                                        Padding="6,2" ToolTip.Tip="{DynamicResource SectionPlaylist_Duplicate_Tip}"/>
+                                <Button Grid.Column="5" Content="{DynamicResource SectionPlaylist_Text_2}" Command="{Binding RemoveCommand}"
+                                        Padding="6,2" ToolTip.Tip="{DynamicResource SectionPlaylist_Remove_Tip}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

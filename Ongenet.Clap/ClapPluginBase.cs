@@ -16,7 +16,7 @@ namespace Ongenet.Clap;
 /// (notes in, audio out, additive) and <see cref="ClapEffect"/> (audio in → audio out, in place).
 /// All native failures are caught; a broken plugin simply produces silence / passes audio through.
 /// </summary>
-public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
+public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable, ILatencyProvider
 {
     protected const int MaxBlock = 8192;
     private const int EventCapacity = 1024;
@@ -70,6 +70,11 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
     private double _activatedRate;
     private volatile bool _processing;
     private bool _disposed;
+
+    private int _reportedLatencySamples;
+
+    /// <inheritdoc />
+    public int ReportedLatencySamples => _reportedLatencySamples;
 
     private string? _guiApi;
     private bool _guiFloating;
@@ -288,6 +293,24 @@ public abstract unsafe class ClapPluginBase : IPluginEditor, IDisposable
         {
             _activated = true;
             _activatedRate = format.SampleRate;
+            RefreshLatency();
+        }
+    }
+
+    private void RefreshLatency()
+    {
+        _reportedLatencySamples = 0;
+        if (_plugin == null || _plugin->GetExtension == null) return;
+        var extName = ClapApi.Utf8(ClapApi.ExtLatency);
+        try
+        {
+            var ext = (ClapApi.ClapPluginLatency*)_plugin->GetExtension(_plugin, extName);
+            if (ext != null && ext->Get != null)
+                _reportedLatencySamples = (int)ext->Get(_plugin);
+        }
+        finally
+        {
+            ClapApi.FreeUtf8(extName);
         }
     }
 

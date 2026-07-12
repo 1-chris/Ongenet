@@ -41,6 +41,7 @@ namespace Ongenet.App.Views.Panels
         // Active-gesture state.
         private Gesture _gesture = Gesture.None;
         private ClipViewModel? _dragClip;
+        private PatternClipViewModel? _dragPatternClip;
         private List<ClipViewModel>? _dragClips;
         private Dictionary<ClipViewModel, double>? _origStarts;
         private bool _draggingGroupSummary;
@@ -79,10 +80,9 @@ namespace Ongenet.App.Views.Panels
             // Clicking the bar ruler sets the start marker.
             RulerScroll.AddHandler(PointerPressedEvent, OnRulerPressed, RoutingStrategies.Tunnel);
 
-            // Advances the playhead overlay and refreshes the track meters. While playing this runs off
-            // the compositor's render frame (vsync-aligned, smooth ~display rate); while stopped it falls
-            // back to a cheap timer for live-input meter polling / scrub. A plain DispatcherTimer can't
-            // hold a clean 60Hz (it jitters under dispatcher load); RequestAnimationFrame can.
+            // Advances the playhead overlay and refreshes the track meters. While playing this runs at
+            // ~30 Hz; while stopped it drops to a slow poll so the compositor isn't asked to present
+            // the whole (translucent) window on every vsync.
             _ticker = new Services.FrameTicker(this, OnTick);
 
             // NB: we deliberately do NOT reposition overlays from LayoutUpdated. That event fires
@@ -102,6 +102,8 @@ namespace Ongenet.App.Views.Panels
             StartMarkerIcon.RenderTransform = _startIconXform;
             LoopRegion.RenderTransform = _loopXform;
             LoopRegionRuler.RenderTransform = _loopRulerXform;
+            PunchBracketLeft.RenderTransform = _punchInXform;
+            PunchBracketRight.RenderTransform = _punchOutXform;
 
             DataContextChanged += OnDataContextChanged;
         }
@@ -115,6 +117,8 @@ namespace Ongenet.App.Views.Panels
         private readonly Avalonia.Media.TranslateTransform _startIconXform = new();
         private readonly Avalonia.Media.TranslateTransform _loopXform = new();
         private readonly Avalonia.Media.TranslateTransform _loopRulerXform = new();
+        private readonly Avalonia.Media.TranslateTransform _punchInXform = new();
+        private readonly Avalonia.Media.TranslateTransform _punchOutXform = new();
 
         // Cached ContentOriginX results — recomputed only when scroll offset or zoom changes.
         private double _cachedLanesOrigin;
@@ -138,8 +142,10 @@ namespace Ongenet.App.Views.Panels
                 UpdateOverlays();
             }
 
-            _ticker.SetFast(_vm?.IsPlaying ?? false);
+            SyncTickerSpeed();
         }
+
+        private void SyncTickerSpeed() => _ticker.SetFast(_vm?.IsPlaying == true && IsVisible);
 
         // The single per-frame UI driver. Runs off the timeline's render-frame loop (RAF while playing,
         // a slow timer while idle). Besides the playhead/meters, it pumps the shared PlaybackClock so the
@@ -149,9 +155,12 @@ namespace Ongenet.App.Views.Panels
 
         private void OnTick()
         {
-            _vm?.RefreshRecording();
-            UpdateOverlays();
-            _vm?.RefreshMeters();
+            if (!IsVisible || _vm is null) return;
+            _vm.RefreshRecording();
+            // Overlays only move during playback — static markers are updated from property handlers.
+            if (_vm.IsPlaying)
+                UpdateOverlays();
+            _vm.RefreshMeters();
             (_clock ??= App.ServiceProvider?.GetService<IPlaybackClock>())?.Pump();
         }
 
@@ -195,13 +204,20 @@ namespace Ongenet.App.Views.Panels
                 InvalidateOriginCache();
                 UpdateOverlays();
             }
+            else if (change.Property == IsVisibleProperty)
+            {
+                SyncTickerSpeed();
+            }
         }
 
         private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName is nameof(TimelineViewModel.IsPlaying) or nameof(TimelineViewModel.StartBeat))
+            if (e.PropertyName is nameof(TimelineViewModel.IsPlaying) or nameof(TimelineViewModel.StartBeat)
+                or nameof(TimelineViewModel.LoopStart) or nameof(TimelineViewModel.LoopEnd)
+                or nameof(TimelineViewModel.IsLoopActive) or nameof(TimelineViewModel.PunchInBeat)
+                or nameof(TimelineViewModel.PunchOutBeat) or nameof(TimelineViewModel.HasPunchRegion))
             {
-                if (e.PropertyName == nameof(TimelineViewModel.IsPlaying)) _ticker.SetFast(_vm?.IsPlaying ?? false);
+                if (e.PropertyName == nameof(TimelineViewModel.IsPlaying)) SyncTickerSpeed();
                 UpdateOverlays();
             }
         }
@@ -261,6 +277,21 @@ namespace Ongenet.App.Views.Panels
             {
                 LoopRegion.IsVisible = false;
                 LoopRegionRuler.IsVisible = false;
+            }
+
+            if (_vm.HasPunchRegion && _vm.PunchInBeat is { } punchIn && _vm.PunchOutBeat is { } punchOut)
+            {
+                var punchInX = rulerOrigin + punchIn * ppb;
+                var punchOutX = rulerOrigin + punchOut * ppb;
+                _punchInXform.X = punchInX;
+                _punchOutXform.X = punchOutX - 2;
+                PunchBracketLeft.IsVisible = true;
+                PunchBracketRight.IsVisible = true;
+            }
+            else
+            {
+                PunchBracketLeft.IsVisible = false;
+                PunchBracketRight.IsVisible = false;
             }
         }
 
@@ -684,12 +715,46 @@ namespace Ongenet.App.Views.Panels
                     return;
                 }
 
+                if (e.ClickCount == 2 && trackLane is { Model.Kind: Core.Models.Audio.TrackKind.Pattern })
+                {
+                    vm.CreatePatternClip(rowIndex, beat);
+                    e.Handled = true;
+                    return;
+                }
+
                 _gesture = Gesture.Band;
                 _bandStart = pos;
                 _bandMoved = false;
                 _bandPressRow = rowIndex;
                 BandSelect(pos, pos, vm); // clears any existing clip selection
                 ShowBand(pos, pos);
+                e.Pointer.Capture(LanesList);
+                e.Handled = true;
+                return;
+            }
+
+            if (hit.Value.PatternClip is { } patternClip)
+            {
+                if (e.ClickCount == 2)
+                {
+                    vm.OpenPatternClip(patternClip);
+                    e.Handled = true;
+                    return;
+                }
+
+                vm.SelectPatternClip(patternClip);
+                _gesture = ClipGestureAt(e, hit.Value.Visual);
+
+                _dragPatternClip = patternClip;
+                _dragClip = null;
+                _dragClips = null;
+                _origStarts = null;
+                _draggingGroupSummary = false;
+                _clipDragCaptured = false;
+                _pressBeat = beat;
+                _origStart = patternClip.Model.StartBeat;
+                _origLength = patternClip.Model.LengthBeats;
+
                 e.Pointer.Capture(LanesList);
                 e.Handled = true;
                 return;
@@ -714,12 +779,7 @@ namespace Ongenet.App.Views.Panels
             var (clip, clipVisual) = (hit.Value.Clip!, hit.Value.Visual!);
             vm.SelectClip(clip);
 
-            var localX = e.GetPosition(clipVisual).X;
-            var width = clipVisual.Bounds.Width;
-            var zone = System.Math.Min(EdgeZone, width * 0.25);
-            _gesture = localX <= zone ? Gesture.ResizeLeft
-                : localX >= width - zone ? Gesture.ResizeRight
-                : Gesture.Move;
+            _gesture = ClipGestureAt(e, clipVisual);
 
             _dragClip = clip;
             _dragClips = null;
@@ -780,6 +840,40 @@ namespace Ongenet.App.Views.Panels
                 var (_, moveBeat) = LocatePoint(pos, vm);
                 var moveDelta = moveBeat - _pressBeat;
                 vm.MoveClips(_dragClips, _origStarts, moveDelta);
+                e.Handled = true;
+                return;
+            }
+
+            if (_dragPatternClip is not null)
+            {
+                if (!_clipDragCaptured)
+                {
+                    History?.Capture(_gesture == Gesture.Move ? "Move pattern clip" : "Resize pattern clip");
+                    _clipDragCaptured = true;
+                }
+
+                var (_, patternBeat) = LocatePoint(pos, vm);
+                var patternDelta = patternBeat - _pressBeat;
+
+                switch (_gesture)
+                {
+                    case Gesture.Move:
+                        _dragPatternClip.Model.StartBeat = System.Math.Max(0, vm.Metrics.Snap(_origStart + patternDelta));
+                        break;
+                    case Gesture.ResizeRight:
+                        var patEnd = vm.Metrics.Snap(_origStart + _origLength + patternDelta);
+                        _dragPatternClip.Model.LengthBeats = System.Math.Max(MinClipBeats, patEnd - _origStart);
+                        break;
+                    case Gesture.ResizeLeft:
+                        var patNewStart = System.Math.Max(0, vm.Metrics.Snap(_origStart + patternDelta));
+                        var patNewLen = _origStart + _origLength - patNewStart;
+                        if (patNewLen < MinClipBeats) { patNewStart = _origStart + _origLength - MinClipBeats; patNewLen = MinClipBeats; }
+                        _dragPatternClip.Model.StartBeat = patNewStart;
+                        _dragPatternClip.Model.LengthBeats = patNewLen;
+                        break;
+                }
+
+                vm.NotifyPatternClipGeometryChanged(_dragPatternClip);
                 e.Handled = true;
                 return;
             }
@@ -873,6 +967,7 @@ namespace Ongenet.App.Views.Panels
 
             _gesture = Gesture.None;
             _dragClip = null;
+            _dragPatternClip = null;
             _dragClips = null;
             _origStarts = null;
             _draggingGroupSummary = false;
@@ -915,16 +1010,28 @@ namespace Ongenet.App.Views.Panels
             Band.IsVisible = true;
         }
 
-        // Finds the clip or group summary under the pointer and its outermost scoped visual.
-        private static (ClipViewModel? Clip, GroupClipSummaryViewModel? Summary, Visual Visual)? ResolveClipOrSummary(PointerEventArgs e)
+        private static Gesture ClipGestureAt(PointerEventArgs e, Visual visual)
+        {
+            var localX = e.GetPosition(visual).X;
+            var width = visual.Bounds.Width;
+            var zone = System.Math.Min(EdgeZone, width * 0.25);
+            return localX <= zone ? Gesture.ResizeLeft
+                : localX >= width - zone ? Gesture.ResizeRight
+                : Gesture.Move;
+        }
+
+        // Finds the clip, pattern block, or group summary under the pointer and its outermost scoped visual.
+        private static (ClipViewModel? Clip, GroupClipSummaryViewModel? Summary, PatternClipViewModel? PatternClip, Visual Visual)? ResolveClipOrSummary(PointerEventArgs e)
         {
             var v = e.Source as Visual;
             while (v is not null)
             {
                 if (v is StyledElement { DataContext: GroupClipSummaryViewModel gsm })
-                    return (null, gsm, v);
+                    return (null, gsm, null, v);
+                if (v is StyledElement { DataContext: PatternClipViewModel pcm })
+                    return (null, null, pcm, v);
                 if (v is StyledElement { DataContext: ClipViewModel cvm })
-                    return (cvm, null, v);
+                    return (cvm, null, null, v);
                 v = v.GetVisualParent();
             }
 

@@ -3,11 +3,9 @@ using System;
 namespace Ongenet.App.Services
 {
     /// <summary>
-    /// Default <see cref="IPlaybackClock"/>. Does NOT own a timer — it is pumped once per render frame
-    /// from the timeline's RequestAnimationFrame loop and self-throttles <see cref="Tick"/> to ~30Hz.
-    /// A separate DispatcherTimer here used to compete with that render-frame callback and make the
-    /// compositor miss vsync (dropping playback to 30fps); routing through the single render-frame loop
-    /// keeps frame pacing clean while still refreshing meters/inspector ~30x/sec.
+    /// Default <see cref="IPlaybackClock"/>. Does NOT own a timer — it is pumped from the transport bar's
+    /// render-frame loop (always visible) and from the timeline while the Arrangement tab is open.
+    /// Self-throttles <see cref="Tick"/> to ~30Hz.
     /// </summary>
     public sealed class PlaybackClock : IPlaybackClock
     {

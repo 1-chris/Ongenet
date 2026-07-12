@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Midi;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Core.Services.Implementation;
@@ -20,13 +21,16 @@ public class PreviewService : IPreviewService
 
     private readonly ISelectionService _selection;
     private readonly IUiThreadDispatcher? _ui;
+    private readonly MidiRetrospectiveCapture? _retrospective;
     private readonly HashSet<int> _active = new();
     private readonly object _lock = new();
 
-    public PreviewService(ISelectionService selection, IUiThreadDispatcher? ui = null)
+    public PreviewService(ISelectionService selection, IUiThreadDispatcher? ui = null,
+        MidiRetrospectiveCapture? retrospective = null)
     {
         _selection = selection;
         _ui = ui;
+        _retrospective = retrospective;
     }
 
     public event Action? ActiveNotesChanged;
@@ -48,6 +52,7 @@ public class PreviewService : IPreviewService
         // Outside the lock: recording capture (NotePressed) runs synchronously on the caller's thread;
         // the keyboard-highlight notification hops to the UI thread.
         NotePressed?.Invoke(midiNote, velocity);
+        _retrospective?.RecordNoteOn(midiNote, velocity);
         RaiseActiveNotesChanged();
     }
 
@@ -61,6 +66,7 @@ public class PreviewService : IPreviewService
         }
 
         NoteReleased?.Invoke(midiNote);
+        _retrospective?.RecordNoteOff(midiNote);
         RaiseActiveNotesChanged();
     }
 
@@ -86,6 +92,15 @@ public class PreviewService : IPreviewService
         ForEachInstrument(i => i.ChannelAftertouch(value));
         ForwardToEffects(new MidiMessage(MidiMessageKind.ChannelAftertouch, 0, (byte)value, 0));
     }
+
+    public void NotePitchBend(int midiNote, int value14)
+        => ForEachInstrument(i => i.NotePitchBend(midiNote, value14));
+
+    public void NotePressure(int midiNote, int value)
+        => ForEachInstrument(i => i.NotePressure(midiNote, value));
+
+    public void NoteTimbre(int midiNote, int value)
+        => ForEachInstrument(i => i.NoteTimbre(midiNote, value));
 
     // Routes a preview action to every enabled instrument in the selected track's rack. Reads the
     // committed snapshot (thread-safe array) since live input can arrive on a background MIDI thread.

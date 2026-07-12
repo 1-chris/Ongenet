@@ -49,6 +49,20 @@ internal sealed class WasapiDeviceService : IAudioDeviceService
         set { lock (_lock) { if (_inputChannelMode == value) return; _inputChannelMode = value; } InputChanged?.Invoke(); }
     }
 
+    /// <summary>When true, WASAPI output uses exclusive mode for lower latency.</summary>
+    public bool UseExclusiveMode { get; set; }
+
+    public bool LowLatencyExclusive
+    {
+        get => UseExclusiveMode;
+        set
+        {
+            if (UseExclusiveMode == value) return;
+            UseExclusiveMode = value;
+            OutputChanged?.Invoke();
+        }
+    }
+
     public event Action? DevicesChanged;
     public event Action? OutputChanged;
     public event Action? InputChanged;

@@ -7,7 +7,9 @@ using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Midi;
+using Ongenet.Core.Audio.Modulation;
 using Ongenet.Core.Models.Audio;
+using Ongenet.Core.Services;
 
 namespace Ongenet.Core.Audio;
 
@@ -21,16 +23,28 @@ public sealed class OfflineRenderer
     private const int BlockFrames = 512;
     private const double TailSeconds = 2.0; // let instrument/effect tails ring out
 
-    /// <summary>Renders the project to <paramref name="path"/> as a 16-bit PCM WAV.
+    /// <summary>Renders the project to <paramref name="path"/> as a PCM WAV (16-, 24-, or 32-bit).
     /// <paramref name="progress"/> (optional) receives the completed fraction, 0..1, at most once
     /// per whole percent so UI marshalling stays cheap.</summary>
     public void RenderToWav(Project project, AudioFormat format, double bpm, string path,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null, int bitDepth = 16,
+        double? regionStartBeat = null, double? regionEndBeat = null,
+        SurroundFormat surround = SurroundFormat.Stereo)
     {
         var session = new RenderSession();
-        session.Build(project, format, bpm, scope: null);
-        using var writer = new WavWriter(path, session.Channels, session.SampleRate);
+        session.Build(project, format, bpm, scope: null, regionStartBeat, regionEndBeat, surround);
+        using var writer = new WavWriter(path, session.Channels, session.SampleRate, bitDepth);
         session.RenderToWriter(writer, progress);
+    }
+
+    /// <summary>Renders the master mix to an in-memory buffer (for ADM BWF export).</summary>
+    public AudioSampleBuffer RenderMasterToBuffer(Project project, AudioFormat format, double bpm,
+        IProgress<double>? progress = null, double? regionStartBeat = null, double? regionEndBeat = null,
+        SurroundFormat surround = SurroundFormat.Stereo)
+    {
+        var session = new RenderSession();
+        session.Build(project, format, bpm, scope: null, regionStartBeat, regionEndBeat, surround);
+        return session.RenderScopeToBuffer(progress);
     }
 
     /// <summary>
@@ -51,6 +65,10 @@ public sealed class OfflineRenderer
         private AudioFormat _format;
         private double _fallbackBpm;
         private ClipRenderScope? _scope;
+        private int _processChannels;
+        private int _outputChannels;
+        private bool _surround51;
+        private bool _surround71;
         private int _channels;
         private int _sampleRate;
         private long _totalFrames;
@@ -66,19 +84,28 @@ public sealed class OfflineRenderer
         private RenderBus? _masterBus;
         private Track? _masterTrack;
         private Dictionary<Guid, Track> _trackById = new();
+        private Dictionary<Guid, int> _pdcDelays = new();
+        private Dictionary<(Guid TrackId, int BusIndex), Guid> _multiOutRoutes = new();
+        private Dictionary<Guid, RenderTrack> _renderTrackById = new();
 
         public int Channels => _channels;
         public int SampleRate => _sampleRate;
 
-        public void Build(Project project, AudioFormat format, double bpm, ClipRenderScope? scope)
+        public void Build(Project project, AudioFormat format, double bpm, ClipRenderScope? scope,
+            double? regionStartBeat = null, double? regionEndBeat = null,
+            SurroundFormat surround = SurroundFormat.Stereo)
         {
             _project = project;
             _format = format;
             _fallbackBpm = bpm;
             _scope = scope;
-            _channels = format.Channels < 1 ? 1 : format.Channels;
+            _surround71 = surround == SurroundFormat.Surround71;
+            _surround51 = surround == SurroundFormat.Surround51;
+            _processChannels = 2;
+            _outputChannels = _surround71 ? 8 : _surround51 ? 6 : (format.Channels < 1 ? 1 : format.Channels);
+            _channels = _outputChannels;
             _sampleRate = format.SampleRate;
-            _startBeat = scope?.StartBeat ?? 0;
+            _startBeat = scope?.StartBeat ?? regionStartBeat ?? 0;
             _trackById = project.Tracks.ToDictionary(t => t.Id);
 
             if (scope is not null)
@@ -115,7 +142,7 @@ public sealed class OfflineRenderer
             foreach (var rt in _renderTracks)
             {
                 if (!rt.Source.IsBus) continue;
-                var rb = new RenderBus(rt) { Buffer = new float[BlockFrames * _channels] };
+                var rb = new RenderBus(rt) { Buffer = new float[BlockFrames * _outputChannels] };
                 _busByTrackId[rt.Source.Id] = rb;
                 _buses.Add(rb);
             }
@@ -138,10 +165,31 @@ public sealed class OfflineRenderer
 
             _buses.Sort((a, b) => b.Depth.CompareTo(a.Depth));
 
+            _pdcDelays = LatencyCompensator.Compute(project.Tracks)
+                .ToDictionary(kv => kv.Key, kv => kv.Value.DelaySamples);
+
+            _multiOutRoutes = MultiOutputRouter.BuildIndex(project.MultiOutputRoutes);
+            foreach (var track in project.Tracks.Where(t => t.Kind == TrackKind.Instrument))
+            {
+                for (var si = 0; si < track.Instruments.Count; si++)
+                {
+                    var slot = track.Instruments[si];
+                    if (slot.OutputTrackId is { } destId)
+                        _multiOutRoutes[(track.Id, slot.OutputBusIndex)] = destId;
+                }
+            }
+
+            _renderTrackById = _renderTracks.ToDictionary(rt => rt.Source.Id);
+
             if (scope is not null)
             {
                 var samplesPerBeat = bpm > 0 ? _sampleRate * 60.0 / bpm : _sampleRate;
                 _totalFrames = (long)Math.Ceiling(scope.LengthBeats * samplesPerBeat);
+            }
+            else if (regionStartBeat is { } rs && regionEndBeat is { } re && re > rs)
+            {
+                var samplesPerBeat = bpm > 0 ? _sampleRate * 60.0 / bpm : _sampleRate;
+                _totalFrames = (long)Math.Ceiling((re - rs) * samplesPerBeat) + (long)(TailSeconds * _sampleRate);
             }
             else
             {
@@ -223,14 +271,14 @@ public sealed class OfflineRenderer
                         : 1.0;
                     var fade = fades.TryGetValue(clip, out var f) ? f : (FadeInBeats: 0.0, FadeOutBeats: 0.0);
                     PitchShifter[]? shifters = null;
-                    if (clip is { PitchCorrected: true, StretchToTempo: true })
-                    {
-                        shifters = new PitchShifter[_channels];
-                        for (var i = 0; i < _channels; i++) { shifters[i] = new PitchShifter(); shifters[i].Configure(_sampleRate); }
-                    }
+                    WarpMap? warp = null;
+                    if (clip.WarpMarkers.Count > 0 || clip.StretchToTempo)
+                        warp = WarpMap.FromClip(clip, clip.SourceOffsetSeconds + sourceDur);
+                    shifters = AudioClipPitch.CreateShiftersIfNeeded(clip, warp, _channels, _sampleRate);
 
                     rt.AudioClips.Add((clip.StartBeat, clip.LengthBeats, samples, stretch, clip.SourceOffsetSeconds,
-                        fade.FadeInBeats, fade.FadeOutBeats, shifters));
+                        fade.FadeInBeats, fade.FadeOutBeats, shifters, warp, clip.WarpMode, clip.PitchCorrected,
+                        clip.AraPitchOffsetSemitones, clip.PitchSegments));
                 }
             }
 
@@ -262,9 +310,9 @@ public sealed class OfflineRenderer
         private void RenderCore(Action<ReadOnlySpan<float>> writeBlock, IProgress<double>? progress)
         {
             var soloActive = _scope is null && _project.Tracks.Any(t => t.IsSoloed);
-            var block = new float[BlockFrames * _channels];
-            var temp = new float[BlockFrames * _channels];
-            var slotTemp = new float[BlockFrames * _channels];
+            var block = new float[BlockFrames * _outputChannels];
+            var temp = new float[BlockFrames * _processChannels];
+            var slotTemp = new float[BlockFrames * _processChannels];
             var active = new List<ScheduledNote>();
             var nextEvent = 0;
             var currentBeat = _startBeat;
@@ -279,8 +327,9 @@ public sealed class OfflineRenderer
                 var bpm = OfflineAutomationDriver.ResolveTempo(_project, currentBeat, _fallbackBpm);
                 var samplesPerBeat = bpm > 0 ? _sampleRate * 60.0 / bpm : _sampleRate;
                 var framesThisBlock = (int)Math.Min(BlockFrames, _totalFrames - framesWritten);
-                var sampleCount = framesThisBlock * _channels;
-                var blockSpan = block.AsSpan(0, sampleCount);
+                var outputSampleCount = framesThisBlock * _outputChannels;
+                var processSampleCount = framesThisBlock * _processChannels;
+                var blockSpan = block.AsSpan(0, outputSampleCount);
                 blockSpan.Clear();
 
                 var prevBeat = currentBeat;
@@ -300,6 +349,10 @@ public sealed class OfflineRenderer
 
                 foreach (var track in _project.Tracks)
                     OfflineAutomationDriver.ApplyTrack(track, prevBeat);
+
+                var blockBpm = OfflineAutomationDriver.ResolveTempo(_project, prevBeat, _fallbackBpm);
+                foreach (var track in _project.Tracks)
+                    Modulation.TrackModulatorDriver.ApplyTrack(track, prevBeat, blockBpm, _project);
 
                 foreach (var rt in _renderTracks)
                 {
@@ -332,7 +385,7 @@ public sealed class OfflineRenderer
                     }
                 }
 
-                foreach (var rb in _buses) Array.Clear(rb.Buffer, 0, sampleCount);
+                foreach (var rb in _buses) Array.Clear(rb.Buffer, 0, outputSampleCount);
 
                 foreach (var rt in _renderTracks)
                 {
@@ -340,18 +393,35 @@ public sealed class OfflineRenderer
                     var silenced = IsSilenced(rt.Source, soloActive);
                     if (silenced && !sidechain.IsRequested(rt.Source.Id)) continue;
 
-                    var tempSpan = temp.AsSpan(0, sampleCount);
+                    var tempSpan = temp.AsSpan(0, processSampleCount);
                     tempSpan.Clear();
                     var hasContent = false;
+                    foreach (var deferred in rt.DeferredInput)
+                    {
+                        for (var i = 0; i < Math.Min(tempSpan.Length, deferred.Length); i++)
+                            tempSpan[i] += deferred[i];
+                        hasContent = true;
+                    }
+                    rt.DeferredInput.Clear();
 
                     if (rt.Slots.Count > 0)
                     {
-                        var slotSpan = slotTemp.AsSpan(0, sampleCount);
+                        var slotSpan = slotTemp.AsSpan(0, processSampleCount);
+                        var slotIndex = 0;
                         foreach (var slot in rt.Slots)
                         {
-                            if (!slot.Enabled) continue;
+                            if (!slot.Enabled) { slotIndex++; continue; }
                             slotSpan.Clear();
-                            slot.Instrument.Render(slotSpan);
+                            if (slot.Instrument is IMultiOutputInstrument multi)
+                            {
+                                multi.RenderMulti(slotSpan, (busIndex, busAudio) =>
+                                    RouteExtraBusOffline(rt, slotIndex, slot.Live, busIndex, busAudio));
+                            }
+                            else
+                            {
+                                slot.Instrument.Render(slotSpan);
+                            }
+
                             foreach (var fx in slot.Effects)
                             {
                                 if (!fx.Enabled) continue;
@@ -361,14 +431,26 @@ public sealed class OfflineRenderer
 
                             for (var i = 0; i < slotSpan.Length; i++) tempSpan[i] += slotSpan[i];
                             hasContent = true;
+                            slotIndex++;
                         }
                     }
                     else
                     {
-                        foreach (var (start, length, samples, stretch, sourceOffset, fadeIn, fadeOut, shifters) in rt.AudioClips)
+                        foreach (var (start, length, samples, stretch, sourceOffset, fadeIn, fadeOut, shifters, warp, warpMode, pitchCorrected, araPitch, pitchSegments) in rt.AudioClips)
                         {
-                            Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat, _sampleRate, _channels,
-                                stretch, sourceOffset, fadeIn, fadeOut, shifters);
+                            var useWarp = warp is not null && (warp.HasExplicitMarkers || warpMode != WarpMode.Beats);
+                            if (useWarp)
+                            {
+                                Mixing.RenderWarpedAudioClip(tempSpan, samples, warp!, start, length, prevBeat,
+                                    samplesPerBeat, _sampleRate, _processChannels, warpMode, pitchCorrected,
+                                    fadeIn, fadeOut, shifters, araPitch, pitchSegments);
+                            }
+                            else
+                            {
+                                Mixing.RenderAudioClip(tempSpan, samples, start, length, prevBeat, samplesPerBeat,
+                                    _sampleRate, _processChannels, stretch, sourceOffset, fadeIn, fadeOut, shifters,
+                                    araPitch, pitchSegments);
+                            }
                             hasContent = true;
                         }
                     }
@@ -385,11 +467,26 @@ public sealed class OfflineRenderer
                         hasContent = true;
                     }
 
-                    if (sidechain.IsRequested(rt.Source.Id)) sidechain.Publish(rt.Source.Id, tempSpan, _channels);
+                    if (sidechain.IsRequested(rt.Source.Id)) sidechain.Publish(rt.Source.Id, tempSpan, _processChannels);
+
+                    var getReturn = (Guid id) =>
+                        _busByTrackId.TryGetValue(id, out var rb) ? rb.Buffer.AsSpan(0, outputSampleCount) : Span<float>.Empty;
+
+                    SendMixing.ProcessSends(tempSpan, rt.Source, getReturn, _outputChannels, framesThisBlock,
+                        preFader: true, IsSilenced(rt.Source, soloActive), hasContent);
+
+                    if (_pdcDelays.TryGetValue(rt.Source.Id, out var pdc) && pdc > 0)
+                    {
+                        rt.EnsurePdc(pdc, _processChannels);
+                        rt.PdcLine.Process(tempSpan, framesThisBlock);
+                    }
 
                     if (_scope is not null && _scope.TapAfterGroupId is null && _contentTrackIds.Contains(rt.Source.Id))
                     {
-                        ApplyStripGains(tempSpan, rt.Source.Volume, rt.Source.Pan, _channels, framesThisBlock);
+                        if (_surround51 || _surround71)
+                            ApplyStripGainsSurround(tempSpan, rt.Source, framesThisBlock);
+                        else
+                            ApplyStripGains(tempSpan, rt.Source.Volume, rt.Source.Pan, _processChannels, framesThisBlock);
                         writeBlock(tempSpan);
                         continue;
                     }
@@ -397,11 +494,21 @@ public sealed class OfflineRenderer
                     var sidechainOnly = _scope is not null && _sidechainOnlyIds.Contains(rt.Source.Id);
                     if ((silenced && !sidechainOnly) || !hasContent) continue;
 
-                    var parent = rt.Source.ParentId is { } pid && _busByTrackId.TryGetValue(pid, out var pb) ? pb : _masterBus;
-                    var target = parent is not null ? parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
-                    var (lg, rg) = Mixing.StripGains(rt.Source.Volume, rt.Source.Pan);
-                    MixIntoBlock(target, tempSpan, lg, rg, _channels, framesThisBlock);
+                    SendMixing.ProcessSends(tempSpan, rt.Source, getReturn, _outputChannels, framesThisBlock,
+                        preFader: false, silenced: false, hasContent: true);
+
+                    var parentBus = MainOutputBus(rt.Source);
+                    var target = parentBus is not null ? parentBus.Buffer.AsSpan(0, outputSampleCount) : blockSpan;
+                    if (_surround51 || _surround71)
+                        MixIntoBlockSurround(target, tempSpan, rt.Source, framesThisBlock, _surround71);
+                    else
+                    {
+                        var (lg, rg) = Mixing.StripGains(rt.Source.Volume, rt.Source.Pan);
+                        MixIntoBlock(target, tempSpan, lg, rg, _outputChannels, framesThisBlock);
+                    }
                 }
+
+                FlushMultiOutputRoutesOffline(outputSampleCount);
 
                 foreach (var rb in _buses)
                 {
@@ -409,7 +516,7 @@ public sealed class OfflineRenderer
                     if (_scope is null && bt.IsMuted) continue;
                     if (_scope is not null && !_includedTrackIds.Contains(bt.Id)) continue;
 
-                    var busSpan = rb.Buffer.AsSpan(0, sampleCount);
+                    var busSpan = rb.Buffer.AsSpan(0, outputSampleCount);
                     if (rb.Track.Effects.Length > 0)
                     {
                         foreach (var fx in rb.Track.Effects)
@@ -420,20 +527,34 @@ public sealed class OfflineRenderer
                         }
                     }
 
-                    if (sidechain.IsRequested(bt.Id)) sidechain.Publish(bt.Id, busSpan, _channels);
+                    if (sidechain.IsRequested(bt.Id)) sidechain.Publish(bt.Id, busSpan, _outputChannels);
+
+                    if (_pdcDelays.TryGetValue(bt.Id, out var busPdc) && busPdc > 0)
+                    {
+                        rb.EnsurePdc(busPdc, _outputChannels);
+                        rb.PdcLine.Process(busSpan, framesThisBlock);
+                    }
 
                     if (_scope is not null && _scope.TapAfterGroupId == bt.Id)
                     {
-                        ApplyBusGains(busSpan, bt.Volume, bt.Pan, _channels, framesThisBlock);
+                        if (_surround51 || _surround71)
+                            ApplyBusGainsSurround(busSpan, bt, framesThisBlock);
+                        else
+                            ApplyBusGains(busSpan, bt.Volume, bt.Pan, _outputChannels, framesThisBlock);
                         writeBlock(busSpan);
                         continue;
                     }
 
                     if (_scope is null && bt.IsMuted) continue;
 
-                    var target = rb.Parent is not null ? rb.Parent.Buffer.AsSpan(0, sampleCount) : blockSpan;
-                    var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
-                    MixIntoBlock(target, busSpan, lg, rg, _channels, framesThisBlock);
+                    var busTarget = rb.Parent is not null ? rb.Parent.Buffer.AsSpan(0, outputSampleCount) : blockSpan;
+                    if (_surround51 || _surround71)
+                        MixIntoBlockSurround(busTarget, busSpan, bt, framesThisBlock, _surround71, useBusGains: true);
+                    else
+                    {
+                        var (blg, brg) = Mixing.BusGains(bt.Volume, bt.Pan);
+                        MixIntoBlock(busTarget, busSpan, blg, brg, _outputChannels, framesThisBlock);
+                    }
                 }
 
                 if (_scope is null)
@@ -483,6 +604,70 @@ public sealed class OfflineRenderer
             if (t.ParentId is { } id && _trackById.TryGetValue(id, out var p)) return p;
             return _masterTrack;
         }
+
+        private RenderBus? MainOutputBus(Track track)
+        {
+            if (!track.RouteToMaster) return null;
+            return track.OutputTarget switch
+            {
+                TrackOutputTarget.None => null,
+                TrackOutputTarget.Master => _masterBus,
+                TrackOutputTarget.SpecificBus when track.OutputBusId is { } id && _busByTrackId.TryGetValue(id, out var b) => b,
+                _ => track.ParentId is { } pid && _busByTrackId.TryGetValue(pid, out var p) ? p : _masterBus
+            };
+        }
+
+        private void RouteExtraBusOffline(RenderTrack source, int slotIndex, InstrumentSlot slot,
+            int busIndex, ReadOnlySpan<float> busAudio)
+        {
+            Guid? destId = slot.OutputTrackId;
+            if (!destId.HasValue && _multiOutRoutes.TryGetValue((source.Source.Id, busIndex), out var routed))
+                destId = routed;
+            if (!destId.HasValue) return;
+
+            var copy = new float[busAudio.Length];
+            busAudio.CopyTo(copy);
+            source.PendingRoutes.Add((destId.Value, copy));
+        }
+
+        private void FlushMultiOutputRoutesOffline(int sampleCount)
+        {
+            foreach (var rt in _renderTracks)
+            {
+                foreach (var route in rt.PendingRoutes)
+                {
+                    if (!_renderTrackById.TryGetValue(route.DestTrackId, out var dest)) continue;
+                    dest.DeferredInput.Add(route.Samples);
+                }
+
+                rt.PendingRoutes.Clear();
+            }
+        }
+
+        private static IMidiAwareEffect[] MidiEffectsOf(IAudioEffect[] effects)
+            => effects.OfType<IMidiAwareEffect>().ToArray();
+
+        private readonly record struct ScheduledNote(double OnBeat, double OffBeat, RenderSlot[]? Slots,
+            IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
+        {
+            public void Fire(bool on)
+            {
+                if (Slots is not null)
+                {
+                    foreach (var slot in Slots)
+                    {
+                        if (!slot.Enabled) continue;
+                        if (on) slot.Instrument.NoteOn(Note, Velocity);
+                        else slot.Instrument.NoteOff(Note);
+                    }
+                }
+
+                if (MidiEffects.Length == 0) return;
+                var vel = (byte)Math.Clamp((int)(Velocity * 127f), 0, 127);
+                var msg = new MidiMessage(on ? MidiMessageKind.NoteOn : MidiMessageKind.NoteOff, 0, (byte)Note, on ? vel : (byte)0);
+                foreach (var fx in MidiEffects) fx.HandleMidi(msg);
+            }
+        }
     }
 
     private static void MixIntoBlock(Span<float> target, Span<float> source, float leftGain, float rightGain,
@@ -520,13 +705,82 @@ public sealed class OfflineRenderer
         }
     }
 
+    private static void MixIntoBlockSurround(Span<float> target, Span<float> source, Track track, int frames,
+        bool surround71 = false, bool useBusGains = false)
+    {
+        var srcCh = frames > 0 ? source.Length / frames : 2;
+        var outCh = surround71 ? 8 : 6;
+        if (srcCh >= outCh)
+        {
+            var v = (float)Math.Clamp(track.Volume, 0, 1);
+            for (var i = 0; i < source.Length; i++)
+                target[i] += source[i] * v;
+            return;
+        }
+
+        var vol = (float)Math.Clamp(track.Volume, 0, 1);
+        float l, r, c, lfe, ls, rs, sl, sr;
+        if (surround71)
+        {
+            (l, r, c, lfe, ls, rs, sl, sr) = SurroundPanner.Pan71(track.Pan, track.SurroundWidth);
+        }
+        else
+        {
+            (l, r, c, lfe, ls, rs) = SurroundPanner.Pan51(track.Pan, track.SurroundWidth);
+            sl = sr = 0;
+        }
+
+        l *= vol; r *= vol; c *= vol; lfe *= vol; ls *= vol; rs *= vol; sl *= vol; sr *= vol;
+
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var si = frame * srcCh;
+            var ti = frame * outCh;
+            var mono = srcCh == 1 ? source[si] : (source[si] + source[si + 1]) * 0.5f;
+            target[ti + 0] += mono * l;
+            target[ti + 1] += mono * r;
+            target[ti + 2] += mono * c;
+            target[ti + 3] += mono * lfe;
+            target[ti + 4] += mono * ls;
+            target[ti + 5] += mono * rs;
+            if (surround71)
+            {
+                target[ti + 6] += mono * sl;
+                target[ti + 7] += mono * sr;
+            }
+        }
+    }
+
+    private static void ApplyStripGainsSurround(Span<float> buffer, Track track, int frames)
+        => ApplyStripGains(buffer, track.Volume, track.Pan, 2, frames);
+
+    private static void ApplyBusGainsSurround(Span<float> buffer, Track track, int frames)
+    {
+        var v = (float)Math.Clamp(track.Volume, 0, 1);
+        var ch = frames > 0 ? buffer.Length / frames : 6;
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var i = frame * ch;
+            for (var c = 0; c < ch; c++)
+                buffer[i + c] *= v;
+        }
+    }
+
     private sealed class RenderTrack
     {
         public RenderTrack(Track source) => Source = source;
         public Track Source { get; }
         public List<RenderSlot> Slots { get; } = new();
         public IAudioEffect[] Effects { get; set; } = Array.Empty<IAudioEffect>();
-        public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch, double SourceOffset, double FadeInBeats, double FadeOutBeats, Dsp.PitchShifter[]? PitchShifters)> AudioClips { get; } = new();
+        public List<(double Start, double Length, AudioSampleBuffer Samples, double Stretch, double SourceOffset, double FadeInBeats, double FadeOutBeats, PitchShifter[]? PitchShifters, WarpMap? Warp, WarpMode WarpMode, bool PitchCorrected, double AraPitchOffsetSemitones, IReadOnlyList<PitchNoteSegment> PitchSegments)> AudioClips { get; } = new();
+        public PdcDelayLine PdcLine { get; } = new();
+        public List<(Guid DestTrackId, float[] Samples)> PendingRoutes { get; } = new();
+        public List<float[]> DeferredInput { get; } = new();
+
+        public void EnsurePdc(int delay, int channels)
+        {
+            if (PdcLine.DelaySamples != delay) PdcLine.Configure(delay, channels, BlockFrames);
+        }
     }
 
     private sealed class RenderSlot
@@ -552,30 +806,11 @@ public sealed class OfflineRenderer
         public RenderBus? Parent { get; set; }
         public float[] Buffer { get; set; } = Array.Empty<float>();
         public int Depth { get; set; }
-    }
+        public PdcDelayLine PdcLine { get; } = new();
 
-    private static IMidiAwareEffect[] MidiEffectsOf(IAudioEffect[] effects)
-        => effects.OfType<IMidiAwareEffect>().ToArray();
-
-    private readonly record struct ScheduledNote(double OnBeat, double OffBeat, RenderSlot[]? Slots,
-        IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
-    {
-        public void Fire(bool on)
+        public void EnsurePdc(int delay, int channels)
         {
-            if (Slots is not null)
-            {
-                foreach (var slot in Slots)
-                {
-                    if (!slot.Enabled) continue;
-                    if (on) slot.Instrument.NoteOn(Note, Velocity);
-                    else slot.Instrument.NoteOff(Note);
-                }
-            }
-
-            if (MidiEffects.Length == 0) return;
-            var vel = (byte)Math.Clamp((int)(Velocity * 127f), 0, 127);
-            var msg = new MidiMessage(on ? MidiMessageKind.NoteOn : MidiMessageKind.NoteOff, 0, (byte)Note, on ? vel : (byte)0);
-            foreach (var fx in MidiEffects) fx.HandleMidi(msg);
+            if (PdcLine.DelaySamples != delay) PdcLine.Configure(delay, channels, BlockFrames);
         }
     }
 }

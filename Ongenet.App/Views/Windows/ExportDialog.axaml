@@ -1,0 +1,133 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:services="using:Ongenet.Core.Services"
+        xmlns:audio="using:Ongenet.Core.Models.Audio"
+        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="520"
+        x:Class="Ongenet.App.Views.Windows.ExportDialog"
+        x:DataType="vm:ExportViewModel"
+        Title="{DynamicResource Export_Export_Title}"
+        Width="420" MinWidth="360"
+        SizeToContent="{DynamicResource Export_Height}"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Border Background="{StaticResource CatppuccinBase}" Padding="16">
+        <StackPanel Spacing="12">
+            <TextBlock Text="{DynamicResource Export_Export}" FontWeight="SemiBold" FontSize="16"/>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{DynamicResource Export_Kind}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ComboBox ItemsSource="{Binding ExportKinds}" SelectedItem="{Binding Kind, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{DynamicResource Export_Surround}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ComboBox ItemsSource="{Binding SurroundFormats}" SelectedItem="{Binding Surround, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{DynamicResource Export_Audio_format}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ComboBox ItemsSource="{Binding AudioFormats}" SelectedItem="{Binding AudioFormat, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4" IsVisible="{Binding HasMarkers}">
+                <TextBlock Text="{DynamicResource Export_Region_from_marker}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ComboBox ItemsSource="{Binding Markers}" SelectedItem="{Binding SelectedMarker, Mode=TwoWay}"
+                          PlaceholderText="{DynamicResource Export_optional}" HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="audio:ArrangementMarker">
+                            <TextBlock>
+                                <Run Text="{Binding Name}"/>
+                                <Run Text="{DynamicResource Export_Text}"/>
+                                <Run Text="{Binding Beat, StringFormat='{}{0:0.##}'}"/>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <CheckBox Content="{DynamicResource Export_Export_timeline_XML_post_handoff}"
+                      IsChecked="{Binding ExportTimelineXml, Mode=TwoWay}"
+                      ToolTip.Tip="{DynamicResource Export_Custom_Ongenet_timeline_XML_for_video_post_refer_Tip}"/>
+
+            <CheckBox Content="{DynamicResource Export_Export_AAF_OMF_handoff_XML}"
+                      IsChecked="{Binding ExportAafOmf, Mode=TwoWay}"
+                      ToolTip.Tip="{DynamicResource Export_Structured_XML_interchange_for_post_houses_binar_Tip}"/>
+
+            <CheckBox Content="{DynamicResource Export_Export_ADM_BWF_immersive}"
+                      IsChecked="{Binding ExportAdmBwf, Mode=TwoWay}"
+                      IsVisible="{Binding ShowAdmOption}"
+                      ToolTip.Tip="{DynamicResource Export_ITU_R_BS2076_metadata_sidecar_for_broadcast_imme_Tip}"/>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="{DynamicResource Export_Stem_separation}" FontWeight="SemiBold" FontSize="11"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Text="{Binding StemSeparationBackend}" FontSize="11"
+                           Foreground="{StaticResource CatppuccinSubtext0}" TextWrapping="Wrap"/>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{DynamicResource Export_Quality}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <ComboBox ItemsSource="{Binding StemQualities}" SelectedItem="{Binding StemQuality, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch"/>
+                </StackPanel>
+                <TextBlock Text="{Binding DemucsInstallHint}" FontSize="10"
+                           Foreground="{StaticResource CatppuccinOverlay0}" TextWrapping="Wrap"
+                           IsVisible="{Binding ShowDemucsHint}"/>
+                <ProgressBar Minimum="0" Maximum="1" Value="{Binding StemSeparationProgress}" Height="6"
+                             IsVisible="{Binding IsSeparatingStems}"/>
+                <Button Content="{DynamicResource Export_Separate_selected_audio_clip_4_stems}"
+                        Command="{Binding SeparateSelectedClipCommand}"
+                        HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{DynamicResource Export_Bit_depth}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ComboBox ItemsSource="{Binding BitDepths}" SelectedItem="{Binding BitDepth, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <StackPanel Spacing="6" IsVisible="{Binding IsRegionVisible}">
+                <TextBlock Text="{DynamicResource Export_Region_beats}" FontWeight="SemiBold" FontSize="11"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+                    <NumericUpDown Grid.Column="0" Value="{Binding RegionStartBeat, Mode=TwoWay}"
+                                   Minimum="0" Increment="0.25" FormatString="0.##"/>
+                    <TextBlock Grid.Column="1" Text="{DynamicResource Export_to}" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <NumericUpDown Grid.Column="2" Value="{Binding RegionEndBeat, Mode=TwoWay}"
+                                   Minimum="0" Increment="0.25" FormatString="0.##"/>
+                </Grid>
+            </StackPanel>
+
+            <StackPanel Spacing="6" IsVisible="{Binding IsStemsVisible}">
+                <TextBlock Text="{DynamicResource Export_Stem_tracks}" FontWeight="SemiBold" FontSize="11"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <ScrollViewer MaxHeight="160" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding StemTracks}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ExportStemTrackViewModel">
+                                <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Margin="0,2"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" Height="8"
+                         IsVisible="{Binding IsExporting}"/>
+            <TextBlock Text="{Binding Status}" FontSize="11"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <Button Content="{DynamicResource Export_Cancel}" Click="OnCancel" IsEnabled="{Binding !IsExporting}"/>
+                <Button Content="{DynamicResource Export_Export_2}" Classes="accent" Click="OnExport" IsEnabled="{Binding CanExport}"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

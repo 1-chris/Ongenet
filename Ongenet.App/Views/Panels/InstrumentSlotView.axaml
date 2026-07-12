@@ -32,7 +32,7 @@
             <DockPanel>
                 <Button DockPanel.Dock="Left" Classes="fxdot" Margin="0,0,8,0"
                         Command="{Binding ToggleEnabledCommand}"
-                        ToolTip.Tip="Enable / disable instrument">
+                        ToolTip.Tip="{DynamicResource InstrumentSlot_Enable_disable_instrument_Tip}">
                     <Panel>
                         <Ellipse Width="12" Height="12" IsVisible="{Binding IsEnabled}"
                                  Fill="{StaticResource CatppuccinGreen}"/>
@@ -41,9 +41,9 @@
                     </Panel>
                 </Button>
 
-                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding RemoveCommand}"
+                <Button DockPanel.Dock="Right" Content="{DynamicResource InstrumentSlot_Text}" Command="{Binding RemoveCommand}"
                         Background="{StaticResource CatppuccinSurface1}" Padding="6,0"
-                        ToolTip.Tip="Remove instrument"/>
+                        ToolTip.Tip="{DynamicResource InstrumentSlot_Remove_instrument_Tip}"/>
                 <Button DockPanel.Dock="Right" Content="▼" Command="{Binding MoveDownCommand}"
                         IsEnabled="{Binding !IsLast}" Background="{StaticResource CatppuccinSurface1}"
                         Padding="6,0" Margin="2,0"/>
@@ -58,17 +58,17 @@
 
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,0"
                                 VerticalAlignment="Center" IsVisible="{Binding IsPresetProvider}">
-                        <TextBlock Text="Preset" VerticalAlignment="Center" FontSize="11"
+                        <TextBlock Text="{DynamicResource InstrumentSlot_Preset}" VerticalAlignment="Center" FontSize="11"
                                    Foreground="{StaticResource CatppuccinSubtext0}"/>
                         <ComboBox MinWidth="150" ItemsSource="{Binding PresetNames}"
                                   SelectedIndex="{Binding SelectedPreset}"
-                                  PlaceholderText="Choose a preset…"
+                                  PlaceholderText="{DynamicResource InstrumentSlot_Choose_a_preset}"
                                   Background="{StaticResource CatppuccinSurface1}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
                                 VerticalAlignment="Center" IsVisible="{Binding IsSampler}">
-                        <Button Content="Load sample…" Click="OnLoadSample"
+                        <Button Content="{DynamicResource InstrumentSlot_Load_sample}" Click="OnLoadSample"
                                 Background="{StaticResource CatppuccinSurface1}"/>
                         <TextBlock Text="{Binding SampleName}" VerticalAlignment="Center"
                                    MaxWidth="220" FontSize="11" TextTrimming="CharacterEllipsis"
@@ -77,14 +77,17 @@
 
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
                                 VerticalAlignment="Center" IsVisible="{Binding IsSoundFont}">
-                        <Button Content="Load…" Click="OnLoadSampler"
-                                ToolTip.Tip="Load an SFZ patch or SF2 SoundFont"
+                        <Button Content="{DynamicResource InstrumentSlot_Zones}" Command="{Binding OpenZoneEditorCommand}"
+                                ToolTip.Tip="{DynamicResource InstrumentSlot_Open_sampler_zone_list_editor_Tip}"
+                                Background="{StaticResource CatppuccinSurface1}"/>
+                        <Button Content="{DynamicResource InstrumentSlot_Load}" Click="OnLoadSampler"
+                                ToolTip.Tip="{DynamicResource InstrumentSlot_Load_an_SFZ_patch_or_SF2_SoundFont_Tip}"
                                 Background="{StaticResource CatppuccinSurface1}"/>
                         <ComboBox MinWidth="180" MaxWidth="240" VerticalAlignment="Center"
                                   IsVisible="{Binding HasSamplerPresets}"
                                   ItemsSource="{Binding SamplerPresetNames}"
                                   SelectedIndex="{Binding SelectedSamplerPreset, Mode=TwoWay}"
-                                  ToolTip.Tip="Select an SF2 preset"/>
+                                  ToolTip.Tip="{DynamicResource InstrumentSlot_Select_an_SF2_preset_Tip}"/>
                         <TextBlock Text="{Binding SamplerStatus}" VerticalAlignment="Center"
                                    MaxWidth="260" FontSize="11" TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource CatppuccinSubtext0}"/>
@@ -97,18 +100,18 @@
                     <Button Content="{Binding EditorButtonText}" Click="OnTogglePluginUi"
                             IsVisible="{Binding HasEditor}" VerticalAlignment="Center"
                             Background="{StaticResource CatppuccinSurface1}"
-                            ToolTip.Tip="Open the plugin's own interface"/>
+                            ToolTip.Tip="{DynamicResource InstrumentSlot_Open_the_plugins_own_interface_Tip}"/>
 
-                    <Button Name="SavePresetButton" Content="Save preset…" VerticalAlignment="Center"
+                    <Button Name="SavePresetButton" Content="{DynamicResource InstrumentSlot_Save_preset}" VerticalAlignment="Center"
                             Margin="8,0,0,0" Background="{StaticResource CatppuccinSurface1}"
-                            ToolTip.Tip="Save this instrument's settings as a preset">
+                            ToolTip.Tip="{DynamicResource InstrumentSlot_Save_this_instruments_settings_as_a_preset_Tip}">
                         <Button.Flyout>
                             <Flyout>
                                 <StackPanel Width="200" Spacing="6">
-                                    <TextBlock Text="Preset name" FontSize="11"
+                                    <TextBlock Text="{DynamicResource InstrumentSlot_Preset_name}" FontSize="11"
                                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                                     <TextBox Text="{Binding PresetName, Mode=TwoWay}" PlaceholderText="{Binding InstrumentName}"/>
-                                    <Button Content="Save" Click="OnSavePreset" HorizontalAlignment="Right"
+                                    <Button Content="{DynamicResource InstrumentSlot_Save}" Click="OnSavePreset" HorizontalAlignment="Right"
                                             Background="{StaticResource CatppuccinSurface1}"/>
                                 </StackPanel>
                             </Flyout>
@@ -133,25 +136,25 @@
                 <Grid ColumnDefinitions="360,*">
                     <Border Grid.Column="0" BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="0,0,1,0">
                         <controls:Engine3DVisualHost VisualizationFactory="{Binding WavetableVisualizationFactory}"
-                                                     Title="Wavetable"/>
+                                                     Title="{DynamicResource InstrumentSlot_Wavetable_Title}"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="14,12" Spacing="9" VerticalAlignment="Top">
-                        <TextBlock Text="WAVETABLE" FontSize="11" FontWeight="Bold"
+                        <TextBlock Text="{DynamicResource InstrumentSlot_WAVETABLE}" FontSize="11" FontWeight="Bold"
                                    Foreground="{StaticResource CatppuccinOverlay1}"/>
                         <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"
-                                   Text="Sweep with Position; assign the LFO to it for movement. Load a sample (top of the card) to slice it into a table, or pick a built-in shape:"/>
-                        <Button Content="Basic morph" Command="{Binding WavetableBasicCommand}"
+                                   Text="{DynamicResource InstrumentSlot_Sweep_with_Position_assign_the_LFO_to_it_for_mov}"/>
+                        <Button Content="{DynamicResource InstrumentSlot_Basic_morph}" Command="{Binding WavetableBasicCommand}"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,6"
                                 Background="{StaticResource CatppuccinSurface1}"
-                                ToolTip.Tip="Sine → triangle → saw → square across the scan"/>
-                        <Button Content="Harmonics" Command="{Binding WavetableHarmonicsCommand}"
+                                ToolTip.Tip="{DynamicResource InstrumentSlot_Sine_triangle_saw_square_across_the_scan_Tip}"/>
+                        <Button Content="{DynamicResource InstrumentSlot_Harmonics}" Command="{Binding WavetableHarmonicsCommand}"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,6"
                                 Background="{StaticResource CatppuccinSurface1}"
-                                ToolTip.Tip="Sine gaining harmonics into a full sawtooth"/>
-                        <Button Content="Random" Command="{Binding WavetableRandomCommand}"
+                                ToolTip.Tip="{DynamicResource InstrumentSlot_Sine_gaining_harmonics_into_a_full_sawtooth_Tip}"/>
+                        <Button Content="{DynamicResource InstrumentSlot_Random}" Command="{Binding WavetableRandomCommand}"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,6"
                                 Background="{StaticResource CatppuccinSurface1}"
-                                ToolTip.Tip="A fresh evolving random-spectrum table"/>
+                                ToolTip.Tip="{DynamicResource InstrumentSlot_A_fresh_evolving_random_spectrum_table_Tip}"/>
                         <TextBlock Text="{Binding SampleName, StringFormat='Table: {0}'}" FontSize="10"
                                    TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource CatppuccinOverlay1}"/>
@@ -164,7 +167,7 @@
                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                 <Grid>
                     <controls:GrainMonitorControl Monitor="{Binding GrainMonitor}"/>
-                    <TextBlock Text="GRAINS" FontSize="9" Margin="6,4"
+                    <TextBlock Text="{DynamicResource InstrumentSlot_GRAINS}" FontSize="9" Margin="6,4"
                                VerticalAlignment="Top" HorizontalAlignment="Left"
                                IsHitTestVisible="False"
                                Foreground="{StaticResource CatppuccinOverlay1}"/>
@@ -179,7 +182,7 @@
                     <controls:WaveformControl Waveform="{Binding InstrumentPreview}"
                                               Revision="{Binding PreviewRevision}"
                                               Fill="{StaticResource CatppuccinMauve}"/>
-                    <TextBlock Text="WAVEFORM" FontSize="9" Margin="6,4"
+                    <TextBlock Text="{DynamicResource InstrumentSlot_WAVEFORM}" FontSize="9" Margin="6,4"
                                VerticalAlignment="Top" HorizontalAlignment="Left"
                                IsHitTestVisible="False"
                                Foreground="{StaticResource CatppuccinOverlay1}"/>
@@ -193,23 +196,23 @@
                 <Grid ColumnDefinitions="*,220">
                     <Grid Grid.Column="0">
                         <controls:ZoneMapControl Zones="{Binding SamplerZones}" Revision="{Binding SamplerRevision}"/>
-                        <TextBlock Text="ZONES  (key × velocity)" FontSize="9" Margin="6,4"
+                        <TextBlock Text="{DynamicResource InstrumentSlot_ZONES_key_velocity}" FontSize="9" Margin="6,4"
                                    VerticalAlignment="Top" HorizontalAlignment="Left"
                                    IsHitTestVisible="False"
                                    Foreground="{StaticResource CatppuccinOverlay1}"/>
                     </Grid>
 
                     <DockPanel Grid.Column="1" Margin="8,4,6,6" LastChildFill="True">
-                        <TextBlock DockPanel.Dock="Top" Text="AMP ENVELOPE" FontSize="9"
+                        <TextBlock DockPanel.Dock="Top" Text="{DynamicResource InstrumentSlot_AMP_ENVELOPE}" FontSize="9"
                                    Foreground="{StaticResource CatppuccinOverlay1}"/>
                         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" Margin="0,6,0,0">
                             <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                                <TextBlock Text="Mod" FontSize="10"
+                                <TextBlock Text="{DynamicResource InstrumentSlot_Mod}" FontSize="10"
                                            Foreground="{StaticResource CatppuccinSubtext0}"/>
                                 <Slider Minimum="0" Maximum="127" Value="{Binding ModWheel, Mode=TwoWay}"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="4,0,0,0">
-                                <TextBlock Text="Bend" FontSize="10"
+                                <TextBlock Text="{DynamicResource InstrumentSlot_Bend}" FontSize="10"
                                            Foreground="{StaticResource CatppuccinSubtext0}"/>
                                 <Slider Minimum="0" Maximum="16383" Value="{Binding PitchBendValue, Mode=TwoWay}"
                                         PointerReleased="OnBendReleased" PointerCaptureLost="OnBendCaptureLost"/>
@@ -224,8 +227,33 @@
             </Border>
 
             <!-- This instrument's own (pre) effect chain -->
-            <Expander Header="Instrument FX (pre)" Margin="0,2,0,0">
+            <Expander Header="{DynamicResource InstrumentSlot_Instrument_FX_pre}" Margin="0,2,0,0">
                 <panels:EffectChainView DataContext="{Binding Effects}" Margin="0,6,0,0"/>
+            </Expander>
+
+            <Expander Header="{DynamicResource InstrumentSlot_Multi_out_routing}" Margin="0,2,0,0">
+                <StackPanel Spacing="6" Margin="0,6,0,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{DynamicResource InstrumentSlot_Plugin_output_bus}" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <NumericUpDown Value="{Binding OutputBusIndex, Mode=TwoWay}"
+                                       Minimum="0" Maximum="15" Increment="1" FormatString="0"
+                                       ToolTip.Tip="{DynamicResource InstrumentSlot_N0_default_stereo_mix_higher_indices_for_multi_o_Tip}"/>
+                    </StackPanel>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{DynamicResource InstrumentSlot_Route_to_track}" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <ComboBox ItemsSource="{Binding OutputRouteOptions}"
+                                  SelectedItem="{Binding SelectedOutputTrack, Mode=TwoWay}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="inst:OutputRouteOption">
+                                    <TextBlock Text="{Binding Name}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
             </Expander>
         </StackPanel>
 

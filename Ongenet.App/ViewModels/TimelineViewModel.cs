@@ -5,14 +5,18 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Ara;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Instruments.Sampler;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.ViewModels.Panels;
 using Ongenet.App.ViewModels.Timeline;
 
 namespace Ongenet.App.ViewModels
@@ -22,7 +26,7 @@ namespace Ongenet.App.ViewModels
     /// Owns the shared <see cref="TimelineMetrics"/>, reports selection to the
     /// <see cref="ISelectionService"/>, and implements track-level actions for the lanes.
     /// </summary>
-    public class TimelineViewModel : ViewModelBase, ITrackActions, IClipActions
+    public class TimelineViewModel : ViewModelBase, ITrackActions, IClipActions, ITakeLaneActions, IPatternClipActions
     {
         private readonly IProjectService _project;
         private readonly ISelectionService _selection;
@@ -36,6 +40,13 @@ namespace Ongenet.App.ViewModels
         private readonly Services.IAppSettingsService _settings;
         private readonly OfflineRenderer _renderer;
         private readonly IAudioEngine _engine;
+        private readonly IAraHost _araHost;
+        private readonly SessionViewModel _session;
+        private readonly ChannelRackViewModel _channelRack;
+        private readonly BottomPanelViewModel _bottomPanel;
+        private readonly StemSeparationService _stemSeparation;
+        private readonly MidiRetrospectiveCapture _retrospective;
+        private readonly Services.IAudioEditorService _audioEditor;
         private bool _isRenderingClip;
 
         // Canonical per-track lanes (one per track). The rendered <see cref="Lanes"/> collection
@@ -49,7 +60,10 @@ namespace Ongenet.App.ViewModels
             IEventAggregator events, IAudioFileService audioFiles, ITransportService transport,
             IInstrumentRegistry instruments, IEditModeService editMode, IRecordingService recording,
             Services.IHistoryService history, Services.IAppSettingsService settings,
-            OfflineRenderer renderer, IAudioEngine engine)
+            OfflineRenderer renderer, IAudioEngine engine, IAraHost araHost,
+            SessionViewModel session, ChannelRackViewModel channelRack, BottomPanelViewModel bottomPanel,
+            StemSeparationService stemSeparation, MidiRetrospectiveCapture retrospective,
+            Services.IAudioEditorService audioEditor)
         {
             _project = project;
             _selection = selection;
@@ -63,21 +77,52 @@ namespace Ongenet.App.ViewModels
             _settings = settings;
             _renderer = renderer;
             _engine = engine;
+            _araHost = araHost;
+            _session = session;
+            _channelRack = channelRack;
+            _bottomPanel = bottomPanel;
+            _stemSeparation = stemSeparation;
+            _retrospective = retrospective;
+            _audioEditor = audioEditor;
 
             SelectClipCommand = new RelayCommand<ClipViewModel>(OnClipClicked);
             AddInstrumentTrackCommand = new RelayCommand(AddInstrumentTrack);
             AddAudioTrackCommand = new RelayCommand(AddAudioTrack);
+            AddHybridTrackCommand = new RelayCommand(AddHybridTrack);
+            AddPatternTrackCommand = new RelayCommand(AddPatternTrack);
+            RippleInsertCommand = new RelayCommand(RippleInsert);
+            RippleDeleteCommand = new RelayCommand(RippleDelete);
+            OpenLogicalMidiEditCommand = new RelayCommand(OpenLogicalMidiEdit, () => HasSelectedMidiClip);
 
             _project.ProjectChanged += Rebuild;
             _selection.SelectionChanged += OnSelectionChanged;
+            _selection.SelectionChanged += () =>
+            {
+                OnPropertyChanged(nameof(HasSelectedMidiClip));
+                OpenLogicalMidiEditCommand.RaiseCanExecuteChanged();
+            };
             events.Subscribe<TrackChangedEvent>(e => RefreshTrack(e.Track));
             events.Subscribe<ClipChangedEvent>(e => RefreshClip(e.Clip));
             events.Subscribe<ClipNotesChangedEvent>(e => RefreshClipNotes(e.Clip));
             events.Subscribe<ClipAddedEvent>(e => OnClipAdded(e.Track, e.Clip));
             events.Subscribe<AutomationChangedEvent>(e => OnAutomationChanged(e.Track));
             events.Subscribe<ArrangementLengthChangedEvent>(_ => ResizeArrangement());
+            events.Subscribe<PatternClipsChangedEvent>(_ => RefreshPatternClipsOnLanes());
+            events.Subscribe<PatternsChangedEvent>(_ => RefreshPatternClipsOnLanes());
             _transport.StateChanged += _ => OnPropertyChanged(nameof(IsPlaying));
             _transport.StartBeatChanged += () => OnPropertyChanged(nameof(StartBeat));
+            _transport.LoopChanged += () =>
+            {
+                OnPropertyChanged(nameof(LoopStart));
+                OnPropertyChanged(nameof(LoopEnd));
+                OnPropertyChanged(nameof(IsLoopActive));
+            };
+            _transport.PunchChanged += () =>
+            {
+                OnPropertyChanged(nameof(PunchInBeat));
+                OnPropertyChanged(nameof(PunchOutBeat));
+                OnPropertyChanged(nameof(HasPunchRegion));
+            };
             // Re-fit tempo-synced audio clips to the grid whenever the project tempo changes.
             _transport.TempoChanged += _ => OnProjectTempoChanged();
             _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSliceMode));
@@ -92,7 +137,7 @@ namespace Ongenet.App.ViewModels
         public void RefreshMeters()
         {
             var now = Environment.TickCount64;
-            if (IsPlaying && now - _lastMeterMs < 33) return;
+            if (now - _lastMeterMs < 33) return;
             _lastMeterMs = now;
             foreach (var lane in _trackLanes) lane.RaiseMeter();
         }
@@ -132,6 +177,10 @@ namespace Ongenet.App.ViewModels
         public double LoopStart => _transport.LoopStart;
         public double LoopEnd => _transport.LoopEnd;
         public bool IsLoopActive => _transport.IsLoopActive;
+
+        public double? PunchInBeat => _transport.PunchInBeat;
+        public double? PunchOutBeat => _transport.PunchOutBeat;
+        public bool HasPunchRegion => PunchInBeat is { } pi && PunchOutBeat is { } po && po > pi;
 
         /// <summary>Sets the start marker to the given beat, snapped to the nearest bar.</summary>
         public void SetStartBeat(double beat)
@@ -178,6 +227,43 @@ namespace Ongenet.App.ViewModels
         public TrackLaneViewModel? FindLaneOf(ClipViewModel clip)
             => _trackLanes.FirstOrDefault(l => l.Clips.Contains(clip));
 
+        /// <summary>Creates an empty 1-bar pattern clip on a pattern track at <paramref name="beat"/>.</summary>
+        public void CreatePatternClip(int rowIndex, double beat)
+        {
+            var lane = TrackLaneAtRow(rowIndex);
+            if (lane is null || lane.Model.Kind != TrackKind.Pattern) return;
+            _history.Capture("Create pattern clip");
+
+            var track = lane.Model;
+            var pattern = ResolveActivePattern(track);
+            if (pattern is null)
+            {
+                pattern = PatternTrackHelper.CreatePattern($"Pattern {PatternTrackHelper.NextPatternNumber(_project.Current)}");
+                _project.Current.Patterns.Add(pattern);
+                track.ActivePatternId = pattern.Id;
+            }
+
+            var bar = BeatsPerBar;
+            var start = Math.Max(0, Math.Floor(beat / bar) * bar);
+            var pc = new PatternClip
+            {
+                PatternId = pattern.Id,
+                TrackId = track.Id,
+                StartBeat = start,
+                LengthBeats = pattern.LengthBeats > 0 ? pattern.LengthBeats : bar
+            };
+            _project.Current.PatternClips.Add(pc);
+            RefreshPatternClipsOnLanes();
+            _events.Publish(new PatternClipsChangedEvent());
+
+            var vm = lane.PatternClips.FirstOrDefault(c => c.Model.Id == pc.Id);
+            if (vm is not null)
+            {
+                SelectPatternClip(vm);
+                OpenPatternClip(vm);
+            }
+        }
+
         /// <summary>Creates an empty 1-bar MIDI clip on the (instrument) row at <paramref name="beat"/>, bar-snapped, and selects it.</summary>
         public void CreateMidiClip(int rowIndex, double beat)
         {
@@ -203,6 +289,86 @@ namespace Ongenet.App.ViewModels
             // Crossfades refresh via the ClipChangedEvent → RefreshClip path below (avoids doing it twice).
             _events.Publish(new ClipChangedEvent(clip.Model));
             RefreshAllGroupSummaries();
+        }
+
+        /// <summary>Selects a pattern playlist block and clears arrangement-clip selection.</summary>
+        public void SelectPatternClip(PatternClipViewModel clip)
+        {
+            ClearPatternClipSelection();
+            _selection.SelectPatternClip(clip.Model, clip.Owner);
+            clip.IsSelected = true;
+            _bottomPanel.BindPatternEditor(clip.Pattern, clip.Owner);
+        }
+
+        /// <summary>Opens the pattern editor for the pattern behind a playlist block.</summary>
+        public void OpenPatternClip(PatternClipViewModel clip)
+        {
+            SelectPatternClip(clip);
+            if (clip.Pattern is not null)
+            {
+                _channelRack.SelectPattern(clip.Pattern);
+                _bottomPanel.ShowPatternEditor();
+            }
+        }
+
+        /// <summary>Applies a live geometry change to a pattern playlist block.</summary>
+        public void NotifyPatternClipGeometryChanged(PatternClipViewModel clip)
+        {
+            clip.RefreshFromModel();
+            ExtendTimeline(clip.Model.StartBeat + clip.Model.LengthBeats);
+            _events.Publish(new PatternClipsChangedEvent());
+        }
+
+        public void DeletePatternClip(PatternClipViewModel clip)
+        {
+            _history.Capture("Delete pattern clip");
+            _project.Current.PatternClips.Remove(clip.Model);
+            ClearPatternClipSelection();
+            RefreshPatternClipsOnLanes();
+            _events.Publish(new PatternClipsChangedEvent());
+        }
+
+        public void DuplicatePatternClip(PatternClipViewModel clip)
+        {
+            _history.Capture("Duplicate pattern clip");
+            var copy = new PatternClip
+            {
+                PatternId = clip.Model.PatternId,
+                TrackId = clip.Model.TrackId,
+                StartBeat = clip.Model.StartBeat + clip.Model.LengthBeats,
+                LengthBeats = clip.Model.LengthBeats
+            };
+            _project.Current.PatternClips.Add(copy);
+            RefreshPatternClipsOnLanes();
+            _events.Publish(new PatternClipsChangedEvent());
+            var lane = FindPatternLaneOf(clip);
+            var vm = lane?.PatternClips.FirstOrDefault(c => c.Model.Id == copy.Id);
+            if (vm is not null) SelectPatternClip(vm);
+        }
+
+        private Pattern? ResolveActivePattern(Track patternTrack)
+        {
+            if (patternTrack.ActivePatternId is { } id)
+                return _project.Current.Patterns.FirstOrDefault(p => p.Id == id);
+            return _project.Current.Patterns.FirstOrDefault();
+        }
+
+        /// <summary>The lane that owns <paramref name="clip"/>, or null.</summary>
+        public TrackLaneViewModel? FindPatternLaneOf(PatternClipViewModel clip)
+            => _trackLanes.FirstOrDefault(l => l.PatternClips.Contains(clip));
+
+        private void ClearPatternClipSelection()
+        {
+            foreach (var lane in _trackLanes)
+            {
+                foreach (var pc in lane.PatternClips)
+                    pc.IsSelected = false;
+            }
+        }
+
+        private void ClearClipSelection()
+        {
+            _selection.SelectClip(null, _selection.SelectedTrack);
         }
 
         /// <summary>
@@ -315,6 +481,70 @@ namespace Ongenet.App.ViewModels
 
         // --- IClipActions (context menu) ---
 
+        // --- ITakeLaneActions (comp editing) ---
+
+        public void PromoteTake(TakeLaneViewModel lane)
+        {
+            _history.Capture("Promote take");
+            var clip = CompEditService.PromoteTake(lane.OwnerTrack, lane.Model);
+            if (clip is null) return;
+            SyncTrackLaneClips(lane.OwnerTrack);
+            RefreshTakeLanesForTrack(lane.OwnerTrack);
+            _events.Publish(new ClipChangedEvent(clip));
+        }
+
+        public void FlattenComp(TakeLaneViewModel lane)
+        {
+            _history.Capture("Flatten comp");
+            var clip = CompEditService.FlattenComp(lane.OwnerTrack, lane.Model, _transport.Tempo.BeatsPerMinute);
+            if (clip is null) return;
+            SyncTrackLaneClips(lane.OwnerTrack);
+            RefreshTakeLanesForTrack(lane.OwnerTrack);
+            _events.Publish(new ClipChangedEvent(clip));
+        }
+
+        public void SplitCompAtPlayhead(TakeLaneViewModel lane)
+        {
+            _history.Capture("Split comp at playhead");
+            CompEditService.SplitAtPlayhead(lane.Model, _transport.PlayheadBeats);
+            lane.RefreshTakes();
+        }
+
+        public void AddTakeLane(Track track)
+        {
+            _history.Capture("Add take lane");
+            CompEditService.EnsureRecordLane(track, createOnLoop: true);
+            RefreshTakeLanesForTrack(track);
+            _events.Publish(new TracksChangedEvent());
+        }
+
+        public void FreezeSelectedTrack()
+        {
+            var track = _selection.SelectedTrack;
+            if (track is null || track.IsBus) return;
+            _history.Capture("Freeze track");
+            TrackFreezeService.FreezeTrack(_project.Current, track, _engine.Format, _transport.Tempo.BeatsPerMinute);
+            SyncTrackLaneClips(track);
+            _events.Publish(new TracksChangedEvent());
+        }
+
+        private void SyncTrackLaneClips(Track track)
+        {
+            var laneVm = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, track));
+            if (laneVm is null) return;
+            laneVm.Clips.Clear();
+            foreach (var clip in track.Clips)
+                laneVm.Clips.Add(new ClipViewModel(clip, track, Metrics, this));
+            UpdateCrossfades(laneVm);
+        }
+
+        private void RefreshTakeLanesForTrack(Track track)
+        {
+            var laneVm = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, track));
+            laneVm?.RefreshTakeLanes(RebuildRows);
+            RebuildRows();
+        }
+
         public bool IsRenderingClip => _isRenderingClip;
 
         public async Task RenderClipToNewTrackAsync(ClipViewModel clip)
@@ -343,6 +573,474 @@ namespace Ongenet.App.ViewModels
                 clip.SetRenderProgress(1);
                 SetRenderingClip(false);
             }
+        }
+
+        public void OpenPitchEditor(ClipViewModel clip)
+        {
+            if (!clip.IsAudio || clip.Model.Samples is null) return;
+
+            var vm = new PolyphonicPitchEditorViewModel(clip, _history, _events);
+            var win = new Views.Windows.PolyphonicPitchEditorWindow { DataContext = vm };
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                win.Show(desktop.MainWindow);
+            else
+                win.Show();
+        }
+
+        public void OpenAraEditor(ClipViewModel clip)
+        {
+            var araPlugin = clip.Owner.Instruments
+                .Select(s => s.Instrument)
+                .OfType<IAraCapable>()
+                .FirstOrDefault(p => p.SupportsAra);
+            if (araPlugin is null) return;
+
+            var pluginId = araPlugin is IInstrument inst ? inst.TypeId : clip.Owner.Id.ToString();
+            var doc = _araHost.BindClip(clip.Model, pluginId, araPlugin);
+            clip.Model.HasAraRegion = true;
+            clip.RefreshFromModel();
+            _events.Publish(new ClipChangedEvent(clip.Model));
+            _araHost.OpenEditor(doc);
+            if (doc is MonophonicPitchAraDocument mono)
+            {
+                mono.SourceSemitoneOffset = clip.Model.AraPitchOffsetSemitones;
+                mono.Changed += OnMonoPitchChanged;
+                void OnMonoPitchChanged()
+                {
+                    clip.Model.AraPitchOffsetSemitones = mono.SourceSemitoneOffset;
+                    clip.RefreshFromModel();
+                    _events.Publish(new ClipChangedEvent(clip.Model));
+                }
+
+                var win = new Views.Windows.MonophonicPitchEditorWindow
+                {
+                    DataContext = mono
+                };
+                win.Closed += (_, _) => mono.Changed -= OnMonoPitchChanged;
+                if (Avalonia.Application.Current?.ApplicationLifetime
+                    is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                    win.Show(desktop.MainWindow);
+                else
+                    win.Show();
+            }
+        }
+
+        public void OpenInAudioEditor(ClipViewModel clip)
+        {
+            if (!clip.IsAudio) return;
+            _audioEditor.OpenClip(clip.Model);
+        }
+
+        public void SetClipFades(ClipViewModel clip, double fadeInBeats, double fadeOutBeats)
+        {
+            _history.Capture("Adjust clip fades");
+            clip.Model.UserFadeInBeats = Math.Max(0, fadeInBeats);
+            clip.Model.UserFadeOutBeats = Math.Max(0, fadeOutBeats);
+            var lane = FindLaneOf(clip);
+            if (lane is not null) UpdateCrossfades(lane);
+            _events.Publish(new ClipChangedEvent(clip.Model));
+        }
+
+        public void MoveWarpMarker(ClipViewModel clip, int markerIndex, double beatPosition)
+        {
+            if (markerIndex < 0 || markerIndex >= clip.Model.WarpMarkers.Count) return;
+            _history.Capture("Move warp marker");
+            clip.Model.WarpMarkers[markerIndex].BeatPosition =
+                Math.Clamp(beatPosition, 0, clip.Model.LengthBeats);
+            clip.NotifyWarpChanged();
+            _events.Publish(new ClipChangedEvent(clip.Model));
+        }
+
+        public void SendClipToSessionSlot(ClipViewModel clip)
+        {
+            _history.Capture("Send to session slot");
+            _session.TryCreateSessionClipFromArrangement(clip.Model, clip.Owner);
+        }
+
+        /// <summary>Runs monophonic pitch detection on an audio clip and creates a MIDI clip on a new track.</summary>
+        public async Task ConvertAudioClipToMidiAsync(ClipViewModel clip)
+        {
+            if (!clip.IsAudio || clip.Model.Samples is not { } buffer || buffer.FrameCount <= 0)
+                return;
+
+            var sourceLane = FindLaneOf(clip);
+            if (sourceLane is null) return;
+
+            SetRenderingClip(true);
+            clip.SetRenderProgress(0);
+            try
+            {
+                var notes = await Task.Run(() =>
+                    MonophonicAudioToMidi.Convert(buffer, clip.Model.LengthBeats));
+                if (notes.Count == 0) return;
+
+                _history.Capture("Convert audio to MIDI");
+
+                var track = new Track
+                {
+                    Name = $"MIDI {InstrumentTrackNumber()}",
+                    Kind = TrackKind.Instrument,
+                    ColorKey = "CatppuccinMauve",
+                    ParentId = clip.Owner.ParentId
+                };
+                track.Instruments.Add(new InstrumentSlot(_instruments.Create(InstrumentRegistry.DefaultInstrumentId)));
+                track.CommitInstruments();
+
+                var midiClip = new Clip
+                {
+                    Name = $"{clip.Name} (MIDI)",
+                    IsAudio = false,
+                    StartBeat = clip.Model.StartBeat,
+                    LengthBeats = clip.Model.LengthBeats,
+                    Notes = notes
+                };
+                track.Clips.Add(midiClip);
+
+                var insertIndex = _trackLanes.IndexOf(sourceLane) + 1;
+                InsertTrack(track, insertIndex);
+
+                var lane = _trackLanes.First(l => ReferenceEquals(l.Model, track));
+                lane.Clips.Add(new ClipViewModel(midiClip, track, Metrics, this) { IsSelected = true });
+                ExtendTimeline(midiClip.EndBeat);
+                _selection.SelectClip(midiClip, track);
+                _events.Publish(new TracksChangedEvent());
+            }
+            finally
+            {
+                clip.SetRenderProgress(1);
+                SetRenderingClip(false);
+            }
+        }
+
+        /// <summary>Polyphonic pitch detection on an audio clip → new MIDI track.</summary>
+        public async Task ConvertAudioClipToPolyMidiAsync(ClipViewModel clip)
+        {
+            if (!clip.IsAudio || clip.Model.Samples is not { } buffer || buffer.FrameCount <= 0)
+                return;
+
+            var sourceLane = FindLaneOf(clip);
+            if (sourceLane is null) return;
+
+            SetRenderingClip(true);
+            clip.SetRenderProgress(0);
+            try
+            {
+                var events = await Task.Run(() =>
+                    PolyphonicAudioToMidi.Convert(buffer, clip.Model.LengthBeats));
+                if (events.Count == 0) return;
+
+                _history.Capture("Convert audio to poly MIDI");
+
+                var track = new Track
+                {
+                    Name = $"Poly MIDI {InstrumentTrackNumber()}",
+                    Kind = TrackKind.Instrument,
+                    ColorKey = "CatppuccinMauve",
+                    ParentId = clip.Owner.ParentId
+                };
+                track.Instruments.Add(new InstrumentSlot(_instruments.Create(InstrumentRegistry.DefaultInstrumentId)));
+                track.CommitInstruments();
+
+                var notes = events.Select(e => new MidiNote
+                {
+                    Note = e.Note,
+                    StartBeat = e.StartBeat,
+                    LengthBeats = e.LengthBeats,
+                    Velocity = e.Velocity
+                }).ToList();
+
+                var midiClip = new Clip
+                {
+                    Name = $"{clip.Name} (Poly MIDI)",
+                    IsAudio = false,
+                    StartBeat = clip.Model.StartBeat,
+                    LengthBeats = clip.Model.LengthBeats,
+                    Notes = notes
+                };
+                track.Clips.Add(midiClip);
+
+                var insertIndex = _trackLanes.IndexOf(sourceLane) + 1;
+                InsertTrack(track, insertIndex);
+
+                var lane = _trackLanes.First(l => ReferenceEquals(l.Model, track));
+                lane.Clips.Add(new ClipViewModel(midiClip, track, Metrics, this) { IsSelected = true });
+                ExtendTimeline(midiClip.EndBeat);
+                _selection.SelectClip(midiClip, track);
+                _events.Publish(new TracksChangedEvent());
+            }
+            finally
+            {
+                clip.SetRenderProgress(1);
+                SetRenderingClip(false);
+            }
+        }
+
+        /// <summary>Opens the guided audio-to-MIDI wizard for an audio clip.</summary>
+        public void OpenAudioToMidiWizard(ClipViewModel clip)
+        {
+            if (!clip.IsAudio) return;
+            _selection.SelectClip(clip.Model, clip.Owner);
+            var vm = new AudioToMidiViewModel(_project, _transport, this, clip);
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                Views.Windows.AudioToMidiWindow.Show(desktop.MainWindow, vm);
+            else
+                Views.Windows.AudioToMidiWindow.Show(new Avalonia.Controls.Window(), vm);
+        }
+
+        /// <summary>Separates an audio clip into four stems on new tracks (vocals/drums/bass/other).</summary>
+        public Task SeparateStemsAsync(ClipViewModel clip)
+            => SeparateStemsAsync(clip, StemSeparationQuality.Fast, null);
+
+        public async Task SeparateStemsAsync(ClipViewModel clip, StemSeparationQuality quality,
+            IProgress<double>? externalProgress = null)
+        {
+            if (!clip.IsAudio || clip.Model.Samples is not { FrameCount: > 0 }) return;
+            var sourceLane = FindLaneOf(clip);
+            if (sourceLane is null) return;
+
+            SetRenderingClip(true);
+            clip.SetRenderProgress(0);
+            try
+            {
+                var progress = externalProgress is null
+                    ? new Progress<double>(p => clip.SetRenderProgress(p))
+                    : new Progress<double>(p =>
+                    {
+                        clip.SetRenderProgress(p);
+                        externalProgress.Report(p);
+                    });
+                var stems = await Task.Run(() => _stemSeparation.Separate(clip.Model.Samples!, progress, quality));
+                _history.Capture("Separate stems");
+
+                var insertIndex = _trackLanes.IndexOf(sourceLane) + 1;
+                var colors = new[] { "CatppuccinPink", "CatppuccinPeach", "CatppuccinBlue", "CatppuccinGreen" };
+                var names = new[]
+                {
+                    StemSeparationService.StemVocals,
+                    StemSeparationService.StemDrums,
+                    StemSeparationService.StemBass,
+                    StemSeparationService.StemOther
+                };
+
+                for (var i = 0; i < names.Length; i++)
+                {
+                    if (!stems.TryGetValue(names[i], out var buffer)) continue;
+                    var track = new Track
+                    {
+                        Name = $"{clip.Name} — {names[i]}",
+                        Kind = TrackKind.Audio,
+                        ColorKey = colors[i],
+                        ParentId = clip.Owner.ParentId
+                    };
+                    var stemClip = new Clip
+                    {
+                        Name = names[i],
+                        IsAudio = true,
+                        StartBeat = clip.Model.StartBeat,
+                        LengthBeats = clip.Model.LengthBeats,
+                        Samples = buffer,
+                        Waveform = AudioWaveform.Build(buffer)
+                    };
+                    track.Clips.Add(stemClip);
+                    InsertTrack(track, insertIndex + i);
+                    var lane = _trackLanes.First(l => ReferenceEquals(l.Model, track));
+                    lane.Clips.Add(new ClipViewModel(stemClip, track, Metrics, this));
+                    ExtendTimeline(stemClip.EndBeat);
+                }
+
+                _events.Publish(new TracksChangedEvent());
+            }
+            finally
+            {
+                clip.SetRenderProgress(1);
+                SetRenderingClip(false);
+            }
+        }
+
+        /// <summary>Creates a linked copy that shares content with the source clip.</summary>
+        public void CreateLinkedCopy(ClipViewModel clip)
+        {
+            var lane = FindLaneOf(clip);
+            if (lane is null) return;
+            _history.Capture("Create linked clip");
+            var group = ClipLinkOps.EnsureGroup(clip.Model);
+            var copy = CloneClip(clip.Model, linked: true, groupId: group);
+            copy.StartBeat = clip.Model.StartBeat + clip.Model.LengthBeats;
+            lane.Model.Clips.Add(copy);
+            lane.Clips.Add(new ClipViewModel(copy, lane.Model, Metrics, this));
+            ExtendTimeline(copy.EndBeat);
+            UpdateCrossfades(lane);
+            _selection.SelectClip(copy, lane.Model);
+            InvalidateClipCommands();
+            RefreshAllGroupSummaries();
+        }
+
+        /// <summary>Detaches a clip from its linked group without changing shared content.</summary>
+        public void UnlinkClip(ClipViewModel clip)
+        {
+            if (clip.Model.LinkedClipGroupId is null) return;
+            _history.Capture("Unlink clip");
+            ClipLinkOps.Unlink(clip.Model);
+            InvalidateClipCommands();
+        }
+
+        /// <summary>Captures recently played MIDI into a new clip at the playhead.</summary>
+        public void CaptureRetrospectiveMidi()
+        {
+            var notes = _retrospective.BuildClipNotes(_transport.PlayheadBeats, _transport.Tempo.BeatsPerMinute);
+            if (notes.Count == 0) return;
+
+            var track = _selection.SelectedTrack;
+            if (track is not { Kind: TrackKind.Instrument })
+            {
+                track = _project.Current.Tracks.FirstOrDefault(t => t is { Kind: TrackKind.Instrument, IsArmed: true })
+                    ?? _project.Current.Tracks.FirstOrDefault(t => t.Kind == TrackKind.Instrument);
+            }
+            if (track is null) return;
+
+            _history.Capture("Capture retrospective MIDI");
+            var startBeat = notes.Min(n => n.StartBeat);
+            var endBeat = notes.Max(n => n.StartBeat + n.LengthBeats);
+            foreach (var note in notes)
+                note.StartBeat -= startBeat;
+
+            var clip = new Clip
+            {
+                Name = "Retrospective MIDI",
+                IsAudio = false,
+                StartBeat = startBeat,
+                LengthBeats = Math.Max(1, endBeat - startBeat),
+                Notes = notes
+            };
+            track.Clips.Add(clip);
+            _retrospective.Clear();
+
+            var lane = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, track));
+            if (lane is not null)
+            {
+                var vm = new ClipViewModel(clip, track, Metrics, this) { IsSelected = true };
+                lane.Clips.Add(vm);
+                ExtendTimeline(clip.EndBeat);
+                _selection.SelectClip(clip, track);
+            }
+
+            _events.Publish(new ClipNotesChangedEvent(clip));
+            InvalidateClipCommands();
+        }
+
+        /// <summary>Offline bounce replacing the clip in place on its track.</summary>
+        public async Task BounceClipInPlaceAsync(ClipViewModel clip)
+        {
+            var lane = FindLaneOf(clip);
+            if (lane is null) return;
+
+            var track = clip.Owner;
+            var index = track.Clips.IndexOf(clip.Model);
+            if (index < 0) return;
+
+            SetRenderingClip(true);
+            clip.SetRenderProgress(0);
+            try
+            {
+                await Task.Run(() =>
+                {
+                    _history.Capture("Bounce clip in place");
+                    BounceInPlaceService.BounceClipInPlace(
+                        _project.Current, track, clip.Model, _engine.Format,
+                        _transport.Tempo.BeatsPerMinute);
+                });
+
+                var baked = track.Clips[index];
+                var vmIndex = lane.Clips.IndexOf(clip);
+                if (vmIndex >= 0)
+                {
+                    var newVm = new ClipViewModel(baked, track, Metrics, this) { IsSelected = true };
+                    lane.Clips[vmIndex] = newVm;
+                    _selection.SelectClip(baked, track);
+                }
+
+                UpdateCrossfades(lane);
+                _events.Publish(new ClipChangedEvent(baked));
+            }
+            finally
+            {
+                clip.SetRenderProgress(1);
+                SetRenderingClip(false);
+            }
+        }
+
+        private void RippleInsert()
+        {
+            var beats = Math.Max(1, _project.Current.TimeSignature.Numerator);
+            _history.Capture("Ripple insert");
+            RippleEditService.InsertTime(_project.Current, _transport.PlayheadBeats, beats);
+            ResizeArrangement();
+            Rebuild();
+            _events.Publish(new TracksChangedEvent());
+        }
+
+        private void RippleDelete()
+        {
+            var beats = Math.Max(1, _project.Current.TimeSignature.Numerator);
+            _history.Capture("Ripple delete");
+            RippleEditService.DeleteTime(_project.Current, _transport.PlayheadBeats, beats);
+            ResizeArrangement();
+            Rebuild();
+            _events.Publish(new TracksChangedEvent());
+        }
+
+        private void OpenLogicalMidiEdit()
+        {
+            var clip = _selection.SelectedClip;
+            if (clip is not { IsMidi: true }) return;
+            OpenLogicalMidiEditForClip(clip);
+        }
+
+        public void OpenLogicalMidiEdit(ClipViewModel clip)
+        {
+            if (!clip.IsMidi) return;
+            _selection.SelectClip(clip.Model, clip.Owner);
+            OpenLogicalMidiEditForClip(clip.Model);
+        }
+
+        private void OpenLogicalMidiEditForClip(Clip clip)
+        {
+            var vm = new LogicalMidiEditViewModel(clip, _history, _events);
+            var win = new Views.Windows.LogicalMidiEditWindow { DataContext = vm };
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                win.ShowDialog(desktop.MainWindow);
+            else
+                win.Show();
+        }
+
+        /// <summary>Collects all MIDI notes from instrument tracks in arrangement beats.</summary>
+        public (IReadOnlyList<MidiNote> Notes, double LengthBeats) CollectProjectMidi()
+        {
+            var notes = new List<MidiNote>();
+            foreach (var track in _project.Current.Tracks.Where(t => t.Kind == TrackKind.Instrument))
+            {
+                foreach (var clip in track.Clips.Where(c => c.IsMidi))
+                {
+                    foreach (var note in clip.Notes)
+                    {
+                        notes.Add(new MidiNote
+                        {
+                            Note = note.Note,
+                            StartBeat = clip.StartBeat + note.StartBeat,
+                            LengthBeats = note.LengthBeats,
+                            Velocity = note.Velocity
+                        });
+                    }
+                }
+            }
+
+            var length = notes.Count > 0
+                ? notes.Max(n => n.EndBeat)
+                : _project.Current.BarCount * Math.Max(1, _project.Current.TimeSignature.Numerator);
+            return (notes, length);
         }
 
         /// <summary>Renders a group summary's descendant mix to a new audio track outside the group.</summary>
@@ -430,6 +1128,9 @@ namespace Ongenet.App.ViewModels
                 {
                     clip.MakeUniqueCommand.RaiseCanExecuteChanged();
                     clip.RenderToNewTrackCommand.RaiseCanExecuteChanged();
+                    clip.ConvertToMidiCommand.RaiseCanExecuteChanged();
+                    clip.ConvertToPolyMidiCommand.RaiseCanExecuteChanged();
+                    clip.BounceInPlaceCommand.RaiseCanExecuteChanged();
                 }
 
                 foreach (var summary in lane.GroupSummaries)
@@ -501,6 +1202,9 @@ namespace Ongenet.App.ViewModels
             InvalidateClipCommands();
             RefreshAllGroupSummaries();
         }
+
+        public int GetLinkedInstanceCount(ClipViewModel clip)
+            => ClipLinkOps.LinkedInstanceCount(_project.Current, clip.Model);
 
         /// <summary>
         /// Recomputes crossfades for a lane's overlapping audio clips and pushes the resulting fade lengths
@@ -674,7 +1378,9 @@ namespace Ongenet.App.ViewModels
         /// <summary>True when <paramref name="clip"/> may be dropped on <paramref name="lane"/>:
         /// MIDI clips go to instrument tracks, audio clips to audio tracks.</summary>
         public static bool CanDropClip(Clip clip, TrackLaneViewModel lane)
-            => clip.IsAudio ? lane.Model.Kind == TrackKind.Audio : lane.Model.Kind == TrackKind.Instrument;
+            => clip.IsAudio
+                ? lane.Model.Kind is TrackKind.Audio or TrackKind.Hybrid
+                : lane.Model.Kind is TrackKind.Instrument or TrackKind.Midi or TrackKind.Hybrid;
 
         /// <summary>
         /// Drops a copy of an existing project clip (dragged from the Project Clips panel) onto
@@ -771,7 +1477,9 @@ namespace Ongenet.App.ViewModels
             // Clips can only move between tracks of a compatible kind: audio clips onto audio tracks,
             // MIDI clips onto instrument tracks. Buses (group/master) carry no clips.
             var kind = target.Model.Kind;
-            var compatible = clip.Model.IsAudio ? kind == TrackKind.Audio : kind == TrackKind.Instrument;
+            var compatible = clip.Model.IsAudio
+                ? kind is TrackKind.Audio or TrackKind.Hybrid
+                : kind is TrackKind.Instrument or TrackKind.Midi or TrackKind.Hybrid;
             if (!compatible) return null;
 
             origin.Model.Clips.Remove(clip.Model);
@@ -796,6 +1504,9 @@ namespace Ongenet.App.ViewModels
 
         /// <summary>Bar markers for the ruler.</summary>
         public ObservableCollection<BarTickViewModel> Bars { get; } = new();
+
+        /// <summary>Named arrangement markers for the ruler.</summary>
+        public ObservableCollection<ArrangementMarkerViewModel> Markers { get; } = new();
 
         /// <summary>Time&lt;-&gt;pixel mapping shared by every lane, clip, and ruler tick.</summary>
         public TimelineMetrics Metrics { get; } = new();
@@ -823,10 +1534,18 @@ namespace Ongenet.App.ViewModels
         /// <summary>Add-track commands for the timeline's blank-area context menu.</summary>
         public RelayCommand AddInstrumentTrackCommand { get; }
         public RelayCommand AddAudioTrackCommand { get; }
+        public RelayCommand AddHybridTrackCommand { get; }
+        public RelayCommand AddPatternTrackCommand { get; }
+        public RelayCommand RippleInsertCommand { get; }
+        public RelayCommand RippleDeleteCommand { get; }
+        public RelayCommand OpenLogicalMidiEditCommand { get; }
+
+        public bool HasSelectedMidiClip => _selection.SelectedClip is { IsMidi: true };
 
         private void OnClipClicked(ClipViewModel? clip)
         {
             if (clip is null) return;
+            ClearPatternClipSelection();
             _selection.SelectClip(clip.Model, clip.Owner);
         }
 
@@ -1054,13 +1773,49 @@ namespace Ongenet.App.ViewModels
             _trackLanes.Clear();
             foreach (var track in _project.Current.Tracks)
             {
-                _trackLanes.Add(new TrackLaneViewModel(track, Metrics, this, this));
+                var lane = new TrackLaneViewModel(track, Metrics, this, this);
+                lane.RefreshTakeLanes(RebuildRows);
+                _trackLanes.Add(lane);
             }
 
             RecomputeIndents();
             RebuildRows();
+            RefreshPatternClipsOnLanes();
+            RefreshMarkers();
             ResizeArrangement();
             foreach (var lane in _trackLanes) UpdateCrossfades(lane);
+        }
+
+        private void RefreshMarkers()
+        {
+            Markers.Clear();
+            foreach (var m in _project.Current.Markers.OrderBy(m => m.Beat))
+                Markers.Add(new ArrangementMarkerViewModel(m, Metrics));
+        }
+
+        public void AddMarkerAtPlayhead(string name)
+        {
+            _history.Capture("Add marker");
+            _project.Current.Markers.Add(new ArrangementMarker
+            {
+                Name = name,
+                Beat = _transport.PlayheadBeats
+            });
+            RefreshMarkers();
+        }
+
+        public void GoToMarker(ArrangementMarker marker)
+        {
+            _transport.StartBeat = marker.Beat;
+            _transport.NotifyPlayhead(marker.Beat);
+        }
+
+        private void RefreshPatternClipsOnLanes()
+        {
+            var clips = _project.Current.PatternClips;
+            var patterns = _project.Current.Patterns;
+            foreach (var lane in _trackLanes)
+                lane.RefreshPatternClips(clips, patterns);
         }
 
         // Sets each lane's nesting depth and colour rails from its parent chain so headers indent under
@@ -1132,20 +1887,26 @@ namespace Ongenet.App.ViewModels
                     continue;
                 }
 
-                if (trackLane.Model.AutomationCollapsed) continue;
-                foreach (var auto in trackLane.Model.AutoLanes)
+                if (!trackLane.Model.AutomationCollapsed)
                 {
-                    // The owning track's rails continue down, plus one more rail in the track's colour so the
-                    // automation row is indented one level under it (no dark divider rail).
-                    var autoBars = new List<Timeline.LaneGutterBar>(trackLane.GutterBars)
+                    foreach (var auto in trackLane.Model.AutoLanes)
                     {
-                        new(trackLane.Model.ColorKey)
-                    };
-                    Lanes.Add(new AutomationLaneViewModel(trackLane.Model, auto, Metrics, this)
-                    {
-                        IndentWidth = (trackLane.IndentLevel + 1) * 16.0,
-                        GutterBars = autoBars
-                    });
+                        var autoBars = new List<Timeline.LaneGutterBar>(trackLane.GutterBars)
+                        {
+                            new(trackLane.Model.ColorKey)
+                        };
+                        Lanes.Add(new AutomationLaneViewModel(trackLane.Model, auto, Metrics, this)
+                        {
+                            IndentWidth = (trackLane.IndentLevel + 1) * 16.0,
+                            GutterBars = autoBars
+                        });
+                    }
+                }
+
+                foreach (var takeLaneVm in trackLane.TakeLanes)
+                {
+                    if (!takeLaneVm.IsExpanded) continue;
+                    Lanes.Add(takeLaneVm);
                 }
             }
 
@@ -1733,6 +2494,34 @@ namespace Ongenet.App.ViewModels
             InsertTrack(track, _trackLanes.Count);
         }
 
+        public void AddHybridTrack()
+        {
+            _history.Capture("Add hybrid track");
+            var track = new Track
+            {
+                Name = $"Hybrid {InstrumentTrackNumber()}",
+                Kind = TrackKind.Hybrid,
+                ColorKey = "CatppuccinSky"
+            };
+            if (_instruments.Create(InstrumentRegistry.DefaultInstrumentId) is IInstrument instrument)
+            {
+                track.Instruments.Add(new InstrumentSlot(instrument));
+                track.CommitInstruments();
+            }
+            InsertTrack(track, _trackLanes.Count);
+        }
+
+        public void AddPatternTrack()
+        {
+            _history.Capture("Add pattern track");
+            var track = PatternTrackHelper.CreatePatternTrack(_project.Current);
+            InsertTrack(track, _trackLanes.Count);
+            _events.Publish(new PatternsChangedEvent());
+            _selection.SelectTrack(track);
+            _bottomPanel.BindPatternEditor(
+                _project.Current.Patterns.FirstOrDefault(p => p.Id == track.ActivePatternId), track);
+        }
+
         public void NotifyTrackChanged(Track track) => _events.Publish(new TrackChangedEvent(track));
 
         /// <summary>Creates a new instrument track with the given instrument type at the given lane index.</summary>
@@ -1794,7 +2583,7 @@ namespace Ongenet.App.ViewModels
             {
                 var effects = App.ServiceProvider?.GetService<IEffectRegistry>();
                 if (effects is null) return null;
-                using var fs = File.OpenRead(path);
+                using var fs = System.IO.File.OpenRead(path);
                 return Ongenet.Core.Persistence.PresetFile.Load(fs, _instruments, effects)?.Instrument;
             }
             catch { return null; }
@@ -1816,7 +2605,7 @@ namespace Ongenet.App.ViewModels
             _selection.SelectTrack(track);
         }
 
-        private static Clip CloneClip(Clip src)
+        private static Clip CloneClip(Clip src, bool linked = false, Guid? groupId = null)
         {
             var copy = new Clip
             {
@@ -1827,15 +2616,45 @@ namespace Ongenet.App.ViewModels
                 StretchToTempo = src.StretchToTempo,
                 PitchCorrected = src.PitchCorrected,
                 SourceTempo = src.SourceTempo,
+                SourceKey = src.SourceKey,
                 AudioFilePath = src.AudioFilePath,
                 Waveform = src.Waveform,
                 Samples = src.Samples,
                 SourceOffsetSeconds = src.SourceOffsetSeconds,
-                SourceLengthSeconds = src.SourceLengthSeconds
+                SourceLengthSeconds = src.SourceLengthSeconds,
+                WarpMode = src.WarpMode,
+                UserFadeInBeats = src.UserFadeInBeats,
+                UserFadeOutBeats = src.UserFadeOutBeats,
+                HasAraRegion = src.HasAraRegion,
+                AraPitchOffsetSemitones = src.AraPitchOffsetSemitones,
+                LinkedClipGroupId = linked ? groupId ?? src.LinkedClipGroupId : null
             };
+            foreach (var ps in src.PitchSegments)
+                copy.PitchSegments.Add(new PitchNoteSegment
+                {
+                    StartSample = ps.StartSample,
+                    EndSample = ps.EndSample,
+                    PitchCents = ps.PitchCents,
+                    Amplitude = ps.Amplitude
+                });
+            foreach (var wm in src.WarpMarkers)
+                copy.WarpMarkers.Add(new WarpMarker { SourceSeconds = wm.SourceSeconds, BeatPosition = wm.BeatPosition });
+
             if (src.IsAudio) return copy;
 
-            copy.Notes = src.Notes;
+            if (linked)
+            {
+                copy.Notes = src.Notes;
+                return copy;
+            }
+
+            copy.Notes = src.Notes.Select(n => new MidiNote
+            {
+                Note = n.Note,
+                StartBeat = n.StartBeat,
+                LengthBeats = n.LengthBeats,
+                Velocity = n.Velocity
+            }).ToList();
             return copy;
         }
 
@@ -1873,6 +2692,7 @@ namespace Ongenet.App.ViewModels
             if (lane is null) return;
             if (lane.Clips.Any(c => ReferenceEquals(c.Model, clip))) return;
             lane.Clips.Add(new ClipViewModel(clip, lane.Model, Metrics, this));
+            if (track.TakeLanes.Count > 0) lane.RefreshTakeLanes(RebuildRows);
             ExtendTimeline(clip.EndBeat);
             if (clip.IsAudio) UpdateCrossfades(lane);
             RefreshAllGroupSummaries();
@@ -1916,18 +2736,31 @@ namespace Ongenet.App.ViewModels
             {
                 var selectedTrack = _selection.SelectedTrack;
                 var selectedClip = _selection.SelectedClip;
+                var selectedPatternClip = _selection.SelectedPatternClip;
                 var selectedTracks = _selection.SelectedTracks;
 
                 SelectedLane = _trackLanes.FirstOrDefault(l => ReferenceEquals(l.Model, selectedTrack));
 
+                if (selectedClip is not null)
+                    ClearPatternClipSelection();
+
                 foreach (var lane in _trackLanes)
                 {
-                    // Highlight every multi-selected track (so the user sees the grouping selection).
                     lane.IsSelected = selectedTracks.Contains(lane.Model);
                     foreach (var clip in lane.Clips)
-                    {
                         clip.IsSelected = ReferenceEquals(clip.Model, selectedClip);
-                    }
+                    foreach (var pc in lane.PatternClips)
+                        pc.IsSelected = ReferenceEquals(pc.Model, selectedPatternClip);
+                }
+
+                if (selectedPatternClip is not null)
+                {
+                    var pattern = _project.Current.Patterns.FirstOrDefault(p => p.Id == selectedPatternClip.PatternId);
+                    _bottomPanel.BindPatternEditor(pattern, selectedTrack);
+                }
+                else if (selectedTrack is { Kind: TrackKind.Pattern })
+                {
+                    _bottomPanel.BindPatternEditor(ResolveActivePattern(selectedTrack), selectedTrack);
                 }
             }
             finally

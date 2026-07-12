@@ -26,7 +26,9 @@ public static class FactoryPresets
         new("3x Osc", "White Riser", WhiteRiser),
         new("3x Osc", "Trance Bass", TranceBass),
         new("3x Osc", "Reverse Cymbal", ReverseCymbal),
-        new("FM Synth", "Glass Bells", GlassBells)
+        new("FM Synth", "Glass Bells", GlassBells),
+        new("FM Synth", "Warm Pad", WarmPad),
+        new("3x Osc", "Pluck Stack", PluckStack)
     };
 
     /// <summary>Factory FX chains for the library's FX Chains tab — well-matched effect stacks new
@@ -61,6 +63,12 @@ public static class FactoryPresets
             new FilterEffect { Mode = FilterMode.LowPass, Frequency = 2500, Resonance = 0.8 },
             new SidechainEffect { Amount = 0.4, RateIndex = 2 },
             new StereoWidthEffect { Width = 1.4 }
+        }),
+        new("Drum Bus Punch", () => new IAudioEffect[]
+        {
+            new FilterEffect { Mode = FilterMode.HighPass, Frequency = 55, Resonance = 0.5 },
+            new CompressorEffect { ThresholdDb = -18, Ratio = 3.0, AttackMs = 8, ReleaseMs = 120, MakeupDb = 3 },
+            new LimiterEffect { CeilingDb = -1.0, ReleaseMs = 80 }
         })
     };
 
@@ -121,5 +129,27 @@ public static class FactoryPresets
         FilterTypeIndex = 1, Cutoff = 800, Resonance = 2.0,
         AttackSeconds = 2.5, DecaySeconds = 1.0, SustainLevel = 1.0, ReleaseSeconds = 0.4,
         Gain = 0.7
+    };
+
+    /// <summary>Warm FM pad: low mod index, long release, soft triangle carrier.</summary>
+    public static FmSynthInstrument WarmPad() => new()
+    {
+        ModRatio = 1.0,
+        ModIndex = 0.6,
+        AttackSeconds = 0.4,
+        DecaySeconds = 0.6,
+        SustainLevel = 0.65,
+        ReleaseSeconds = 2.4
+    };
+
+    /// <summary>Short pluck stack: bright saw + octave square for arp-friendly stabs.</summary>
+    public static TripleOscInstrument PluckStack() => new()
+    {
+        Wave1 = (int)OscWave.Saw,
+        Wave2 = (int)OscWave.Square, Coarse2 = 12, Level2 = 0.28,
+        Wave3 = (int)OscWave.Saw, Level3 = 0.0,
+        FilterTypeIndex = 1, Cutoff = 4200, Resonance = 1.2,
+        AttackSeconds = 0.001, DecaySeconds = 0.22, SustainLevel = 0.0, ReleaseSeconds = 0.18,
+        Gain = 0.78
     };
 }

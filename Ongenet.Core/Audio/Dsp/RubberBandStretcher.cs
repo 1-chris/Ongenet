@@ -36,6 +36,36 @@ internal static class RubberBandStretcher
         return output;
     }
 
+    /// <summary>Duration-preserving time stretch (unity pitch) for warp Complex segments.</summary>
+    public static float[] TimeStretch(float[] input, int channels, int sampleRate, double timeRatio,
+        IProgress<double>? progress = null)
+    {
+        var frames = input.Length / channels;
+        if (frames <= 0 || Math.Abs(timeRatio - 1.0) < 1e-6)
+        {
+            progress?.Report(1.0);
+            return input;
+        }
+
+        var output = new float[frames * channels];
+        for (var c = 0; c < channels; c++)
+        {
+            var channelIn = Deinterleave(input, channels, frames, c);
+            var config = RubberBandR2Config.Create(sampleRate, 1.0, timeRatio, channelIn.Length);
+            var engine = new RubberBandR2Engine(config);
+            var channelOut = engine.PitchShift(channelIn, progress, c, channels);
+            var targetLen = Math.Max(1, (int)Math.Round(channelIn.Length * timeRatio));
+            if (channelOut.Length != targetLen)
+                channelOut = FitToLength(channelOut, targetLen);
+            if (channelOut.Length != channelIn.Length)
+                channelOut = FitToLength(channelOut, channelIn.Length);
+            Interleave(output, channels, channelOut, c);
+        }
+
+        progress?.Report(1.0);
+        return output;
+    }
+
     private static float[] Deinterleave(float[] interleaved, int channels, long frames, int channel)
     {
         var mono = new float[frames];

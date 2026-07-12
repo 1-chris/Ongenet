@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:panels="using:Ongenet.App.Views.Panels"
+        x:Class="Ongenet.App.Views.Windows.AudioEditorWindow"
+        x:DataType="vm:AudioEditorViewModel"
+        Title="{Binding Title}" Width="960" Height="640" MinWidth="720" MinHeight="480">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Text="{DynamicResource AudioEditor_Hint}"
+                   TextWrapping="Wrap" Margin="0,0,0,8"
+                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <TextBlock Grid.Column="0" Text="{DynamicResource AudioEditor_MultitrackHint}"
+                       VerticalAlignment="Center" FontSize="11"
+                       Foreground="{StaticResource CatppuccinSubtext1}"/>
+            <Button Grid.Column="1" Content="{DynamicResource AudioEditor_RemoveLane}"
+                    Command="{Binding RemoveLaneCommand}" CommandParameter="{Binding ActiveLane}"
+                    IsEnabled="{Binding ActiveLane, Converter={x:Static ObjectConverters.IsNotNull}}"
+                    Padding="10,4"/>
+        </Grid>
+
+        <Grid ColumnDefinitions="220,*">
+            <Border Grid.Column="0" Margin="0,0,8,0" Padding="8"
+                    Background="{StaticResource CatppuccinSurface0}" CornerRadius="4">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="{DynamicResource AudioEditor_OpenClips}"
+                               FontWeight="SemiBold" Margin="0,0,0,6"
+                               Foreground="{StaticResource CatppuccinText}"/>
+                    <ListBox ItemsSource="{Binding Lanes}" SelectedItem="{Binding ActiveLane, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AudioEditorLaneViewModel">
+                                <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="1" Padding="12" Background="{StaticResource CatppuccinMantle}" CornerRadius="4">
+                <Grid>
+                    <TextBlock Text="{DynamicResource AudioEditor_SelectClipPrompt}"
+                               IsVisible="{Binding !HasLanes}"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <panels:SampleEditorView DataContext="{Binding ActiveEditor}"
+                                             IsVisible="{Binding ActiveEditor, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

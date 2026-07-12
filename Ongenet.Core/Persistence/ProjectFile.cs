@@ -3,13 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Automation;
+using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Audio.Parameters;
+using Ongenet.Core.Audio.Scheduling;
 using Ongenet.Core.Models.Audio;
+using Ongenet.Core.Music;
+using Ongenet.Core.Music;
+using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Core.Persistence;
 
@@ -23,9 +29,8 @@ namespace Ongenet.Core.Persistence;
 public static class ProjectFile
 {
     /// <summary>Bumped whenever the on-disk layout changes. Newer files opened in an older app degrade gracefully.</summary>
-    /// <remarks>v2: instrument tracks store an instrument rack (a list of slots, each with its own effect
-    /// chain) instead of a single optional instrument. v1 files load as a one-slot rack.</remarks>
-    public const int FormatVersion = 2;
+    /// <remarks>v2: instrument rack. v3: track routing. v4: patterns, session, warp, takes, multi-out, MPE/groove/drum. v5: pattern tracks, pattern row metadata. v6: ARA pitch offset. v7: poly pitch segments.</remarks>
+    public const int FormatVersion = 7;
 
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("ONGENPRJ"); // 8 bytes
     private const string ManifestEntry = "ongen.manifest";
@@ -98,6 +103,175 @@ public static class ProjectFile
         // MIDI-controller mappings: a trailing self-describing chunk so older readers (which stop after
         // the tracks) ignore it, and newer readers skip it gracefully when an old file lacks it.
         WriteMidiMappings(w, p);
+        WriteProjectExtensions(w, p);
+    }
+
+    private static void WriteProjectExtensions(OngenWriter w, Project p)
+    {
+        w.WriteChunk(c =>
+        {
+            // Patterns
+            c.WriteInt(p.Patterns.Count);
+            foreach (var pat in p.Patterns) WritePattern(c, pat);
+
+            c.WriteInt(p.PatternClips.Count);
+            foreach (var pc in p.PatternClips)
+            {
+                c.WriteGuid(pc.Id);
+                c.WriteGuid(pc.PatternId);
+                c.WriteGuid(pc.TrackId);
+                c.WriteDouble(pc.StartBeat);
+                c.WriteDouble(pc.LengthBeats);
+            }
+
+            // Session clips
+            c.WriteInt(p.SessionClips.Count);
+            foreach (var sc in p.SessionClips)
+            {
+                c.WriteGuid(sc.Id);
+                c.WriteGuid(sc.TrackId);
+                c.WriteInt(sc.SceneIndex);
+                c.WriteString(sc.Name);
+                c.WriteDouble(sc.LengthBeats);
+                c.WriteInt((int)sc.LaunchMode);
+                c.WriteNullableGuid(sc.SourceClipId);
+            }
+
+            // Multi-out routes
+            c.WriteInt(p.MultiOutputRoutes.Count);
+            foreach (var r in p.MultiOutputRoutes)
+            {
+                c.WriteGuid(r.SourceTrackId);
+                c.WriteInt(r.SlotIndex);
+                c.WriteInt(r.PluginOutputBus);
+                c.WriteGuid(r.DestinationTrackId);
+                c.WriteDouble(r.Level);
+            }
+
+            // MPE
+            c.WriteBool(p.Mpe.Enabled);
+            c.WriteInt(p.Mpe.MasterChannel);
+            c.WriteInt(p.Mpe.MemberChannelStart);
+            c.WriteInt(p.Mpe.MemberChannelCount);
+
+            // Active groove (optional)
+            if (p.ActiveGroove is { } g)
+            {
+                c.WriteBool(true);
+                c.WriteGuid(g.Id);
+                c.WriteString(g.Name);
+                c.WriteDouble(g.SwingAmount);
+                c.WriteInt(g.Division);
+            }
+            else c.WriteBool(false);
+
+            // Drum maps
+            c.WriteInt(p.DrumMaps.Count);
+            foreach (var dm in p.DrumMaps) WriteDrumMap(c, dm);
+
+            // Video tracks
+            c.WriteInt(p.VideoTracks.Count);
+            foreach (var vt in p.VideoTracks)
+            {
+                c.WriteGuid(vt.Id);
+                c.WriteString(vt.FilePath);
+                c.WriteDouble(vt.OffsetSeconds);
+                c.WriteDouble(vt.Fps);
+                c.WriteBool(vt.Muted);
+            }
+
+            c.WriteInt((int)p.PlaybackMode);
+            c.WriteDouble(p.LaunchQuantizeBeats);
+
+            c.WriteInt(p.SessionClips.Count);
+            foreach (var sc in p.SessionClips)
+            {
+                c.WriteInt((int)sc.FollowAction);
+                c.WriteDouble(sc.LaunchQuantizeBeats);
+            }
+
+            c.WriteInt(p.Markers.Count);
+            foreach (var m in p.Markers)
+            {
+                c.WriteGuid(m.Id);
+                c.WriteString(m.Name);
+                c.WriteDouble(m.Beat);
+            }
+
+            c.WriteInt(p.ArrangementSections.Count);
+            foreach (var section in p.ArrangementSections)
+            {
+                c.WriteGuid(section.Id);
+                c.WriteGuid(section.MarkerId);
+            }
+
+            c.WriteInt(p.KeyRootPitchClass);
+            c.WriteInt((int)p.KeyScale);
+        });
+    }
+
+    private static void WritePattern(OngenWriter w, Pattern pat)
+    {
+        w.WriteChunk(c =>
+        {
+            c.WriteGuid(pat.Id);
+            c.WriteString(pat.Name);
+            c.WriteDouble(pat.LengthBeats);
+            c.WriteInt(pat.ColorIndex);
+            c.WriteInt(pat.Channels.Count);
+            foreach (var ch in pat.Channels)
+            {
+                c.WriteGuid(ch.Id);
+                c.WriteInt(ch.Order);
+                c.WriteInt((int)ch.SourceKind);
+                c.WriteGuid(ch.TrackId);
+                c.WriteNullableGuid(ch.SampleClipId);
+                c.WriteString(ch.Name);
+                c.WriteBool(ch.Muted);
+                c.WriteDouble(ch.Volume);
+                c.WriteDouble(ch.Pan);
+            }
+
+            c.WriteInt(pat.StepSequences.Count);
+            foreach (var seq in pat.StepSequences) WriteStepSequence(c, seq);
+        });
+    }
+
+    private static void WriteStepSequence(OngenWriter w, StepSequence seq)
+    {
+        w.WriteChunk(c =>
+        {
+            c.WriteGuid(seq.Id);
+            c.WriteGuid(seq.PatternChannelId);
+            c.WriteInt(seq.StepCount);
+            c.WriteInt(seq.Steps.Count);
+            foreach (var s in seq.Steps)
+            {
+                c.WriteBool(s.Active);
+                c.WriteInt(s.Note);
+                c.WriteFloat(s.Velocity);
+                c.WriteFloat(s.Pan);
+                c.WriteFloat(s.Probability);
+                c.WriteInt(s.MicroTimingTicks);
+            }
+        });
+    }
+
+    private static void WriteDrumMap(OngenWriter w, DrumMap dm)
+    {
+        w.WriteChunk(c =>
+        {
+            c.WriteGuid(dm.Id);
+            c.WriteString(dm.Name);
+            c.WriteInt(dm.Entries.Count);
+            foreach (var e in dm.Entries)
+            {
+                c.WriteInt(e.Note);
+                c.WriteString(e.Label);
+                c.WriteNullableGuid(e.SampleClipId);
+                c.WriteFloat(e.VelocityScale);
+            }
+        });
     }
 
     private static void WriteMidiMappings(OngenWriter w, Project p)
@@ -163,6 +337,9 @@ public static class ProjectFile
                 ComponentSerializer.WriteComponent(c, inst.TypeId, inst, inst.Parameters, store, slot.Enabled, inst as ISampleHost);
                 c.WriteInt(slot.Effects.Count);
                 foreach (var e in slot.Effects) ComponentSerializer.WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
+                // v4 slot routing (trailing per slot when fileVersion >= 4 handled at read; always write for v4+)
+                c.WriteInt(slot.OutputBusIndex);
+                c.WriteNullableGuid(slot.OutputTrackId);
             }
 
             c.WriteInt(t.Effects.Count);
@@ -173,7 +350,63 @@ public static class ProjectFile
 
             c.WriteInt(t.Clips.Count);
             foreach (var clip in t.Clips) WriteClip(c, clip, store);
+
+            // v3 routing (trailing — older readers stop after clips).
+            c.WriteInt((int)t.OutputTarget);
+            c.WriteNullableGuid(t.OutputBusId);
+            c.WriteBool(t.RouteToMaster);
+            c.WriteInt(t.Sends.Count);
+            foreach (var send in t.Sends)
+            {
+                c.WriteGuid(send.Id);
+                c.WriteGuid(send.TargetTrackId);
+                c.WriteDouble(send.Level);
+                c.WriteBool(send.PreFader);
+                c.WriteBool(send.Enabled);
+            }
+
+            // v4 take lanes
+            c.WriteInt(t.TakeLanes.Count);
+            foreach (var lane in t.TakeLanes)
+            {
+                c.WriteGuid(lane.Id);
+                c.WriteString(lane.Name);
+                c.WriteBool(lane.IsExpanded);
+                c.WriteInt(lane.Takes.Count);
+                foreach (var take in lane.Takes)
+                {
+                    c.WriteGuid(take.Id);
+                    c.WriteGuid(take.ClipId);
+                    c.WriteBool(take.IsSelected);
+                    c.WriteDouble(take.StartBeat);
+                    c.WriteDouble(take.LengthBeats);
+                }
+            }
+
+            c.WriteDouble(t.SurroundWidth);
+            c.WriteNullableGuid(t.ActivePatternId);
+            c.WriteNullableGuid(t.DrumMapId);
+            c.WriteBool(t.IsFrozen);
+            c.WriteBool(t.RouteToExternalMidi);
+            c.WriteInt(t.ExternalMidiChannel);
+            c.WriteNullableGuid(t.ActiveTakeLaneId);
+
+            c.WriteInt(t.Modulators.Count);
+            foreach (var mod in t.Modulators) WriteModulator(c, mod);
         });
+    }
+
+    private static void WriteModulator(OngenWriter c, TrackModulator mod)
+    {
+        c.WriteGuid(mod.Id);
+        c.WriteInt((int)mod.Kind);
+        c.WriteBool(mod.Enabled);
+        c.WriteDouble(mod.RateHz);
+        c.WriteDouble(mod.Depth);
+        c.WriteInt((int)mod.Wave);
+        c.WriteInt((int)mod.Target.Kind);
+        c.WriteInt(mod.Target.EffectIndex);
+        c.WriteInt(mod.Target.ParamIndex);
     }
 
     private static void WriteAutoLane(OngenWriter w, AutomationLane lane)
@@ -224,6 +457,29 @@ public static class ProjectFile
             // up via ChunkHasMore.
             c.WriteBool(clip.PitchCorrected);
             c.WriteString(clip.SourceKey ?? "");
+
+            // v4 warp markers
+            c.WriteInt((int)clip.WarpMode);
+            c.WriteInt(clip.WarpMarkers.Count);
+            foreach (var wm in clip.WarpMarkers)
+            {
+                c.WriteDouble(wm.SourceSeconds);
+                c.WriteDouble(wm.BeatPosition);
+            }
+
+            c.WriteDouble(clip.UserFadeInBeats);
+            c.WriteDouble(clip.UserFadeOutBeats);
+            c.WriteBool(clip.HasAraRegion);
+            c.WriteDouble(clip.AraPitchOffsetSemitones);
+            c.WriteNullableGuid(clip.LinkedClipGroupId);
+            c.WriteInt(clip.PitchSegments.Count);
+            foreach (var ps in clip.PitchSegments)
+            {
+                c.WriteLong(ps.StartSample);
+                c.WriteLong(ps.EndSample);
+                c.WriteDouble(ps.PitchCents);
+                c.WriteFloat(ps.Amplitude);
+            }
         });
     }
 
@@ -287,6 +543,8 @@ public static class ProjectFile
 
             // Optional trailing MIDI-mappings chunk (absent in files saved before this feature).
             if (r.HasMore) r.ReadChunk(c => ReadMidiMappings(c, project));
+
+            if (r.HasMore) r.ReadChunk(c => ReadProjectExtensions(c, project, fileVersion));
         }
 
         return new LoadResult(project, loopStart, loopEnd, startBeat, warnings, fromNewer);
@@ -332,6 +590,11 @@ public static class ProjectFile
                     var slot = new InstrumentSlot(inst) { Enabled = enabled };
                     foreach (var sfx in slotFx) slot.Effects.Add(sfx);
                     slot.CommitEffects();
+                    if (fileVersion >= 4)
+                    {
+                        slot.OutputBusIndex = c.ReadInt();
+                        slot.OutputTrackId = c.ReadNullableGuid();
+                    }
                     track.Instruments.Add(slot);
                 }
             }
@@ -356,14 +619,95 @@ public static class ProjectFile
             var clipCount = c.ReadInt();
             for (var i = 0; i < clipCount; i++)
                 track.Clips.Add(ReadClip(c, samples));
+
+            // v3 routing (optional trailing fields).
+            if (fileVersion >= 3 && c.ChunkHasMore)
+            {
+                track.OutputTarget = (TrackOutputTarget)c.ReadInt();
+                track.OutputBusId = c.ReadNullableGuid();
+                track.RouteToMaster = c.ReadBool();
+                var sendCount = c.ReadInt();
+                for (var i = 0; i < sendCount; i++)
+                {
+                    track.Sends.Add(new TrackSend
+                    {
+                        Id = c.ReadGuid(),
+                        TargetTrackId = c.ReadGuid(),
+                        Level = c.ReadDouble(),
+                        PreFader = c.ReadBool(),
+                        Enabled = c.ReadBool()
+                    });
+                }
+            }
+
+            if (c.ChunkHasMore)
+            {
+                var takeLaneCount = c.ReadInt();
+                for (var i = 0; i < takeLaneCount; i++)
+                {
+                    var lane = new TakeLane
+                    {
+                        Id = c.ReadGuid(),
+                        Name = c.ReadString(),
+                        IsExpanded = c.ReadBool()
+                    };
+                    var takeCount = c.ReadInt();
+                    for (var j = 0; j < takeCount; j++)
+                    {
+                        lane.Takes.Add(new Take
+                        {
+                            Id = c.ReadGuid(),
+                            ClipId = c.ReadGuid(),
+                            IsSelected = c.ReadBool(),
+                            StartBeat = c.ReadDouble(),
+                            LengthBeats = c.ReadDouble()
+                        });
+                    }
+                    track.TakeLanes.Add(lane);
+                }
+            }
+
+            if (c.ChunkHasMore)
+                track.SurroundWidth = c.ReadDouble();
+            if (c.ChunkHasMore)
+                track.ActivePatternId = c.ReadNullableGuid();
+            if (c.ChunkHasMore)
+                track.DrumMapId = c.ReadNullableGuid();
+            if (c.ChunkHasMore)
+                track.IsFrozen = c.ReadBool();
+            if (c.ChunkHasMore)
+                track.RouteToExternalMidi = c.ReadBool();
+            if (c.ChunkHasMore)
+                track.ExternalMidiChannel = c.ReadInt();
+            if (c.ChunkHasMore)
+                track.ActiveTakeLaneId = c.ReadNullableGuid();
+            if (c.ChunkHasMore)
+            {
+                var modCount = c.ReadInt();
+                for (var i = 0; i < modCount; i++)
+                    track.Modulators.Add(ReadModulator(c));
+            }
         });
 
         // Populate the audio-thread snapshots the engine reads.
         track.CommitInstruments();
         track.CommitEffects();
         track.CommitAutoLanes();
+        track.CommitModulators();
         return track;
     }
+
+    private static TrackModulator ReadModulator(OngenReader c)
+        => new()
+        {
+            Id = c.ReadGuid(),
+            Kind = (TrackModulatorKind)c.ReadInt(),
+            Enabled = c.ReadBool(),
+            RateHz = c.ReadDouble(),
+            Depth = c.ReadDouble(),
+            Wave = (LfoWave)c.ReadInt(),
+            Target = new AutomationBinding((AutomationTargetKind)c.ReadInt(), c.ReadInt(), c.ReadInt())
+        };
 
     private static AutomationLane? ReadAutoLane(OngenReader r, Track track, List<string> warnings, Project? project)
     {
@@ -492,8 +836,273 @@ public static class ProjectFile
                 var key = c.ReadString();
                 clip.SourceKey = key.Length > 0 ? key : null;
             }
+
+            if (c.ChunkHasMore)
+            {
+                clip.WarpMode = (WarpMode)c.ReadInt();
+                var wmCount = c.ReadInt();
+                for (var i = 0; i < wmCount; i++)
+                {
+                    clip.WarpMarkers.Add(new WarpMarker
+                    {
+                        SourceSeconds = c.ReadDouble(),
+                        BeatPosition = c.ReadDouble()
+                    });
+                }
+            }
+
+            if (c.ChunkHasMore)
+            {
+                clip.UserFadeInBeats = c.ReadDouble();
+                clip.UserFadeOutBeats = c.ReadDouble();
+            }
+
+            if (c.ChunkHasMore) clip.HasAraRegion = c.ReadBool();
+            if (c.ChunkHasMore) clip.AraPitchOffsetSemitones = c.ReadDouble();
+            if (c.ChunkHasMore) clip.LinkedClipGroupId = c.ReadNullableGuid();
+            if (c.ChunkHasMore)
+            {
+                var segCount = c.ReadInt();
+                for (var i = 0; i < segCount; i++)
+                {
+                    clip.PitchSegments.Add(new PitchNoteSegment
+                    {
+                        StartSample = c.ReadLong(),
+                        EndSample = c.ReadLong(),
+                        PitchCents = c.ReadDouble(),
+                        Amplitude = c.ReadFloat()
+                    });
+                }
+            }
         });
         return clip;
+    }
+
+    private static void ReadProjectExtensions(OngenReader c, Project project, int fileVersion)
+    {
+        var patCount = c.ReadInt();
+        for (var i = 0; i < patCount; i++)
+        {
+            Pattern? pat = null;
+            c.ReadChunk(pc =>
+            {
+                pat = new Pattern { Id = pc.ReadGuid() };
+                pat.Name = pc.ReadString();
+                pat.LengthBeats = pc.ReadDouble();
+                pat.ColorIndex = pc.ReadInt();
+                var chCount = pc.ReadInt();
+                for (var j = 0; j < chCount; j++)
+                {
+                    var chId = pc.ReadGuid();
+                    PatternChannel ch;
+                    if (fileVersion >= 5)
+                    {
+                        ch = new PatternChannel
+                        {
+                            Id = chId,
+                            Order = pc.ReadInt(),
+                            SourceKind = (PatternRowSourceKind)pc.ReadInt(),
+                            TrackId = pc.ReadGuid(),
+                            SampleClipId = pc.ReadNullableGuid(),
+                            Name = pc.ReadString(),
+                            Muted = pc.ReadBool(),
+                            Volume = pc.ReadDouble(),
+                            Pan = pc.ReadDouble()
+                        };
+                    }
+                    else
+                    {
+                        ch = new PatternChannel
+                        {
+                            Id = chId,
+                            Order = j,
+                            TrackId = pc.ReadGuid(),
+                            Name = pc.ReadString(),
+                            Muted = pc.ReadBool(),
+                            Volume = pc.ReadDouble(),
+                            Pan = pc.ReadDouble()
+                        };
+                    }
+                    pat.Channels.Add(ch);
+                }
+                var seqCount = pc.ReadInt();
+                for (var j = 0; j < seqCount; j++)
+                    pat.StepSequences.Add(ReadStepSequence(pc));
+            });
+            if (pat is not null) project.Patterns.Add(pat);
+        }
+
+        var pcCount = c.ReadInt();
+        for (var i = 0; i < pcCount; i++)
+        {
+            project.PatternClips.Add(new PatternClip
+            {
+                Id = c.ReadGuid(),
+                PatternId = c.ReadGuid(),
+                TrackId = c.ReadGuid(),
+                StartBeat = c.ReadDouble(),
+                LengthBeats = c.ReadDouble()
+            });
+        }
+
+        var scCount = c.ReadInt();
+        for (var i = 0; i < scCount; i++)
+        {
+            project.SessionClips.Add(new SessionClip
+            {
+                Id = c.ReadGuid(),
+                TrackId = c.ReadGuid(),
+                SceneIndex = c.ReadInt(),
+                Name = c.ReadString(),
+                LengthBeats = c.ReadDouble(),
+                LaunchMode = (SessionLaunchMode)c.ReadInt(),
+                SourceClipId = c.ReadNullableGuid()
+            });
+        }
+
+        var moCount = c.ReadInt();
+        for (var i = 0; i < moCount; i++)
+        {
+            project.MultiOutputRoutes.Add(new MultiOutputRoute
+            {
+                SourceTrackId = c.ReadGuid(),
+                SlotIndex = c.ReadInt(),
+                PluginOutputBus = c.ReadInt(),
+                DestinationTrackId = c.ReadGuid(),
+                Level = c.ReadDouble()
+            });
+        }
+
+        project.Mpe.Enabled = c.ReadBool();
+        project.Mpe.MasterChannel = c.ReadInt();
+        project.Mpe.MemberChannelStart = c.ReadInt();
+        project.Mpe.MemberChannelCount = c.ReadInt();
+
+        if (c.ReadBool())
+        {
+            project.ActiveGroove = new GrooveTemplate
+            {
+                Id = c.ReadGuid(),
+                Name = c.ReadString(),
+                SwingAmount = c.ReadDouble(),
+                Division = c.ReadInt()
+            };
+        }
+
+        var dmCount = c.ReadInt();
+        for (var i = 0; i < dmCount; i++)
+        {
+            DrumMap? dm = null;
+            c.ReadChunk(dc =>
+            {
+                dm = new DrumMap { Id = dc.ReadGuid(), Name = dc.ReadString() };
+                var ec = dc.ReadInt();
+                for (var j = 0; j < ec; j++)
+                {
+                    dm.Entries.Add(new DrumMapEntry
+                    {
+                        Note = dc.ReadInt(),
+                        Label = dc.ReadString(),
+                        SampleClipId = dc.ReadNullableGuid(),
+                        VelocityScale = dc.ReadFloat()
+                    });
+                }
+            });
+            if (dm is not null) project.DrumMaps.Add(dm);
+        }
+
+        if (c.ChunkHasMore)
+        {
+            var vtCount = c.ReadInt();
+            for (var i = 0; i < vtCount; i++)
+            {
+                project.VideoTracks.Add(new Models.Media.VideoTrack
+                {
+                    Id = c.ReadGuid(),
+                    FilePath = c.ReadString(),
+                    OffsetSeconds = c.ReadDouble(),
+                    Fps = c.ReadDouble(),
+                    Muted = c.ReadBool()
+                });
+            }
+        }
+
+        if (c.ChunkHasMore)
+        {
+            project.PlaybackMode = (PlaybackMode)c.ReadInt();
+            project.LaunchQuantizeBeats = c.ReadDouble();
+        }
+
+        if (c.ChunkHasMore)
+        {
+            var faCount = c.ReadInt();
+            for (var i = 0; i < faCount && i < project.SessionClips.Count; i++)
+            {
+                project.SessionClips[i].FollowAction = (FollowAction)c.ReadInt();
+                project.SessionClips[i].LaunchQuantizeBeats = c.ReadDouble();
+            }
+        }
+
+        if (c.ChunkHasMore)
+        {
+            var markerCount = c.ReadInt();
+            for (var i = 0; i < markerCount; i++)
+            {
+                project.Markers.Add(new ArrangementMarker
+                {
+                    Id = c.ReadGuid(),
+                    Name = c.ReadString(),
+                    Beat = c.ReadDouble()
+                });
+            }
+        }
+
+        if (c.ChunkHasMore)
+        {
+            var sectionCount = c.ReadInt();
+            for (var i = 0; i < sectionCount; i++)
+            {
+                project.ArrangementSections.Add(new ArrangementSection
+                {
+                    Id = c.ReadGuid(),
+                    MarkerId = c.ReadGuid()
+                });
+            }
+        }
+
+        if (c.ChunkHasMore)
+        {
+            project.KeyRootPitchClass = c.ReadInt();
+            project.KeyScale = (ScaleType)c.ReadInt();
+        }
+    }
+
+    private static StepSequence ReadStepSequence(OngenReader c)
+    {
+        StepSequence? seq = null;
+        c.ReadChunk(sc =>
+        {
+            seq = new StepSequence
+            {
+                Id = sc.ReadGuid(),
+                PatternChannelId = sc.ReadGuid(),
+                StepCount = sc.ReadInt()
+            };
+            var stepCount = sc.ReadInt();
+            for (var i = 0; i < stepCount; i++)
+            {
+                seq.Steps.Add(new StepData
+                {
+                    Active = sc.ReadBool(),
+                    Note = sc.ReadInt(),
+                    Velocity = sc.ReadFloat(),
+                    Pan = sc.ReadFloat(),
+                    Probability = sc.ReadFloat(),
+                    MicroTimingTicks = sc.ReadInt()
+                });
+            }
+        });
+        return seq ?? new StepSequence();
     }
 
     private static bool MagicMatches(byte[] read)

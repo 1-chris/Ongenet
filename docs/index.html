@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ongenet — free, open-source DAW for Linux, Windows &amp; macOS</title>
-<meta name="description" content="Ongenet is a free, open-source digital audio workstation (DAW) for Linux, Windows and macOS. Arrange MIDI and audio, host CLAP/LV2/VST plugins, automate mixes, render clips to new tracks, and export offline — built on Avalonia and .NET 10.">
-<meta name="keywords" content="Ongenet, DAW, digital audio workstation, open source, free DAW, music production, MIDI, audio, Linux DAW, Windows DAW, macOS DAW, VST, CLAP, LV2, Avalonia">
+<meta name="description" content="Ongenet is a free, open-source digital audio workstation (DAW) for Linux, Windows and macOS. Arrange, mix, session clips, step patterns, polyphonic pitch editing, C# scripting, optional plugin isolation, CLAP/LV2/VST hosting — MIT licensed.">
+<meta name="keywords" content="Ongenet, DAW, digital audio workstation, open source, free DAW, music production, MIDI, audio, Linux DAW, Windows DAW, macOS DAW, VST, CLAP, LV2, Avalonia, session view, step sequencer, Ableton Link, mixer">
 <meta name="author" content="Ongenet">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#1e1e2e">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Ongenet">
 <meta property="og:title" content="Ongenet — free, open-source DAW">
-<meta property="og:description" content="A modern, native DAW for Linux, Windows and macOS. Free and open source (MIT). Arrange, mix, automate, render clips to new tracks, and try it in your browser.">
+<meta property="og:description" content="A modern, native DAW for Linux, Windows and macOS. Free and open source (MIT). Arrange, mix with sends, launch session clips, export offline, and try it in your browser.">
 <meta property="og:url" content="https://onge.net/">
 <meta property="og:image" content="https://onge.net/caps/Ongenet_Mocha.png">
 <meta property="og:image:alt" content="Screenshot of the Ongenet main window with timeline, transport and instrument editor.">
@@ -34,7 +34,7 @@
   "applicationCategory": "MultimediaApplication",
   "applicationSubCategory": "Digital Audio Workstation",
   "operatingSystem": "Windows, macOS, Linux",
-  "description": "Free, open-source digital audio workstation for arranging MIDI and audio, hosting plugins, automating mixes, and offline export.",
+  "description": "Free, open-source digital audio workstation: arrange, mix, session clips, step patterns, polyphonic pitch editing, C# scripting, optional plugin crash isolation, CLAP/LV2/VST hosting, offline export, Ableton Link sync.",
   "url": "https://onge.net/",
   "downloadUrl": "https://github.com/1-chris/Ongenet/releases",
   "codeRepository": "https://github.com/1-chris/Ongenet",
@@ -59,10 +59,22 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
 
 <!-- ===== Top bar ===== -->
 <div class="topbar">
-  <div class="wrap">
+  <div class="wrap topbar-inner">
     <div class="brand">Ongenet<span class="dot">.</span></div>
-    <div class="topbar-right">
-      <div class="theme-switcher" id="theme-switcher">
+    <nav class="navlinks" aria-label="Page sections">
+      <a href="#workspace">Workspace</a>
+      <a href="#arrangement">Arrangement</a>
+      <a href="#piano-roll">Piano roll</a>
+      <a href="#field">Field</a>
+      <a href="#effects-rack">Effects</a>
+      <a href="#instruments">Instruments</a>
+      <a href="#mixer">Mixer</a>
+      <a href="#session">Session</a>
+      <a href="#features">Features</a>
+      <a href="app/">Web demo</a>
+      <a href="https://github.com/1-chris/Ongenet/releases">Download</a>
+    </nav>
+    <div class="theme-switcher" id="theme-switcher">
         <button class="theme-btn" id="theme-btn" type="button"
                 aria-label="Theme" aria-haspopup="true" aria-expanded="false">
           <span class="swatch" aria-hidden="true"></span>
@@ -91,27 +103,16 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
           </button>
         </div>
       </div>
-      <nav class="navlinks" aria-label="Page sections">
-        <a href="#workspace">Workspace</a>
-        <a href="#arrangement">Arrangement</a>
-        <a href="#piano-roll">Piano roll</a>
-        <a href="#field">Field</a>
-        <a href="#effects-rack">Effects</a>
-        <a href="#instruments">Instruments</a>
-        <a href="#features">Features</a>
-        <a href="app/">Web demo</a>
-        <a href="https://github.com/1-chris/Ongenet/releases">Download</a>
-      </nav>
-    </div>
   </div>
 </div>
 
 <!-- ===== Hero ===== -->
 <header class="wrap hero">
   <h1>Ongenet</h1>
-  <p class="tag">A free, open-source Digital Audio Workstation.</p>
-  <p class="sub">MIT-licensed and free to download, modify and share &middot; built on Avalonia and .NET 10
-     &middot; Linux, Windows &amp; macOS &middot; four Catppuccin flavours, switchable live in-app and on this page.</p>
+  <p class="tag">A free, open-source DAW for beat-making, songwriting, and hybrid live/arrange work.</p>
+  <p class="sub">MIT-licensed — free to download, modify and share, with no account or subscription.
+     Built on Avalonia and .NET 10 &middot; Linux, Windows &amp; macOS &middot; four Catppuccin flavours,
+     switchable live in-app and on this page.</p>
   <div class="cta">
     <a class="btn btn-primary" href="https://github.com/1-chris/Ongenet/releases">⬇ Download</a>
     <a class="btn btn-ghost" href="app/">▶ Try it in your browser</a>
@@ -145,7 +146,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
           <li><strong>Transport bar</strong> — Play, Stop, Record, tempo, bars, time signature, offline Render and a stereo master loudness meter.</li>
           <li><strong>Left inspector</strong> — Track Controls and Project Clips tabs; toggle with the ◂/▸ button.</li>
           <li><strong>Centre timeline</strong> — The arrange view with bar ruler, track headers, clips and a moving playhead.</li>
-          <li><strong>Right library</strong> — Browser tabs for Projects, Files, Samples, Soundfonts, Instruments, Effects, presets and FX chains; starts collapsed to a tab strip.</li>
+          <li><strong>Right library</strong> — Browser tabs for Projects (built-in demo songs), Files, Samples, Soundfonts, Instruments, Effects, Inst/FX Presets (your saved <code>.ongenpreset</code> library), and FX chains; starts collapsed to a tab strip.</li>
           <li><strong>Bottom editors</strong> — Instrument, Piano Roll and Effects tabs; drag the 4px splitters between regions to resize.</li>
         </ul>
       </div>
@@ -184,6 +185,65 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
         <img class="theme-cap" data-cap="Timeline" src="caps/Timeline_Mocha.png"
              alt="Ongenet arrange view with grouped tracks, clips and automation lanes." loading="lazy">
         <figcaption class="cap">Grouped tracks, colour-coded clips and per-track automation lanes.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===== Mixer ===== -->
+  <section id="mixer">
+    <div class="section-head">
+      <div class="kicker">Mix</div>
+      <h2>Mixer &amp; sends</h2>
+      <p>A dedicated mixer view with channel strips, live metering and auxiliary sends to return buses —
+         with plugin delay compensation so every path meets the master in phase.</p>
+    </div>
+    <div class="showcase reverse">
+      <div class="showcase-copy">
+        <h3>Mix like a console</h3>
+        <p>Switch from the arrange timeline to the Mixer tab for a strip-by-strip overview of the whole
+           project — groups, returns and the master included.</p>
+        <ul>
+          <li>Per-track volume, constant-power pan, mute and solo with peak metering on every strip.</li>
+          <li><strong>Aux sends</strong> — pre- or post-fader taps into return tracks for parallel reverb, delay and FX.</li>
+          <li><strong>PDC</strong> — latency-reporting plugins are delay-compensated automatically on live playback and offline export.</li>
+          <li>Return buses run their own insert chains and sum back into the group/master tree.</li>
+          <li>Sidechain ducking and vocoder carrier reads remain separate cross-track taps (not sends).</li>
+        </ul>
+      </div>
+      <figure class="shot showcase-shot">
+        <img class="theme-cap" data-cap="Mixer" src="caps/Mixer_Mocha.png"
+             alt="Ongenet mixer view with channel strips and send controls." loading="lazy"
+             onerror="this.style.display='none'">
+        <figcaption class="cap">Mixer — channel strips, meters and aux sends.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===== Session ===== -->
+  <section id="session">
+    <div class="section-head">
+      <div class="kicker">Perform</div>
+      <h2>Session view</h2>
+      <p>An Ableton-style clip launcher for live performance and loop-based writing — with Arrangement,
+         Session-only and Hybrid playback modes.</p>
+    </div>
+    <div class="showcase">
+      <div class="showcase-copy">
+        <h3>Launch clips on the grid</h3>
+        <p>Session clips reference arrangement clips and fire with Trigger, Gate, Toggle or Repeat launch
+           modes. Scene columns launch every track at once.</p>
+        <ul>
+          <li>Clip grid aligned to tracks and scenes; launch quantize snaps starts to the beat grid.</li>
+          <li><strong>Hybrid mode</strong> plays the timeline arrangement while session clips overdub on top.</li>
+          <li>Stop individual clips, whole tracks, or everything with one click.</li>
+          <li>Same engine path as the timeline — sends, PDC, automation and plugin hosting all apply.</li>
+        </ul>
+      </div>
+      <figure class="shot showcase-shot">
+        <img class="theme-cap" data-cap="Session" src="caps/Session_Mocha.png"
+             alt="Ongenet session view clip launcher grid." loading="lazy"
+             onerror="this.style.display='none'">
+        <figcaption class="cap">Session view — clip launcher grid with scene columns.</figcaption>
       </figure>
     </div>
   </section>
@@ -450,6 +510,66 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
          with sample-accurate sequencing.</p>
     </div>
 
+    <div class="feature" style="border-left-color:var(--lavender)">
+      <h3>Channel rack &amp; step sequencer</h3>
+      <p>Pattern-based drum and melodic programming in the spirit of FL Studio's channel rack.</p>
+      <ul>
+        <li><strong>Channel rack</strong> — overview of pattern channels with per-channel mute and pattern selection.</li>
+        <li><strong>Step sequencer</strong> — edit steps per channel; pattern clips on the timeline expand into MIDI via the pattern scheduler at playback time.</li>
+        <li>Patterns are shared objects — one pattern can drive multiple instrument tracks through channel routing.</li>
+      </ul>
+    </div>
+
+    <div class="feature" style="border-left-color:var(--blue)">
+      <h3>Offline export</h3>
+      <p>Bounce the mix faster than real time from the transport bar Export button.</p>
+      <ul>
+        <li>Master mix, per-track stems, or a beat region — WAV, FLAC, MP3, or OGG (16/24/32-bit where applicable).</li>
+        <li>Named arrangement markers can define export regions; optional ffmpeg video mux.</li>
+        <li>5.1 / 7.1 surround offline; live 5.1 monitoring (6+ channels) and 7.1 (8+ channels).</li>
+        <li>Honours automation, aux sends, plugin delay compensation, sidechain and effect tails.</li>
+        <li>Project-wide Standard MIDI File export from the transport bar.</li>
+      </ul>
+    </div>
+
+    <div class="feature" style="border-left-color:var(--lavender)">
+      <h3>Modern open-source desktop DAW</h3>
+      <p>Ongenet is a broad, engine-backed OSS DAW for beat-making, songwriting, vocal tuning, hybrid arrange/session work, and Field modular synthesis on Linux, Windows and macOS.</p>
+      <ul>
+        <li><strong>Production:</strong> hybrid arrange/session, comping, ripple edit, bounce in place, track freeze, polyphonic pitch editor, standalone audio editor, C# scripting, logical MIDI edit, audio-to-MIDI, tap tempo, section playlist, autosave recovery.</li>
+        <li><strong>Mix &amp; export:</strong> immersive surround panning, input monitoring, routing matrix, timeline XML handoff, stems/regions/surround offline, collaboration folder sync.</li>
+        <li><strong>Creativity:</strong> Field modular engine, Stuttero, step micro-timing, user groove pool, track modulators, nine built-in song templates.</li>
+        <li><strong>Pro I/O:</strong> CLAP/LV2/VST2/VST3/AU hosting with PDC and optional VST3 effect crash isolation; WASAPI exclusive mode; MIDI clock output; expression maps; control-surface learn; screen-reader labels; ADM BWF immersive export and timeline XML handoff for post pipelines.</li>
+      </ul>
+    </div>
+
+    <div class="feature" style="border-left-color:var(--green)">
+      <h3>Audio Editor &amp; pitch editing</h3>
+      <p>Edison-class standalone sample editor plus built-in VariAudio-class polyphonic pitch correction — no third-party Melodyne required.</p>
+      <ul>
+        <li><strong>Audio Editor</strong> — multitrack lanes, cut/copy/paste, spectral overlay, normalize, fades; open from View menu or clip context menu.</li>
+        <li><strong>Pitch Editor</strong> — analyze note segments, drag pitch per blob, real-time crossfaded playback; flatten to new audio clip.</li>
+      </ul>
+    </div>
+
+    <div class="feature" style="border-left-color:var(--teal)">
+      <h3>Scripting &amp; plugin isolation</h3>
+      <p>Extend the DAW with C# automation scripts and optionally sandbox VST3 effects in a child process.</p>
+      <ul>
+        <li><strong>Tools → Scripts</strong> — Roslyn host with curated project/transport API; factory scripts for tempo, rename, and quantize.</li>
+        <li><strong>Plugin isolation</strong> — Settings → General → Plugins; <code>Ongenet.PluginHost</code> child process for crash-safe VST3 effects.</li>
+      </ul>
+    </div>
+
+    <div class="feature" style="border-left-color:var(--mauve)">
+      <h3>Ableton Link</h3>
+      <p>Sync tempo and phase with other Link-enabled apps on the same network.</p>
+      <ul>
+        <li>Implemented in the isolated <code>Ongenet.Link</code> assembly (GPL) so the core app stays MIT-licensed.</li>
+        <li>Degrades gracefully to a no-op when the native Link library is not present.</li>
+      </ul>
+    </div>
+
     <div class="feature c-red">
       <h3>Sidechaining</h3>
       <p>A dedicated Sidechain effect with two ducking modes, driven by a lock-free cross-track signal bus.</p>
@@ -462,7 +582,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
     </div>
 
     <div class="feature" style="border-left-color:var(--maroon)">
-      <h3>Stuttero <span class="pill">new</span></h3>
+      <h3>Stuttero</h3>
       <p>A real-time stutter / beat-repeat performance effect in the spirit of Stutter Edit — our own,
          built right into the effect chain.</p>
       <ul>
@@ -488,9 +608,11 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
       <p>Capture MIDI and audio with a familiar arm &rarr; count-in &rarr; record flow.</p>
       <ul>
         <li>Per-track arm, a one-bar metronome count-in, and clips that grow live on the timeline as you play.</li>
-        <li>Audio-track input recording with a live-drawing waveform; independent input/output device selection (mono or stereo).</li>
+        <li>Audio-track input recording with a live-drawing waveform; per-track software input monitoring (Off/Auto/On).</li>
+        <li>Independent input/output device selection (mono or stereo).</li>
         <li>Play instruments live from a hardware MIDI controller, the on-screen keyboard, or an FL-style computer-keyboard layout.</li>
         <li>Optional input quantize snaps recorded notes to the grid (1/4 … 1/32, including triplets).</li>
+        <li>Transport <strong>Tap</strong> button sets BPM; optional MIDI clock output in Settings → Audio.</li>
       </ul>
     </div>
 
@@ -518,7 +640,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
     </div>
 
     <div class="feature" style="border-left-color:var(--sky)">
-      <h3>Plugins — CLAP, LV2, VST2 &amp; VST3 <span class="pill">new</span></h3>
+      <h3>Plugins — CLAP, LV2, VST2 &amp; VST3</h3>
       <p>Host your existing plugin collection. Every format is implemented from scratch — direct ABI
          interop, no wrapper libraries and no Steinberg SDK — and discovered at startup from the standard
          per-OS locations.</p>
@@ -533,7 +655,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
     </div>
 
     <div class="feature" style="border-left-color:var(--green)">
-      <h3>Render clip to new track <span class="pill">new</span></h3>
+      <h3>Render clip to new track</h3>
       <p>Flatten a clip in place — instruments, slot pre-FX, track post-FX and ancestor group buses — without
          leaving the arrange view.</p>
       <ul>
@@ -551,7 +673,9 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
         <li><strong>Live theming</strong> — 26 semantic tokens across Mocha, Macchiato, Frappé and Latte, a built-in theme editor in Settings and JSON import/export, all applied without a restart.</li>
         <li><strong>Undo / redo</strong> — snapshot-based history with a jump-to-any-point History window (Ctrl+Z / Ctrl+Y).</li>
         <li><strong>Single-file projects</strong> — the <code>.ongen</code> format bundles everything (samples de-duplicated) in one version-tolerant file.</li>
-        <li><strong>Offline export</strong> — render the whole arrangement to a WAV faster than real time, with automation, sidechain and effect tails honoured.</li>
+        <li><strong>Offline export</strong> — render the whole arrangement to a WAV faster than real time, with automation, sends, PDC, sidechain and effect tails honoured.</li>
+        <li><strong>Built-in projects</strong> — nine code-generated demo songs and templates under Library → Projects (First Light, Undertow, Ascension, Dust &amp; Vinyl, House Starter, Static Bloom, Techno Starter, Trap Beat, Field Modular), or <em>New ▾</em> in the title bar.</li>
+        <li><strong>Inst / FX Presets</strong> — your saved instrument, effect and chain presets as <code>.ongenpreset</code> files (including factory material copied into the user preset folder on first run).</li>
       </ul>
     </div>
   </section>
@@ -560,8 +684,9 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
   <section>
     <div class="band">
       <h2>Get Ongenet</h2>
-      <p>Free and open source under the MIT licence. Self-contained builds for Linux, Windows and macOS
-         are published on GitHub Releases — no runtime to install, no paywall, no account required.</p>
+      <p>Free and open source under the MIT licence — no runtime to install, no paywall, no account required.
+         Self-contained builds for Linux, Windows and macOS are published on GitHub Releases; the full
+         source is on GitHub for anyone to audit, fork or contribute to.</p>
       <a class="btn btn-primary" href="https://github.com/1-chris/Ongenet/releases">⬇ Go to downloads</a>
     </div>
   </section>

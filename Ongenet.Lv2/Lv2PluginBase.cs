@@ -25,11 +25,10 @@ namespace Ongenet.Lv2;
 /// keeps editable values independent of the native instance, so they survive the re-instantiation LV2
 /// requires on a sample-rate change (and lets parameters exist before the plugin is even loaded).
 ///
-/// GUI: v1 has no native plugin window (LV2 UIs are separate binaries with their own ABI). Plugins are
-/// edited through Ongenet's generic parameter inspector; <see cref="HasEditor"/> is false. The
-/// <see cref="IPluginEditor"/> members are the seam for native UI hosting in a later phase.
+/// GUI: v1 uses the generic parameter inspector; <see cref="TryOpenNativeUi"/> is the seam for
+/// embedding LV2 UI binaries (suil-equivalent) in a later phase.
 /// </summary>
-public abstract unsafe partial class Lv2PluginBase : IPluginEditor, IDisposable
+public abstract unsafe partial class Lv2PluginBase : IPluginEditor, IDisposable, ILatencyProvider
 {
     protected const int MaxBlock = 8192;
     private const int AtomBufferBytes = 1 << 16; // 64 KiB per atom port
@@ -88,6 +87,11 @@ public abstract unsafe partial class Lv2PluginBase : IPluginEditor, IDisposable
     private bool _activated;
     private double _instSampleRate;
     private bool _disposed;
+    private nint _latencyOutputCell;
+    private int _reportedLatencySamples;
+
+    /// <inheritdoc />
+    public int ReportedLatencySamples => _reportedLatencySamples;
 
     private IReadOnlyList<Parameter>? _parameters;
 
@@ -273,7 +277,9 @@ public abstract unsafe partial class Lv2PluginBase : IPluginEditor, IDisposable
                     }
                     else
                     {
-                        *cell = port.Default; // output control: connected but unused
+                        *cell = port.Default;
+                        if (string.Equals(port.Symbol, "latency", StringComparison.OrdinalIgnoreCase))
+                            _latencyOutputCell = (nint)cell;
                     }
 
                     buf = cell;
@@ -446,6 +452,9 @@ public abstract unsafe partial class Lv2PluginBase : IPluginEditor, IDisposable
 
         _desc->Run(_handle, (uint)frames);
         if (_workerIface != null && _workerIface->EndRun != null) _workerIface->EndRun(_handle);
+
+        if (_latencyOutputCell != 0)
+            _reportedLatencySamples = Math.Max(0, (int)*(float*)_latencyOutputCell);
 
         var outCount = _audioOut.Count;
         if (outCount == 0) return;

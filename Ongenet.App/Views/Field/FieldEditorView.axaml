@@ -10,16 +10,24 @@
              x:Class="Ongenet.App.Views.Field.FieldEditorView">
     <Grid RowDefinitions="Auto,*">
         <!-- Toolbar -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto" Margin="6" ColumnSpacing="8">
-            <TextBlock Grid.Column="0" Text="Preset" VerticalAlignment="Center"
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,Auto,Auto" Margin="6" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Text="{DynamicResource FieldEditor_Preset}" VerticalAlignment="Center"
                        Foreground="{StaticResource CatppuccinSubtext0}"/>
-            <ComboBox Grid.Column="1" Width="180" ItemsSource="{Binding PresetNames}"
+            <ComboBox Grid.Column="1" Width="160" ItemsSource="{Binding PresetNames}"
                       SelectedIndex="{Binding SelectedPreset, Mode=TwoWay}"
-                      PlaceholderText="Built-in patch…"/>
-            <TextBlock Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center"
+                      PlaceholderText="{DynamicResource FieldEditor_Built_in_patch}"/>
+            <Button Grid.Column="2" Content="{DynamicResource FieldEditor_Root}" IsVisible="{Binding CanExitGroup}"
+                    Click="OnExitGroup" Padding="8,2"/>
+            <TextBlock Grid.Column="3" Text="{Binding BreadcrumbText}" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext1}" FontSize="11"/>
+            <TextBlock Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Foreground="{StaticResource CatppuccinSubtext1}"
-                       Text="Middle-drag to pan · scroll to zoom · drag ports to connect · right-click to add"/>
-            <Button Grid.Column="3" Name="PopOutButton" Content="Pop out"/>
+                       Text="{DynamicResource FieldEditor_Middle_drag_pan_scroll_zoom_double_click_group_E}"/>
+            <TextBox Grid.Column="5" Width="120" PlaceholderText="{DynamicResource FieldEditor_Patch_name}"
+                     Text="{Binding PatchName, Mode=TwoWay}"/>
+            <Button Grid.Column="6" Content="{DynamicResource FieldEditor_Save_patch}" Click="OnSavePatch" Padding="8,2"/>
+            <Button Grid.Column="7" Content="{DynamicResource FieldEditor_Load_patch}" Click="OnLoadPatch" Padding="8,2" Margin="0,0,6,0"/>
+            <Button Grid.Column="8" Name="PopOutButton" Content="{DynamicResource FieldEditor_Pop_out}"/>
         </Grid>
 
         <!-- Body: palette | canvas | inspector -->
@@ -67,14 +75,14 @@
                         <!-- Resource loaders for sample / soundfont nodes -->
                         <StackPanel Spacing="4" Margin="0,4,0,0"
                                     IsVisible="{Binding SelectedIsSampleHost}">
-                            <Button Content="Load sample…" Name="LoadSampleButton" Click="OnLoadSample"
+                            <Button Content="{DynamicResource FieldEditor_Load_sample}" Name="LoadSampleButton" Click="OnLoadSample"
                                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                             <TextBlock Text="{Binding SelectedResourceStatus}" FontSize="10" TextWrapping="Wrap"
                                        Foreground="{StaticResource CatppuccinSubtext0}"/>
                         </StackPanel>
                         <StackPanel Spacing="4" Margin="0,4,0,0"
                                     IsVisible="{Binding SelectedIsSoundFont}">
-                            <Button Content="Load soundfont…" Name="LoadSoundFontButton" Click="OnLoadSoundFont"
+                            <Button Content="{DynamicResource FieldEditor_Load_soundfont}" Name="LoadSoundFontButton" Click="OnLoadSoundFont"
                                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                             <TextBlock Text="{Binding SelectedResourceStatus}" FontSize="10" TextWrapping="Wrap"
                                        Foreground="{StaticResource CatppuccinSubtext0}"/>
@@ -82,7 +90,7 @@
 
                         <panels:ParametersView DataContext="{Binding SelectedParameters}"
                                                Margin="0,6,0,0"/>
-                        <TextBlock Text="Select a node to edit its parameters."
+                        <TextBlock Text="{DynamicResource FieldEditor_Select_a_node_to_edit_its_parameters}"
                                    TextWrapping="Wrap" FontSize="11"
                                    Foreground="{StaticResource CatppuccinSubtext0}"
                                    IsVisible="{Binding !HasSelection}"/>

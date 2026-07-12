@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Field;
@@ -43,12 +44,15 @@ namespace Ongenet.App.ViewModels.Instruments
         private readonly Action<InstrumentSlotViewModel, string> _replacePresetWith;          // (target, presetPath)
         private readonly Action<InstrumentSlotViewModel, string, bool> _insertSoundFontRelative; // (target, sfPath, below)
         private readonly Action<InstrumentSlotViewModel, string> _replaceSoundFontWith;          // (target, sfPath)
+        private readonly IProjectService _project;
+        private readonly Guid _ownerTrackId;
 
         private readonly DispatcherTimer _previewTimer;
         private readonly List<ParameterViewModel> _subscribedParams = new();
         private float[] _previewBuffer = Array.Empty<float>();
 
-        public InstrumentSlotViewModel(InstrumentSlot slot, IAudioFileService audioFiles,
+        public InstrumentSlotViewModel(InstrumentSlot slot, Guid ownerTrackId, IProjectService project,
+            IAudioFileService audioFiles,
             ITransportService transport, IHistoryService history, IEffectRegistry effects, IPlaybackClock clock,
             Action notifyChanged, Action<InstrumentSlotViewModel> remove, Action<InstrumentSlotViewModel, int> move,
             Action<InstrumentSlotViewModel, string, bool> insertRelative, Action<InstrumentSlotViewModel, string> replaceWith,
@@ -56,6 +60,8 @@ namespace Ongenet.App.ViewModels.Instruments
             Action<InstrumentSlotViewModel, string, bool> insertSoundFontRelative, Action<InstrumentSlotViewModel, string> replaceSoundFontWith)
         {
             _slot = slot;
+            _ownerTrackId = ownerTrackId;
+            _project = project;
             _audioFiles = audioFiles;
             _transport = transport;
             _history = history;
@@ -79,10 +85,78 @@ namespace Ongenet.App.ViewModels.Instruments
             ToggleEnabledCommand = new RelayCommand(() => IsEnabled = !IsEnabled);
             MoveUpCommand = new RelayCommand(() => _move(this, -1));
             MoveDownCommand = new RelayCommand(() => _move(this, +1));
+            OpenZoneEditorCommand = new RelayCommand(OpenZoneEditor, () => HasZones);
 
             clock.Tick += OnPlaybackTick;
             RebuildParameters();
+            RebuildOutputRoutes();
             RenderPreview();
+        }
+
+        /// <summary>Plugin output bus index (0 = default stereo mix).</summary>
+        public int OutputBusIndex
+        {
+            get => _slot.OutputBusIndex;
+            set
+            {
+                if (_slot.OutputBusIndex == value) return;
+                _history.Capture("Change output bus");
+                _slot.OutputBusIndex = value;
+                SyncMultiOutputRoute();
+                OnPropertyChanged();
+                _notifyChanged();
+            }
+        }
+
+        /// <summary>When set, routes this slot to another track instead of the owner.</summary>
+        public Guid? OutputTrackId
+        {
+            get => _slot.OutputTrackId;
+            set
+            {
+                if (_slot.OutputTrackId == value) return;
+                _history.Capture("Change output route");
+                _slot.OutputTrackId = value;
+                SyncMultiOutputRoute();
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedOutputTrack));
+                _notifyChanged();
+            }
+        }
+
+        private void SyncMultiOutputRoute()
+        {
+            _project.Current.MultiOutputRoutes.RemoveAll(r =>
+                r.SourceTrackId == _ownerTrackId && r.PluginOutputBus == _slot.OutputBusIndex);
+            if (_slot.OutputTrackId is { } destId)
+            {
+                _project.Current.MultiOutputRoutes.Add(new MultiOutputRoute
+                {
+                    SourceTrackId = _ownerTrackId,
+                    PluginOutputBus = _slot.OutputBusIndex,
+                    DestinationTrackId = destId
+                });
+            }
+        }
+
+        public ObservableCollection<OutputRouteOption> OutputRouteOptions { get; } = new();
+
+        public OutputRouteOption? SelectedOutputTrack
+        {
+            get => OutputRouteOptions.FirstOrDefault(o => o.TrackId == OutputTrackId);
+            set => OutputTrackId = value?.TrackId;
+        }
+
+        private void RebuildOutputRoutes()
+        {
+            OutputRouteOptions.Clear();
+            OutputRouteOptions.Add(new OutputRouteOption(null, "(owner track)"));
+            foreach (var track in _project.Current.Tracks)
+            {
+                if (track.Id == _ownerTrackId || track.Kind == TrackKind.Master) continue;
+                OutputRouteOptions.Add(new OutputRouteOption(track.Id, track.Name));
+            }
+            OnPropertyChanged(nameof(SelectedOutputTrack));
         }
 
         public InstrumentSlot Slot => _slot;
@@ -96,6 +170,7 @@ namespace Ongenet.App.ViewModels.Instruments
         public RelayCommand ToggleEnabledCommand { get; }
         public RelayCommand MoveUpCommand { get; }
         public RelayCommand MoveDownCommand { get; }
+        public RelayCommand OpenZoneEditorCommand { get; }
 
         public bool IsFirst { get; set; }
         public bool IsLast { get; set; }
@@ -317,6 +392,20 @@ namespace Ongenet.App.ViewModels.Instruments
         public IReadOnlyList<SamplerRegion> SamplerZones => SamplerInst?.Regions ?? Array.Empty<SamplerRegion>();
         public bool HasZones => SamplerZones.Count > 0;
 
+        private void OpenZoneEditor()
+        {
+            if (SamplerInst is null || SamplerZones.Count == 0) return;
+            var vm = new SamplerZoneEditorViewModel();
+            vm.Load(SamplerInst);
+            var win = new Views.Windows.SamplerZoneEditorWindow { DataContext = vm };
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow is not null)
+                win.Show(desktop.MainWindow);
+            else
+                win.Show();
+        }
+
         private int _samplerRevision;
         public int SamplerRevision => _samplerRevision;
 
@@ -374,7 +463,8 @@ namespace Ongenet.App.ViewModels.Instruments
                 return _fieldEditor ??= new FieldEditorViewModel(fi.Graph,
                     App.ServiceProvider?.GetService<IFieldNodeRegistry>() ?? new FieldNodeRegistry(),
                     fi.Recompile, fi.PresetNames,
-                    i => { fi.LoadPreset(i); RebuildParameters(); }, () => fi.Compiled, isInstrument: true);
+                    i => { fi.LoadPreset(i); RebuildParameters(); }, () => fi.Compiled, isInstrument: true,
+                    instrumentHost: () => fi);
             }
         }
 
@@ -495,5 +585,17 @@ namespace Ongenet.App.ViewModels.Instruments
         }
 
         private void OnParameterChanged(object? sender, PropertyChangedEventArgs e) => SchedulePreview();
+    }
+
+    public sealed class OutputRouteOption
+    {
+        public OutputRouteOption(Guid? trackId, string name)
+        {
+            TrackId = trackId;
+            Name = name;
+        }
+
+        public Guid? TrackId { get; }
+        public string Name { get; }
     }
 }

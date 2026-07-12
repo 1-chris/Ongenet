@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ongenet.App.Localization;
 
 namespace Ongenet.App.Services;
 
@@ -17,6 +18,7 @@ public sealed class AppSettings
     public string? AudioInputDevice { get; set; }
     public string InputChannelMode { get; set; } = "Stereo";
     public string? MidiInputDevice { get; set; }
+    public bool MidiClockEnabled { get; set; }
     public string? ThemeName { get; set; }
     public bool ThemeIsLight { get; set; }
     public double InputQuantizeBeats { get; set; }
@@ -39,6 +41,64 @@ public sealed class AppSettings
 
     /// <summary>Recently opened/saved project files, most recent first (drives the library's Projects tab).</summary>
     public List<string> RecentProjects { get; set; } = new();
+
+    /// <summary>Control surface profile name; null/empty = legacy MCU + Launchpad combined mapping.</summary>
+    public string? ControlSurfaceProfile { get; set; }
+
+    /// <summary>When true, Windows WASAPI uses exclusive mode for lower latency.</summary>
+    public bool WasapiExclusiveMode { get; set; }
+
+    /// <summary>Saved window layout profiles (multi-monitor workspace).</summary>
+    public List<WindowLayoutProfileDto> WindowLayouts { get; set; } = new();
+
+    /// <summary>Name of the active window layout profile.</summary>
+    public string? ActiveWindowLayout { get; set; }
+
+    /// <summary>Folder path for optional project collaboration sync.</summary>
+    public string? CollaborationSyncFolder { get; set; }
+
+    /// <summary>When true, periodically save autosave backups while editing.</summary>
+    public bool AutosaveEnabled { get; set; } = true;
+
+    /// <summary>Minutes between autosave writes (default 5).</summary>
+    public int AutosaveIntervalMinutes { get; set; } = 5;
+
+    /// <summary>Learned/custom mixer CC mappings for control surfaces.</summary>
+    public List<ControlSurfaceMappingDto> ControlSurfaceMappings { get; set; } = new();
+
+    /// <summary>Custom keyboard shortcut overrides.</summary>
+    public List<KeyboardShortcutDto> KeyboardShortcuts { get; set; } = new();
+
+    /// <summary>UI culture: "system", "en", "ja", etc.</summary>
+    public string UiCulture { get; set; } = ILocalizationService.SystemCultureId;
+
+    /// <summary>When true, VST3 plugins run in an isolated child process (desktop only).</summary>
+    public bool PluginIsolationEnabled { get; set; }
+}
+
+public sealed class KeyboardShortcutDto
+{
+    public string Action { get; set; } = "";
+    public string Key { get; set; } = "";
+    public string Modifiers { get; set; } = "";
+}
+
+public sealed class ControlSurfaceMappingDto
+{
+    public string Profile { get; set; } = "";
+    public int MixerChannel { get; set; }
+    public int CcNumber { get; set; }
+    public string Target { get; set; } = "Volume";
+}
+
+public sealed class WindowLayoutProfileDto
+{
+    public string Name { get; set; } = "";
+    public double MainWindowX { get; set; }
+    public double MainWindowY { get; set; }
+    public double MainWindowWidth { get; set; }
+    public double MainWindowHeight { get; set; }
+    public bool MainWindowMaximized { get; set; }
 }
 
 /// <summary>Serializable form of a <see cref="Core.Audio.Midi.TransportMapping"/>.</summary>

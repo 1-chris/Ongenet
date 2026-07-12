@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        x:Class="Ongenet.App.Views.Windows.AudioToMidiWindow"
+        x:DataType="vm:AudioToMidiViewModel"
+        Title="{DynamicResource AudioToMidi_Audio_to_MIDI_Title}"
+        Width="400" Height="320"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="16">
+        <StackPanel Spacing="12">
+            <TextBlock Text="{DynamicResource AudioToMidi_Audio_to_MIDI}" FontWeight="SemiBold" FontSize="16"/>
+            <TextBlock Text="{Binding ClipName, StringFormat='Source: {0}'}"
+                       FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{DynamicResource AudioToMidi_Detection_mode}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <TextBlock Text="{DynamicResource AudioToMidi_Monophonic_works_best_for_bass_lines_and_single_}"
+                       TextWrapping="Wrap" FontSize="11"
+                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="{DynamicResource AudioToMidi_N1_Analyze}" Command="{Binding AnalyzeCommand}" Padding="12,6"/>
+                <TextBlock Text="{Binding DetectedNotes, StringFormat='{}{0} notes'}"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+            </StackPanel>
+
+            <ProgressBar IsIndeterminate="True" Height="6" IsVisible="{Binding IsAnalyzing}"/>
+            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontSize="11"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <Button Content="{DynamicResource AudioToMidi_Cancel}" Click="OnCancel"/>
+                <Button Content="{DynamicResource AudioToMidi_N2_Create_MIDI_track}" Classes="accent"
+                        Command="{Binding CreateCommand}" Padding="12,6"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

@@ -11,7 +11,7 @@
 
     <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
         <Grid>
-            <TextBlock Text="Select an audio sample." IsVisible="{Binding !HasSample}"
+            <TextBlock Text="{DynamicResource SampleInspector_Select_an_audio_sample}" IsVisible="{Binding !HasSample}"
                        Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
 
             <StackPanel IsVisible="{Binding HasSample}" Spacing="10">
@@ -50,19 +50,25 @@
                             SelectionEndSeconds="{Binding SelectionEndSeconds, Mode=TwoWay}"
                             HoverSeconds="{Binding HoverSeconds, Mode=TwoWay}"
                             PlayheadSeconds="{Binding PlayheadSeconds}"
-                            SnapEnabled="{Binding SnapEnabled, Mode=TwoWay}"/>
+                            SnapEnabled="{Binding SnapEnabled, Mode=TwoWay}"
+                            SpectralOverlayEnabled="{Binding SpectralViewEnabled, Mode=TwoWay}"
+                            SpectralMagnitudes="{Binding SpectralMagnitudes}"
+                            SpectralRevision="{Binding SpectralRevision}"/>
                     </ScrollViewer>
                 </Border>
 
-                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
                     <Button Grid.Column="0" Content="{Binding PlayButtonText}" Command="{Binding PlayStopCommand}"
                             MinWidth="56" Margin="0,0,10,0" Padding="10,4"/>
-                    <Button Grid.Column="1" Content="Cut" Command="{Binding CutCommand}" Margin="0,0,6,0" Padding="10,4"/>
-                    <Button Grid.Column="2" Content="Copy" Command="{Binding CopyCommand}" Margin="0,0,6,0" Padding="10,4"/>
-                    <Button Grid.Column="3" Content="Paste" Command="{Binding PasteCommand}" Margin="0,0,6,0" Padding="10,4"/>
-                    <Button Grid.Column="4" Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,6,0" Padding="10,4"/>
-                    <ToggleButton Grid.Column="5" Content="Snap" IsChecked="{Binding SnapEnabled, Mode=TwoWay}"
+                    <Button Grid.Column="1" Content="{DynamicResource SampleInspector_Cut}" Command="{Binding CutCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <Button Grid.Column="2" Content="{DynamicResource SampleInspector_Copy}" Command="{Binding CopyCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <Button Grid.Column="3" Content="{DynamicResource SampleInspector_Paste}" Command="{Binding PasteCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <Button Grid.Column="4" Content="{DynamicResource SampleInspector_Delete}" Command="{Binding DeleteCommand}" Margin="0,0,6,0" Padding="10,4"/>
+                    <ToggleButton Grid.Column="5" Content="{DynamicResource SampleInspector_Snap}" IsChecked="{Binding SnapEnabled, Mode=TwoWay}"
                                   Margin="0,0,6,0" Padding="10,4"/>
+                    <ToggleButton Grid.Column="6" Content="{DynamicResource SampleInspector_Spectral}" IsChecked="{Binding SpectralViewEnabled, Mode=TwoWay}"
+                                  Margin="0,0,6,0" Padding="10,4"
+                                  ToolTip.Tip="{DynamicResource SampleInspector_Show_FFT_magnitude_overlay_on_the_waveform_Tip}"/>
                     <TextBlock Grid.Column="7" Text="{Binding HoverInfo}" VerticalAlignment="Center"
                                FontSize="11" Foreground="{StaticResource CatppuccinSubtext1}" Margin="0,0,12,0"/>
                     <TextBlock Grid.Column="8" Text="{Binding SelectionInfo}" VerticalAlignment="Center"
@@ -73,13 +79,13 @@
                         Background="{StaticResource CatppuccinSurface0}"
                         IsVisible="{Binding HasSelection}">
                     <StackPanel Orientation="Horizontal" Spacing="16">
-                        <TextBlock Text="Region edit" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"
+                        <TextBlock Text="{DynamicResource SampleInspector_Region_edit}" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"
                                    Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,0,4,0"/>
                         <StackPanel Width="58" HorizontalAlignment="Center">
                             <controls:Knob Name="GainKnob" Width="40" Height="40" HorizontalAlignment="Center"
                                            Minimum="-24" Maximum="24" Skew="1"
                                            Value="{Binding SelectionGainDb, Mode=TwoWay}"/>
-                            <TextBlock Text="Gain" FontSize="10" HorizontalAlignment="Center"
+                            <TextBlock Text="{DynamicResource SampleInspector_Gain}" FontSize="10" HorizontalAlignment="Center"
                                        Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,2,0,0"/>
                             <TextBlock Text="{Binding SelectionGainText}" FontSize="9" HorizontalAlignment="Center"
                                        Foreground="{StaticResource CatppuccinSubtext1}"/>
@@ -89,40 +95,40 @@
                             <controls:Knob Name="PanKnob" Width="40" Height="40" HorizontalAlignment="Center"
                                            Minimum="-1" Maximum="1" Skew="1"
                                            Value="{Binding SelectionPan, Mode=TwoWay}"/>
-                            <TextBlock Text="Pan" FontSize="10" HorizontalAlignment="Center"
+                            <TextBlock Text="{DynamicResource SampleInspector_Pan}" FontSize="10" HorizontalAlignment="Center"
                                        Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,2,0,0"/>
                             <TextBlock Text="{Binding SelectionPanText}" FontSize="9" HorizontalAlignment="Center"
                                        Foreground="{StaticResource CatppuccinSubtext1}"/>
                         </StackPanel>
-                        <Button Content="Swap L/R" Command="{Binding SwapChannelsCommand}"
+                        <Button Content="{DynamicResource SampleInspector_Swap_L_R}" Command="{Binding SwapChannelsCommand}"
                                 VerticalAlignment="Center" Padding="10,4"
                                 IsVisible="{Binding CanSwapChannels}"/>
-                        <Button Content="Reverse" Command="{Binding ReverseSelectionCommand}"
+                        <Button Content="{DynamicResource SampleInspector_Reverse}" Command="{Binding ReverseSelectionCommand}"
                                 VerticalAlignment="Center" Padding="10,4"/>
                     </StackPanel>
                 </Border>
 
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <TextBlock Text="Natural tempo" VerticalAlignment="Center"
+                    <TextBlock Text="{DynamicResource SampleInspector_Natural_tempo}" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <NumericUpDown Value="{Binding NaturalBpm}" Minimum="0" Maximum="400" Increment="1"
                                    FormatString="0.##" Width="120" VerticalAlignment="Center"/>
-                    <TextBlock Text="BPM" VerticalAlignment="Center"
+                    <TextBlock Text="{DynamicResource SampleInspector_BPM}" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <Button Content="Re-detect tempo" Command="{Binding RedetectTempoCommand}"
+                    <Button Content="{DynamicResource SampleInspector_Re_detect_tempo}" Command="{Binding RedetectTempoCommand}"
                             Margin="8,0,0,0" Padding="10,4"/>
                 </StackPanel>
 
                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
-                    <TextBlock Grid.Column="0" Text="Sample key" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{DynamicResource SampleInspector_Sample_key}" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <TextBlock Grid.Column="1" Text="{Binding KeyInfo}" VerticalAlignment="Center" MinWidth="56"
                                Foreground="{StaticResource CatppuccinText}"/>
-                    <Button Grid.Column="3" Content="Detect key" Command="{Binding DetectKeyCommand}" Padding="10,4"/>
+                    <Button Grid.Column="3" Content="{DynamicResource SampleInspector_Detect_key}" Command="{Binding DetectKeyCommand}" Padding="10,4"/>
                 </Grid>
 
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                    <TextBlock Grid.Column="0" Text="Target key" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{DynamicResource SampleInspector_Target_key}" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <ComboBox Grid.Column="1" MinWidth="180" VerticalAlignment="Center"
                               ItemsSource="{Binding TargetKeyOptions}"
@@ -133,11 +139,11 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <Button Grid.Column="2" Content="Change key" Command="{Binding ChangeKeyCommand}"
+                    <Button Grid.Column="2" Content="{DynamicResource SampleInspector_Change_key}" Command="{Binding ChangeKeyCommand}"
                             Padding="10,4" IsEnabled="{Binding CanChangeKey}"/>
                 </Grid>
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding IsChangingKey}">
-                    <TextBlock Grid.Column="0" Text="Changing key…" VerticalAlignment="Center" FontSize="11"
+                    <TextBlock Grid.Column="0" Text="{DynamicResource SampleInspector_Changing_key}" VerticalAlignment="Center" FontSize="11"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <ProgressBar Grid.Column="1" Height="6" VerticalAlignment="Center"
                                  Minimum="0" Maximum="1" Value="{Binding KeyChangeProgress}"/>
@@ -146,19 +152,34 @@
                            Foreground="{StaticResource CatppuccinSubtext1}"/>
 
                 <CheckBox IsChecked="{Binding StretchEnabled}"
-                          Content="Stretch to project tempo (lock to the beat grid)"
+                          Content="{DynamicResource SampleInspector_Stretch_to_project_tempo_lock_to_the_beat_grid}"
                           Foreground="{StaticResource CatppuccinText}"/>
 
                 <CheckBox IsChecked="{Binding PitchCorrected}" IsEnabled="{Binding StretchEnabled}" Margin="20,0,0,0"
-                          Content="Preserve pitch when stretching"
+                          Content="{DynamicResource SampleInspector_Preserve_pitch_when_stretching}"
                           Foreground="{StaticResource CatppuccinText}"/>
 
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="{DynamicResource SampleInspector_Warp_mode}" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding WarpModes}" SelectedItem="{Binding WarpMode}"
+                              MinWidth="140"/>
+                    <Button Grid.Column="2" Content="{DynamicResource SampleInspector_Flatten_warp}" Command="{Binding FlattenWarpCommand}" Padding="10,4"/>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Content="{DynamicResource SampleInspector_Normalize}" Command="{Binding NormalizeCommand}" Padding="10,4"/>
+                    <Button Content="{DynamicResource SampleInspector_Fade_in}" Command="{Binding FadeInSelectionCommand}" Padding="10,4"/>
+                    <Button Content="{DynamicResource SampleInspector_Fade_out}" Command="{Binding FadeOutSelectionCommand}" Padding="10,4"/>
+                    <Button Content="{DynamicResource SampleInspector_Stretch_selection}" Command="{Binding StretchSelectionCommand}" Padding="10,4"/>
+                </StackPanel>
+
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Stretch" Margin="0,0,12,2"
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource SampleInspector_Stretch}" Margin="0,0,12,2"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StretchInfo}" Margin="0,0,0,2"
                                Foreground="{StaticResource CatppuccinText}"/>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Grid length" Margin="0,0,12,0"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource SampleInspector_Grid_length}" Margin="0,0,12,0"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LengthInfo}"
                                Foreground="{StaticResource CatppuccinText}"/>

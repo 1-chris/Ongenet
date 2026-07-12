@@ -27,7 +27,7 @@ public static class Crossfade
         {
             if (!clip.IsAudio) continue;
             ordered.Add(clip);
-            fades[clip] = (0.0, 0.0);
+            fades[clip] = (clip.UserFadeInBeats, clip.UserFadeOutBeats);
         }
 
         ordered.Sort((a, b) => a.StartBeat.CompareTo(b.StartBeat));
@@ -46,6 +46,13 @@ public static class Crossfade
             var c = fades[cur];
             fades[prev] = (p.FadeInBeats, Math.Max(p.FadeOutBeats, len));
             fades[cur] = (Math.Max(c.FadeInBeats, len), c.FadeOutBeats);
+        }
+
+        foreach (var clip in ordered)
+        {
+            var f = fades[clip];
+            fades[clip] = (Math.Max(f.FadeInBeats, clip.UserFadeInBeats),
+                Math.Max(f.FadeOutBeats, clip.UserFadeOutBeats));
         }
 
         return fades;

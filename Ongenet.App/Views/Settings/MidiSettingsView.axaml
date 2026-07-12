@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.App.ViewModels"
              xmlns:midi="using:Ongenet.Core.Audio.Midi"
+             xmlns:services="using:Ongenet.App.Services"
              mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="560"
              x:Class="Ongenet.App.Views.Settings.MidiSettingsView"
              x:DataType="vm:MidiSettingsViewModel">
@@ -26,33 +27,33 @@
         <StackPanel Margin="18" Spacing="10">
 
             <!-- Input device -->
-            <TextBlock Classes="Section" Text="MIDI input" Margin="0"/>
+            <TextBlock Classes="Section" Text="{DynamicResource SettingsMidi_MIDI_input}" Margin="0"/>
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <ComboBox Width="280" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}"
-                          ToolTip.Tip="MIDI input device">
+                          ToolTip.Tip="{DynamicResource SettingsMidi_MIDI_input_device_Tip}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="midi:MidiDeviceInfo">
                             <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
-                <Button Classes="Small" Content="Refresh" Click="RefreshDevices_Click"/>
+                <Button Classes="Small" Content="{DynamicResource SettingsMidi_Refresh}" Click="RefreshDevices_Click"/>
             </StackPanel>
             <TextBlock Text="{Binding BackendNote}" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
             <StackPanel Orientation="Horizontal" Spacing="6">
-                <TextBlock Text="Activity:" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Text="{DynamicResource SettingsMidi_Activity}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 <TextBlock Text="{Binding Activity}" FontSize="11"
                            FontFamily="Consolas, Menlo, DejaVu Sans Mono, Monospace"
                            Foreground="{StaticResource CatppuccinGreen}"/>
             </StackPanel>
 
             <!-- Recording -->
-            <TextBlock Classes="Section" Text="Recording"/>
+            <TextBlock Classes="Section" Text="{DynamicResource SettingsMidi_Recording}"/>
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="Input quantize" VerticalAlignment="Center"
+                <TextBlock Text="{DynamicResource SettingsMidi_Input_quantize}" VerticalAlignment="Center"
                            Foreground="{StaticResource CatppuccinSubtext1}"/>
                 <ComboBox Width="140" ItemsSource="{Binding QuantizeOptions}" SelectedItem="{Binding SelectedQuantize}"
-                          ToolTip.Tip="Snap recorded note starts to this grid">
+                          ToolTip.Tip="{DynamicResource SettingsMidi_Snap_recorded_note_starts_to_this_grid_Tip}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:QuantizeOption">
                             <TextBlock Text="{Binding Label}"/>
@@ -62,7 +63,7 @@
             </StackPanel>
 
             <!-- Transport control mapping -->
-            <TextBlock Classes="Section" Text="Transport control"/>
+            <TextBlock Classes="Section" Text="{DynamicResource SettingsMidi_Transport_control}"/>
             <ItemsControl ItemsSource="{Binding TransportRows}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:TransportMapRow">
@@ -72,23 +73,41 @@
                             <TextBlock Grid.Column="1" Text="{Binding Binding}" VerticalAlignment="Center"
                                        Foreground="{StaticResource CatppuccinSubtext0}"/>
                             <Button Grid.Column="2" Classes="Small" Content="{Binding LearnText}" Click="LearnTransport_Click"/>
-                            <Button Grid.Column="3" Classes="Small" Content="Clear" Click="ClearTransport_Click"/>
+                            <Button Grid.Column="3" Classes="Small" Content="{DynamicResource SettingsMidi_Clear}" Click="ClearTransport_Click"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Keyboard shortcuts -->
+            <TextBlock Classes="Section" Text="{DynamicResource SettingsMidi_Keyboard_shortcuts}"/>
+            <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource CatppuccinOverlay1}"
+                       Text="{DynamicResource SettingsMidi_Global_shortcuts_for_arrangement_editing_and_sec}"/>
+            <ItemsControl ItemsSource="{Binding ShortcutRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="services:KeyboardShortcutRow">
+                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,3" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinText}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Binding}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <Button Grid.Column="2" Classes="Small" Content="{DynamicResource SettingsMidi_Reset}" Click="ResetShortcut_Click"/>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
             <!-- CC → parameter mappings -->
-            <TextBlock Classes="Section" Text="Parameter mappings"/>
+            <TextBlock Classes="Section" Text="{DynamicResource SettingsMidi_Parameter_mappings}"/>
             <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource CatppuccinOverlay1}"
-                       Text="Right-click any knob or parameter and choose “MIDI learn”, then move a control on your device to bind it. Mappings are saved with the project."/>
+                       Text="{DynamicResource SettingsMidi_Right_click_any_knob_or_parameter_and_choose_MID}"/>
             <ItemsControl ItemsSource="{Binding Mappings}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:MidiMappingRow">
                         <Grid ColumnDefinitions="*,Auto" Margin="0,3" ColumnSpacing="8">
                             <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
                                        TextTrimming="CharacterEllipsis" Foreground="{StaticResource CatppuccinText}"/>
-                            <Button Grid.Column="1" Classes="Small" Content="Remove" Click="RemoveMapping_Click"/>
+                            <Button Grid.Column="1" Classes="Small" Content="{DynamicResource SettingsMidi_Remove}" Click="RemoveMapping_Click"/>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

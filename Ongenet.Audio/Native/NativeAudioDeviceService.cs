@@ -74,6 +74,8 @@ internal sealed class NativeAudioDeviceService : IAudioDeviceService
         }
     }
 
+    public bool LowLatencyExclusive { get; set; }
+
     public event Action? DevicesChanged;
     public event Action? OutputChanged;
     public event Action? InputChanged;

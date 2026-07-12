@@ -7,16 +7,23 @@ namespace Ongenet.App.ViewModels;
 public sealed class SettingsViewModel : ViewModelBase
 {
     public SettingsViewModel(AudioDevicesViewModel audio, MidiSettingsViewModel midi, ThemeEditorViewModel theme,
-        LibrarySettingsViewModel library)
+        LibrarySettingsViewModel library, ControlSurfaceSettingsViewModel controlSurface,
+        ControlRoomSettingsViewModel controlRoom, GeneralSettingsViewModel general)
     {
         Audio = audio;
         Midi = midi;
         Theme = theme;
         Library = library;
+        ControlSurface = controlSurface;
+        ControlRoom = controlRoom;
+        General = general;
     }
 
     public AudioDevicesViewModel Audio { get; }
     public MidiSettingsViewModel Midi { get; }
     public ThemeEditorViewModel Theme { get; }
     public LibrarySettingsViewModel Library { get; }
+    public ControlSurfaceSettingsViewModel ControlSurface { get; }
+    public ControlRoomSettingsViewModel ControlRoom { get; }
+    public GeneralSettingsViewModel General { get; }
 }

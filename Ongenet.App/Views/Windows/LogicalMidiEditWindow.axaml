@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        x:Class="Ongenet.App.Views.Windows.LogicalMidiEditWindow"
+        x:DataType="vm:LogicalMidiEditViewModel"
+        Title="{DynamicResource LogicalMidi_Logical_MIDI_Edit_Title}"
+        Width="360" Height="360"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="16">
+        <StackPanel Spacing="12">
+            <TextBlock Text="{Binding ClipName, StringFormat='Edit: {0}'}" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding NoteCount, StringFormat='{}{0} notes'}"
+                       FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource LogicalMidi_Transpose_st}" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding TransposeSemitones}"
+                                 Minimum="-48" Maximum="48" Increment="1" FormatString="0"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource LogicalMidi_Quantize_grid}" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding QuantizeGrid}"
+                                 Minimum="0.0625" Maximum="4" Increment="0.0625" FormatString="0.###"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource LogicalMidi_Velocity_scale}" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding VelocityScale}"
+                                 Minimum="0.1" Maximum="4" Increment="0.1" FormatString="0.##"/>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource LogicalMidi_Humanize_ticks}" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding HumanizeTicks}"
+                                 Minimum="0" Maximum="96" Increment="1" FormatString="0"/>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource LogicalMidi_Note_chance}" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding NoteChance}"
+                                 Minimum="0" Maximum="1" Increment="0.05" FormatString="0.##"/>
+            </Grid>
+
+            <Button Content="{DynamicResource LogicalMidi_Apply}" Command="{Binding ApplyCommand}" HorizontalAlignment="Right" Padding="16,6"/>
+        </StackPanel>
+    </Border>
+</Window>

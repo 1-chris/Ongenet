@@ -10,7 +10,7 @@
 
     <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
         <Grid>
-            <TextBlock Text="Select a track to add effects." IsVisible="{Binding !HasTrack}"
+            <TextBlock Text="{DynamicResource Effects_Select_a_track_to_add_effects}" IsVisible="{Binding !HasTrack}"
                        Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
 
             <DockPanel IsVisible="{Binding HasTrack}">

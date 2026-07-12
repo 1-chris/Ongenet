@@ -8,6 +8,17 @@ The whole UI is the shared Avalonia library [`Ongenet.App`](../Ongenet.App). The
 [`Views/Windows/MainWindow.axaml`](../Ongenet.App/Views/Windows/MainWindow.axaml), composed by
 [`ViewModels/MainViewModel.cs`](../Ongenet.App/ViewModels/MainViewModel.cs).
 
+### Accessibility
+
+Core regions expose Avalonia `AutomationProperties` names and help text for screen readers:
+
+- **Transport** — Play, Stop, Record, tempo, export, metronome, master volume
+- **Timeline** — arrangement landmark and track lanes
+- **Mixer** — channel strips and routing controls
+- **Settings** — tabbed preferences (Audio, MIDI, Control Surface, Theme, Library)
+
+Use keyboard focus and the shortcuts below for mouse-free operation.
+
 ---
 
 ## The big picture
@@ -84,9 +95,11 @@ The playback control strip ([`Views/Panels/TransportView.axaml`](../Ongenet.App/
 | **Tempo** | Project BPM (20–300) |
 | **Bars** | Arrangement length in bars |
 | **Time signature** | Numerator + denominator (denominators 1/2/4/8/16) |
-| **Master meter** | Live stereo output level (read-only — there is no master *fader* here) |
+| **Master meter + fader** | Live stereo output level meter and master volume slider |
+| **Metronome (Click)** | Toggle audible click during playback (independent of record count-in) |
+| **MIDI export** | Export all instrument-track MIDI from the arrangement to a Standard MIDI File |
 
-> The **metronome** only clicks during the recording count-in; there is no standalone metronome toggle.
+> During **record**, a one-bar metronome count-in still runs before capture begins. The **Click** toggle is for everyday playback practice.
 > **Audio/MIDI device pickers** live in **Settings → Audio / MIDI**, not on the transport.
 
 ---
@@ -149,7 +162,8 @@ Audio clips show a waveform with fade handles; MIDI clips show a mini note previ
 The MIDI note editor for the selected MIDI clip
 ([`Views/Panels/PianoRollView.axaml`](../Ongenet.App/Views/Panels/PianoRollView.axaml)):
 
-- **Toolbar** — Import MIDI, Export MIDI, a melody/chord **Generator**, the **Edit / Select / Slice**
+- **Toolbar** — Import MIDI, Export MIDI, a melody/chord **Generator**, **Quantize** and **Groove**,
+  an **Expression** lane toggle (MPE), the **Edit / Select / Slice**
   tools, and **Arpeggio**.
 - **Key gutter** (left) — a vertical piano keyboard; click a key to audition that pitch.
 - **Grid** — draw and edit notes.
@@ -169,14 +183,15 @@ Mouse extras: **right-click** a note to delete it; **middle-drag** to zoom/pan. 
 
 ## 6. The "mixer" — where mixing actually lives
 
-There is **no separate mixer window** with channel strips. Mixing is spread across the places you're
-already working:
+There is a dedicated **Mixer** centre tab with channel strips, sends, meters, per-track **input monitoring**
+(Off/Auto/On on audio tracks), and an editable **Routing Matrix**
+window for bus and multi-out routing. Mixing is also available from:
 
 | Where | What you control |
 | --- | --- |
 | Track inspector (left) | Volume, pan, mute, solo for the selected track |
 | Timeline track headers | M / S / record-arm and a live meter per track |
-| Transport bar | The master output meter (read-only) |
+| Transport bar | Master output meter and master volume fader |
 | Effects tab (bottom) | The track's **post** effect chain |
 | Instrument slot (bottom) | Each instrument's **pre** effect chain |
 | Group / bus tracks | Tracks route into group buses (and the master); set a track's parent to build the bus tree |
@@ -184,6 +199,35 @@ already working:
 The actual mixing math is in [`Ongenet.Core/Audio/Mixing.cs`](../Ongenet.Core/Audio/Mixing.cs) and the
 engine; the routing model (tracks → group buses → master) is explained in
 [audio-engine.md](audio-engine.md).
+
+### Instrument rack (track inspector)
+
+On **instrument** tracks, the left **Track Controls** inspector includes an **Instrument rack** section:
+eight macro knobs and an optional **drum pad grid** (16 pads with MIDI note triggers). Switch between
+standard rack and drum grid from the rack kind dropdown.
+
+### Hybrid tracks
+
+**Add Hybrid Track** (timeline context menu) creates a lane that accepts **both** audio and MIDI
+clips — Ableton/Bitwig-style hybrid workflows without duplicating tracks.
+
+### Specialist windows (View menu)
+
+| Window | Purpose |
+| --- | --- |
+| **Tempo Map** | Master tempo automation |
+| **Section Playlist** | Ordered arrangement-marker playback with reorder/duplicate |
+| **Chord Track** | Global harmony regions applied to MIDI clips |
+| **Expression Maps** | VST expression / keyswitch articulation maps |
+| **Audio Editor** | Edison-class multitrack sample editor — clip list + shared waveform tools ([audio-editor.md](audio-editor.md)) |
+| **Pitch Editor** | Polyphonic note-segment pitch correction on audio clips (timeline → **Open Pitch Editor**) |
+| **Scripts** | Tools → Scripts — run C# automation against the open project ([scripting.md](scripting.md)) |
+
+**Settings → General → Plugins → Isolate plugins in separate process** enables optional VST3 effect
+crash isolation via `Ongenet.PluginHost` ([plugin-isolation.md](plugin-isolation.md)).
+
+**Export → ADM BWF** (when surround is 5.1/7.1) exports ITU-R BS.2076 immersive handoff. **AAF/OMF
+handoff** exports structured XML for post houses.
 
 ---
 
@@ -265,6 +309,7 @@ Opened from the title bar (or the piano roll):
 
 | Window | Purpose |
 | --- | --- |
+| [Guide](../Ongenet.App/Views/Windows/GuideWindow.axaml) | Built-in help topics (title bar **Guide** button) |
 | [Settings](../Ongenet.App/Views/Windows/SettingsWindow.axaml) | Audio device, MIDI devices/mappings, Theme editor, Library folders |
 | [History](../Ongenet.App/Views/Windows/HistoryWindow.axaml) | Browse and jump around the undo stack |
 | [Logs](../Ongenet.App/Views/Windows/LogWindow.axaml) | Debug log viewer |
@@ -291,14 +336,45 @@ Defined in [`MainWindow.axaml.cs`](../Ongenet.App/Views/Windows/MainWindow.axaml
 | **Ctrl + Z** | Undo |
 | **Ctrl + Shift + Z** | Redo |
 | **Ctrl + Y** | Redo (alternative) |
+| **Ctrl + Shift + I** | Ripple insert time at playhead (one bar) |
+| **Ctrl + Shift + Backspace** | Ripple delete time at playhead (one bar) |
+| **Ctrl + Alt + T** | Open tempo map window |
+| **Ctrl + Alt + L** | Open section playlist window |
 | **Space** | Play / stop toggle |
 | **Shift + [** | Set loop **start** to the start marker |
 | **Shift + ]** | Set loop **end** to the start marker |
 | **F8** | Toggle Avalonia renderer diagnostics (FPS / render & layout graphs) |
+| **View → Tempo Map** | Edit master tempo automation (menu; no default shortcut) |
+| **View → Section Playlist** | Ordered section playback from arrangement markers (menu) |
+| **Edit → Ripple edit** | Toggle ripple mode for clip edits (when enabled in edit menu) |
+| **File → Collaboration → Pull latest** | Import the project copy from the sync folder |
+| **Transport → Capture MIDI** | Retrospective capture of buffered notes into a new clip |
+
+> Custom transport/key mappings can be configured in **Settings → MIDI** (`TransportMappings` in app settings).
 
 > Set the environment variable `ONGENET_FPS=1` to auto-enable the F8 diagnostics overlay at startup.
 > (Avalonia DevTools — the visual-tree inspector — is **F12** in Debug builds; see
 > [DEVELOPMENT.md](../DEVELOPMENT.md).)
+
+Custom bindings for ripple edit, tempo map, and section playlist can be reset to defaults in
+**Settings → MIDI → Keyboard shortcuts**. Overrides are stored in the app settings file.
+
+### Collaboration (Export menu)
+
+| Action | Description |
+| --- | --- |
+| **Sync to collaboration folder** | Export the saved project + share manifest to the configured sync folder |
+| **Pull from collaboration folder** | Load the shared project from the sync folder; prompts if you have unsaved local changes |
+
+### Arrangement tools (View menu)
+
+| Menu item | Shortcut | Description |
+| --- | --- | --- |
+| **Tempo Map** | Ctrl + Alt + T | Edit master tempo automation |
+| **Section Playlist** | Ctrl + Alt + L | Arrange and play back song sections |
+
+Ripple insert/delete shift all clips at/after the playhead by one bar. Use **Ctrl + Shift + I** /
+**Ctrl + Shift + Backspace**, or the timeline context commands.
 
 ### Timeline (when the timeline has focus — click a lane first)
 

@@ -29,6 +29,7 @@ internal static class WasapiNative
     // Device state + share mode + stream flags.
     public const uint DEVICE_STATE_ACTIVE = 0x1;
     public const int AUDCLNT_SHAREMODE_SHARED = 0;
+    public const int AUDCLNT_SHAREMODE_EXCLUSIVE = 1;
     public const uint AUDCLNT_STREAMFLAGS_LOOPBACK = 0x00020000;
     public const uint AUDCLNT_STREAMFLAGS_EVENTCALLBACK = 0x00040000;
     public const uint CLSCTX_ALL = 23;

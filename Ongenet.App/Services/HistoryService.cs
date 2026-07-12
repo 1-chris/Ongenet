@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Persistence;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.ViewModels;
 
 namespace Ongenet.App.Services
 {
@@ -23,25 +25,28 @@ namespace Ongenet.App.Services
         private readonly ISelectionService _selection;
         private readonly IInstrumentRegistry _instruments;
         private readonly IEffectRegistry _effects;
+        private readonly Func<PianoRollViewModel> _pianoRoll;
 
         private readonly List<Entry> _states = new();
-        private int _index;        // index in _states of the current committed state
-        private string? _pending;  // label of an action whose result hasn't been committed yet
+        private int _index;
+        private string? _pending;
         private bool _restoring;
 
         public HistoryService(IProjectService project, ITransportService transport, ISelectionService selection,
-            IInstrumentRegistry instruments, IEffectRegistry effects)
+            IInstrumentRegistry instruments, IEffectRegistry effects, Func<PianoRollViewModel> pianoRoll)
         {
             _project = project;
             _transport = transport;
             _selection = selection;
             _instruments = instruments;
             _effects = effects;
+            _pianoRoll = pianoRoll;
         }
 
         public bool CanUndo => _pending is not null || _index > 0;
         public bool CanRedo => _pending is null && _index < _states.Count - 1;
         public event Action? Changed;
+        public event Action<IReadOnlyList<NoteSelectionKey>>? NoteSelectionRestored;
 
         public IReadOnlyList<HistoryEntry> Timeline
         {
@@ -50,7 +55,6 @@ namespace Ongenet.App.Services
                 var list = new List<HistoryEntry>(_states.Count + 1);
                 for (var i = 0; i < _states.Count; i++)
                     list.Add(new HistoryEntry(i, _states[i].Label, _pending is null && i == _index));
-                // An action whose result isn't committed yet shows as the provisional current tip.
                 if (_pending is not null)
                     list.Add(new HistoryEntry(_states.Count, _pending, true));
                 return list;
@@ -61,16 +65,16 @@ namespace Ongenet.App.Services
         {
             if (_restoring) return;
             EnsureSeed();
-            Commit();                              // finalize the previous action's result
-            DropRedoBranch();                      // a new action diverges from the current point
-            _pending = label;                      // committed lazily once its mutation completes
+            Commit();
+            DropRedoBranch();
+            _pending = label;
             Changed?.Invoke();
         }
 
         public void Undo()
         {
             if (!CanUndo) return;
-            Commit();                              // ensure the latest action is on the timeline
+            Commit();
             if (_index <= 0) return;
             _index--;
             Apply(_states[_index]);
@@ -101,18 +105,15 @@ namespace Ongenet.App.Services
             _states.Clear();
             _pending = null;
             _index = 0;
-            _states.Add(Take("Open")); // seed the baseline from the (current) project
+            _states.Add(Take("Open"));
             Changed?.Invoke();
         }
-
-        // --- internals ---
 
         private void EnsureSeed()
         {
             if (_states.Count == 0) { _states.Add(Take("Open")); _index = 0; }
         }
 
-        // Snapshots the now-complete result of the pending action onto the timeline.
         private void Commit()
         {
             if (_pending is null) return;
@@ -131,24 +132,30 @@ namespace Ongenet.App.Services
 
         private Entry Take(string label) => new(
             ProjectCloner.Clone(_project.Current, _instruments, _effects),
-            _transport.LoopStart, _transport.LoopEnd, _transport.StartBeat, label);
+            _transport.LoopStart, _transport.LoopEnd, _transport.StartBeat, label,
+            _selection.SelectedTrack?.Id,
+            _selection.SelectedClip?.Id,
+            _selection.SelectedPatternClip?.Id,
+            CaptureNoteSelection());
+
+        private List<NoteSelectionKey> CaptureNoteSelection()
+            => _pianoRoll().SelectedNotes
+                .Select(n => new NoteSelectionKey(n.Model.StartBeat, n.Model.Note))
+                .ToList();
 
         private void Apply(Entry entry)
         {
             _restoring = true;
             try
             {
-                var selectedId = _selection.SelectedTrack?.Id;
-
-                // Install a fresh clone so the stored snapshot stays pristine for repeat visits.
                 var live = ProjectCloner.Clone(entry.Project, _instruments, _effects);
-                _project.SetCurrentProject(live); // fires ProjectChanged → rebuilds timeline + engine
+                _project.SetCurrentProject(live);
                 _transport.LoopStart = entry.LoopStart;
                 _transport.LoopEnd = entry.LoopEnd;
                 _transport.StartBeat = entry.StartBeat;
 
-                // The swap invalidated the old selection references; re-resolve the track by its stable Id.
-                _selection.SelectTrack(selectedId is { } id ? live.Tracks.Find(t => t.Id == id) : null);
+                RestoreSelection(live, entry);
+                NoteSelectionRestored?.Invoke(entry.NoteSelection);
             }
             finally
             {
@@ -156,6 +163,39 @@ namespace Ongenet.App.Services
             }
         }
 
-        private sealed record Entry(Project Project, double LoopStart, double LoopEnd, double StartBeat, string Label);
+        private void RestoreSelection(Project live, Entry entry)
+        {
+            Track? track = entry.SelectedTrackId is { } tid
+                ? live.Tracks.Find(t => t.Id == tid)
+                : null;
+
+            if (entry.SelectedClipId is { } clipId && track is not null)
+            {
+                var clip = track.Clips.Find(c => c.Id == clipId);
+                _selection.SelectClip(clip, track);
+                return;
+            }
+
+            if (entry.SelectedPatternClipId is { } pcId)
+            {
+                var pc = live.PatternClips.Find(c => c.Id == pcId);
+                track ??= pc is not null ? live.Tracks.Find(t => t.Id == pc.TrackId) : null;
+                _selection.SelectPatternClip(pc, track);
+                return;
+            }
+
+            _selection.SelectTrack(track);
+        }
+
+        private sealed record Entry(
+            Project Project,
+            double LoopStart,
+            double LoopEnd,
+            double StartBeat,
+            string Label,
+            Guid? SelectedTrackId,
+            Guid? SelectedClipId,
+            Guid? SelectedPatternClipId,
+            List<NoteSelectionKey> NoteSelection);
     }
 }

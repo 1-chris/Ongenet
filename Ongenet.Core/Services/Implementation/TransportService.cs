@@ -94,10 +94,62 @@ public class TransportService : ITransportService
 
     public bool IsLoopActive => _loopEnd > _loopStart;
 
+    private bool _loopRecording;
+    private double? _punchInBeat;
+    private double? _punchOutBeat;
+
+    public bool LoopRecording
+    {
+        get => _loopRecording;
+        set
+        {
+            if (_loopRecording == value) return;
+            _loopRecording = value;
+            PunchChanged?.Invoke();
+        }
+    }
+
+    private bool _metronomeEnabled;
+
+    public bool MetronomeEnabled
+    {
+        get => _metronomeEnabled;
+        set
+        {
+            if (_metronomeEnabled == value) return;
+            _metronomeEnabled = value;
+            MetronomeChanged?.Invoke();
+        }
+    }
+
+    public double? PunchInBeat
+    {
+        get => _punchInBeat;
+        set
+        {
+            if (_punchInBeat == value) return;
+            _punchInBeat = value;
+            PunchChanged?.Invoke();
+        }
+    }
+
+    public double? PunchOutBeat
+    {
+        get => _punchOutBeat;
+        set
+        {
+            if (_punchOutBeat == value) return;
+            _punchOutBeat = value;
+            PunchChanged?.Invoke();
+        }
+    }
+
     public event Action<TransportState>? StateChanged;
     public event Action<Tempo>? TempoChanged;
     public event Action? StartBeatChanged;
     public event Action? LoopChanged;
+    public event Action? PunchChanged;
+    public event Action? MetronomeChanged;
     public event Action? CountInFinished;
 
     public void Play() => State = TransportState.Playing;

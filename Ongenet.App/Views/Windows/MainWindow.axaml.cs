@@ -1,14 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Music;
+using Avalonia.Media;
+using Ongenet.Core.Services;
+using Ongenet.Core.Services.Implementation;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Localization;
 using Ongenet.App.Input;
+using Ongenet.App.Services;
 using Ongenet.App.ViewModels;
+using Ongenet.App.Views.Windows;
 
 namespace Ongenet.App.Views.Windows
 {
@@ -20,6 +30,12 @@ namespace Ongenet.App.Views.Windows
         private LogWindow? _logWindow;
         private SettingsWindow? _settingsWindow;
         private HistoryWindow? _historyWindow;
+        private GuideWindow? _guideWindow;
+        private TempoMapWindow? _tempoMapWindow;
+        private SectionPlaylistWindow? _sectionPlaylistWindow;
+        private ChordTrackWindow? _chordTrackWindow;
+        private ExpressionMapWindow? _expressionMapWindow;
+        private ScriptsWindow? _scriptsWindow;
 
         // FL-Studio-style typing-keyboard note input: tracks which physical keys are currently
         // held (→ which MIDI notes are sounding) so auto-repeat KeyDowns don't re-trigger.
@@ -28,6 +44,8 @@ namespace Ongenet.App.Views.Windows
         public MainWindow()
         {
             InitializeComponent();
+            if (App.ServiceProvider?.GetService<IAudioEditorService>() is AudioEditorService audioEditor)
+                audioEditor.SetOwner(this);
             AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, OnGlobalKeyUp, RoutingStrategies.Tunnel);
             // Clicking a tab on a collapsed panel expands it (and selects that tab). Tunnel + handledEventsToo
@@ -44,7 +62,96 @@ namespace Ongenet.App.Views.Windows
         protected override void OnOpened(EventArgs e)
         {
             base.OnOpened(e);
+            PopulateBuiltInNewMenu();
+            RestoreWindowLayout();
             if (Environment.GetEnvironmentVariable("ONGENET_FPS") == "1") ToggleRenderDiagnostics();
+            _ = TryOfferRecoveryAsync();
+        }
+
+        private async Task TryOfferRecoveryAsync()
+        {
+            if (ProjectFile is not { } pf) return;
+            var candidates = ProjectAutosaveService.ScanForRecovery(pf.CurrentPath);
+            if (candidates.Count == 0) return;
+
+            var newest = candidates[0];
+            var kind = newest.IsAutosave
+                ? Loc.Get("Dialog_RecoverKind_Autosave")
+                : Loc.Get("Dialog_RecoverKind_Incomplete");
+            var dialog = new Window
+            {
+                Title = Loc.Get("Dialog_RecoverProject_Title"),
+                Width = 420,
+                Height = 160,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = new StackPanel
+                {
+                    Margin = new Thickness(16),
+                    Spacing = 12,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            TextWrapping = TextWrapping.Wrap,
+                            Text = Loc.Format("Dialog_RecoverProject_Message", kind,
+                                newest.TimestampUtc.ToLocalTime().ToString("g"))
+                        },
+                        new StackPanel
+                        {
+                            Orientation = Avalonia.Layout.Orientation.Horizontal,
+                            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                            Spacing = 8,
+                            Children =
+                            {
+                                new Button { Content = Loc.Get("Dialog_Dismiss"), Tag = false },
+                                new Button { Content = Loc.Get("Dialog_Recover"), Tag = true }
+                            }
+                        }
+                    }
+                }
+            };
+            if (dialog.Content is StackPanel root &&
+                root.Children.LastOrDefault() is StackPanel buttons)
+            {
+                foreach (var child in buttons.Children.OfType<Button>())
+                    child.Click += (_, _) => { dialog.Tag = child.Tag; dialog.Close(); };
+            }
+
+            await dialog.ShowDialog(this);
+            if (dialog.Tag is true)
+                await pf.LoadAsync(newest.Path);
+        }
+
+        private void PopulateBuiltInNewMenu()
+        {
+            var flyout = this.FindControl<Button>("NewButton")?.Flyout as MenuFlyout;
+            if (flyout is null) return;
+            flyout.Items.Add(new Separator());
+            foreach (var info in BuiltInProjects.All)
+            {
+                var item = new MenuItem { Header = info.Name, Tag = info };
+                item.Click += OnNewBuiltIn_Click;
+                flyout.Items.Add(item);
+            }
+        }
+
+        private async void OnNewBuiltIn_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem { Tag: BuiltInProjectInfo info }) return;
+            if (ProjectFile is not { } pf) return;
+            if (!await ConfirmDiscardAsync(pf)) return;
+
+            var instruments = App.ServiceProvider?.GetService<IInstrumentRegistry>();
+            if (instruments is null) return;
+            try
+            {
+                pf.LoadProject(info.Create(instruments));
+                History?.Clear();
+            }
+            catch (Exception ex)
+            {
+                await MessageDialog.Notify(this, "Couldn't open built-in project", ex.Message);
+            }
         }
 
         private void ToggleRenderDiagnostics()
@@ -65,7 +172,10 @@ namespace Ongenet.App.Views.Windows
                 e.Cancel = true;
                 _ = MessageDialog.Notify(this, "Please wait",
                     "A save is still in progress. Try closing again once it finishes.");
+                return;
             }
+
+            SaveWindowLayout();
         }
 
         // --- Collapsible panels (bottom / left / right). Each remembers its pre-collapse size. ---
@@ -165,11 +275,14 @@ namespace Ongenet.App.Views.Windows
         private ISelectionService? Selection => App.ServiceProvider?.GetService<ISelectionService>();
         private ITransportService? Transport => App.ServiceProvider?.GetService<ITransportService>();
         private Services.IHistoryService? History => App.ServiceProvider?.GetService<Services.IHistoryService>();
+        private Services.KeyboardShortcutService? Shortcuts => App.ServiceProvider?.GetService<Services.KeyboardShortcutService>();
 
         private void OnGlobalKeyDown(object? sender, KeyEventArgs e)
         {
             // Don't steal typing from text inputs (track rename, numeric fields, etc.).
             if (e.Source is TextBox) return;
+
+            if (TryHandleAppShortcut(e)) return;
 
             // Project file shortcuts (Ctrl+N/O/S, Ctrl+Shift+S).
             if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
@@ -221,6 +334,39 @@ namespace Ongenet.App.Views.Windows
             _heldKeys[e.Key] = note;
             Preview?.NoteOn(note);
             e.Handled = true;
+        }
+
+        private bool TryHandleAppShortcut(KeyEventArgs e)
+        {
+            if (Shortcuts is null) return false;
+            if (DataContext is not MainViewModel vm) return false;
+
+            if (Shortcuts.Matches(e, AppShortcutAction.RippleInsert))
+            {
+                vm.Timeline.RippleInsertCommand.Execute(null);
+                e.Handled = true;
+                return true;
+            }
+            if (Shortcuts.Matches(e, AppShortcutAction.RippleDelete))
+            {
+                vm.Timeline.RippleDeleteCommand.Execute(null);
+                e.Handled = true;
+                return true;
+            }
+            if (Shortcuts.Matches(e, AppShortcutAction.OpenTempoMap))
+            {
+                OpenTempoMap_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return true;
+            }
+            if (Shortcuts.Matches(e, AppShortcutAction.OpenSectionPlaylist))
+            {
+                OpenSectionPlaylist_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return true;
+            }
+
+            return false;
         }
 
         // Space toggles transport. Routed through the transport view model so it honours the same
@@ -332,6 +478,20 @@ namespace Ongenet.App.Views.Windows
             }
         }
 
+        private void OpenGuide_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_guideWindow is null)
+            {
+                _guideWindow = new GuideWindow();
+                _guideWindow.Closed += (_, _) => _guideWindow = null;
+                _guideWindow.Show(this);
+            }
+            else
+            {
+                _guideWindow.Activate();
+            }
+        }
+
         private void OpenHistory_Click(object? sender, RoutedEventArgs e)
         {
             var viewModel = App.ServiceProvider?.GetService<HistoryViewModel>();
@@ -347,6 +507,260 @@ namespace Ongenet.App.Views.Windows
             else
             {
                 _historyWindow.Activate();
+            }
+        }
+
+        private void OpenScripts_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_scriptsWindow is not null) { _scriptsWindow.Activate(); return; }
+            _scriptsWindow = new ScriptsWindow();
+            _scriptsWindow.Closed += (_, _) => _scriptsWindow = null;
+            _scriptsWindow.Show(this);
+        }
+
+        private void OpenTempoMap_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_tempoMapWindow is not null) { _tempoMapWindow.Activate(); return; }
+            var vm = App.ServiceProvider?.GetService<TempoMapViewModel>();
+            if (vm is null) return;
+            _tempoMapWindow = new TempoMapWindow { DataContext = vm };
+            _tempoMapWindow.Closed += (_, _) => _tempoMapWindow = null;
+            _tempoMapWindow.Show(this);
+        }
+
+        private void OpenSectionPlaylist_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_sectionPlaylistWindow is not null) { _sectionPlaylistWindow.Activate(); return; }
+            var vm = App.ServiceProvider?.GetService<SectionPlaylistViewModel>();
+            if (vm is null) return;
+            _sectionPlaylistWindow = new SectionPlaylistWindow { DataContext = vm };
+            _sectionPlaylistWindow.Closed += (_, _) => _sectionPlaylistWindow = null;
+            _sectionPlaylistWindow.Show(this);
+        }
+
+        private void OpenChordTrack_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_chordTrackWindow is not null) { _chordTrackWindow.Activate(); return; }
+            var vm = App.ServiceProvider?.GetService<ChordTrackViewModel>();
+            if (vm is null) return;
+            vm.Rebuild();
+            _chordTrackWindow = new ChordTrackWindow { DataContext = vm };
+            _chordTrackWindow.Closed += (_, _) => _chordTrackWindow = null;
+            _chordTrackWindow.Show(this);
+        }
+
+        private void OpenExpressionMaps_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_expressionMapWindow is not null) { _expressionMapWindow.Activate(); return; }
+            var vm = App.ServiceProvider?.GetService<ExpressionMapViewModel>();
+            if (vm is null) return;
+            _expressionMapWindow = new ExpressionMapWindow { DataContext = vm };
+            _expressionMapWindow.Closed += (_, _) => _expressionMapWindow = null;
+            _expressionMapWindow.Show(this);
+        }
+
+        private void OpenAudioEditor_Click(object? sender, RoutedEventArgs e)
+        {
+            var editor = App.ServiceProvider?.GetService<Services.IAudioEditorService>();
+            var selection = App.ServiceProvider?.GetService<ISelectionService>();
+            if (editor is Services.AudioEditorService svc)
+                svc.SetOwner(this);
+            if (selection?.SelectedClip is { IsAudio: true } clip)
+                editor?.OpenClip(clip);
+            else
+                editor?.Open();
+        }
+
+        // --- Window layout profiles ---
+
+        private IAppSettingsService? AppSettings => App.ServiceProvider?.GetService<IAppSettingsService>();
+
+        private void RestoreWindowLayout()
+        {
+            var settings = AppSettings?.Current;
+            if (settings is null) return;
+
+            var profile = settings.WindowLayouts.FirstOrDefault(l => l.Name == settings.ActiveWindowLayout)
+                            ?? settings.WindowLayouts.FirstOrDefault();
+            if (profile is null) return;
+
+            if (profile.MainWindowMaximized)
+                WindowState = WindowState.Maximized;
+            else
+            {
+                Position = new PixelPoint((int)profile.MainWindowX, (int)profile.MainWindowY);
+                Width = profile.MainWindowWidth > 100 ? profile.MainWindowWidth : Width;
+                Height = profile.MainWindowHeight > 100 ? profile.MainWindowHeight : Height;
+            }
+        }
+
+        private void SaveWindowLayout()
+        {
+            var svc = AppSettings;
+            if (svc is null) return;
+
+            var name = svc.Current.ActiveWindowLayout ?? "Default";
+            var profile = svc.Current.WindowLayouts.FirstOrDefault(l => l.Name == name);
+            if (profile is null)
+            {
+                profile = new WindowLayoutProfileDto { Name = name };
+                svc.Current.WindowLayouts.Add(profile);
+            }
+
+            if (WindowState == WindowState.Maximized)
+            {
+                profile.MainWindowMaximized = true;
+            }
+            else
+            {
+                profile.MainWindowMaximized = false;
+                profile.MainWindowX = Position.X;
+                profile.MainWindowY = Position.Y;
+                profile.MainWindowWidth = Width;
+                profile.MainWindowHeight = Height;
+            }
+
+            svc.Current.ActiveWindowLayout = profile.Name;
+            svc.CaptureAndSave();
+        }
+
+        private void OnSaveLayout_Click(object? sender, RoutedEventArgs e)
+        {
+            var svc = AppSettings;
+            if (svc is null) return;
+            var name = $"Layout {svc.Current.WindowLayouts.Count + 1}";
+            var profile = new WindowLayoutProfileDto { Name = name };
+            if (WindowState == WindowState.Maximized)
+                profile.MainWindowMaximized = true;
+            else
+            {
+                profile.MainWindowX = Position.X;
+                profile.MainWindowY = Position.Y;
+                profile.MainWindowWidth = Width;
+                profile.MainWindowHeight = Height;
+            }
+            svc.Current.WindowLayouts.Add(profile);
+            svc.Current.ActiveWindowLayout = name;
+            svc.CaptureAndSave();
+        }
+
+        private void OnLoadLayout_Click(object? sender, RoutedEventArgs e)
+        {
+            var svc = AppSettings;
+            if (svc is null || svc.Current.WindowLayouts.Count == 0) return;
+            var profile = svc.Current.WindowLayouts[^1];
+            svc.Current.ActiveWindowLayout = profile.Name;
+            if (profile.MainWindowMaximized)
+                WindowState = WindowState.Maximized;
+            else
+            {
+                WindowState = WindowState.Normal;
+                Position = new PixelPoint((int)profile.MainWindowX, (int)profile.MainWindowY);
+                Width = profile.MainWindowWidth;
+                Height = profile.MainWindowHeight;
+            }
+            svc.CaptureAndSave();
+        }
+
+        private async void OnPullCollaboration_Click(object? sender, RoutedEventArgs e)
+        {
+            var svc = AppSettings;
+            var pf = ProjectFile;
+            var project = App.ServiceProvider?.GetService<IProjectService>();
+            if (svc is null || pf is null || project is null) return;
+
+            var syncFolder = svc.Current.CollaborationSyncFolder;
+            if (string.IsNullOrWhiteSpace(syncFolder))
+            {
+                var folder = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Choose collaboration sync folder",
+                    AllowMultiple = false
+                });
+                syncFolder = folder.FirstOrDefault()?.TryGetLocalPath();
+                if (string.IsNullOrWhiteSpace(syncFolder)) return;
+                svc.Current.CollaborationSyncFolder = syncFolder;
+                svc.CaptureAndSave();
+            }
+
+            if (!CollaborationService.TryPullLatest(syncFolder, out var projectPath) || string.IsNullOrWhiteSpace(projectPath))
+            {
+                await MessageDialog.Notify(this, "Nothing to pull",
+                    "No share manifest or project file was found in the collaboration folder.");
+                return;
+            }
+
+            if (pf.IsDirty)
+            {
+                var manifest = CollaborationService.LoadManifest(syncFolder);
+                var remoteTime = manifest?.ExportedUtc.ToLocalTime().ToString("g") ?? "unknown";
+                var keepLocal = await MessageDialog.Confirm(this, "Collaboration conflict",
+                    $"Your project has unsaved changes, but a newer copy exists in the sync folder (exported {remoteTime}).\n\n" +
+                    "Discard local changes and load the shared copy?",
+                    "Load shared copy", "Keep local");
+                if (!keepLocal) return;
+            }
+
+            try
+            {
+                var result = await pf.LoadAsync(projectPath);
+                History?.Clear();
+                if (result.Warnings.Count > 0)
+                    await MessageDialog.Notify(this, "Project pulled with warnings",
+                        string.Join("\n", result.Warnings));
+                else
+                    await MessageDialog.Notify(this, "Pulled",
+                        $"Loaded {System.IO.Path.GetFileName(projectPath)} from the collaboration folder.");
+            }
+            catch (Exception ex)
+            {
+                await MessageDialog.Notify(this, "Pull failed", ex.Message);
+            }
+        }
+
+        private async void OnExportAudio_Click(object? sender, RoutedEventArgs e)
+            => await ExportDialog.ShowAsync(this);
+
+        private async void OnSyncCollaboration_Click(object? sender, RoutedEventArgs e)
+        {
+            var svc = AppSettings;
+            var pf = ProjectFile;
+            var project = App.ServiceProvider?.GetService<IProjectService>();
+            if (svc is null || pf is null || project is null) return;
+
+            var syncFolder = svc.Current.CollaborationSyncFolder;
+            if (string.IsNullOrWhiteSpace(syncFolder))
+            {
+                var folder = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Choose collaboration sync folder",
+                    AllowMultiple = false
+                });
+                syncFolder = folder.FirstOrDefault()?.TryGetLocalPath();
+                if (string.IsNullOrWhiteSpace(syncFolder)) return;
+                svc.Current.CollaborationSyncFolder = syncFolder;
+                svc.CaptureAndSave();
+            }
+
+            var path = pf.CurrentPath;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                await MessageDialog.Notify(this, "Save required",
+                    "Save the project before syncing to the collaboration folder.");
+                return;
+            }
+
+            try
+            {
+                CollaborationService.ExportShareManifest(project.Current, path, syncFolder);
+                var versionPath = CollaborationService.PushVersion(path, syncFolder);
+                var versions = CollaborationService.ListVersions(syncFolder);
+                await MessageDialog.Notify(this, "Synced",
+                    $"Project synced to {syncFolder}\nVersion snapshot: {System.IO.Path.GetFileName(versionPath)}\n({versions.Count} versions on file)");
+            }
+            catch (Exception ex)
+            {
+                await MessageDialog.Notify(this, "Sync failed", ex.Message);
             }
         }
 

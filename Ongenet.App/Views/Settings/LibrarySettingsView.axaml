@@ -9,9 +9,9 @@
 
     <ScrollViewer>
         <StackPanel Margin="14" Spacing="14">
-            <TextBlock Text="Sample folders" FontWeight="Bold" FontSize="13"
+            <TextBlock Text="{DynamicResource SettingsLibrary_Sample_folders}" FontWeight="Bold" FontSize="13"
                        Foreground="{StaticResource CatppuccinText}"/>
-            <TextBlock Text="Folders scanned for the Samples library tab." FontSize="11"
+            <TextBlock Text="{DynamicResource SettingsLibrary_Folders_scanned_for_the_Samples_library_tab}" FontSize="11"
                        Foreground="{StaticResource CatppuccinSubtext0}"/>
             <Border Height="130" CornerRadius="4" Background="{StaticResource CatppuccinMantle}"
                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
@@ -19,13 +19,13 @@
                          Background="Transparent"/>
             </Border>
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Add folder…" Click="OnAddSample" Background="{StaticResource CatppuccinSurface1}"/>
-                <Button Content="Remove" Click="OnRemoveSample" Background="{StaticResource CatppuccinSurface1}"/>
+                <Button Content="{DynamicResource SettingsLibrary_Add_folder}" Click="OnAddSample" Background="{StaticResource CatppuccinSurface1}"/>
+                <Button Content="{DynamicResource SettingsLibrary_Remove}" Click="OnRemoveSample" Background="{StaticResource CatppuccinSurface1}"/>
             </StackPanel>
 
-            <TextBlock Text="Sound-font folders" FontWeight="Bold" FontSize="13" Margin="0,8,0,0"
+            <TextBlock Text="{DynamicResource SettingsLibrary_Sound_font_folders}" FontWeight="Bold" FontSize="13" Margin="0,8,0,0"
                        Foreground="{StaticResource CatppuccinText}"/>
-            <TextBlock Text="Folders scanned for .sf2 / .sfz in the Soundfonts library tab." FontSize="11"
+            <TextBlock Text="{DynamicResource SettingsLibrary_Folders_scanned_for_sf2_sfz_in_the_Soundfonts_li}" FontSize="11"
                        Foreground="{StaticResource CatppuccinSubtext0}"/>
             <Border Height="130" CornerRadius="4" Background="{StaticResource CatppuccinMantle}"
                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
@@ -33,11 +33,11 @@
                          Background="Transparent"/>
             </Border>
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Add folder…" Click="OnAddSoundFont" Background="{StaticResource CatppuccinSurface1}"/>
-                <Button Content="Remove" Click="OnRemoveSoundFont" Background="{StaticResource CatppuccinSurface1}"/>
+                <Button Content="{DynamicResource SettingsLibrary_Add_folder}" Click="OnAddSoundFont" Background="{StaticResource CatppuccinSurface1}"/>
+                <Button Content="{DynamicResource SettingsLibrary_Remove}" Click="OnRemoveSoundFont" Background="{StaticResource CatppuccinSurface1}"/>
             </StackPanel>
 
-            <CheckBox Content="Auto-play files when selected" Margin="0,8,0,0"
+            <CheckBox Content="{DynamicResource SettingsLibrary_Auto_play_files_when_selected}" Margin="0,8,0,0"
                       IsChecked="{Binding AutoPlay, Mode=TwoWay}"/>
         </StackPanel>
     </ScrollViewer>

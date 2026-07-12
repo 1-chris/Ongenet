@@ -4,6 +4,7 @@ using System.Linq;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.MidiFx;
 
 namespace Ongenet.Core.Models.Audio;
 
@@ -29,8 +30,8 @@ public sealed class Track
     /// </summary>
     public Guid? ParentId { get; set; }
 
-    /// <summary>True for a bus (group or master) that sums child output rather than carrying clips.</summary>
-    public bool IsBus => Kind is TrackKind.Group or TrackKind.Master;
+    /// <summary>True for a bus (group, return, or master) that sums child output rather than carrying clips.</summary>
+    public bool IsBus => Kind is TrackKind.Group or TrackKind.Return or TrackKind.Master;
 
     /// <summary>Whether the track is muted.</summary>
     public bool IsMuted { get; set; }
@@ -55,6 +56,9 @@ public sealed class Track
 
     /// <summary>Stereo pan, -1 (hard left) .. +1 (hard right).</summary>
     public double Pan { get; set; } = DefaultPan;
+
+    /// <summary>Surround width for 5.1 export, 0 (mono/center) .. 1 (full stereo/sides).</summary>
+    public double SurroundWidth { get; set; } = 1.0;
 
     /// <summary>
     /// The track's colour, stored as a palette key (e.g. "CatppuccinMauve") or a "#rrggbb"
@@ -81,6 +85,9 @@ public sealed class Track
     /// <summary>Publishes the current <see cref="Instruments"/> list to the audio thread.</summary>
     public void CommitInstruments() => _activeInstruments = Instruments.ToArray();
 
+    /// <summary>Instrument/drum rack layout (macros, pad grid).</summary>
+    public InstrumentRackSettings Rack { get; set; } = new();
+
     /// <summary>The first instrument in the rack, or null. Convenience for read-only call sites.</summary>
     public IInstrument? PrimaryInstrument => Instruments.Count > 0 ? Instruments[0].Instrument : null;
 
@@ -101,6 +108,17 @@ public sealed class Track
     /// <summary>Publishes the current <see cref="Effects"/> list to the audio thread.</summary>
     public void CommitEffects() => _activeEffects = Effects.ToArray();
 
+    /// <summary>MIDI-FX chain (UI-facing). Edit, then call <see cref="CommitMidiEffects"/>.</summary>
+    public List<IMidiEffect> MidiEffects { get; } = new();
+
+    private volatile IMidiEffect[] _activeMidiEffects = Array.Empty<IMidiEffect>();
+
+    /// <summary>Lock-free snapshot of the MIDI-FX chain read by the scheduler.</summary>
+    public IMidiEffect[] ActiveMidiEffects => _activeMidiEffects;
+
+    /// <summary>Publishes the current <see cref="MidiEffects"/> list to the audio thread.</summary>
+    public void CommitMidiEffects() => _activeMidiEffects = MidiEffects.ToArray();
+
     /// <summary>Automation lanes on this track (UI-facing). Edit, then call <see cref="CommitAutoLanes"/>.</summary>
     public List<AutomationLane> AutoLanes { get; } = new();
 
@@ -112,9 +130,65 @@ public sealed class Track
     /// <summary>Publishes the current <see cref="AutoLanes"/> list to the audio thread.</summary>
     public void CommitAutoLanes() => _activeAutoLanes = AutoLanes.ToArray();
 
+    /// <summary>Track-level modulators (LFO → parameter). Edit, then call <see cref="CommitModulators"/>.</summary>
+    public List<TrackModulator> Modulators { get; } = new();
+
+    private volatile TrackModulator[] _activeModulators = Array.Empty<TrackModulator>();
+
+    /// <summary>Lock-free snapshot of modulators read by the audio engine.</summary>
+    public TrackModulator[] ActiveModulators => _activeModulators;
+
+    /// <summary>Publishes the current <see cref="Modulators"/> list to the audio thread.</summary>
+    public void CommitModulators() => _activeModulators = Modulators.ToArray();
+
     /// <summary>Transient UI state: whether this track's automation lanes are collapsed in the timeline.</summary>
     public bool AutomationCollapsed { get; set; }
 
     /// <summary>Transient UI state: whether this group's nested rows (children + automation) are collapsed.</summary>
     public bool GroupCollapsed { get; set; }
+
+    /// <summary>Main output routing target (parent group, master, specific bus, or none).</summary>
+    public TrackOutputTarget OutputTarget { get; set; } = TrackOutputTarget.ParentBus;
+
+    /// <summary>When <see cref="OutputTarget"/> is <see cref="TrackOutputTarget.SpecificBus"/>, the destination bus id.</summary>
+    public Guid? OutputBusId { get; set; }
+
+    /// <summary>When false, the track is excluded from the master chain (FL-style "route to master" off).</summary>
+    public bool RouteToMaster { get; set; } = true;
+
+    /// <summary>Auxiliary sends to return tracks.</summary>
+    public List<TrackSend> Sends { get; } = new();
+
+    /// <summary>Comping take lanes (recording alternates).</summary>
+    public List<TakeLane> TakeLanes { get; } = new();
+
+    /// <summary>Take lane that receives new recordings; null uses the first armed lane or first lane.</summary>
+    public Guid? ActiveTakeLaneId { get; set; }
+
+    /// <summary>
+    /// For <see cref="TrackKind.Pattern"/> tracks: the pattern edited when no clip is selected and the
+    /// default pattern used when creating new pattern clips on this lane.
+    /// </summary>
+    public Guid? ActivePatternId { get; set; }
+
+    /// <summary>Optional drum map applied to MIDI notes on this track.</summary>
+    public Guid? DrumMapId { get; set; }
+
+    /// <summary>When true the track plays from a pre-rendered freeze buffer instead of live instruments/FX.</summary>
+    public bool IsFrozen { get; set; }
+
+    /// <summary>Pre-freeze instruments/FX/clips restored by unfreeze.</summary>
+    public FreezeSnapshot? FreezeBackup { get; set; }
+
+    /// <summary>Per-channel surround pan when mixing to 5.1/7.1.</summary>
+    public SurroundChannelPan SurroundPan { get; set; } = new();
+
+    /// <summary>When true, MIDI on this track is also sent to the external MIDI output device.</summary>
+    public bool RouteToExternalMidi { get; set; }
+
+    /// <summary>MIDI channel (1–16) used when <see cref="RouteToExternalMidi"/> is enabled.</summary>
+    public int ExternalMidiChannel { get; set; } = 1;
+
+    /// <summary>Software input monitoring for audio tracks (not persisted).</summary>
+    public InputMonitoringMode InputMonitoring { get; set; } = InputMonitoringMode.Auto;
 }

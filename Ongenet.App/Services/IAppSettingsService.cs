@@ -25,4 +25,10 @@ public interface IAppSettingsService
 
     /// <summary>Raised after library settings (scan paths / auto-play) are saved.</summary>
     event System.Action? LibraryChanged;
+
+    /// <summary>Applies and persists a UI culture change.</summary>
+    void SetUiCulture(string cultureId);
+
+    /// <summary>Applies and persists the plugin isolation toggle.</summary>
+    void SetPluginIsolationEnabled(bool enabled);
 }

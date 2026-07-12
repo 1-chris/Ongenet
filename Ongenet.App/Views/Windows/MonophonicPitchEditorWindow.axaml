@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ara="using:Ongenet.Ara"
+        x:Class="Ongenet.App.Views.Windows.MonophonicPitchEditorWindow"
+        x:DataType="ara:MonophonicPitchAraDocument"
+        Width="360" Height="180" Title="{DynamicResource MonoPitch_Pitch_Editor_Title}"
+        WindowStartupLocation="CenterOwner">
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="16">
+        <StackPanel Spacing="12">
+            <TextBlock Text="{DynamicResource MonoPitch_Monophonic_pitch_shift_built_in_ARA_fallback}"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+            <StackPanel Spacing="4">
+                <DockPanel>
+                    <TextBlock Text="{DynamicResource MonoPitch_Semitones}" DockPanel.Dock="Left"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock Text="{Binding SourceSemitoneOffset, StringFormat='{}{0:0.0}'}"
+                               HorizontalAlignment="Right"
+                               Foreground="{StaticResource CatppuccinSubtext1}"/>
+                </DockPanel>
+                <Slider Minimum="-24" Maximum="24" Value="{Binding SourceSemitoneOffset, Mode=TwoWay}"/>
+            </StackPanel>
+            <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
+                       Text="{DynamicResource MonoPitch_When_the_Celemony_ARA_SDK_is_unavailable_Ongenet}"/>
+        </StackPanel>
+    </Border>
+</Window>

@@ -29,6 +29,7 @@ namespace Ongenet.App.ViewModels
             {
                 OnPropertyChanged(nameof(Backends));
                 OnPropertyChanged(nameof(SelectedBackend));
+                OnPropertyChanged(nameof(ShowWasapiExclusive));
                 RaiseLists();
             });
         }
@@ -88,6 +89,37 @@ namespace Ongenet.App.ViewModels
                 OnPropertyChanged();
                 _settings?.CaptureAndSave(); // device changes persist via events; mode has no event
 
+            }
+        }
+
+        /// <summary>When true, WASAPI uses exclusive output mode for lower latency (Windows only).</summary>
+        public bool WasapiExclusiveMode
+        {
+            get => _settings?.Current.WasapiExclusiveMode ?? _devices.LowLatencyExclusive;
+            set
+            {
+                if (_devices.LowLatencyExclusive == value &&
+                    (_settings is null || _settings.Current.WasapiExclusiveMode == value))
+                    return;
+                _devices.LowLatencyExclusive = value;
+                if (_settings is not null)
+                    _settings.Current.WasapiExclusiveMode = value;
+                OnPropertyChanged();
+                _settings?.CaptureAndSave();
+            }
+        }
+
+        public bool ShowWasapiExclusive => SelectedBackend?.Id is "wasapi" or "win";
+
+        public bool MidiClockEnabled
+        {
+            get => _settings?.Current.MidiClockEnabled ?? false;
+            set
+            {
+                if (_settings is null || _settings.Current.MidiClockEnabled == value) return;
+                _settings.Current.MidiClockEnabled = value;
+                OnPropertyChanged();
+                _settings.CaptureAndSave();
             }
         }
 

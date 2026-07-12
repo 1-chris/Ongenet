@@ -24,6 +24,9 @@ public partial class FieldEditorView : UserControl
     public FieldEditorView()
     {
         InitializeComponent();
+        Ongenet.App.Accessibility.A11y.Landmark(this,
+            Ongenet.App.Localization.Loc.Get("A11y_FieldEditor_Name"),
+            Ongenet.App.Localization.Loc.Get("A11y_FieldEditor_Help"));
     }
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
@@ -149,6 +152,55 @@ public partial class FieldEditorView : UserControl
         {
             canvas.AddNodeAtViewCenter(item.TypeId);
         }
+    }
+
+    private void OnExitGroup(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm) vm.ExitGroup();
+    }
+
+    private async void OnSavePatch(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not FieldEditorViewModel vm) return;
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null) return;
+
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save Field patch",
+            SuggestedFileName = string.IsNullOrWhiteSpace(vm.PatchName) ? "Field Patch" : vm.PatchName.Trim(),
+            DefaultExtension = "ongenpreset",
+            FileTypeChoices = new List<FilePickerFileType>
+            {
+                new("Field patch") { Patterns = new[] { "*.ongenpreset" } }
+            }
+        });
+
+        var path = file?.TryGetLocalPath();
+        if (string.IsNullOrEmpty(path)) return;
+        vm.CaptureHistory("Save Field patch");
+        vm.SavePatchToFile(path);
+    }
+
+    private async void OnLoadPatch(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not FieldEditorViewModel vm) return;
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null) return;
+
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Load Field patch",
+            AllowMultiple = false,
+            FileTypeFilter = new List<FilePickerFileType>
+            {
+                new("Field patch") { Patterns = new[] { "*.ongenpreset" } }
+            }
+        });
+
+        var path = System.Linq.Enumerable.FirstOrDefault(files)?.TryGetLocalPath();
+        if (string.IsNullOrEmpty(path)) return;
+        vm.LoadPatchFromFile(path);
     }
 
     private async void OnLoadSample(object? sender, RoutedEventArgs e)

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Ongenet.App.Localization;
 using Ongenet.App.Theming;
 using Ongenet.App.ViewModels.Field;
 using Ongenet.Core.Audio.Field;
@@ -184,7 +186,7 @@ public sealed class FieldCanvasControl : ThemedControl
         DrawGrid(ctx);
 
         // Connections.
-        foreach (var conn in _vm.Graph.Connections)
+        foreach (var conn in _vm.VisibleConnections())
         {
             var src = _vm.Graph.FindNode(conn.SourceNode);
             var dst = _vm.Graph.FindNode(conn.DestNode);
@@ -212,8 +214,12 @@ public sealed class FieldCanvasControl : ThemedControl
             DrawWire(ctx, WorldToScreen(start.X, start.Y), _connectCurrent, _wire);
         }
 
+        // Groups (root view only).
+        if (_vm.NavigationGroupId is null)
+            foreach (var group in _vm.Graph.Groups) DrawGroup(ctx, group);
+
         // Nodes.
-        foreach (var n in _vm.Graph.Nodes) DrawNode(ctx, n);
+        foreach (var n in _vm.VisibleNodes()) DrawNode(ctx, n);
     }
 
     private void DrawGrid(DrawingContext ctx)
@@ -226,6 +232,56 @@ public sealed class FieldCanvasControl : ThemedControl
             ctx.DrawLine(_grid, new Point(x, 0), new Point(x, Bounds.Height));
         for (var y = startY; y < Bounds.Height; y += spacing)
             ctx.DrawLine(_grid, new Point(0, y), new Point(Bounds.Width, y));
+    }
+
+    private void DrawGroup(DrawingContext ctx, FieldGroup group)
+    {
+        if (!TryGetGroupBounds(group, out var bounds)) return;
+        var tl = WorldToScreen(bounds.X, bounds.Y);
+        var rect = new Rect(tl.X, tl.Y, bounds.Width * Zoom, bounds.Height * Zoom);
+        ctx.DrawRectangle(new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Surface1, 120)),
+            new Pen(new SolidColorBrush(ThemePalette.Mauve), 1.5), rect, 8, 8);
+        if (Zoom > 0.45)
+            DrawText(ctx, group.Name, new Point(tl.X + 8 * Zoom, tl.Y + 4 * Zoom), 11 * Zoom,
+                new SolidColorBrush(ThemePalette.Mauve));
+    }
+
+    private bool TryGetGroupBounds(FieldGroup group, out Rect bounds)
+    {
+        bounds = default;
+        var minX = double.PositiveInfinity;
+        var minY = double.PositiveInfinity;
+        var maxX = double.NegativeInfinity;
+        var maxY = double.NegativeInfinity;
+        var any = false;
+        foreach (var node in _vm!.Graph.Nodes)
+        {
+            if (!group.NodeIds.Contains(node.Id)) continue;
+            any = true;
+            minX = Math.Min(minX, node.X);
+            minY = Math.Min(minY, node.Y);
+            maxX = Math.Max(maxX, node.X + NodeW(node));
+            maxY = Math.Max(maxY, node.Y + NodeHeight(node));
+        }
+
+        if (!any) return false;
+        const double pad = 18;
+        bounds = new Rect(minX - pad, minY - pad, maxX - minX + pad * 2, maxY - minY + pad * 2);
+        return true;
+    }
+
+    private bool HitGroup(Point screen, out FieldGroup? group)
+    {
+        group = null;
+        if (_vm is null || _vm.NavigationGroupId is not null) return false;
+        foreach (var g in _vm.Graph.Groups)
+        {
+            if (!TryGetGroupBounds(g, out var bounds)) continue;
+            var tl = WorldToScreen(bounds.X, bounds.Y);
+            var rect = new Rect(tl.X, tl.Y, bounds.Width * Zoom, bounds.Height * Zoom);
+            if (rect.Contains(screen)) { group = g; return true; }
+        }
+        return false;
     }
 
     private void DrawNode(DrawingContext ctx, FieldNode n)
@@ -377,7 +433,11 @@ public sealed class FieldCanvasControl : ThemedControl
         // Port hit?
         if (HitPort(pt, out var node, out var port))
         {
-            if (port!.Direction == FieldPortDirection.Input) _vm.Graph.DisconnectPort(node!.Id, port.Id);
+            if (port!.Direction == FieldPortDirection.Input)
+            {
+                _vm.CaptureHistory("Wire Field node");
+                _vm.Graph.DisconnectPort(node!.Id, port.Id);
+            }
             _mode = Mode.Connect;
             _connectNode = node;
             _connectPort = port;
@@ -389,11 +449,20 @@ public sealed class FieldCanvasControl : ThemedControl
         // Node body hit?
         if (HitNode(pt, out var hitNode))
         {
+            _vm.CaptureHistory("Move Field node");
             _vm.SelectedNode = hitNode;
             _mode = Mode.DragNode;
             _dragNode = hitNode;
             var world = ScreenToWorld(pt);
             _dragOffset = new Point(world.X - hitNode!.X, world.Y - hitNode.Y);
+            e.Handled = true;
+            return;
+        }
+
+        // Group enter (double-click empty group chrome at root)?
+        if (e.ClickCount >= 2 && HitGroup(pt, out var enterGroup) && enterGroup is not null)
+        {
+            _vm.EnterGroup(enterGroup);
             e.Handled = true;
             return;
         }
@@ -453,6 +522,7 @@ public sealed class FieldCanvasControl : ThemedControl
             if (HitPort(pt, out var node, out var port) && node is not null && port is not null
                 && port.Direction != _connectPort.Direction && !ReferenceEquals(node, _connectNode))
             {
+                _vm.CaptureHistory("Wire Field node");
                 if (_connectPort.Direction == FieldPortDirection.Output)
                     _vm.Graph.Connect(_connectNode.Id, _connectPort.Id, node.Id, port.Id);
                 else
@@ -464,6 +534,10 @@ public sealed class FieldCanvasControl : ThemedControl
                 // Dropped an input-originated rewire on empty space: the disconnect already applied.
                 _vm.NotifyStructureChanged();
             }
+        }
+        else if (_mode == Mode.DragNode && _dragNode is not null)
+        {
+            _vm.FinishMoveNode(_dragNode);
         }
 
         _mode = Mode.None;
@@ -498,6 +572,11 @@ public sealed class FieldCanvasControl : ThemedControl
             _vm.RemoveSelected();
             e.Handled = true;
         }
+        else if (e.Key == Key.Escape && _vm.CanExitGroup)
+        {
+            _vm.ExitGroup();
+            e.Handled = true;
+        }
     }
 
     private bool HitPort(Point screen, out FieldNode? node, out FieldPort? port)
@@ -506,7 +585,7 @@ public sealed class FieldCanvasControl : ThemedControl
         port = null;
         if (_vm is null) return false;
         var r = (PortRadius + 5) * Math.Max(0.5, Zoom);
-        foreach (var n in _vm.Graph.Nodes)
+        foreach (var n in _vm.VisibleNodes())
         {
             for (var i = 0; i < n.Inputs.Count; i++)
             {
@@ -527,9 +606,10 @@ public sealed class FieldCanvasControl : ThemedControl
         node = null;
         if (_vm is null) return false;
         // Topmost last: iterate in reverse.
-        for (var i = _vm.Graph.Nodes.Count - 1; i >= 0; i--)
+        var nodes = _vm.VisibleNodes().ToList();
+        for (var i = nodes.Count - 1; i >= 0; i--)
         {
-            var n = _vm.Graph.Nodes[i];
+            var n = nodes[i];
             var origin = WorldToScreen(n.X, n.Y);
             var rect = new Rect(origin.X, origin.Y, NodeW(n) * Zoom, NodeHeight(n) * Zoom);
             if (rect.Contains(screen)) { node = n; return true; }
@@ -542,9 +622,10 @@ public sealed class FieldCanvasControl : ThemedControl
         node = null;
         if (_vm is null) return false;
         var hs = ResizeHandle * Zoom;
-        for (var i = _vm.Graph.Nodes.Count - 1; i >= 0; i--)
+        var nodes = _vm.VisibleNodes().ToList();
+        for (var i = nodes.Count - 1; i >= 0; i--)
         {
-            var n = _vm.Graph.Nodes[i];
+            var n = nodes[i];
             var origin = WorldToScreen(n.X, n.Y);
             var right = origin.X + NodeW(n) * Zoom;
             var bottom = origin.Y + NodeHeight(n) * Zoom;
@@ -568,12 +649,19 @@ public sealed class FieldCanvasControl : ThemedControl
         {
             _vm.SelectedNode = node;
             var menu = new MenuFlyout();
-            var del = new MenuItem { Header = "Delete node" };
+            var del = new MenuItem { Header = Loc.Get("Menu_DeleteNode") };
             del.Click += (_, _) => _vm.RemoveNode(node);
             menu.Items.Add(del);
-            var disc = new MenuItem { Header = "Disconnect all" };
+            if (_vm.NavigationGroupId is null && _vm.Graph.Groups.FirstOrDefault(g => g.NodeIds.Contains(node.Id)) is { } parent)
+            {
+                var enter = new MenuItem { Header = Loc.Format("Menu_EnterGroup", parent.Name) };
+                enter.Click += (_, _) => _vm.EnterGroup(parent);
+                menu.Items.Add(enter);
+            }
+            var disc = new MenuItem { Header = Loc.Get("Menu_DisconnectAll") };
             disc.Click += (_, _) =>
             {
+                _vm.CaptureHistory("Wire Field node");
                 foreach (var p in node.Inputs) _vm.Graph.DisconnectPort(node.Id, p.Id);
                 foreach (var p in node.Outputs) _vm.Graph.DisconnectPort(node.Id, p.Id);
                 _vm.NotifyStructureChanged();

@@ -14,5 +14,6 @@ public static class FieldNodeCategories
     public const string Sampler = "Sampler";
     public const string Math = "Math";
     public const string Logic = "Logic";
+    public const string Music = "Music Theory";
     public const string Modules = "Modules";
 }

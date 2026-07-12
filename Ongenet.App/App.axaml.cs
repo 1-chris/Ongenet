@@ -11,7 +11,10 @@ using Ongenet.Core.DependencyInjection;
 using Ongenet.Core.Services.Implementation;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Platform;
+using Ongenet.App.Localization;
 using Ongenet.App.ViewModels;
+using Ongenet.Ara;
+using Ongenet.Link;
 
 namespace Ongenet.App
 {
@@ -83,13 +86,30 @@ namespace Ongenet.App
             services.AddSingleton<Services.IAutomationService, Services.AutomationService>();
 
             // Undo/redo history (project-snapshot based).
+            services.AddSingleton<Func<PianoRollViewModel>>(sp => () => sp.GetRequiredService<PianoRollViewModel>());
             services.AddSingleton<Services.IHistoryService, Services.HistoryService>();
+            services.AddSingleton<Core.Services.IHistoryCapture>(sp => sp.GetRequiredService<Services.IHistoryService>());
+            services.AddSingleton<Services.KeyboardShortcutService>();
 
             // ~30fps UI heartbeat so automated controls visibly move during playback.
             services.AddSingleton<Services.IPlaybackClock, Services.PlaybackClock>();
 
+            services.AddSingleton<Services.ControlSurfaceService>();
+            services.AddSingleton<Services.OscControlService>();
+            services.AddSingleton<Core.Services.TimecodeSyncService>();
+
             // Process CPU/RAM indicators (desktop overrides with a real sampler).
             services.AddSingleton<Services.ISystemMetricsSampler, Services.NullSystemMetricsSampler>();
+
+            // Ableton Link (desktop overrides with NativeLinkSession when libabl-link is present).
+            services.AddSingleton<ILinkSession>(_ => new NullLinkSession());
+            services.AddSingleton<IMidiOutputService, NullMidiOutputService>();
+
+            // ARA hosting seam (desktop uses the same stub until ENABLE_ARA + SDK are configured).
+            services.AddSingleton<IAraHost, AraHost>();
+
+            // Plugin crash isolation (desktop overrides with OutOfProcessPluginHost).
+            services.AddSingleton<Core.Services.IPluginProcessHost, Core.Services.InProcessPluginHost>();
 
             // ViewModels. Panel view models are singletons: they share the one transport,
             // selection, and project for the lifetime of the single main window.
@@ -101,6 +121,13 @@ namespace Ongenet.App
             services.AddSingleton<InstrumentInspectorViewModel>();
             services.AddSingleton<SampleInspectorViewModel>();
             services.AddSingleton<PianoRollViewModel>();
+            services.AddSingleton<ViewModels.Panels.StepSequencerViewModel>();
+            services.AddSingleton<ViewModels.Panels.ChannelRackViewModel>();
+            services.AddSingleton<ViewModels.Panels.PatternTrackInspectorViewModel>();
+            services.AddSingleton<ViewModels.Panels.PatternEditorViewModel>();
+            services.AddSingleton<ViewModels.Panels.MidiFxViewModel>();
+            services.AddSingleton<ViewModels.Panels.GrooveSettingsViewModel>();
+            services.AddTransient<ViewModels.Panels.DrumMapEditorViewModel>();
             services.AddSingleton<EffectsViewModel>();
             services.AddSingleton<BottomPanelViewModel>();
             services.AddSingleton<FileBrowserViewModel>();
@@ -118,18 +145,42 @@ namespace Ongenet.App
             services.AddSingleton<ViewModels.Library.EffectChainPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.ProjectsLibraryViewModel>();
             services.AddSingleton<ViewModels.ProjectClipsViewModel>();
+            services.AddSingleton<ViewModels.Panels.MixerViewModel>();
 
+            services.AddSingleton<Core.Services.ExportService>();
+            services.AddTransient<ExportViewModel>();
+            services.AddTransient<SamplerZoneEditorViewModel>();
+            services.AddTransient<LogicalMidiEditViewModel>();
+            services.AddSingleton<ViewModels.Panels.SessionViewModel>();
+            services.AddSingleton<ViewModels.Panels.NotationViewModel>();
+            services.AddSingleton<ViewModels.Panels.VideoTrackViewModel>();
+            services.AddSingleton<ViewModels.Panels.InstrumentRackViewModel>();
+            services.AddSingleton<Services.IAudioEditorService, Services.AudioEditorService>();
+            services.AddTransient<AudioEditorViewModel>();
+            services.AddSingleton<ChordTrackViewModel>();
+            services.AddSingleton<ExpressionMapViewModel>();
+            services.AddSingleton<ControlRoomSettingsViewModel>();
+            services.AddSingleton<ScriptsViewModel>();
+            services.AddSingleton<Core.Services.IScriptingHost, Core.Services.NullScriptingHost>();
+
+            services.AddTransient<GuideViewModel>();
             services.AddSingleton<MainViewModel>();
 
             // Live theming (Catppuccin variants + custom themes).
             services.AddSingleton<Theming.IThemeService, Theming.ThemeService>();
+            services.AddSingleton<ILocalizationService, LocalizationService>();
             services.AddSingleton<ThemeEditorViewModel>();
             services.AddSingleton<HistoryViewModel>();
 
             // Unified settings window (Audio / MIDI / Theme tabs).
             services.AddSingleton<MidiSettingsViewModel>();
+            services.AddSingleton<ControlSurfaceSettingsViewModel>();
             services.AddSingleton<LibrarySettingsViewModel>();
+            services.AddSingleton<GeneralSettingsViewModel>();
             services.AddSingleton<SettingsViewModel>();
+            services.AddTransient<ViewModels.Panels.RoutingMatrixViewModel>();
+            services.AddSingleton<TempoMapViewModel>();
+            services.AddSingleton<SectionPlaylistViewModel>();
 
             // Platform-specific services last, so a head can override a shared default (e.g. a browser-safe
             // settings store) and contribute its audio backend(s), MIDI source and any plugin hosts.
@@ -160,6 +211,9 @@ namespace Ongenet.App
 
             // Capture the palette brushes and apply the default theme.
             ServiceProvider.GetRequiredService<Theming.IThemeService>().Initialize();
+
+            // Load default locale strings (ApplyToServices may switch to the saved culture).
+            ServiceProvider.GetRequiredService<ILocalizationService>().Initialize();
 
             // Apply persisted preferences (theme, audio/MIDI device, input quantize, transport maps) over
             // the defaults, before the engine and MIDI input start, so they open on the saved devices.

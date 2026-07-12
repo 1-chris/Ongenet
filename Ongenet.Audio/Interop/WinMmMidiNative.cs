@@ -57,4 +57,33 @@ internal static class WinMmMidiNative
 
     [DllImport(Lib)]
     public static extern int midiInClose(IntPtr hMidiIn);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct MIDIOUTCAPS
+    {
+        public ushort wMid;
+        public ushort wPid;
+        public uint vDriverVersion;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = MAXPNAMELEN)]
+        public string szPname;
+
+        public uint dwSupport;
+    }
+
+    [DllImport(Lib)]
+    public static extern uint midiOutGetNumDevs();
+
+    [DllImport(Lib, EntryPoint = "midiOutGetDevCapsW", CharSet = CharSet.Unicode)]
+    public static extern int midiOutGetDevCaps(UIntPtr uDeviceID, ref MIDIOUTCAPS caps, uint cbMidiOutCaps);
+
+    [DllImport(Lib)]
+    public static extern int midiOutOpen(out IntPtr lphMidiOut, uint uDeviceID, IntPtr dwCallback,
+        IntPtr dwInstance, uint dwFlags);
+
+    [DllImport(Lib)]
+    public static extern int midiOutClose(IntPtr hMidiOut);
+
+    [DllImport(Lib)]
+    public static extern int midiOutShortMsg(IntPtr hMidiOut, uint dwMsg);
 }

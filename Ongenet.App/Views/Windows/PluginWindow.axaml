@@ -4,7 +4,7 @@
         Width="500" Height="360" MinWidth="200" MinHeight="120"
         CanResize="True"
         Background="{StaticResource CatppuccinBase}"
-        Title="Plugin">
+        Title="{DynamicResource Plugin_Plugin_Title}">
     <!-- Intentionally empty: the CLAP plugin embeds its native GUI into this window's surface. -->
     <Panel Background="{StaticResource CatppuccinBase}"/>
 </Window>

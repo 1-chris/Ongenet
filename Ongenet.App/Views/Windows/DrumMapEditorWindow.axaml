@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+        xmlns:core="using:Ongenet.Core.Models.Audio"
+        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="520"
+        x:Class="Ongenet.App.Views.Windows.DrumMapEditorWindow"
+        x:DataType="vm:DrumMapEditorViewModel"
+        Width="420" Height="520" MinWidth="360" MinHeight="400"
+        Title="{DynamicResource DrumMap_Drum_Map_Editor_Title}">
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+            <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+                <TextBlock Text="{DynamicResource DrumMap_Drum_maps}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding Maps}" SelectedItem="{Binding SelectedMap}"
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="core:DrumMap">
+                            <TextBlock Text="{Binding Name}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBox Text="{Binding MapName}" PlaceholderText="{DynamicResource DrumMap_Map_name}"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                <Button Content="{DynamicResource DrumMap_Add_map}" Command="{Binding AddMapCommand}" Padding="8,4"/>
+                <Button Content="{DynamicResource DrumMap_Add_pad}" Command="{Binding AddEntryCommand}" Padding="8,4"/>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2">
+                <ItemsControl ItemsSource="{Binding Entries}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DrumMapEntryViewModel">
+                            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4"
+                                    Background="{StaticResource CatppuccinSurface0}">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+                                    <NumericUpDown Grid.Column="0" Value="{Binding Note}" Minimum="0" Maximum="127"
+                                                   Width="70" FormatString="0"/>
+                                    <TextBox Grid.Column="1" Text="{Binding Label}" PlaceholderText="{DynamicResource DrumMap_Label}"/>
+                                    <TextBox Grid.Column="2" Text="{Binding SampleClipIdText}" Width="120"
+                                             PlaceholderText="{DynamicResource DrumMap_Clip_GUID}"/>
+                                    <NumericUpDown Grid.Column="3" Value="{Binding VelocityScale}" Minimum="0" Maximum="2"
+                                                   Increment="0.1" Width="80" FormatString="0.##"/>
+                                    <Button Grid.Column="4" Content="{DynamicResource DrumMap_Text}" Command="{Binding RemoveCommand}" Padding="6,2"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="3" Margin="0,8,0,0" FontSize="10"
+                       Foreground="{StaticResource CatppuccinOverlay1}"
+                       Text="{DynamicResource DrumMap_Note_label_velocity_scale_optional_sample_clip_I}"/>
+        </Grid>
+    </Border>
+</Window>

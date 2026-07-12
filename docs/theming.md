@@ -290,7 +290,7 @@ the per-token colour sliders (which call `SetToken` for live preview).
 
 Saved settings store only the **built-in theme name + light/dark flag**
 ([`AppSettingsService`](../Ongenet.App/Services/AppSettingsService.cs)). Custom per-token edits and
-imported (non-built-in) themes apply for the session but aren't yet persisted across restarts — if you
+imported (non-built-in) themes apply for the session but are not persisted across restarts — if you
 want a tweaked theme to survive, export it to JSON.
 
 ---

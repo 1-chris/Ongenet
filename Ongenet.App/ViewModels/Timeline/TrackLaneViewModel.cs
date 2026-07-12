@@ -1,5 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using Ongenet.Core.Models.Audio;
 
 namespace Ongenet.App.ViewModels.Timeline
@@ -22,6 +25,8 @@ namespace Ongenet.App.ViewModels.Timeline
         private readonly TimelineMetrics _metrics;
         private readonly ITrackActions _actions;
         private readonly IClipActions _clipActions;
+        private readonly IPatternClipActions? _patternClipActions;
+        private readonly ITakeLaneActions? _takeLaneActions;
         private bool _isSelected;
         private bool _isDropTarget;
 
@@ -31,12 +36,15 @@ namespace Ongenet.App.ViewModels.Timeline
             _metrics = metrics;
             _actions = actions;
             _clipActions = clipActions;
+            _patternClipActions = actions as IPatternClipActions;
+            _takeLaneActions = actions as ITakeLaneActions;
             _metrics.PropertyChanged += OnMetricsChanged;
 
             DuplicateCommand = new RelayCommand(() => _actions.DuplicateTrack(this));
             DeleteCommand = new RelayCommand(() => _actions.DeleteTrack(this));
             AddInstrumentTrackCommand = new RelayCommand(() => _actions.AddInstrumentTrack());
             AddAudioTrackCommand = new RelayCommand(() => _actions.AddAudioTrack());
+            AddPatternTrackCommand = new RelayCommand(() => _actions.AddPatternTrack());
             ToggleAutomationCommand = new RelayCommand(() => _actions.ToggleAutomation(this));
             ToggleCollapseCommand = new RelayCommand(() =>
             {
@@ -52,6 +60,16 @@ namespace Ongenet.App.ViewModels.Timeline
             {
                 Clips.Add(new ClipViewModel(clip, model, metrics, clipActions));
             }
+
+            RefreshTakeLanes();
+        }
+
+        /// <summary>Rebuilds take-lane view models from the track model.</summary>
+        public void RefreshTakeLanes(Action? layoutChanged = null)
+        {
+            TakeLanes.Clear();
+            foreach (var takeLane in Model.TakeLanes)
+                TakeLanes.Add(new TakeLaneViewModel(takeLane, Model, _metrics, _takeLaneActions, layoutChanged));
         }
 
         /// <summary>Track rows are a fixed height.</summary>
@@ -114,6 +132,7 @@ namespace Ongenet.App.ViewModels.Timeline
         public RelayCommand DeleteCommand { get; }
         public RelayCommand AddInstrumentTrackCommand { get; }
         public RelayCommand AddAudioTrackCommand { get; }
+        public RelayCommand AddPatternTrackCommand { get; }
 
         /// <summary>Collapses/expands this track's automation rows.</summary>
         public RelayCommand ToggleAutomationCommand { get; }
@@ -235,6 +254,24 @@ namespace Ongenet.App.ViewModels.Timeline
         /// <summary>The clips on this lane.</summary>
         public ObservableCollection<ClipViewModel> Clips { get; } = new();
 
+        /// <summary>Comping take lanes under this track.</summary>
+        public ObservableCollection<TakeLaneViewModel> TakeLanes { get; } = new();
+
+        /// <summary>Pattern blocks placed on this track in the playlist.</summary>
+        public ObservableCollection<PatternClipViewModel> PatternClips { get; } = new();
+
+        /// <summary>Rebuilds pattern-clip view models from the project playlist.</summary>
+        public void RefreshPatternClips(IEnumerable<PatternClip> clips, IReadOnlyList<Pattern> patterns)
+        {
+            PatternClips.Clear();
+            if (Model.Kind != TrackKind.Pattern) return;
+            foreach (var pc in clips.Where(c => c.TrackId == Model.Id))
+            {
+                var pattern = patterns.FirstOrDefault(p => p.Id == pc.PatternId);
+                PatternClips.Add(new PatternClipViewModel(pc, Model, pattern, _metrics, _patternClipActions));
+            }
+        }
+
         /// <summary>Aggregate child-clip summaries shown on group lanes.</summary>
         public ObservableCollection<GroupClipSummaryViewModel> GroupSummaries { get; } = new();
 
@@ -249,7 +286,16 @@ namespace Ongenet.App.ViewModels.Timeline
         }
 
         /// <summary>Re-reads the live meter level (called on the UI meter timer).</summary>
-        public void RaiseMeter() => OnPropertyChanged(nameof(MeterLevel));
+        public void RaiseMeter()
+        {
+            var level = MeterLevel;
+            if (Math.Abs(level - _lastRaisedMeter) < 0.002f)
+                return;
+            _lastRaisedMeter = level;
+            OnPropertyChanged(nameof(MeterLevel));
+        }
+
+        private float _lastRaisedMeter = -1f;
 
         private void OnMetricsChanged(object? sender, PropertyChangedEventArgs e)
         {

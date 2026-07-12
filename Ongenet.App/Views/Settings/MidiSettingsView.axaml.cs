@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Ongenet.App.Services;
 using Ongenet.App.ViewModels;
 
 namespace Ongenet.App.Views.Settings;
@@ -33,5 +34,11 @@ public partial class MidiSettingsView : UserControl
     {
         if (DataContext is MidiSettingsViewModel vm && (sender as Control)?.DataContext is MidiMappingRow row)
             vm.RemoveMapping(row);
+    }
+
+    private void ResetShortcut_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MidiSettingsViewModel vm && (sender as Control)?.DataContext is KeyboardShortcutRow row)
+            vm.ResetShortcut(row.Action);
     }
 }

@@ -52,53 +52,104 @@
                 <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
                             VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
                     <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
-                            Click="CloseButton_Click" ToolTip.Tip="Close">
+                            Click="CloseButton_Click" ToolTip.Tip="{DynamicResource Main_Close_Tip}">
                         <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
                     <Button Classes="MacButton" Background="{StaticResource CatppuccinYellow}"
-                            Click="MinimizeButton_Click" ToolTip.Tip="Minimize">
+                            Click="MinimizeButton_Click" ToolTip.Tip="{DynamicResource Main_Minimize_Tip}">
                         <Path Data="M0,3 L7,3" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
                     <Button Classes="MacButton" Background="{StaticResource CatppuccinGreen}"
-                            Click="MaximizeButton_Click" ToolTip.Tip="Maximize">
+                            Click="MaximizeButton_Click" ToolTip.Tip="{DynamicResource Main_Maximize_Tip}">
                         <Path Data="M0,3 L7,3 M3.5,0 L3.5,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" Spacing="12">
-                    <TextBlock Text="Ongenet" FontSize="12" Foreground="{StaticResource CatppuccinMauve}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{DynamicResource Main_Ongenet}" FontSize="12" Foreground="{StaticResource CatppuccinMauve}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
                                VerticalAlignment="Center" Margin="-6,1,0,0"/>
-                    <Button Content="New" Click="OnNew_Click" FontSize="11" Padding="8,2"
+                    <Button Name="NewButton" Content="New ▾" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="New project (Ctrl+N)"/>
-                    <Button Content="Open" Click="OnOpen_Click" FontSize="11" Padding="8,2"
+                            ToolTip.Tip="{DynamicResource Main_New_project_CtrlN_Tip}">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuItem Header="{DynamicResource Main_Blank_project}" Click="OnNew_Click"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Content="{DynamicResource Main_Open}" Click="OnOpen_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="Open project (Ctrl+O)"/>
-                    <Button Content="Save" Click="OnSave_Click" FontSize="11" Padding="8,2"
+                            ToolTip.Tip="{DynamicResource Main_Open_project_CtrlO_Tip}"/>
+                    <Button Content="{DynamicResource Main_Save}" Click="OnSave_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="Save project (Ctrl+S)"/>
-                    <Button Content="Save As" Click="OnSaveAs_Click" FontSize="11" Padding="8,2"
+                            ToolTip.Tip="{DynamicResource Main_Save_project_CtrlS_Tip}"/>
+                    <Button Content="{DynamicResource Main_Save_As}" Click="OnSaveAs_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="Save project as… (Ctrl+Shift+S)"/>
+                            ToolTip.Tip="{DynamicResource Main_Save_project_as_CtrlShiftS_Tip}"/>
+                    <Button Name="ExportShareButton" Content="Export ▾" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_Export_and_collaboration_Tip}">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuItem Header="{DynamicResource Main_Export_audio}" Click="OnExportAudio_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Sync_to_collaboration_folder}" Click="OnSyncCollaboration_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Pull_from_collaboration_folder}" Click="OnPullCollaboration_Click"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Name="LayoutButton" Content="Layout ▾" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_Save_or_restore_window_layout_Tip}">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuItem Header="{DynamicResource Main_Save_layout}" Click="OnSaveLayout_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Load_layout}" Click="OnLoadLayout_Click"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Content="View ▾" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuItem Header="{DynamicResource Main_Tempo_Map}" Click="OpenTempoMap_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Section_Playlist}" Click="OpenSectionPlaylist_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Chord_Track}" Click="OpenChordTrack_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Expression_Maps}" Click="OpenExpressionMaps_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Audio_Editor}" Click="OpenAudioEditor_Click"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Content="{DynamicResource Main_Tools} ▾" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_Tools_Tip}">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuItem Header="{DynamicResource Main_Scripts}" Click="OpenScripts_Click"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                     <Button Content="↶" Click="OnUndo_Click" FontSize="13" Padding="8,2"
                             IsEnabled="{Binding CanUndo}"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="Undo (Ctrl+Z)"/>
+                            ToolTip.Tip="{DynamicResource Main_Undo_CtrlZ_Tip}"/>
                     <Button Content="↷" Click="OnRedo_Click" FontSize="13" Padding="8,2"
                             IsEnabled="{Binding CanRedo}"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="Redo (Ctrl+Y)"/>
-                    <Button Content="History" Click="OpenHistory_Click" FontSize="11" Padding="8,2"
+                            ToolTip.Tip="{DynamicResource Main_Redo_CtrlY_Tip}"/>
+                    <Button Content="{DynamicResource Main_Guide}" Click="OpenGuide_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="History"/>
-                    <Button Content="Logs" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
+                            ToolTip.Tip="{DynamicResource Main_In_app_guide_Tip}"/>
+                    <Button Content="{DynamicResource Main_History}" Click="OpenHistory_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_History_Tip}"/>
+                    <Button Content="{DynamicResource Main_Logs}" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <Button Content="Settings" Click="OpenSettings_Click" FontSize="11" Padding="8,2"
+                    <Button Content="{DynamicResource Main_Settings}" Click="OpenSettings_Click" FontSize="11" Padding="8,2"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="Settings (audio, MIDI, theme)"/>
+                            ToolTip.Tip="{DynamicResource Main_Settings_audio_MIDI_theme_Tip}"/>
                     <!-- Save/Load progress indicator -->
                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                                 IsVisible="{Binding IsBusy}">
@@ -148,24 +199,43 @@
                                     HorizontalAlignment="Right" VerticalAlignment="Center"
                                     Background="Transparent" Padding="8,0" FontSize="11"
                                     Foreground="{StaticResource CatppuccinSubtext0}"
-                                    ToolTip.Tip="Collapse / expand panel"/>
+                                    ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
                         </Border>
-                        <!-- Tabbed like the right sidebar: Track Controls (selected track) + Project Clips. -->
+                        <!-- Track-oriented project sidebar: controls, clip catalog, and pattern/channel rack. -->
                         <TabControl Grid.Row="1" Name="LeftContent" MinWidth="180"
                                     Background="{StaticResource CatppuccinMantle}">
-                            <TabItem Header="Track Controls">
+                            <TabItem Header="{DynamicResource Main_Track_Controls}">
                                 <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
                             </TabItem>
-                            <TabItem Header="Project Clips">
+                            <TabItem Header="{DynamicResource Main_Project_Clips}">
                                 <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
+                            </TabItem>
+                            <TabItem Header="{DynamicResource Main_Channel_Rack}">
+                                <views:ChannelRackView DataContext="{Binding BottomPanel.ChannelRack}"/>
                             </TabItem>
                         </TabControl>
                     </Grid>
                     <GridSplitter Grid.Column="1" Grid.Row="0" Name="LeftSplitter" ResizeDirection="Columns"
                                   Background="{StaticResource CatppuccinCrust}"/>
 
-                    <!-- Centre: timeline (the bottom panel spans the full width below, see further down) -->
-                    <views:TimelineView Grid.Column="2" Grid.Row="0" DataContext="{Binding Timeline}"/>
+                    <!-- Centre: arrangement / mixer / session tabs -->
+                    <TabControl Grid.Column="2" Grid.Row="0" Background="{StaticResource CatppuccinBase}">
+                        <TabItem Header="{DynamicResource Main_Arrangement}">
+                            <views:TimelineView DataContext="{Binding Timeline}"/>
+                        </TabItem>
+                        <TabItem Header="{DynamicResource Main_Mixer}">
+                            <views:MixerView DataContext="{Binding Mixer}"/>
+                        </TabItem>
+                        <TabItem Header="{DynamicResource Main_Session}">
+                            <views:SessionView DataContext="{Binding Session}"/>
+                        </TabItem>
+                        <TabItem Header="{DynamicResource Main_Notation}">
+                            <views:NotationView DataContext="{Binding Notation}"/>
+                        </TabItem>
+                        <TabItem Header="{DynamicResource Main_Video}">
+                            <views:VideoTrackView DataContext="{Binding Video}"/>
+                        </TabItem>
+                    </TabControl>
 
                     <GridSplitter Grid.Column="3" Grid.Row="0" Grid.RowSpan="3" Name="RightSplitter" ResizeDirection="Columns"
                                   Background="{StaticResource CatppuccinCrust}"/>
@@ -183,7 +253,7 @@
                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                         Background="Transparent"
                                         Foreground="{StaticResource CatppuccinSubtext0}"
-                                        ToolTip.Tip="Collapse / expand panel"/>
+                                        ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
                             </Border>
                             <!-- Custom vertical tab strip: a fully-templated ListBox of rotated labels so we
                                  control the centring ourselves. -->
@@ -209,16 +279,16 @@
                                         <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
                                     </Style>
                                 </ListBox.Styles>
-                                <ListBoxItem Name="TabProjects"><controls:VerticalTabLabel Text="Projects" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabEverything"><controls:VerticalTabLabel Text="Everything" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabFiles"><controls:VerticalTabLabel Text="Files" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabSamples"><controls:VerticalTabLabel Text="Samples" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabSoundfonts"><controls:VerticalTabLabel Text="Soundfonts" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabInstruments"><controls:VerticalTabLabel Text="Instruments" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabEffects"><controls:VerticalTabLabel Text="Effects" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabInstPresets"><controls:VerticalTabLabel Text="Inst Presets" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabFxPresets"><controls:VerticalTabLabel Text="FX Presets" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
-                                <ListBoxItem Name="TabFxChains"><controls:VerticalTabLabel Text="FX Chains" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabProjects"><controls:VerticalTabLabel Text="{DynamicResource Main_Projects}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabEverything"><controls:VerticalTabLabel Text="{DynamicResource Main_Everything}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabFiles"><controls:VerticalTabLabel Text="{DynamicResource Main_Files}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabSamples"><controls:VerticalTabLabel Text="{DynamicResource Main_Samples}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabSoundfonts"><controls:VerticalTabLabel Text="{DynamicResource Main_Soundfonts}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabInstruments"><controls:VerticalTabLabel Text="{DynamicResource Main_Instruments}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabEffects"><controls:VerticalTabLabel Text="{DynamicResource Main_Effects}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabInstPresets"><controls:VerticalTabLabel Text="{DynamicResource Main_Inst_Presets}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabFxPresets"><controls:VerticalTabLabel Text="{DynamicResource Main_FX_Presets}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabFxChains"><controls:VerticalTabLabel Text="{DynamicResource Main_FX_Chains}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                             </ListBox>
                         </DockPanel>
 
@@ -270,10 +340,19 @@
                                     </ContentControl>
                                 </Panel>
                             </TabItem>
-                            <TabItem Header="Piano Roll" IsVisible="{Binding ShowPianoRollTab}">
+                            <TabItem Header="{DynamicResource Main_Pattern}" IsVisible="{Binding ShowPatternTab}">
+                                <views:PatternEditorView DataContext="{Binding PatternEditor}"/>
+                            </TabItem>
+                            <TabItem Header="{DynamicResource Main_Piano_Roll}" IsVisible="{Binding ShowPianoRollTab}">
                                 <views:PianoRollView Name="BottomPianoContent" DataContext="{Binding PianoRoll}"/>
                             </TabItem>
-                            <TabItem Header="Effects">
+                            <TabItem Header="{DynamicResource Main_Clip}" IsVisible="{Binding ShowClipTab}">
+                                <views:ClipInspectorView DataContext="{Binding ClipInspector}"/>
+                            </TabItem>
+                            <TabItem Header="{DynamicResource Main_MIDI_FX}" IsVisible="{Binding ShowMidiFxTab}">
+                                <views:MidiFxView DataContext="{Binding MidiFx}"/>
+                            </TabItem>
+                            <TabItem Header="{DynamicResource Main_Effects}">
                                 <views:EffectsView Name="BottomEffectsContent" DataContext="{Binding Effects}"/>
                             </TabItem>
                         </TabControl>
@@ -281,7 +360,7 @@
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Background="Transparent" Padding="10,4" FontSize="11"
                                 Foreground="{StaticResource CatppuccinSubtext0}"
-                                ToolTip.Tip="Collapse / expand panel"/>
+                                ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
                     </Grid>
                 </Grid>
             </Grid>

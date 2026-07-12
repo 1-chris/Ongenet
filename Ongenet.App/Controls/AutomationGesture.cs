@@ -1,6 +1,7 @@
 using System;
 using Avalonia.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.App.Localization;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Parameters;
@@ -43,14 +44,14 @@ namespace Ongenet.App.Controls
 
             if (reset is not null)
             {
-                var resetItem = new MenuItem { Header = "Reset to default" };
+                var resetItem = new MenuItem { Header = Loc.Get("Menu_ResetDefault") };
                 resetItem.Click += (_, _) => reset();
                 flyout.Items.Add(resetItem);
             }
 
             if (automation is not null && owner is not null)
             {
-                var item = new MenuItem { Header = "Create automation track" };
+                var item = new MenuItem { Header = Loc.Get("Menu_CreateAutomation") };
                 item.Click += (_, _) => automation.CreateLane(owner, target);
                 flyout.Items.Add(item);
 
@@ -74,13 +75,13 @@ namespace Ongenet.App.Controls
             var existing = midi.FindMapping(owner, binding);
             if (existing is null)
             {
-                var learn = new MenuItem { Header = "MIDI learn" };
+                var learn = new MenuItem { Header = Loc.Get("Menu_MidiLearn") };
                 learn.Click += (_, _) => midi.BeginLearn(owner, target);
                 flyout.Items.Add(learn);
             }
             else
             {
-                var remove = new MenuItem { Header = $"Remove MIDI mapping (CC {existing.Controller})" };
+                var remove = new MenuItem { Header = Loc.Format("Menu_RemoveMidiMapping", existing.Controller) };
                 remove.Click += (_, _) => midi.Remove(existing);
                 flyout.Items.Add(remove);
             }

@@ -43,6 +43,18 @@ internal static class CoreMidiNative
     public static extern uint MIDIGetSource(nuint sourceIndex0);
 
     [DllImport(CoreMidi)]
+    public static extern nuint MIDIGetNumberOfDestinations();
+
+    [DllImport(CoreMidi)]
+    public static extern uint MIDIGetDestination(nuint destIndex0);
+
+    [DllImport(CoreMidi)]
+    public static extern int MIDIOutputPortCreate(uint client, IntPtr portName, out uint outPort);
+
+    [DllImport(CoreMidi)]
+    public static extern int MIDISend(uint port, uint dest, IntPtr pktlist);
+
+    [DllImport(CoreMidi)]
     public static extern int MIDIPortConnectSource(uint port, uint source, IntPtr connRefCon);
 
     [DllImport(CoreMidi)]

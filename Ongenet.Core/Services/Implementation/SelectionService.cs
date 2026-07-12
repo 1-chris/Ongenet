@@ -15,16 +15,18 @@ public class SelectionService : ISelectionService
 
     public Track? SelectedTrack { get; private set; }
     public Clip? SelectedClip { get; private set; }
+    public PatternClip? SelectedPatternClip { get; private set; }
     public IReadOnlyList<Track> SelectedTracks => _selectedTracks;
 
     public event Action? SelectionChanged;
 
     public void SelectTrack(Track? track)
     {
-        if (ReferenceEquals(SelectedTrack, track) && SelectedClip is null
+        if (ReferenceEquals(SelectedTrack, track) && SelectedClip is null && SelectedPatternClip is null
             && _selectedTracks.Count == (track is null ? 0 : 1)) return;
 
         SelectedClip = null;
+        SelectedPatternClip = null;
         SelectedTrack = track;
         _selectedTracks.Clear();
         if (track is not null) _selectedTracks.Add(track);
@@ -34,6 +36,7 @@ public class SelectionService : ISelectionService
     public void ToggleTrackSelection(Track track)
     {
         SelectedClip = null;
+        SelectedPatternClip = null;
         if (_selectedTracks.Remove(track))
         {
             if (ReferenceEquals(SelectedTrack, track))
@@ -51,9 +54,25 @@ public class SelectionService : ISelectionService
     public void SelectClip(Clip? clip, Track? owner)
     {
         if (ReferenceEquals(SelectedClip, clip) && ReferenceEquals(SelectedTrack, owner)
+            && SelectedPatternClip is null
             && _selectedTracks.Count == (owner is null ? 0 : 1)) return;
 
         SelectedClip = clip;
+        SelectedPatternClip = null;
+        SelectedTrack = owner;
+        _selectedTracks.Clear();
+        if (owner is not null) _selectedTracks.Add(owner);
+        SelectionChanged?.Invoke();
+    }
+
+    public void SelectPatternClip(PatternClip? clip, Track? owner)
+    {
+        if (ReferenceEquals(SelectedPatternClip, clip) && ReferenceEquals(SelectedTrack, owner)
+            && SelectedClip is null
+            && _selectedTracks.Count == (owner is null ? 0 : 1)) return;
+
+        SelectedPatternClip = clip;
+        SelectedClip = null;
         SelectedTrack = owner;
         _selectedTracks.Clear();
         if (owner is not null) _selectedTracks.Add(owner);

@@ -12,4 +12,8 @@ public static class MidiQuantize
     /// </summary>
     public static double Snap(double beat, double gridBeats)
         => gridBeats <= 0 ? beat : Math.Round(beat / gridBeats) * gridBeats;
+
+    /// <summary>Next grid line at or after <paramref name="beat"/> (launch quantize).</summary>
+    public static double SnapForward(double beat, double gridBeats)
+        => gridBeats <= 0 ? beat : Math.Ceiling(beat / gridBeats - 1e-9) * gridBeats;
 }

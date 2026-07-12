@@ -7,6 +7,7 @@ using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Core.Services.Implementation;
@@ -29,6 +30,7 @@ public sealed class RecordingService : IRecordingService
     private readonly IPreviewService _preview;
     private readonly IEventAggregator _events;
     private readonly IAudioInput _audioInput;
+    private readonly IInputMonitorService _inputMonitor;
 
     private readonly List<LiveTake> _takes = new();
     private readonly Dictionary<int, OpenNote> _open = new(); // note -> note being captured
@@ -49,9 +51,11 @@ public sealed class RecordingService : IRecordingService
     private bool _isRecording;
     private volatile bool _capturing;
     private double _recordStartBeat;
+    private double _lastPlayheadBeat;
 
     public RecordingService(ITransportService transport, IProjectService project,
-        ISelectionService selection, IPreviewService preview, IEventAggregator events, IAudioInput audioInput)
+        ISelectionService selection, IPreviewService preview, IEventAggregator events, IAudioInput audioInput,
+        IInputMonitorService inputMonitor)
     {
         _transport = transport;
         _project = project;
@@ -59,6 +63,7 @@ public sealed class RecordingService : IRecordingService
         _preview = preview;
         _events = events;
         _audioInput = audioInput;
+        _inputMonitor = inputMonitor;
 
         _preview.NotePressed += OnNotePressed;
         _preview.NoteReleased += OnNoteReleased;
@@ -96,16 +101,19 @@ public sealed class RecordingService : IRecordingService
         if (targets.Count == 0 && armedLanes.Count == 0 && audioTargets.Count == 0) return; // nothing to record into
 
         _takes.Clear();
-        _takes.AddRange(targets.Select(t => new LiveTake(t)));
+        _takes.AddRange(targets.Select(t => new LiveTake(t,
+            IsCompRecordingMode ? CompEditService.EnsureRecordLane(t) : null)));
         _autoCaptures.Clear();
         _autoCaptures.AddRange(armedLanes);
         _audioTakes.Clear();
-        _audioTakes.AddRange(audioTargets.Select(t => new AudioTake(t)));
+        _audioTakes.AddRange(audioTargets.Select(t => new AudioTake(t,
+            IsCompRecordingMode ? CompEditService.EnsureRecordLane(t) : null)));
         _captureQueue.Clear();
         _autoStarted = false;
         _open.Clear();
         _capturing = false;
         _recordStartBeat = _transport.StartBeat;
+        _lastPlayheadBeat = _recordStartBeat;
 
         // Route live monitoring to the first instrument target so the user hears what they're recording.
         if (targets.Count > 0) _selection.SelectTrack(targets[0]);
@@ -114,6 +122,7 @@ public sealed class RecordingService : IRecordingService
         // queued once capturing actually begins (after the count-in).
         if (_audioTakes.Count > 0)
         {
+            _inputMonitor.SetRecordingExclusive(true);
             try
             {
                 _audioInput.Start(OnCapture);
@@ -141,6 +150,7 @@ public sealed class RecordingService : IRecordingService
 
         // Stop the input device so no more blocks queue; remaining queued blocks are drained below.
         if (_audioInput.IsCapturing) _audioInput.Stop();
+        _inputMonitor.SetRecordingExclusive(false);
 
         // Close any still-held notes at the final playhead and flush one last live update (this also
         // drains the final captured audio blocks while _capturing is still true).
@@ -159,6 +169,7 @@ public sealed class RecordingService : IRecordingService
             var clip = take.Clip!;
             var bars = Math.Max(1, (int)Math.Ceiling(clip.LengthBeats / beatsPerBar));
             clip.LengthBeats = bars * beatsPerBar;
+            FinalizeCompTake(take.Track, take.TakeLane, clip);
             _events.Publish(new ClipChangedEvent(clip));
         }
 
@@ -176,10 +187,12 @@ public sealed class RecordingService : IRecordingService
         foreach (var take in _audioTakes.Where(t => t.Clip is not null))
         {
             var clip = take.Clip!;
-            clip.Samples = new AudioSampleBuffer(take.Samples.ToArray(), _captureChannels, _captureRate);
+            if (take.Samples.Count > 0)
+                clip.Samples = new AudioSampleBuffer(take.Samples.ToArray(), _captureChannels, _captureRate);
             take.Waveform?.Flush();
             var bars = Math.Max(1, (int)Math.Ceiling(clip.LengthBeats / beatsPerBar));
             clip.LengthBeats = bars * beatsPerBar;
+            FinalizeCompTake(take.Track, take.TakeLane, clip);
             _events.Publish(new ClipChangedEvent(clip));
         }
 
@@ -207,12 +220,17 @@ public sealed class RecordingService : IRecordingService
         SampleAutomation();
         PumpAudioTakes();
 
+        var playhead = _transport.PlayheadBeats;
+        if (IsCompRecordingMode && playhead + 1e-6 < _lastPlayheadBeat)
+            HandleCompLoopWrap();
+        _lastPlayheadBeat = playhead;
+
         bool hasOpen;
         lock (_openLock) hasOpen = _open.Count > 0;
         if (!hasOpen && !TakesStarted) return; // no MIDI captured yet — no clip
 
         EnsureTakeClips();
-        var playhead = _transport.PlayheadBeats;
+        playhead = _transport.PlayheadBeats;
 
         // Place/grow each captured note; finalised ones (with an end) are committed and dropped.
         // Note models live on clips (UI-thread owned); _open is shared with the live-input thread, so
@@ -286,6 +304,7 @@ public sealed class RecordingService : IRecordingService
     private void OnCapture(ReadOnlySpan<float> input, int channels)
     {
         if (!_capturing) return;
+        _inputMonitor.PushCapture(input, channels);
         _captureQueue.Enqueue(input.ToArray());
     }
 
@@ -297,8 +316,13 @@ public sealed class RecordingService : IRecordingService
         {
             foreach (var take in _audioTakes)
             {
-                take.Samples.AddRange(block);
-                take.Waveform?.Append(block, _captureChannels);
+                if (take.Clip?.Samples is { } buffer)
+                    SampleEditorService.AppendInput(buffer, block, _captureChannels, _captureRate, take.Waveform);
+                else
+                {
+                    take.Samples.AddRange(block);
+                    take.Waveform?.Append(block, _captureChannels);
+                }
             }
         }
     }
@@ -327,18 +351,21 @@ public sealed class RecordingService : IRecordingService
         if (_audioTakes.Count == 0 || _audioTakes[0].Clip is not null) return;
         foreach (var take in _audioTakes)
         {
-            var waveform = new AudioWaveform(samplesPerBucket: 128, sampleRate: _captureRate);
+            var waveform = SampleEditorService.CreateLiveWaveform(_captureRate);
+            var buffer = new AudioSampleBuffer(Array.Empty<float>(), _captureChannels, _captureRate);
             var clip = new Clip
             {
                 Name = "Recorded",
                 StartBeat = _recordStartBeat,
                 LengthBeats = MinNoteBeats,
                 IsAudio = true,
+                Samples = buffer,
                 Waveform = waveform
             };
             take.Clip = clip;
             take.Waveform = waveform;
             take.Track.Clips.Add(clip);
+            RegisterCompTake(take.Track, take.TakeLane, clip);
             _events.Publish(new ClipAddedEvent(take.Track, clip));
         }
     }
@@ -372,6 +399,7 @@ public sealed class RecordingService : IRecordingService
             var clip = new Clip { Name = "Recorded", StartBeat = _recordStartBeat, LengthBeats = MinNoteBeats };
             take.Clip = clip;
             take.Track.Clips.Add(clip);
+            RegisterCompTake(take.Track, take.TakeLane, clip);
             _events.Publish(new ClipAddedEvent(take.Track, clip));
         }
     }
@@ -401,18 +429,107 @@ public sealed class RecordingService : IRecordingService
 
     private int BeatsPerBar => Math.Max(1, _project.Current.TimeSignature.Numerator);
 
+    private bool IsCompRecordingMode =>
+        _transport.LoopRecording ||
+        (_transport.PunchInBeat is { } punchIn && _transport.PunchOutBeat is { } punchOut && punchOut > punchIn);
+
+    private void HandleCompLoopWrap()
+    {
+        var loopStart = _transport.IsLoopActive ? _transport.LoopStart : _transport.StartBeat;
+        var loopEnd = _transport.IsLoopActive ? _transport.LoopEnd : _recordStartBeat + BeatsPerBar * 4;
+        var wrapEnd = Math.Min(_lastPlayheadBeat, loopEnd);
+
+        FinalizeLoopTakes(wrapEnd);
+        _recordStartBeat = loopStart;
+
+        foreach (var take in _takes)
+        {
+            take.TakeLane = CompEditService.AdvanceRecordLane(take.Track);
+            take.Clip = null;
+        }
+
+        foreach (var take in _audioTakes)
+        {
+            take.TakeLane = CompEditService.AdvanceRecordLane(take.Track);
+            take.Clip = null;
+            take.Samples.Clear();
+            take.Waveform = null;
+        }
+
+        _events.Publish(new TracksChangedEvent());
+    }
+
+    private void FinalizeLoopTakes(double endBeat)
+    {
+        foreach (var take in _takes.Where(t => t.Clip is not null))
+        {
+            var clip = take.Clip!;
+            clip.LengthBeats = Math.Max(MinNoteBeats, endBeat - clip.StartBeat);
+            FinalizeCompTake(take.Track, take.TakeLane, clip);
+            _events.Publish(new ClipChangedEvent(clip));
+        }
+
+        foreach (var take in _audioTakes.Where(t => t.Clip is not null))
+        {
+            var clip = take.Clip!;
+            clip.LengthBeats = Math.Max(MinNoteBeats, endBeat - clip.StartBeat);
+            if (take.Samples.Count > 0)
+                clip.Samples = new AudioSampleBuffer(take.Samples.ToArray(), _captureChannels, _captureRate);
+            take.Waveform?.Flush();
+            FinalizeCompTake(take.Track, take.TakeLane, clip);
+            _events.Publish(new ClipChangedEvent(clip));
+        }
+    }
+
+    private void RegisterCompTake(Track track, TakeLane? lane, Clip clip)
+    {
+        if (!IsCompRecordingMode || lane is null) return;
+        foreach (var existing in lane.Takes) existing.IsSelected = false;
+
+        lane.Takes.Add(new Take
+        {
+            ClipId = clip.Id,
+            StartBeat = clip.StartBeat,
+            LengthBeats = clip.LengthBeats,
+            IsSelected = true
+        });
+    }
+
+    private static void FinalizeCompTake(Track track, TakeLane? lane, Clip clip)
+    {
+        if (lane is null) return;
+        foreach (var compTake in lane.Takes)
+        {
+            if (compTake.ClipId != clip.Id) continue;
+            compTake.StartBeat = clip.StartBeat;
+            compTake.LengthBeats = clip.LengthBeats;
+        }
+    }
+
     private sealed class LiveTake
     {
-        public LiveTake(Track track) => Track = track;
+        public LiveTake(Track track, TakeLane? lane)
+        {
+            Track = track;
+            TakeLane = lane;
+        }
+
         public Track Track { get; }
+        public TakeLane? TakeLane { get; set; }
         public Clip? Clip { get; set; }
     }
 
     // An audio track being recorded into: the growing interleaved PCM and its live waveform.
     private sealed class AudioTake
     {
-        public AudioTake(Track track) => Track = track;
+        public AudioTake(Track track, TakeLane? lane)
+        {
+            Track = track;
+            TakeLane = lane;
+        }
+
         public Track Track { get; }
+        public TakeLane? TakeLane { get; set; }
         public Clip? Clip { get; set; }
         public List<float> Samples { get; } = new();
         public AudioWaveform? Waveform { get; set; }

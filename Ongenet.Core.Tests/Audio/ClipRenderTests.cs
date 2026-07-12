@@ -256,4 +256,81 @@ public class ClipRenderTests
 
         Assert.NotEqual(Rms(dry), Rms(sidechained));
     }
+
+    [Fact]
+    public void StretchToTempo_RenderedLengthMatchesClipBeats()
+    {
+        var project = NewProject();
+        var track = new Track { Name = "Audio", Kind = TrackKind.Audio };
+        const double lengthBeats = 4.0;
+        const double sourceSeconds = 2.0;
+        var sourceFrames = (int)Math.Round(sourceSeconds * Format.SampleRate);
+        var clip = new Clip
+        {
+            Name = "Loop",
+            IsAudio = true,
+            StartBeat = 0,
+            LengthBeats = lengthBeats,
+            StretchToTempo = true,
+            Samples = ToneBuffer(sourceFrames)
+        };
+        track.Clips.Add(clip);
+        project.Tracks.Add(track);
+
+        var scope = ClipRenderScope.ForClip(project, track, clip);
+        var rendered = new OfflineRenderer().RenderScopeToBuffer(project, Format, Bpm, scope);
+
+        Assert.Equal(ExpectedFrames(lengthBeats), rendered.FrameCount);
+        Assert.True(Rms(rendered) > 0.001);
+    }
+
+    [Fact]
+    public void WarpedClip_WithMarker_RendersExpectedLength()
+    {
+        var project = NewProject();
+        var track = new Track { Name = "Audio", Kind = TrackKind.Audio };
+        const double lengthBeats = 4.0;
+        var clip = new Clip
+        {
+            Name = "Warped",
+            IsAudio = true,
+            StartBeat = 0,
+            LengthBeats = lengthBeats,
+            StretchToTempo = true,
+            WarpMode = WarpMode.Beats,
+            PitchCorrected = true,
+            Samples = ToneBuffer(Format.SampleRate * 2)
+        };
+        clip.WarpMarkers.Add(new WarpMarker { BeatPosition = 0, SourceSeconds = 0 });
+        clip.WarpMarkers.Add(new WarpMarker { BeatPosition = 2, SourceSeconds = 1 });
+        track.Clips.Add(clip);
+        project.Tracks.Add(track);
+
+        var scope = ClipRenderScope.ForClip(project, track, clip);
+        var rendered = new OfflineRenderer().RenderScopeToBuffer(project, Format, Bpm, scope);
+
+        Assert.Equal(ExpectedFrames(lengthBeats), rendered.FrameCount);
+        Assert.True(Rms(rendered) > 0.001);
+    }
+
+    [Fact]
+    public void ClipBake_FlattensWarpToNativeBuffer()
+    {
+        const double lengthBeats = 4.0;
+        var clip = new Clip
+        {
+            Name = "Warped",
+            IsAudio = true,
+            LengthBeats = lengthBeats,
+            StretchToTempo = true,
+            WarpMode = WarpMode.Repitch,
+            Samples = ToneBuffer(Format.SampleRate * 2)
+        };
+        clip.WarpMarkers.Add(new WarpMarker { BeatPosition = 2, SourceSeconds = 1 });
+
+        var baked = ClipBake.Bake(clip, Bpm, Format.SampleRate, Format.Channels);
+
+        Assert.Equal(ExpectedFrames(lengthBeats), baked.FrameCount);
+        Assert.True(Rms(baked) > 0.001);
+    }
 }

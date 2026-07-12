@@ -89,6 +89,36 @@ public sealed class Clip
     /// Duplicated MIDI clips share the same list until one is made unique.</summary>
     public List<MidiNote> Notes { get; set; } = new();
 
+    /// <summary>MIDI CC automation within this clip (clip-relative beats).</summary>
+    public List<MidiControlChange> ControlChanges { get; } = new();
+
     /// <summary>True when this clip carries MIDI notes rather than audio.</summary>
     public bool IsMidi => !IsAudio;
+
+    /// <summary>Warp/time-stretch mode for audio clips.</summary>
+    public WarpMode WarpMode { get; set; } = WarpMode.Beats;
+
+    /// <summary>Piecewise warp markers (source seconds ↔ beat positions).</summary>
+    public List<WarpMarker> WarpMarkers { get; } = new();
+
+    /// <summary>User-defined fade-in length in beats (in addition to overlap crossfades).</summary>
+    public double UserFadeInBeats { get; set; }
+
+    /// <summary>User-defined fade-out length in beats (in addition to overlap crossfades).</summary>
+    public double UserFadeOutBeats { get; set; }
+
+    /// <summary>True when this audio clip is bound to an ARA playback region.</summary>
+    public bool HasAraRegion { get; set; }
+
+    /// <summary>Global pitch shift applied by the ARA region, in semitones.</summary>
+    public double AraPitchOffsetSemitones { get; set; }
+
+    /// <summary>Per-segment polyphonic pitch corrections in source sample frames.</summary>
+    public List<PitchNoteSegment> PitchSegments { get; } = new();
+
+    /// <summary>
+    /// When set, this clip is linked to others sharing the same group id (shared note list or audio
+    /// buffer). Duplicating as a linked copy keeps content in sync until unlinked.
+    /// </summary>
+    public Guid? LinkedClipGroupId { get; set; }
 }

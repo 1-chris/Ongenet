@@ -4,7 +4,7 @@ This guide walks you through building a new audio **effect** for Ongenet — som
 audio and changes it, like a delay, filter, distortion or compressor. It is written for people
 comfortable with C# but **new to audio programming (DSP)**, and it explains the audio ideas as it goes.
 
-If you haven't yet, skim [creating-instruments.md](creating-instruments.md) first — it introduces the
+Skim [creating-instruments.md](creating-instruments.md) first — it introduces the
 core concepts (samples, frames, blocks, the real-time audio thread) that this guide builds on. The big
 difference: an **instrument produces** sound from notes, while an **effect transforms** sound that is
 already there.

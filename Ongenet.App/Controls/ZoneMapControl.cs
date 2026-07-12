@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
+using Ongenet.App.Localization;
 using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.App.Theming;
 
@@ -80,7 +81,7 @@ namespace Ongenet.App.Controls
             var zones = Zones;
             if (zones is null || zones.Count == 0)
             {
-                var ft = new FormattedText("No SFZ loaded", System.Globalization.CultureInfo.CurrentCulture,
+                var ft = new FormattedText(Loc.Get("Control_NoSfzLoaded"), System.Globalization.CultureInfo.CurrentCulture,
                     FlowDirection.LeftToRight, LabelTypeface, 12, _emptyBrush);
                 context.DrawText(ft, new Point(8, h / 2 - 8));
                 return;

@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+        xmlns:audio="using:Ongenet.Core.Models.Audio"
+        mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="480"
+        x:Class="Ongenet.App.Views.Windows.RoutingMatrixWindow"
+        x:DataType="vm:RoutingMatrixViewModel"
+        Width="640" Height="480" MinWidth="480" MinHeight="320"
+        Title="{DynamicResource Routing_Routing_Matrix_Title}">
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+        <Grid RowDefinitions="Auto,*,Auto,*">
+            <TextBlock Grid.Row="0" Text="{DynamicResource Routing_Track_outputs}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding TrackRoutes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TrackRouteRow">
+                            <Border Margin="0,0,0,4" Padding="8" CornerRadius="4"
+                                    Background="{StaticResource CatppuccinSurface0}">
+                                <Grid ColumnDefinitions="120,160,160,*">
+                                    <TextBlock Grid.Column="0" Text="{Binding TrackName}" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding OutputTargets}"
+                                              SelectedItem="{Binding OutputTarget}" Margin="6,0"/>
+                                    <ComboBox Grid.Column="2" ItemsSource="{Binding OutputBuses}"
+                                              SelectedItem="{Binding OutputBus}" IsEnabled="{Binding UsesSpecificBus}"
+                                              PlaceholderText="{DynamicResource Routing_Destination_bus}" Margin="6,0">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="audio:Track"><TextBlock Text="{Binding Name}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6"
+                                                IsVisible="{Binding HasSend}">
+                                        <TextBlock Text="{Binding SendName}" VerticalAlignment="Center" FontSize="10"/>
+                                        <Slider Minimum="0" Maximum="1" Width="100" Value="{Binding SendLevel}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="2" Text="{DynamicResource Routing_Multi_out_plugin_routes}" FontWeight="SemiBold" Margin="0,12,0,8"/>
+            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding MultiOutRoutes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MultiOutRouteRow">
+                            <Border Margin="0,0,0,4" Padding="8" CornerRadius="4"
+                                    Background="{StaticResource CatppuccinSurface0}">
+                                <Grid ColumnDefinitions="*,Auto,180,150">
+                                    <TextBlock Grid.Column="0" Text="{Binding SourceTrackName}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1" Margin="8,0"
+                                               Text="{Binding PluginOutputBus, StringFormat='Bus {0}'}"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox Grid.Column="2" ItemsSource="{Binding Destinations}"
+                                              SelectedItem="{Binding Destination}" Margin="8,0">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="audio:Track"><TextBlock Text="{Binding Name}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+                                        <Slider Minimum="0" Maximum="1" Width="100" Value="{Binding Level}"/>
+                                        <TextBlock Text="{Binding Level, StringFormat='{}{0:0%}'}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

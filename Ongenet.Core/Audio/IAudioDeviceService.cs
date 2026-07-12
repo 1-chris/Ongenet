@@ -36,4 +36,7 @@ public interface IAudioDeviceService
 
     /// <summary>Raised when <see cref="SelectedInput"/> changes (a capture stream must reopen).</summary>
     event Action? InputChanged;
+
+    /// <summary>When true, the backend uses exclusive/low-latency output mode if supported.</summary>
+    bool LowLatencyExclusive { get => false; set { } }
 }

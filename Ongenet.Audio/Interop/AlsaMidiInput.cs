@@ -99,7 +99,7 @@ public sealed class AlsaMidiInput : IMidiInputBackend
 
         lock (_lock)
         {
-            var rc = AlsaMidiNative.snd_rawmidi_open(out _handle, IntPtr.Zero, device.OpenId,
+            var rc = AlsaMidiNative.snd_rawmidi_open(out _handle, out _, device.OpenId,
                 AlsaMidiNative.SND_RAWMIDI_NONBLOCK);
             if (rc < 0)
             {

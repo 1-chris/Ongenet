@@ -45,6 +45,7 @@ internal static unsafe class AudioUnitApi
     public const uint kAudioUnitProperty_ParameterList = 3;
     public const uint kAudioUnitProperty_ParameterInfo = 4;
     public const uint kAudioUnitProperty_StreamFormat = 8;
+    public const uint kAudioUnitProperty_Latency = 12;
     public const uint kAudioUnitProperty_MaximumFramesPerSlice = 14;
     public const uint kAudioUnitProperty_SetRenderCallback = 23;
     public const uint kAudioUnitProperty_CocoaUI = 31;

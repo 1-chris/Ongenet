@@ -20,4 +20,5 @@ public sealed record VstPluginDescriptor(
     string Name,
     string Vendor,
     bool IsInstrument,
-    bool IsEffect);
+    bool IsEffect,
+    bool SupportsAra = false);

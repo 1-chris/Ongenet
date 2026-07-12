@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Ongenet.App.Localization;
 using Ongenet.App.Theming;
 
 namespace Ongenet.App.Views.Windows
@@ -49,7 +50,7 @@ namespace Ongenet.App.Views.Windows
                 else if (e.Key == Key.Escape) { _result = null; Close(); e.Handled = true; }
             };
 
-            var cancel = new Button { Content = "Cancel", Padding = new Thickness(14, 5) };
+            var cancel = new Button { Content = Loc.Get("Dialog_Cancel"), Padding = new Thickness(14, 5) };
             cancel.Click += (_, _) => { _result = null; Close(); };
 
             var confirm = new Button { Content = confirmText, Padding = new Thickness(14, 5) };
@@ -84,9 +85,9 @@ namespace Ongenet.App.Views.Windows
 
         /// <summary>Shows the prompt; resolves to the entered text, or null when cancelled/empty.</summary>
         public static async Task<string?> Prompt(Window owner, string title, string label,
-            string initialText = "", string confirmText = "OK")
+            string initialText = "", string? confirmText = null)
         {
-            var dialog = new InputDialog(title, label, initialText, confirmText);
+            var dialog = new InputDialog(title, label, initialText, confirmText ?? Loc.Get("Dialog_OK"));
             await dialog.ShowDialog(owner);
             return dialog._result;
         }

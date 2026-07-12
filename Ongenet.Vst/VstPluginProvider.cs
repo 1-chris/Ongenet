@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Services;
 using Ongenet.Vst.Vst2;
 using Ongenet.Vst.Vst3;
 
@@ -17,13 +18,16 @@ public sealed class VstPluginProvider
 {
     private readonly IInstrumentRegistry _instruments;
     private readonly IEffectRegistry _effects;
+    private readonly IPluginProcessHost _pluginHost;
     private readonly VstPluginScanner _scanner;
     private readonly Action<string>? _log;
 
-    public VstPluginProvider(IInstrumentRegistry instruments, IEffectRegistry effects, Action<string>? log = null)
+    public VstPluginProvider(IInstrumentRegistry instruments, IEffectRegistry effects,
+        IPluginProcessHost? pluginHost = null, Action<string>? log = null)
     {
         _instruments = instruments;
         _effects = effects;
+        _pluginHost = pluginHost ?? new InProcessPluginHost();
         _scanner = new VstPluginScanner(log);
         _log = log;
     }
@@ -82,7 +86,17 @@ public sealed class VstPluginProvider
         ? new Vst3Instrument(d.Path, d.Uid, d.Name)
         : new Vst2Instrument(d.Path, d.Uid, d.Name);
 
-    private static IAudioEffect CreateEffect(VstPluginDescriptor d) => d.Format == VstFormat.Vst3
-        ? new Vst3Effect(d.Path, d.Uid, d.Name)
-        : new Vst2Effect(d.Path, d.Uid, d.Name);
+    private IAudioEffect CreateEffect(VstPluginDescriptor d)
+    {
+        if (d.Format == VstFormat.Vst3 && _pluginHost.IsIsolationEnabled)
+        {
+            var isolated = _pluginHost.TryCreateIsolatedEffect(d.Path, d.Uid, d.Name);
+            if (isolated is not null)
+                return isolated;
+        }
+
+        return d.Format == VstFormat.Vst3
+            ? new Vst3Effect(d.Path, d.Uid, d.Name)
+            : new Vst2Effect(d.Path, d.Uid, d.Name);
+    }
 }

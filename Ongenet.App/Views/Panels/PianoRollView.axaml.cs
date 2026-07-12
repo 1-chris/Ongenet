@@ -63,6 +63,9 @@ namespace Ongenet.App.Views.Panels
         {
             InitializeComponent();
             Focusable = true;
+            Accessibility.A11y.Landmark(this,
+                Localization.Loc.Get("A11y_PianoRoll"),
+                Localization.Loc.Get("A11y_PianoRoll_Help"));
 
             // The grid is the master scroller; the ruler (X) and key gutter (Y) are pinned to it.
             // Sync is bidirectional so that wheel-scrolling over the gutter/ruler drives the grid too,

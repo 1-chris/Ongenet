@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Ongenet.Audio.Interop;
 using Ongenet.Core.Audio.Midi;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Desktop.Services;
@@ -21,16 +22,24 @@ public sealed class MidiInputService : IMidiInputService
     private readonly IPreviewService _preview;
     private readonly IMidiMappingService _mappings;
     private readonly ITransportMapService _transport;
+    private readonly IProjectService _project;
+    private readonly MidiRetrospectiveCapture _retrospective;
     private readonly IMidiInputBackend? _backend;
+    private readonly MpeZoneRouter _mpeRouter;
+    private readonly List<MpeRoutedAction> _mpeActions = new();
 
     private List<MidiDeviceInfo> _devices = new();
     private MidiDeviceInfo? _selected;
 
-    public MidiInputService(IPreviewService preview, IMidiMappingService mappings, ITransportMapService transport)
+    public MidiInputService(IPreviewService preview, IMidiMappingService mappings, ITransportMapService transport,
+        IProjectService project, MidiRetrospectiveCapture retrospective)
     {
         _preview = preview;
         _mappings = mappings;
         _transport = transport;
+        _project = project;
+        _retrospective = retrospective;
+        _mpeRouter = new MpeZoneRouter(project.Current.Mpe);
         _backend = MidiInputBackendFactory.Create();
         RefreshDevices();
 
@@ -67,6 +76,14 @@ public sealed class MidiInputService : IMidiInputService
     // Invoked on the backend's read thread. Keep it quick: route and return.
     private void OnMidi(MidiMessage m)
     {
+        _retrospective.Record(m);
+        if (_mpeRouter.TryRoute(m, _mpeActions))
+        {
+            foreach (var action in _mpeActions) ApplyMpeAction(action);
+            MessageReceived?.Invoke(m);
+            return;
+        }
+
         switch (m.Kind)
         {
             case MidiMessageKind.NoteOn:
@@ -92,6 +109,30 @@ public sealed class MidiInputService : IMidiInputService
         }
 
         MessageReceived?.Invoke(m);
+    }
+
+    private void ApplyMpeAction(in MpeRoutedAction action)
+    {
+        switch (action.Kind)
+        {
+            case MpeRoutedActionKind.NoteOn:
+                if (!_transport.HandleMessage(new MidiMessage(MidiMessageKind.NoteOn, 0, (byte)action.Note,
+                        (byte)Math.Clamp((int)(action.Velocity * 127f), 0, 127))))
+                    _preview.NoteOn(action.Note, action.Velocity);
+                break;
+            case MpeRoutedActionKind.NoteOff:
+                _preview.NoteOff(action.Note);
+                break;
+            case MpeRoutedActionKind.NotePitchBend:
+                _preview.NotePitchBend(action.Note, action.Value);
+                break;
+            case MpeRoutedActionKind.NotePressure:
+                _preview.NotePressure(action.Note, action.Value);
+                break;
+            case MpeRoutedActionKind.NoteTimbre:
+                _preview.NoteTimbre(action.Note, action.Value);
+                break;
+        }
     }
 
     public void Dispose() => _backend?.Dispose();

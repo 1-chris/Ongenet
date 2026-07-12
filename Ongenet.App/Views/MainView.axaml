@@ -41,7 +41,7 @@
                   Background="{StaticResource CatppuccinMantle}">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                             Margin="12,0" Spacing="10">
-                    <TextBlock Text="Ongenet" FontSize="12" FontWeight="SemiBold"
+                    <TextBlock Text="{DynamicResource MainView_Ongenet}" FontSize="12" FontWeight="SemiBold"
                                Foreground="{StaticResource CatppuccinMauve}" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Version}" FontSize="10"
                                Foreground="{StaticResource CatppuccinOverlay1}" VerticalAlignment="Center"/>
@@ -55,13 +55,16 @@
 
             <!-- Workspace: track inspector | timeline | library -->
             <Grid Grid.Row="2" ColumnDefinitions="240,4,*,4,300">
-                <!-- Left sidebar: tabbed like the library — Track Controls + Project Clips. -->
+                <!-- Left sidebar: track controls, clip catalog, and project-level pattern/channel rack. -->
                 <TabControl Grid.Column="0" MinWidth="180" Background="{StaticResource CatppuccinMantle}">
-                    <TabItem Header="Track Controls">
+                    <TabItem Header="{DynamicResource MainView_Track_Controls}">
                         <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
                     </TabItem>
-                    <TabItem Header="Project Clips">
+                    <TabItem Header="{DynamicResource MainView_Project_Clips}">
                         <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource MainView_Channel_Rack}">
+                        <views:ChannelRackView DataContext="{Binding BottomPanel.ChannelRack}"/>
                     </TabItem>
                 </TabControl>
                 <GridSplitter Grid.Column="1" ResizeDirection="Columns"
@@ -77,19 +80,19 @@
                 <DockPanel Grid.Column="4" Background="{StaticResource CatppuccinMantle}" MinWidth="220">
                     <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
                     <TabControl Background="{StaticResource CatppuccinMantle}">
-                        <TabItem Header="Instruments">
+                        <TabItem Header="{DynamicResource MainView_Instruments}">
                             <views:LibraryListView DataContext="{Binding InstrumentLibrary}"/>
                         </TabItem>
-                        <TabItem Header="Effects">
+                        <TabItem Header="{DynamicResource MainView_Effects}">
                             <views:LibraryListView DataContext="{Binding EffectsLibrary}"/>
                         </TabItem>
-                        <TabItem Header="Everything">
+                        <TabItem Header="{DynamicResource MainView_Everything}">
                             <views:LibraryListView DataContext="{Binding Everything}"/>
                         </TabItem>
-                        <TabItem Header="Projects">
+                        <TabItem Header="{DynamicResource MainView_Projects}">
                             <views:LibraryListView DataContext="{Binding ProjectsLibrary}"/>
                         </TabItem>
-                        <TabItem Header="Files">
+                        <TabItem Header="{DynamicResource MainView_Files}">
                             <views:FileBrowserView DataContext="{Binding FileBrowser}"/>
                         </TabItem>
                     </TabControl>
@@ -113,10 +116,16 @@
                         </ContentControl>
                     </Panel>
                 </TabItem>
-                <TabItem Header="Piano Roll" IsVisible="{Binding ShowPianoRollTab}">
+                <TabItem Header="{DynamicResource MainView_Pattern}" IsVisible="{Binding ShowPatternTab}">
+                    <views:PatternEditorView DataContext="{Binding PatternEditor}"/>
+                </TabItem>
+                <TabItem Header="{DynamicResource MainView_Piano_Roll}" IsVisible="{Binding ShowPianoRollTab}">
                     <views:PianoRollView DataContext="{Binding PianoRoll}"/>
                 </TabItem>
-                <TabItem Header="Effects">
+                <TabItem Header="{DynamicResource MainView_MIDI_FX}" IsVisible="{Binding ShowMidiFxTab}">
+                    <views:MidiFxView DataContext="{Binding MidiFx}"/>
+                </TabItem>
+                <TabItem Header="{DynamicResource MainView_Effects}">
                     <views:EffectsView DataContext="{Binding Effects}"/>
                 </TabItem>
             </TabControl>

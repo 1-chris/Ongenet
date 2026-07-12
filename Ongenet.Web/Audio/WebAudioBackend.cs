@@ -147,6 +147,8 @@ public sealed class WebAudioDeviceService : IAudioDeviceService
         }
     }
 
+    public bool LowLatencyExclusive { get; set; }
+
     public void Refresh() => DevicesChanged?.Invoke();
 
     public event Action? DevicesChanged;

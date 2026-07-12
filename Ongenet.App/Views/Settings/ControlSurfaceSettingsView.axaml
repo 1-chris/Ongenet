@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="480"
+             x:Class="Ongenet.App.Views.Settings.ControlSurfaceSettingsView"
+             x:DataType="vm:ControlSurfaceSettingsViewModel">
+    <UserControl.Styles>
+        <Style Selector="Button.Small">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="18" Spacing="10">
+            <TextBlock Text="{DynamicResource SettingsControlSurface_Control_surface}" FontSize="14" FontWeight="SemiBold"
+                       Foreground="{StaticResource CatppuccinText}"/>
+            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"
+                       Text="{DynamicResource SettingsControlSurface_Choose_how_incoming_MIDI_is_mapped_Legacy_keeps_}"/>
+            <CheckBox Content="{DynamicResource SettingsControlSurface_Enable_control_surface}" IsChecked="{Binding IsEnabled, Mode=TwoWay}"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{DynamicResource SettingsControlSurface_Profile}" VerticalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinSubtext1}"/>
+                <ComboBox Width="240" ItemsSource="{Binding Profiles}"
+                          SelectedItem="{Binding SelectedProfile, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ControlSurfaceProfileOption">
+                            <TextBlock Text="{Binding Label}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding ShowMixerMappings}" Spacing="6">
+                <TextBlock Text="{DynamicResource SettingsControlSurface_Mixer_CC_mappings}" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource CatppuccinText}"/>
+                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"
+                           Text="{DynamicResource SettingsControlSurface_Click_Learn_then_move_a_fader_or_knob_on_your_co}"/>
+                <ItemsControl ItemsSource="{Binding MappingRows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ControlSurfaceMappingRow">
+                            <Grid ColumnDefinitions="120,70,Auto,Auto" Margin="0,3" ColumnSpacing="8">
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                           Foreground="{StaticResource CatppuccinText}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Binding}" VerticalAlignment="Center"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <Button Grid.Column="2" Classes="Small" Content="{Binding LearnText}"
+                                        Click="LearnMapping_Click"/>
+                                <Button Grid.Column="3" Classes="Small" Content="{DynamicResource SettingsControlSurface_Clear}"
+                                        Click="ClearMapping_Click"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

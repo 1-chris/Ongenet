@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -65,6 +66,15 @@ namespace Ongenet.App.Controls
         public static readonly StyledProperty<bool> SnapEnabledProperty =
             AvaloniaProperty.Register<SampleWaveformEditorControl, bool>(nameof(SnapEnabled), true);
 
+        public static readonly StyledProperty<bool> SpectralOverlayEnabledProperty =
+            AvaloniaProperty.Register<SampleWaveformEditorControl, bool>(nameof(SpectralOverlayEnabled));
+
+        public static readonly StyledProperty<IReadOnlyList<float>?> SpectralMagnitudesProperty =
+            AvaloniaProperty.Register<SampleWaveformEditorControl, IReadOnlyList<float>?>(nameof(SpectralMagnitudes));
+
+        public static readonly StyledProperty<int> SpectralRevisionProperty =
+            AvaloniaProperty.Register<SampleWaveformEditorControl, int>(nameof(SpectralRevision));
+
         private const double RulerHeight = 18.0;
         private const double HandleHitPx = 6.0;
         private const double MinTrimSeconds = 0.001;
@@ -93,7 +103,8 @@ namespace Ongenet.App.Controls
                 SecondsPerBeatProperty, BeatsPerBarProperty, HorizontalOffsetProperty, ContentWidthProperty, ViewportWidthProperty,
                 TrimStartSecondsProperty, TrimEndSecondsProperty, HighlightStartSecondsProperty,
                 HighlightEndSecondsProperty,                 SelectionStartSecondsProperty, SelectionEndSecondsProperty,
-                HoverSecondsProperty, PlayheadSecondsProperty);
+                HoverSecondsProperty, PlayheadSecondsProperty, SpectralOverlayEnabledProperty,
+                SpectralMagnitudesProperty, SpectralRevisionProperty);
         }
 
         protected override void BuildThemeResources()
@@ -126,6 +137,9 @@ namespace Ongenet.App.Controls
         public double HoverSeconds { get => GetValue(HoverSecondsProperty); set => SetValue(HoverSecondsProperty, value); }
         public double PlayheadSeconds { get => GetValue(PlayheadSecondsProperty); set => SetValue(PlayheadSecondsProperty, value); }
         public bool SnapEnabled { get => GetValue(SnapEnabledProperty); set => SetValue(SnapEnabledProperty, value); }
+        public bool SpectralOverlayEnabled { get => GetValue(SpectralOverlayEnabledProperty); set => SetValue(SpectralOverlayEnabledProperty, value); }
+        public IReadOnlyList<float>? SpectralMagnitudes { get => GetValue(SpectralMagnitudesProperty); set => SetValue(SpectralMagnitudesProperty, value); }
+        public int SpectralRevision { get => GetValue(SpectralRevisionProperty); set => SetValue(SpectralRevisionProperty, value); }
 
         public event EventHandler? TrimCommitted;
         public event EventHandler? SelectionChanged;
@@ -148,6 +162,9 @@ namespace Ongenet.App.Controls
             var waveHeight = Math.Max(1, height - RulerHeight);
 
             DrawGridAndRuler(context, width, waveTop, waveHeight);
+
+            if (SpectralOverlayEnabled && SpectralMagnitudes is { Count: > 0 })
+                DrawSpectralOverlay(context, width, waveTop, waveHeight);
 
             using (context.PushTransform(Matrix.CreateTranslation(0, waveTop)))
             {
@@ -235,6 +252,24 @@ namespace Ongenet.App.Controls
                         new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.Text, 120)));
                     context.DrawText(timeLabel, new Point(x + 2, 10));
                 }
+            }
+        }
+
+        private void DrawSpectralOverlay(DrawingContext context, double width, double waveTop, double waveHeight)
+        {
+            var mags = SpectralMagnitudes!;
+            var count = mags.Count;
+            if (count <= 0) return;
+
+            var barWidth = Math.Max(1.0, width / count);
+            var spectralBrush = new SolidColorBrush(ThemePalette.WithAlpha(ThemePalette.ColorOf("Mauve"), 90));
+
+            for (var i = 0; i < count; i++)
+            {
+                var h = mags[i] * waveHeight * 0.85;
+                if (h < 1) continue;
+                var x = i * barWidth;
+                context.FillRectangle(spectralBrush, new Rect(x, waveTop + waveHeight - h, barWidth, h));
             }
         }
 

@@ -10,7 +10,7 @@
 
     <Border Background="{StaticResource CatppuccinMantle}">
         <Panel>
-            <TextBlock Text="The project's MIDI and audio clips appear here. Drag one onto a matching track in the timeline."
+            <TextBlock Text="{DynamicResource ProjectClips_The_projects_MIDI_and_audio_clips_appear_here_Dr}"
                        IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
                        Margin="12" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
 
@@ -31,13 +31,13 @@
                                                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                                                 <Border.ContextMenu>
                                                     <ContextMenu>
-                                                        <MenuItem Header="Rename…" Command="{Binding RenameAllCommand}"/>
-                                                        <MenuItem Header="Delete all from project" Command="{Binding DeleteAllCommand}"/>
+                                                        <MenuItem Header="{DynamicResource ProjectClips_Rename}" Command="{Binding RenameAllCommand}"/>
+                                                        <MenuItem Header="{DynamicResource ProjectClips_Delete_all_from_project}" Command="{Binding DeleteAllCommand}"/>
                                                     </ContextMenu>
                                                 </Border.ContextMenu>
                                                 <StackPanel Spacing="4">
                                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                                        <TextBlock Text="🎵" VerticalAlignment="Center" FontSize="11"/>
+                                                        <TextBlock Text="{DynamicResource ProjectClips_Text}" VerticalAlignment="Center" FontSize="11"/>
                                                         <StackPanel>
                                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"
                                                                        TextTrimming="CharacterEllipsis"/>

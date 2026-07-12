@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+             xmlns:views="using:Ongenet.App.Views.Panels"
+             x:Class="Ongenet.App.Views.Panels.ChannelRackView"
+             x:DataType="vm:ChannelRackViewModel">
+    <Grid ColumnDefinitions="220,*" Background="{StaticResource CatppuccinCrust}">
+        <!-- Channel list -->
+        <Border Grid.Column="0" Background="{StaticResource CatppuccinMantle}"
+                BorderBrush="{StaticResource CatppuccinSurface0}" BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,*">
+                <Border Grid.Row="0" Padding="8,6" Background="{StaticResource CatppuccinSurface0}">
+                    <TextBlock Text="{Binding PatternName}" FontWeight="SemiBold" FontSize="12"
+                               Foreground="{StaticResource CatppuccinText}"/>
+                </Border>
+                <ListBox Grid.Row="1" ItemsSource="{Binding Channels}"
+                         SelectedIndex="{Binding SelectedChannelIndex, Mode=TwoWay}"
+                         Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PatternChannelRowViewModel">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="4,2">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                           Foreground="{StaticResource CatppuccinText}"/>
+                                <Button Grid.Column="1" Content="{DynamicResource ChannelRack_PR}" FontSize="9" Padding="4,1" Margin="2,0"
+                                        Command="{Binding SendToPianoRollCommand}" ToolTip.Tip="{DynamicResource ChannelRack_Send_to_piano_roll_Tip}"/>
+                                <Button Grid.Column="2" Content="{DynamicResource ChannelRack_ST}" FontSize="9" Padding="4,1" Margin="0,0,2,0"
+                                        Command="{Binding SendToStepSeqCommand}" ToolTip.Tip="{DynamicResource ChannelRack_Send_to_step_sequencer_Tip}"/>
+                                <CheckBox Grid.Column="3" Content="{DynamicResource ChannelRack_M}" IsChecked="{Binding IsMuted}"
+                                          FontSize="10" Margin="4,0"/>
+                                <Slider Grid.Column="4" Width="60" Minimum="0" Maximum="1"
+                                        Value="{Binding Volume}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <!-- Step sequencer -->
+        <views:StepSequencerView Grid.Column="1" DataContext="{Binding StepSequencer}"/>
+    </Grid>
+</UserControl>

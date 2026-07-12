@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Ongenet.App.Localization;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.App.Theming;
 
@@ -145,7 +146,7 @@ namespace Ongenet.App.Controls
             AddType("Low-pass", EqBandType.LowPass);
             AddType("Notch", EqBandType.Notch);
             flyout.Items.Add(new Separator());
-            var del = new MenuItem { Header = "Delete band" };
+            var del = new MenuItem { Header = Loc.Get("Menu_DeleteBand") };
             del.Click += (_, _) =>
             {
                 eq.RemoveBand(band);

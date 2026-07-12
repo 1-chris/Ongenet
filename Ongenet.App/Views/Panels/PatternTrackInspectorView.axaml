@@ -1,0 +1,101 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+             xmlns:audio="using:Ongenet.Core.Models.Audio"
+             x:Class="Ongenet.App.Views.Panels.PatternTrackInspectorView"
+             x:DataType="vm:PatternTrackInspectorViewModel">
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="10,8">
+        <StackPanel Spacing="8">
+            <TextBlock Text="{DynamicResource PatternInspector_PATTERN_TRACK}" FontWeight="Bold" FontSize="11"
+                       Foreground="{StaticResource CatppuccinOverlay1}"
+                       ToolTip.Tip="{DynamicResource PatternInspector_Pattern_tracks_hold_step_sequencer_style_pattern_Tip}"/>
+
+            <StackPanel Spacing="1" IsVisible="{Binding HasPatternTrack}">
+                <TextBlock Text="{DynamicResource PatternInspector_Pattern_name}" Foreground="{StaticResource CatppuccinSubtext0}"
+                           ToolTip.Tip="{DynamicResource PatternInspector_Name_of_the_pattern_object_one_pattern_can_be_us_Tip}"/>
+                <TextBox Text="{Binding PatternName}"
+                         ToolTip.Tip="{DynamicResource PatternInspector_Rename_the_pattern_Changing_the_name_updates_it__Tip}"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4" IsVisible="{Binding HasPatternTrack}">
+                <TextBlock Text="{DynamicResource PatternInspector_Add_instrument_track}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"
+                           ToolTip.Tip="{DynamicResource PatternInspector_Add_a_row_that_sends_MIDI_notes_to_an_existing_i_Tip}"/>
+                <ComboBox ItemsSource="{Binding InstrumentTrackOptions}"
+                          SelectedItem="{Binding SelectedInstrumentTrack}"
+                          HorizontalAlignment="Stretch"
+                          ToolTip.Tip="{DynamicResource PatternInspector_Choose_which_instrument_track_receives_notes_fro_Tip}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="audio:Track">
+                            <TextBlock Text="{Binding Name}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Content="{DynamicResource PatternInspector_Add_instrument_row}" Command="{Binding AddInstrumentRowCommand}" HorizontalAlignment="Stretch"
+                        ToolTip.Tip="{DynamicResource PatternInspector_Create_a_new_pattern_row_linked_to_the_selected__Tip}"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4" IsVisible="{Binding HasPatternTrack}">
+                <TextBlock Text="{DynamicResource PatternInspector_Add_audio_sample}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"
+                           ToolTip.Tip="{DynamicResource PatternInspector_Add_a_row_that_triggers_a_one_shot_audio_clip_on_Tip}"/>
+                <ComboBox ItemsSource="{Binding SampleOptions}"
+                          SelectedItem="{Binding SelectedSample}"
+                          HorizontalAlignment="Stretch"
+                          ToolTip.Tip="{DynamicResource PatternInspector_Pick_an_audio_clip_from_the_project_library_to_f_Tip}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AudioClipOption">
+                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Content="{DynamicResource PatternInspector_Add_sample_row}" Command="{Binding AddSampleRowCommand}" HorizontalAlignment="Stretch"
+                        ToolTip.Tip="{DynamicResource PatternInspector_Add_a_sample_row_that_plays_the_chosen_audio_cli_Tip}"/>
+            </StackPanel>
+
+            <TextBlock Text="{DynamicResource PatternInspector_Pattern_rows}" FontWeight="SemiBold" FontSize="11"
+                       IsVisible="{Binding HasPatternTrack}"
+                       Foreground="{StaticResource CatppuccinOverlay1}"
+                       ToolTip.Tip="{DynamicResource PatternInspector_All_channels_in_this_pattern_reorder_rows_to_mat_Tip}"/>
+
+            <ItemsControl ItemsSource="{Binding Rows}" IsVisible="{Binding HasPatternTrack}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PatternRowInspectorViewModel">
+                        <Border Margin="0,4,0,0" Padding="6" CornerRadius="4"
+                                Background="{StaticResource CatppuccinSurface0}"
+                                ToolTip.Tip="{DynamicResource PatternInspector_One_row_in_the_pattern_corresponds_to_a_channel__Tip}">
+                            <StackPanel Spacing="4">
+                                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                             ToolTip.Tip="{DynamicResource PatternInspector_Row_label_shown_in_the_pattern_editor_and_channe_Tip}"/>
+                                    <Button Grid.Column="1" Content="▲" Padding="4,0" Margin="4,0,0,0"
+                                            Command="{Binding MoveUpCommand}"
+                                            ToolTip.Tip="{DynamicResource PatternInspector_Move_this_row_up_in_the_pattern_list_also_change_Tip}"/>
+                                    <Button Grid.Column="2" Content="▼" Padding="4,0" Margin="2,0,0,0"
+                                            Command="{Binding MoveDownCommand}"
+                                            ToolTip.Tip="{DynamicResource PatternInspector_Move_this_row_down_in_the_pattern_list_Tip}"/>
+                                    <Button Grid.Column="3" Content="{DynamicResource PatternInspector_Text}" Padding="4,0" Margin="2,0,0,0"
+                                            Command="{Binding RemoveCommand}"
+                                            ToolTip.Tip="{DynamicResource PatternInspector_Delete_this_row_and_its_steps_from_the_pattern_Tip}"/>
+                                </Grid>
+                                <TextBlock Text="{Binding SourceLabel}" FontSize="9"
+                                           Foreground="{StaticResource CatppuccinOverlay1}"
+                                           ToolTip.Tip="{DynamicResource PatternInspector_What_this_row_triggers_the_linked_instrument_tra_Tip}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <CheckBox Content="{DynamicResource PatternInspector_Mute}" IsChecked="{Binding IsMuted}"
+                                              ToolTip.Tip="{DynamicResource PatternInspector_Mute_this_pattern_row_its_steps_stay_in_the_grid_Tip}"/>
+                                    <Slider Minimum="0" Maximum="1" Value="{Binding Volume}" Width="100"
+                                            ToolTip.Tip="{DynamicResource PatternInspector_Row_output_level_scales_velocity_volume_when_ste_Tip}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{DynamicResource PatternInspector_Select_a_pattern_track_to_edit_its_rows}"
+                       IsVisible="{Binding !HasPatternTrack}"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource CatppuccinSubtext0}"
+                       ToolTip.Tip="{DynamicResource PatternInspector_Click_a_pattern_track_header_in_the_timeline_to__Tip}"/>
+        </StackPanel>
+    </Border>
+</UserControl>

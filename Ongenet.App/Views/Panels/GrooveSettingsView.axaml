@@ -1,0 +1,78 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+             xmlns:core="using:Ongenet.Core.Models.Audio"
+             mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="320"
+             x:Class="Ongenet.App.Views.Panels.GrooveSettingsView"
+             x:DataType="vm:GrooveSettingsViewModel">
+
+    <StackPanel Spacing="8" Margin="0,8,0,0">
+        <TextBlock Text="{DynamicResource Groove_GROOVE}" FontWeight="Bold" FontSize="11"
+                   Foreground="{StaticResource CatppuccinOverlay1}"
+                   ToolTip.Tip="{DynamicResource Groove_Groove_applies_humanized_timing_and_swing_to_MID_Tip}"/>
+
+        <ComboBox ItemsSource="{Binding GroovePool}" SelectedItem="{Binding SelectedGroove}"
+                  PlaceholderText="{DynamicResource Groove_No_groove}" HorizontalAlignment="Stretch"
+                  ToolTip.Tip="{DynamicResource Groove_Pick_a_groove_template_from_the_project_pool_Gro_Tip}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="core:GrooveTemplate">
+                    <TextBlock Text="{Binding Name}"/>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <StackPanel Spacing="2" IsVisible="{Binding HasActiveGroove}">
+            <TextBlock Text="{DynamicResource Groove_Swing_amount}" Foreground="{StaticResource CatppuccinSubtext0}"
+                       ToolTip.Tip="{DynamicResource Groove_Swing_delays_off_beat_notes_50_is_straight_no_sw_Tip}"/>
+            <Slider Minimum="0.5" Maximum="0.85" Value="{Binding SwingAmount}"
+                    ToolTip.Tip="{DynamicResource Groove_Adjust_how_strong_the_selected_grooves_swing_is__Tip}"/>
+        </StackPanel>
+
+        <TextBlock Text="{DynamicResource Groove_MPE}" FontWeight="Bold" FontSize="11" Margin="0,8,0,0"
+                   Foreground="{StaticResource CatppuccinOverlay1}"
+                   ToolTip.Tip="{DynamicResource Groove_MPE_MIDI_Polyphonic_Expression_sends_per_note_pi_Tip}"/>
+
+        <CheckBox Content="{DynamicResource Groove_Enable_MPE}" IsChecked="{Binding MpeEnabled}"
+                  ToolTip.Tip="{DynamicResource Groove_Turn_on_MPE_routing_for_this_track_When_enabled__Tip}"/>
+
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsEnabled="{Binding MpeEnabled}">
+            <TextBlock Grid.Column="0" Text="{DynamicResource Groove_Master_ch}" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext0}"
+                       ToolTip.Tip="{DynamicResource Groove_MPE_master_channel_carries_shared_messages_like__Tip}"/>
+            <NumericUpDown Grid.Column="1" Value="{Binding MpeMasterChannel}" Minimum="1" Maximum="16"
+                           ToolTip.Tip="{DynamicResource Groove_Set_the_master_MIDI_channel_usually_1_Member_cha_Tip}"/>
+        </Grid>
+
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsEnabled="{Binding MpeEnabled}">
+            <TextBlock Grid.Column="0" Text="{DynamicResource Groove_Member_start}" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext0}"
+                       ToolTip.Tip="{DynamicResource Groove_First_member_channel_each_playing_note_is_assign_Tip}"/>
+            <NumericUpDown Grid.Column="1" Value="{Binding MpeMemberChannelStart}" Minimum="1" Maximum="15"
+                           ToolTip.Tip="{DynamicResource Groove_Lowest_channel_number_used_for_per_note_expressi_Tip}"/>
+        </Grid>
+
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsEnabled="{Binding MpeEnabled}">
+            <TextBlock Grid.Column="0" Text="{DynamicResource Groove_Member_count}" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext0}"
+                       ToolTip.Tip="{DynamicResource Groove_How_many_MIDI_channels_are_reserved_for_simultan_Tip}"/>
+            <NumericUpDown Grid.Column="1" Value="{Binding MpeMemberChannelCount}" Minimum="1" Maximum="15"
+                           ToolTip.Tip="{DynamicResource Groove_Number_of_consecutive_member_channels_More_chann_Tip}"/>
+        </Grid>
+
+        <Button Content="{DynamicResource Groove_Import_groove}" Command="{Binding ImportGrooveCommand}" HorizontalAlignment="Left"
+                Margin="0,4,0,0" Padding="10,4"
+                ToolTip.Tip="{DynamicResource Groove_Import_a_groove_template_file_into_the_project_p_Tip}"/>
+        <Button Content="{DynamicResource Groove_Extract_from_clip}" Command="{Binding ExtractGrooveCommand}" HorizontalAlignment="Left"
+                Padding="10,4"
+                ToolTip.Tip="{DynamicResource Groove_Analyze_timing_in_the_selected_MIDI_clip_and_sav_Tip}"/>
+
+        <Button Content="{DynamicResource Groove_Drum_map_editor}" Command="{Binding OpenDrumMapEditorCommand}" HorizontalAlignment="Left"
+                Margin="0,4,0,0" Padding="10,4"
+                ToolTip.Tip="{DynamicResource Groove_Open_the_drum_map_editor_to_name_MIDI_notes_Kick_Tip}"/>
+        <TextBlock Text="{Binding DrumMapCount, StringFormat='{}{0} drum map(s) in project'}"
+                   FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
+                   ToolTip.Tip="{DynamicResource Groove_How_many_drum_maps_are_saved_in_this_project_Map_Tip}"/>
+    </StackPanel>
+</UserControl>

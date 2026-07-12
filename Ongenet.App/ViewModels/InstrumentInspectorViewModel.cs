@@ -31,13 +31,14 @@ namespace Ongenet.App.ViewModels
         private readonly IInstrumentRegistry _instruments;
         private readonly IHistoryService _history;
         private readonly IEventAggregator _events;
+        private readonly IProjectService _project;
 
         // Preferred display order for the add-instrument menu categories (plugin formats grouped separately).
         private static readonly string[] CategoryOrder = { "Synth", "Sampler", "Drum", "CLAP", "LV2", "VST2", "VST3", "AU" };
 
         public InstrumentInspectorViewModel(ISelectionService selection, IAudioFileService audioFiles,
             IPreviewService preview, ITransportService transport, IPlaybackClock clock, IEffectRegistry effects,
-            IInstrumentRegistry instruments, IHistoryService history, IEventAggregator events)
+            IInstrumentRegistry instruments, IHistoryService history, IEventAggregator events, IProjectService project)
         {
             _selection = selection;
             _audioFiles = audioFiles;
@@ -48,6 +49,7 @@ namespace Ongenet.App.ViewModels
             _instruments = instruments;
             _history = history;
             _events = events;
+            _project = project;
 
             _selection.SelectionChanged += OnSelectionChanged;
             _preview.ActiveNotesChanged += UpdateKeyHighlights;
@@ -288,7 +290,7 @@ namespace Ongenet.App.ViewModels
             if (Track is { } track)
             {
                 foreach (var slot in track.Instruments)
-                    Slots.Add(new InstrumentSlotViewModel(slot, _audioFiles, _transport, _history, _effects,
+                    Slots.Add(new InstrumentSlotViewModel(slot, track.Id, _project, _audioFiles, _transport, _history, _effects,
                         _clock, () => _events.Publish(new TracksChangedEvent()), RemoveSlot, MoveSlot,
                         InsertRelativeToSlot, ReplaceSlotWith, InsertPresetRelativeToSlot, ReplacePresetForSlot,
                         InsertSoundFontRelativeToSlot, ReplaceSoundFontForSlot));

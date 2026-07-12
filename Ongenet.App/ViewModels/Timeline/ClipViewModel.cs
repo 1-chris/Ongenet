@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
+using Ongenet.Ara;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Audio;
 
@@ -13,6 +15,7 @@ namespace Ongenet.App.ViewModels.Timeline
     public class ClipViewModel : ViewModelBase
     {
         private readonly TimelineMetrics _metrics;
+        private readonly IClipActions _actions;
         private bool _isSelected;
         private bool _isRendering;
         private double _renderProgress;
@@ -22,6 +25,7 @@ namespace Ongenet.App.ViewModels.Timeline
             Model = model;
             Owner = owner;
             _metrics = metrics;
+            _actions = actions;
             _metrics.PropertyChanged += OnMetricsChanged;
             DuplicateCommand = new RelayCommand(() => actions.DuplicateClip(this));
             DeleteCommand = new RelayCommand(() => actions.DeleteClip(this));
@@ -32,7 +36,47 @@ namespace Ongenet.App.ViewModels.Timeline
             RenderToNewTrackCommand = new RelayCommand(
                 () => _ = actions.RenderClipToNewTrackAsync(this),
                 () => !actions.IsRenderingClip);
+            OpenAraEditorCommand = new RelayCommand(() => actions.OpenAraEditor(this), () => HasAraSupport);
+            OpenPitchEditorCommand = new RelayCommand(() => actions.OpenPitchEditor(this), () => IsAudio);
+            OpenInAudioEditorCommand = new RelayCommand(() => actions.OpenInAudioEditor(this), () => IsAudio);
+            SendToSessionSlotCommand = new RelayCommand(() => actions.SendClipToSessionSlot(this));
+            ConvertToMidiCommand = new RelayCommand(
+                () => actions.OpenAudioToMidiWizard(this),
+                () => IsAudio && !actions.IsRenderingClip);
+            ConvertToPolyMidiCommand = new RelayCommand(
+                () => _ = actions.ConvertAudioClipToPolyMidiAsync(this),
+                () => IsAudio && !actions.IsRenderingClip);
+            SeparateStemsCommand = new RelayCommand(
+                () => _ = actions.SeparateStemsAsync(this),
+                () => IsAudio && !actions.IsRenderingClip);
+            CreateLinkedCopyCommand = new RelayCommand(() => actions.CreateLinkedCopy(this));
+            UnlinkClipCommand = new RelayCommand(() => actions.UnlinkClip(this),
+                () => actions.GetLinkedInstanceCount(this) > 0);
+            BounceInPlaceCommand = new RelayCommand(
+                () => _ = actions.BounceClipInPlaceAsync(this),
+                () => !actions.IsRenderingClip);
+            LogicalMidiEditCommand = new RelayCommand(
+                () => actions.OpenLogicalMidiEdit(this), () => IsMidi);
         }
+
+        public RelayCommand OpenAraEditorCommand { get; }
+        public RelayCommand OpenPitchEditorCommand { get; }
+        public RelayCommand OpenInAudioEditorCommand { get; }
+        public RelayCommand SendToSessionSlotCommand { get; }
+        public RelayCommand ConvertToMidiCommand { get; }
+        public RelayCommand ConvertToPolyMidiCommand { get; }
+        public RelayCommand SeparateStemsCommand { get; }
+        public RelayCommand CreateLinkedCopyCommand { get; }
+        public RelayCommand UnlinkClipCommand { get; }
+        public RelayCommand BounceInPlaceCommand { get; }
+        public RelayCommand LogicalMidiEditCommand { get; }
+
+        /// <summary>True when the owning track hosts an ARA-capable plug-in.</summary>
+        public bool HasAraSupport => IsAudio && Owner.Instruments
+            .Any(s => s.Instrument is IAraCapable { SupportsAra: true });
+
+        /// <summary>True when the clip shows the ARA region indicator.</summary>
+        public bool HasAraRegion => Model.HasAraRegion || HasAraSupport;
 
         public RelayCommand DuplicateCommand { get; }
         public RelayCommand DeleteCommand { get; }
@@ -47,13 +91,16 @@ namespace Ongenet.App.ViewModels.Timeline
         /// <summary>The track that owns this clip (needed when reporting selection).</summary>
         public Track Owner { get; }
 
-        public string Name => Model.Name;
+        public string Name => Model.LinkedClipGroupId is null ? Model.Name : $"{Model.Name} 🔗";
 
         /// <summary>Left edge of the clip on the lane canvas, in pixels.</summary>
         public double Left => _metrics.BeatsToPixels(Model.StartBeat);
 
         /// <summary>Width of the clip, in pixels.</summary>
         public double Width => _metrics.BeatsToPixels(Model.LengthBeats);
+
+        /// <summary>Shared timeline zoom for fade handle dragging.</summary>
+        public double PixelsPerBeat => _metrics.PixelsPerBeat;
 
         /// <summary>True while this clip is being rendered to a new track.</summary>
         public bool IsRendering
@@ -114,6 +161,30 @@ namespace Ongenet.App.ViewModels.Timeline
 
         /// <summary>Clip length in beats, for mapping notes into the miniature view.</summary>
         public double ClipLengthBeats => Model.LengthBeats;
+
+        public IReadOnlyList<WarpMarker> WarpMarkers => Model.WarpMarkers;
+
+        public double SourceDurationSeconds => Model.Samples is { } s && s.SampleRate > 0
+            ? s.FrameCount / (double)s.SampleRate
+            : 0;
+
+        public double SourceOffsetSeconds => Model.SourceOffsetSeconds;
+
+        private int _warpRevision;
+
+        public int WarpRevision
+        {
+            get => _warpRevision;
+            private set => SetField(ref _warpRevision, value);
+        }
+
+        public void NotifyWarpChanged() => WarpRevision++;
+
+        public void OnFadeDragCompleted(double fadeInBeats, double fadeOutBeats)
+            => _actions.SetClipFades(this, fadeInBeats, fadeOutBeats);
+
+        public void OnWarpMarkerMoved(int index, double beatPosition)
+            => _actions.MoveWarpMarker(this, index, beatPosition);
 
         private int _notesRevision;
 
@@ -208,6 +279,8 @@ namespace Ongenet.App.ViewModels.Timeline
             OnPropertyChanged(nameof(WaveEndFraction));
             OnPropertyChanged(nameof(IsAudio));
             OnPropertyChanged(nameof(IsMidi));
+            OnPropertyChanged(nameof(HasAraSupport));
+            OnPropertyChanged(nameof(HasAraRegion));
             OnPropertyChanged(nameof(ClipLengthBeats));
             OnPropertyChanged(nameof(RenderProgressWidth));
             // Repaint the miniature note view and waveform too (a resize/grow changes their mapping).

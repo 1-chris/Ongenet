@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Persistence;
 
@@ -24,6 +25,12 @@ public interface IPresetLibrary
 
     /// <summary>Saves the instrument's current settings as a user preset; returns the file path.</summary>
     string SaveInstrument(IInstrument instrument, string name);
+
+    /// <summary>Saves a Field instrument graph patch; returns the file path.</summary>
+    string SaveFieldPatch(IInstrument fieldInstrument, string name);
+
+    /// <summary>Saves a Field effect graph patch; returns the file path.</summary>
+    string SaveFieldEffectPatch(FieldEffect fieldEffect, string name);
 
     /// <summary>Saves the effect's current settings as a user preset; returns the file path.</summary>
     string SaveEffect(IAudioEffect effect, string name);
@@ -76,6 +83,7 @@ public sealed class PresetLibrary : IPresetLibrary
             switch (meta.Kind)
             {
                 case PresetKind.Instrument: instr.Add((DisplayNameFor(meta), item)); break;
+                case PresetKind.FieldPatch: instr.Add(("Field Patches", item)); break;
                 case PresetKind.EffectChain: chains.Add(item); break;
                 default: fx.Add((DisplayNameFor(meta), item)); break;
             }
@@ -93,6 +101,23 @@ public sealed class PresetLibrary : IPresetLibrary
     {
         var path = UserPresetPath("Instruments", instrument.TypeId, name);
         using (var fs = File.Create(path)) PresetFile.SaveInstrument(instrument, name, Environment.UserName, fs);
+        Rescan();
+        return path;
+    }
+
+    public string SaveFieldPatch(IInstrument fieldInstrument, string name)
+    {
+        var path = UserPresetPath("Field", fieldInstrument.TypeId, name);
+        using (var fs = File.Create(path)) PresetFile.SaveFieldPatch(fieldInstrument, name, Environment.UserName, fs);
+        Rescan();
+        return path;
+    }
+
+    public string SaveFieldEffectPatch(FieldEffect fieldEffect, string name)
+    {
+        var path = UserPresetPath("Field", fieldEffect.TypeId, name);
+        using (var fs = File.Create(path))
+            PresetFile.SaveEffect(fieldEffect, name, Environment.UserName, fs);
         Rescan();
         return path;
     }
@@ -202,6 +227,39 @@ public sealed class PresetLibrary : IPresetLibrary
             catch
             {
                 // Skip a chain that fails to materialize; the rest still work.
+            }
+        }
+
+        // Factory Field instrument patches for the Field Patches library group.
+        MaterializeFieldPatches(factoryDir);
+    }
+
+    private void MaterializeFieldPatches(string factoryDir)
+    {
+        IInstrument field;
+        try { field = _instruments.Create(FieldInstrument.Id); }
+        catch { return; }
+
+        if (field is not IPresetProvider provider) return;
+
+        var names = new[] { "Prism Lead", "Crystal Pluck", "Reese Bass", "Nova Saw" };
+        var dir = Path.Combine(factoryDir, "Field Patches");
+        foreach (var name in names)
+        {
+            var path = Path.Combine(dir, Sanitize(name) + ".ongenpreset");
+            if (File.Exists(path)) continue;
+            var index = provider.PresetNames.ToList().IndexOf(name);
+            if (index < 0) continue;
+            try
+            {
+                Directory.CreateDirectory(dir);
+                provider.LoadPreset(index);
+                using var fs = File.Create(path);
+                PresetFile.SaveFieldPatch(field, name, "Factory", fs);
+            }
+            catch
+            {
+                // Skip a patch that fails to materialize; the rest still work.
             }
         }
     }

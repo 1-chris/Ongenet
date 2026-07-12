@@ -44,11 +44,18 @@ public sealed class Lfo
         return Shape(p);
     }
 
-    private double Shape(double p) => Wave switch
+    private double Shape(double p) => Evaluate(Wave, p);
+
+    /// <summary>Evaluates an LFO waveform at normalised phase 0..1 (wraps automatically).</summary>
+    public static double Evaluate(LfoWave wave, double phase)
     {
-        LfoWave.Triangle => 1.0 - 4.0 * Math.Abs(p - 0.5), // +1 at 0.5, -1 at the ends
-        LfoWave.Saw => 2.0 * p - 1.0,
-        LfoWave.Square => p < 0.5 ? 1.0 : -1.0,
-        _ => Math.Sin(2.0 * Math.PI * p)
-    };
+        phase -= Math.Floor(phase);
+        return wave switch
+        {
+            LfoWave.Triangle => 1.0 - 4.0 * Math.Abs(phase - 0.5),
+            LfoWave.Saw => 2.0 * phase - 1.0,
+            LfoWave.Square => phase < 0.5 ? 1.0 : -1.0,
+            _ => Math.Sin(2.0 * Math.PI * phase)
+        };
+    }
 }

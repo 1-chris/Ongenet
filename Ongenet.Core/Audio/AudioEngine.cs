@@ -11,6 +11,7 @@ using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.Core.Audio.Scheduling;
 
 namespace Ongenet.Core.Audio;
 
@@ -46,16 +47,24 @@ public sealed class AudioEngine : IAudioEngine
     private readonly IAudioOutput _output;
     private readonly IProjectService _project;
     private readonly ITransportService _transport;
+    private readonly IPlaybackModeService _playback;
     private readonly IAuditionPlayer _audition;
+    private readonly IMidiOutputService _midiOut;
+    private readonly IInputMonitorService _inputMonitor;
 
     private volatile Track[] _tracks = Array.Empty<Track>();
 
+    private readonly ArrangementScheduler _arrangementScheduler = new();
+    private readonly PatternScheduler _patternScheduler = new();
+
     private volatile bool _playing;
     private ScheduledNote[] _events = Array.Empty<ScheduledNote>();
+    private ScheduledControlChange[] _ccEvents = Array.Empty<ScheduledControlChange>();
     private TrackActivityMap _trackActivity = TrackActivityMap.Empty;
     private AudioClipPlayback[] _audioClips = Array.Empty<AudioClipPlayback>();
     private readonly List<ScheduledNote> _active = new();
     private int _nextEvent;
+    private int _nextCcEvent;
     private double _currentBeat;
     private double _samplesPerBeat = 1;
     private double _arrangementEndBeat; // for whole-song auto-loop (snapshot at playback start)
@@ -63,6 +72,7 @@ public sealed class AudioEngine : IAudioEngine
     // --- Bus routing (groups + master). Rebuilt whenever the track topology changes; published as a
     //     single immutable snapshot so the audio thread always reads a consistent graph. ---
     private volatile Routing _routing = new();
+    private Dictionary<(Guid TrackId, int BusIndex), Guid> _multiOutRoutes = new();
 
     // --- Metronome count-in (recording pre-roll) ---
     private bool _countingIn;
@@ -71,6 +81,7 @@ public sealed class AudioEngine : IAudioEngine
     private int _countInClicks;         // clicks fired so far
     private int _countInClicksTotal;    // one click per count-in beat
     private int _beatsPerBar = 4;       // for the downbeat accent
+    private int _metronomeNextBeat = -1; // next whole beat to click during playback metronome
 
     // Click oscillator (a short decaying sine added to the master bus).
     private int _clickRemaining;
@@ -105,15 +116,21 @@ public sealed class AudioEngine : IAudioEngine
     private bool _disposed;
 
     public AudioEngine(IAudioOutput output, IProjectService project, ITransportService transport,
-        IEventAggregator events, IAuditionPlayer audition)
+        IPlaybackModeService playback, IEventAggregator events, IAuditionPlayer audition,
+        IMidiOutputService? midiOut = null, IInputMonitorService? inputMonitor = null)
     {
         _output = output;
         _project = project;
         _transport = transport;
+        _playback = playback;
         _audition = audition;
+        _midiOut = midiOut ?? new NullMidiOutputService();
+        _inputMonitor = inputMonitor ?? new NullInputMonitorService();
         _renderJob = RenderTrackJob;
         _project.ProjectChanged += RebuildTracks;
         _transport.StateChanged += OnTransportStateChanged;
+        _playback.ActiveClipsChanged += OnSessionClipsChanged;
+        _playback.ModeChanged += OnPlaybackModeChanged;
         _output.FormatChanged += RebuildTracks; // re-prepare DSP when the device's sample rate changes
         events.Subscribe<TracksChangedEvent>(_ => RebuildTracks());
         events.Subscribe<AutomationChangedEvent>(e => e.Track.CommitAutoLanes());
@@ -148,6 +165,7 @@ public sealed class AudioEngine : IAudioEngine
         }
 
         _tracks = tracks;
+        _multiOutRoutes = MultiOutputRouter.BuildIndex(_project.Current.MultiOutputRoutes);
         BuildRouting(tracks);
     }
 
@@ -188,7 +206,7 @@ public sealed class AudioEngine : IAudioEngine
         var states = new List<TrackState>();
         foreach (var t in tracks)
         {
-            if (!t.IsBus) states.Add(new TrackState { Track = t });
+            if (IsDirectAudioTrack(t)) states.Add(new TrackState { Track = t });
         }
 
         _routing = new Routing
@@ -199,17 +217,54 @@ public sealed class AudioEngine : IAudioEngine
             MasterTrack = masterTrack,
             BusesDeepestFirst = busById.Values.OrderByDescending(b => b.Depth).ToArray(),
             ContentStates = states.ToArray(),
-            SidechainSources = CollectSidechainSources(tracks)
+            SidechainSources = CollectSidechainSources(tracks),
+            Pdc = LatencyCompensator.Compute(tracks)
         };
+
+        var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
+        var maxFrames = 8192;
+        foreach (var st in states)
+        {
+            if (_routing.Pdc.TryGetValue(st.Track.Id, out var comp))
+            {
+                st.PdcDelay = comp.DelaySamples;
+                st.EnsurePdc(channels, maxFrames);
+            }
+        }
+
+        foreach (var bus in busById.Values)
+        {
+            if (_routing.Pdc.TryGetValue(bus.Track.Id, out var comp))
+            {
+                bus.PdcDelay = comp.DelaySamples;
+                bus.EnsurePdc(channels, maxFrames);
+            }
+        }
     }
 
     // Tracks referenced as sidechain sources must render even when muted/soloed-out.
     private static HashSet<Guid> CollectSidechainSources(Track[] tracks)
         => Automation.OfflineAutomationDriver.CollectSidechainSources(tracks);
 
-    // The bus a track's output feeds into (its ParentId group, or the master when unset).
-    private static Bus? ParentBusOf(Track track, Routing routing)
-        => track.ParentId is { } pid && routing.BusById.TryGetValue(pid, out var b) ? b : routing.Master;
+    // The bus a track's output feeds into (respecting OutputTarget / RouteToMaster).
+    private static Bus? MainOutputBusOf(Track track, Routing routing)
+    {
+        if (!track.RouteToMaster) return null;
+        return track.OutputTarget switch
+        {
+            TrackOutputTarget.None => null,
+            TrackOutputTarget.Master => routing.Master,
+            TrackOutputTarget.SpecificBus when track.OutputBusId is { } id && routing.BusById.TryGetValue(id, out var b) => b,
+            _ => track.ParentId is { } pid && routing.BusById.TryGetValue(pid, out var p) ? p : routing.Master
+        };
+    }
+
+    // Legacy alias used by group hierarchy checks.
+    private static Bus? ParentBusOf(Track track, Routing routing) => MainOutputBusOf(track, routing);
+
+    // Pattern and MIDI lanes schedule notes elsewhere; they never render audio in the engine.
+    private static bool IsDirectAudioTrack(Track track) =>
+        !track.IsBus && track.Kind is TrackKind.Audio or TrackKind.Instrument;
 
     // The parent track in the routing tree (the master is the implicit parent of top-level tracks).
     private static Track? ParentTrackOf(Track track, Routing routing)
@@ -243,107 +298,80 @@ public sealed class AudioEngine : IAudioEngine
             _playing = false;
             _countingIn = false;
             _clickRemaining = 0;
+            _metronomeNextBeat = -1;
             AllNotesOff();
             _transport.NotifyPlayhead(_transport.StartBeat);
         }
     }
 
-    private void BeginPlayback()
+    private void OnSessionClipsChanged()
+    {
+        if (_playing) RebuildPlaybackSchedule(_transport.PlayheadBeats);
+    }
+
+    private void OnPlaybackModeChanged()
+    {
+        if (_playing) RebuildPlaybackSchedule(_transport.PlayheadBeats);
+    }
+
+    private void BeginPlayback() => RebuildPlaybackSchedule(_transport.StartBeat);
+
+    private void RebuildPlaybackSchedule(double startBeat)
     {
         var sampleRate = _output.Format.SampleRate;
         var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
         var bpm = _transport.Tempo.BeatsPerMinute;
         _samplesPerBeat = bpm > 0 ? sampleRate * 60.0 / bpm : sampleRate;
-        var startBeat = _transport.StartBeat;
 
-        var notes = new List<ScheduledNote>();
-        var clips = new List<AudioClipPlayback>();
-
-        foreach (var track in _tracks)
+        var context = new PlaybackScheduleContext
         {
-            // MIDI clips drive the track's instrument (sound) and any MIDI-aware insert effect (gestures).
-            var midiFx = MidiEffectsOf(track);
-            if (track.Kind == TrackKind.Instrument && track.ActiveInstruments.Length > 0)
-            {
-                var slots = track.ActiveInstruments;
-                foreach (var clip in track.Clips)
-                {
-                    if (!clip.IsMidi) continue;
-                    foreach (var note in clip.Notes)
-                    {
-                        var onBeat = clip.StartBeat + note.StartBeat;
-                        var offBeat = onBeat + note.LengthBeats;
-                        if (offBeat <= startBeat) continue;
-                        notes.Add(new ScheduledNote(track.Id, onBeat, offBeat, slots, midiFx, note.Note, note.Velocity));
-                    }
-                }
-            }
-            else if (midiFx.Length > 0 && track.Kind != TrackKind.Audio)
-            {
-                // A non-instrument track (e.g. a bus) carrying MIDI clips can still trigger its effects.
-                foreach (var clip in track.Clips)
-                {
-                    if (!clip.IsMidi) continue;
-                    foreach (var note in clip.Notes)
-                    {
-                        var onBeat = clip.StartBeat + note.StartBeat;
-                        var offBeat = onBeat + note.LengthBeats;
-                        if (offBeat <= startBeat) continue;
-                        notes.Add(new ScheduledNote(track.Id, onBeat, offBeat, null, midiFx, note.Note, note.Velocity));
-                    }
-                }
-            }
+            Project = _project.Current,
+            Tracks = _tracks,
+            StartBeat = startBeat,
+            SampleRate = sampleRate,
+            Channels = channels,
+            Bpm = bpm
+        };
 
-            if (track.Kind == TrackKind.Audio)
-            {
-                // Crossfades for overlapping clips on this track (per-clip fade gains, independent of the strip).
-                var fades = Crossfade.Compute(track.Clips);
-                foreach (var clip in track.Clips)
-                {
-                    if (clip.Samples is { } samples && clip.EndBeat > startBeat)
-                    {
-                        // Tempo-synced clips resample so the clip's source window spans its beat-length at
-                        // the current tempo (keeps loops on the grid); others play at native speed. A sliced
-                        // clip only spans part of the source (SourceLengthSeconds), so stretch off that.
-                        var sourceDur = clip.SourceLengthSeconds
-                            ?? Math.Max(0.0, samples.FrameCount / (double)samples.SampleRate - clip.SourceOffsetSeconds);
-                        var fade = fades.TryGetValue(clip, out var f) ? f : (FadeInBeats: 0.0, FadeOutBeats: 0.0);
-                        // Pitch-preserving stretch: one PSOLA shifter per channel, configured at the device rate.
-                        var shifters = clip is { PitchCorrected: true, StretchToTempo: true }
-                            ? BuildPitchShifters(channels, sampleRate)
-                            : null;
-                        // Store the stretch *inputs* (source window + flag), not a fixed ratio: the block
-                        // renderer derives the read rate from the live tempo so speed follows tempo automation.
-                        clips.Add(new AudioClipPlayback(track, clip.StartBeat, clip.LengthBeats, samples,
-                            clip.StretchToTempo, sourceDur, clip.SourceOffsetSeconds,
-                            fade.FadeInBeats, fade.FadeOutBeats, shifters));
-                    }
-                }
-            }
+        var schedule = BuildSchedule(context);
+
+        var notes = new List<ScheduledNote>(schedule.Notes.Length);
+        foreach (var n in schedule.Notes)
+        {
+            var track = _tracks.FirstOrDefault(t => t.Id == n.TrackId);
+            notes.Add(new ScheduledNote(n.TrackId, n.OnBeat, n.OffBeat, n.Slots, n.MidiEffects, n.Note, n.Velocity, n.Gain,
+                n.Pan, track?.RouteToExternalMidi ?? false, track?.ExternalMidiChannel ?? 1));
         }
 
-        notes.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
-
-        // Snapshot the arrangement end (max of the user-set bar count and the furthest clip) so the
-        // engine can auto-loop the whole song when there's no explicit loop region.
-        var beatsPerBar = Math.Max(1, _project.Current.TimeSignature.Numerator);
-        var contentEnd = 0.0;
-        foreach (var track in _tracks)
+        var ccEvents = new List<ScheduledControlChange>(schedule.ControlChanges.Length);
+        foreach (var cc in schedule.ControlChanges)
         {
-            foreach (var clip in track.Clips)
-            {
-                if (clip.EndBeat > contentEnd) contentEnd = clip.EndBeat;
-            }
+            var track = _tracks.FirstOrDefault(t => t.Id == cc.TrackId);
+            ccEvents.Add(new ScheduledControlChange(cc.TrackId, cc.Beat, cc.Slots, cc.Controller, cc.Value,
+                track?.RouteToExternalMidi ?? false, track?.ExternalMidiChannel ?? 1));
         }
 
-        _arrangementEndBeat = Math.Max(_project.Current.BarCount * (double)beatsPerBar, contentEnd);
+        var clips = new List<AudioClipPlayback>(schedule.AudioClips.Length);
+        foreach (var ac in schedule.AudioClips)
+        {
+            clips.Add(new AudioClipPlayback(ac.Track, ac.StartBeat, ac.LengthBeats, ac.Samples,
+                ac.StretchToTempo, ac.SourceDurSeconds, ac.SourceOffsetSeconds,
+                ac.FadeInBeats, ac.FadeOutBeats, ac.PitchShifters, ac.Warp, ac.WarpMode, ac.PitchCorrected,
+                ac.AraPitchOffsetSemitones, ac.PitchSegments, ac.Gain));
+        }
+
+        _arrangementEndBeat = schedule.ArrangementEndBeat;
 
         _active.Clear();
         _currentBeat = startBeat;
         _nextEvent = 0;
+        _nextCcEvent = 0;
+        ResetPlaybackMetronome(startBeat);
         while (_nextEvent < notes.Count && notes[_nextEvent].OnBeat < startBeat) _nextEvent++;
+        while (_nextCcEvent < ccEvents.Count && ccEvents[_nextCcEvent].Beat < startBeat) _nextCcEvent++;
 
         _events = notes.ToArray();
+        _ccEvents = ccEvents.OrderBy(c => c.Beat).ToArray();
         _trackActivity = TrackActivityMap.Build(_events);
         _audioClips = clips.ToArray();
 
@@ -369,6 +397,73 @@ public sealed class AudioEngine : IAudioEngine
             _playing = true;
         }
     }
+
+    private PlaybackSchedule BuildSchedule(PlaybackScheduleContext context)
+    {
+        var sessionClips = context.Project.SessionClips;
+        var launches = _playback.ActiveLaunches;
+
+        return _playback.Mode switch
+        {
+            PlaybackMode.Session => new SessionScheduler(sessionClips, launches).Build(context),
+            PlaybackMode.Hybrid => BuildHybridSchedule(context, sessionClips, launches),
+            _ => MergeWithPatterns(_arrangementScheduler.Build(context), context)
+        };
+    }
+
+    private PlaybackSchedule BuildHybridSchedule(PlaybackScheduleContext context,
+        IReadOnlyList<SessionClip> sessionClips,
+        IReadOnlyDictionary<Guid, SessionClipLaunchState> launches)
+    {
+        var crossfader = (float)_playback.SessionCrossfader;
+        var arrGain = 1f - crossfader;
+        var sesGain = crossfader;
+
+        var arrangement = MergeWithPatterns(_arrangementScheduler.Build(context), context);
+        var session = new SessionScheduler(sessionClips, launches).Build(context);
+
+        return BlendSchedules(arrangement, session, arrGain, sesGain);
+    }
+
+    private PlaybackSchedule MergeWithPatterns(PlaybackSchedule baseSchedule, PlaybackScheduleContext context)
+        => HybridScheduler.MergeSchedules(baseSchedule, _patternScheduler.Build(context));
+
+    private static PlaybackSchedule BlendSchedules(PlaybackSchedule arrangement, PlaybackSchedule session,
+        float arrangementGain, float sessionGain)
+    {
+        var notes = arrangement.Notes.Select(n => n with { Gain = arrangementGain })
+            .Concat(session.Notes.Select(n => n with { Gain = sessionGain }))
+            .OrderBy(n => n.OnBeat)
+            .ToArray();
+        var clips = arrangement.AudioClips.Select(c => CopyClip(c, arrangementGain))
+            .Concat(session.AudioClips.Select(c => CopyClip(c, sessionGain)))
+            .ToArray();
+        return new PlaybackSchedule
+        {
+            Notes = notes,
+            ControlChanges = arrangement.ControlChanges.Concat(session.ControlChanges).OrderBy(c => c.Beat).ToArray(),
+            AudioClips = clips,
+            ArrangementEndBeat = Math.Max(arrangement.ArrangementEndBeat, session.ArrangementEndBeat)
+        };
+    }
+
+    private static ScheduledAudioClip CopyClip(ScheduledAudioClip c, float gain) => new()
+    {
+        Track = c.Track,
+        StartBeat = c.StartBeat,
+        LengthBeats = c.LengthBeats,
+        Samples = c.Samples,
+        StretchToTempo = c.StretchToTempo,
+        SourceDurSeconds = c.SourceDurSeconds,
+        SourceOffsetSeconds = c.SourceOffsetSeconds,
+        FadeInBeats = c.FadeInBeats,
+        FadeOutBeats = c.FadeOutBeats,
+        PitchShifters = c.PitchShifters,
+        Warp = c.Warp,
+        WarpMode = c.WarpMode,
+        PitchCorrected = c.PitchCorrected,
+        Gain = gain
+    };
 
     private void Render(Span<float> buffer)
     {
@@ -412,7 +507,11 @@ public sealed class AudioEngine : IAudioEngine
             }
         }
 
+        if (playing) ScheduleControlChanges(curBeat);
         if (playing) ScheduleNotes(curBeat);
+
+        if (playing && !_countingIn && _transport.MetronomeEnabled)
+            ProcessPlaybackMetronome(prevBeat, curBeat);
 
         var tracks = _tracks;
         var routing = _routing;
@@ -432,6 +531,9 @@ public sealed class AudioEngine : IAudioEngine
         if (playing)
         {
             foreach (var track in tracks) ApplyAutomation(track, curBeat);
+            var bpm = EffectiveBpm(curBeat, _transport.Tempo.BeatsPerMinute);
+            foreach (var track in tracks)
+                Modulation.TrackModulatorDriver.ApplyTrack(track, curBeat, bpm, _project.Current);
         }
 
         var soloActive = false;
@@ -466,6 +568,8 @@ public sealed class AudioEngine : IAudioEngine
         _blkSoloActive = soloActive;
         if (states.Length > 0) _workers.Run(states.Length, _renderJob);
 
+        FlushMultiOutputRoutes(states);
+
         // MIXDOWN phase: sidechain publishes, strip gains, bus summing — serial and deterministic.
         foreach (var st in states)
         {
@@ -490,10 +594,37 @@ public sealed class AudioEngine : IAudioEngine
             if (sidechainSource || _sidechain.IsRequested(track.Id))
                 _sidechain.Publish(track.Id, st.Buffer.AsSpan(0, buffer.Length), channels);
 
-            var parent = ParentBusOf(track, routing);
-            var target = parent is not null ? parent.Buffer.AsSpan(0, buffer.Length) : buffer;
-            var (lg, rg) = Mixing.StripGains(track.Volume, track.Pan);
-            track.MeterLevel = MixInto(target, st.Buffer.AsSpan(0, buffer.Length), lg, rg, channels, frames, track.MeterLevel);
+            ProcessSends(st, track, routing, channels, frames, soloActive, preFader: true);
+
+            if (st.PdcDelay > 0)
+                st.PdcLine.Process(st.Buffer.AsSpan(0, buffer.Length), frames);
+
+            var parent = MainOutputBusOf(track, routing);
+            if (parent is null)
+            {
+                ProcessSends(st, track, routing, channels, frames, soloActive, preFader: false);
+                track.MeterLevel = Mixing.PeakLevel(st.Buffer.AsSpan(0, buffer.Length), channels, frames, track.MeterLevel, MeterRelease);
+                continue;
+            }
+
+            var target = parent.Buffer.AsSpan(0, buffer.Length);
+            if (channels >= 8)
+            {
+                var sg = Mixing.Surround71StripGains(track.Volume, track.Pan, track.SurroundWidth, track.SurroundPan);
+                track.MeterLevel = MixIntoSurround71(target, st.Buffer.AsSpan(0, buffer.Length), sg, channels, frames, track.MeterLevel);
+            }
+            else if (channels >= 6)
+            {
+                var sg = Mixing.Surround51StripGains(track.Volume, track.Pan, track.SurroundWidth, track.SurroundPan);
+                track.MeterLevel = MixIntoSurround51(target, st.Buffer.AsSpan(0, buffer.Length), sg, channels, frames, track.MeterLevel);
+            }
+            else
+            {
+                var (lg, rg) = Mixing.StripGains(track.Volume, track.Pan);
+                track.MeterLevel = MixInto(target, st.Buffer.AsSpan(0, buffer.Length), lg, rg, channels, frames, track.MeterLevel);
+            }
+
+            ProcessSends(st, track, routing, channels, frames, soloActive, preFader: false);
         }
 
         // 2) Buses deepest-first: insert effects on the summed input → strip → into the parent bus
@@ -522,6 +653,9 @@ public sealed class AudioEngine : IAudioEngine
             // A group/master bus can be a sidechain source too (e.g. a "Drums" group triggering a duck).
             if (_sidechain.IsRequested(bt.Id)) _sidechain.Publish(bt.Id, busSpan, channels);
 
+            if (bus.PdcDelay > 0)
+                bus.PdcLine.Process(busSpan, frames);
+
             var target = bus.Parent is not null ? bus.Parent.Buffer.AsSpan(0, buffer.Length) : buffer;
             var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
             bt.MeterLevel = MixInto(target, busSpan, lg, rg, channels, frames, bt.MeterLevel);
@@ -531,6 +665,11 @@ public sealed class AudioEngine : IAudioEngine
         {
             _currentBeat = curBeat;
             _transport.NotifyPlayhead(curBeat);
+            if (_playback.Mode != PlaybackMode.Arrangement)
+            {
+                _playback.ProcessPlayhead(curBeat);
+                _playback.TickFollowActions(prevBeat, curBeat);
+            }
         }
 
         // Metronome clicks (triggered during the count-in) are added to the master bus.
@@ -538,6 +677,9 @@ public sealed class AudioEngine : IAudioEngine
 
         // Library/file audition preview (independent of the transport) mixes into the master.
         _audition.Mix(buffer, _output.Format);
+
+        // Software input monitoring for armed/on audio tracks.
+        _inputMonitor.Mix(buffer, channels, frames);
 
         // Limit and measure the master output.
         float masterPeakL = 0, masterPeakR = 0;
@@ -565,6 +707,37 @@ public sealed class AudioEngine : IAudioEngine
         var elapsedTicks = Stopwatch.GetTimestamp() - blockStart;
         var micros = elapsedTicks * 1_000_000 / Stopwatch.Frequency;
         AudioDiagnostics.RecordBlock(micros);
+    }
+
+    private void ProcessSends(TrackState st, Track track, Routing routing, int channels, int frames,
+        bool soloActive, bool preFader)
+    {
+        if (track.Sends.Count == 0) return;
+        if (IsSilenced(track, soloActive, routing)) return;
+        if (!st.HasContent) return;
+
+        var span = st.Buffer.AsSpan(0, _blkBufferLength);
+        var (lg, rg) = Mixing.StripGains(track.Volume, track.Pan);
+        foreach (var send in track.Sends)
+        {
+            if (!send.Enabled || send.Level <= 0) continue;
+            if (send.PreFader != preFader) continue;
+            if (!routing.BusById.TryGetValue(send.TargetTrackId, out var ret)) continue;
+
+            var gain = (float)send.Level;
+            var dst = ret.Buffer.AsSpan(0, _blkBufferLength);
+            for (var frame = 0; frame < frames; frame++)
+            {
+                var i = frame * channels;
+                var l = span[i] * (preFader ? gain : gain * lg);
+                dst[i] += l;
+                if (channels >= 2)
+                {
+                    var r = span[i + 1] * (preFader ? gain : gain * rg);
+                    dst[i + 1] += r;
+                }
+            }
+        }
     }
 
     private static float MaxWithRelease(float peak, float current)
@@ -612,15 +785,24 @@ public sealed class AudioEngine : IAudioEngine
         var hasContent = false;
         var slotTemp = state.SlotScratch.AsSpan(0, bufferLength);
         var slots = track.ActiveInstruments;
+        var slotIndex = 0;
         if (slots.Length > 0)
         {
             foreach (var slot in slots)
             {
-                if (!slot.Enabled) continue;
-                if (playing && !InstrumentNeedsRender(slot.Instrument, track.Id)) continue;
+                if (!slot.Enabled) { slotIndex++; continue; }
+                if (playing && !InstrumentNeedsRender(slot.Instrument, track.Id)) { slotIndex++; continue; }
 
                 slotTemp.Clear();
-                slot.Instrument.Render(slotTemp);
+                if (slot.Instrument is IMultiOutputInstrument multi)
+                {
+                    multi.RenderMulti(slotTemp, (busIndex, busAudio) =>
+                        RouteExtraBus(state, track.Id, slotIndex, slot, busIndex, busAudio));
+                }
+                else
+                {
+                    slot.Instrument.Render(slotTemp);
+                }
 
                 var slotSignal = HasSignal(slotTemp);
                 if (slotSignal)
@@ -635,6 +817,8 @@ public sealed class AudioEngine : IAudioEngine
                     for (var i = 0; i < slotTemp.Length; i++) temp[i] += slotTemp[i];
                     hasContent = true;
                 }
+
+                slotIndex++;
             }
         }
         else if (playing && track.Kind == TrackKind.Audio)
@@ -678,6 +862,39 @@ public sealed class AudioEngine : IAudioEngine
 
         state.SilentSamples += frames;
         return hasContent && state.SilentSamples < dormantSamples;
+    }
+
+    private void RouteExtraBus(TrackState sourceState, Guid sourceTrackId, int slotIndex,
+        InstrumentSlot slot, int busIndex, ReadOnlySpan<float> busAudio)
+    {
+        Guid? destId = slot.OutputTrackId;
+        if (!destId.HasValue && _multiOutRoutes.TryGetValue((sourceTrackId, busIndex), out var routed))
+            destId = routed;
+        if (!destId.HasValue) return;
+
+        var copy = new float[busAudio.Length];
+        busAudio.CopyTo(copy);
+        sourceState.PendingRoutes.Add((destId.Value, copy));
+    }
+
+    private static void FlushMultiOutputRoutes(TrackState[] states)
+    {
+        var byId = new Dictionary<Guid, TrackState>(states.Length);
+        foreach (var st in states) byId[st.Track.Id] = st;
+
+        foreach (var st in states)
+        {
+            foreach (var (destId, samples) in st.PendingRoutes)
+            {
+                if (!byId.TryGetValue(destId, out var dest)) continue;
+                var destSpan = dest.Buffer.AsSpan(0, samples.Length);
+                for (var i = 0; i < samples.Length; i++) destSpan[i] += samples[i];
+                dest.HasContent = true;
+                dest.SilentSamples = 0;
+            }
+
+            st.PendingRoutes.Clear();
+        }
     }
 
     private static bool HasSignal(ReadOnlySpan<float> buffer)
@@ -750,11 +967,141 @@ public sealed class AudioEngine : IAudioEngine
         return MaxWithRelease(peak, currentMeter);
     }
 
-    // Resets playback to <paramref name="target"/> for a loop: silences sounding notes and re-points the
+    private static float MixIntoSurround51(Span<float> target, Span<float> source,
+        (float L, float R, float C, float Lfe, float Ls, float Rs) gains, int channels, int frames, float currentMeter)
+    {
+        var peak = 0f;
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var i = frame * channels;
+            var l = source[i];
+            var r = channels >= 2 ? source[i + 1] : l;
+            var mid = (l + r) * 0.5f;
+
+            if (channels > 0)
+            {
+                var v0 = l * gains.L;
+                target[i] += v0;
+                var a0 = v0 < 0 ? -v0 : v0;
+                if (a0 > peak) peak = a0;
+            }
+            if (channels > 1)
+            {
+                var v1 = r * gains.R;
+                target[i + 1] += v1;
+                var a1 = v1 < 0 ? -v1 : v1;
+                if (a1 > peak) peak = a1;
+            }
+            if (channels > 2)
+            {
+                var v2 = mid * gains.C;
+                target[i + 2] += v2;
+                var a2 = v2 < 0 ? -v2 : v2;
+                if (a2 > peak) peak = a2;
+            }
+            if (channels > 3)
+            {
+                var v3 = mid * gains.Lfe;
+                target[i + 3] += v3;
+                var a3 = v3 < 0 ? -v3 : v3;
+                if (a3 > peak) peak = a3;
+            }
+            if (channels > 4)
+            {
+                var v4 = l * gains.Ls;
+                target[i + 4] += v4;
+                var a4 = v4 < 0 ? -v4 : v4;
+                if (a4 > peak) peak = a4;
+            }
+            if (channels > 5)
+            {
+                var v5 = r * gains.Rs;
+                target[i + 5] += v5;
+                var a5 = v5 < 0 ? -v5 : v5;
+                if (a5 > peak) peak = a5;
+            }
+        }
+
+        return MaxWithRelease(peak, currentMeter);
+    }
+
+    private static float MixIntoSurround71(Span<float> target, Span<float> source,
+        (float L, float R, float C, float Lfe, float Ls, float Rs, float Sl, float Sr) gains,
+        int channels, int frames, float currentMeter)
+    {
+        var peak = 0f;
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var i = frame * channels;
+            var l = source[i];
+            var r = channels >= 2 ? source[i + 1] : l;
+            var mid = (l + r) * 0.5f;
+
+            if (channels > 0)
+            {
+                var v0 = l * gains.L;
+                target[i] += v0;
+                var a0 = v0 < 0 ? -v0 : v0;
+                if (a0 > peak) peak = a0;
+            }
+            if (channels > 1)
+            {
+                var v1 = r * gains.R;
+                target[i + 1] += v1;
+                var a1 = v1 < 0 ? -v1 : v1;
+                if (a1 > peak) peak = a1;
+            }
+            if (channels > 2)
+            {
+                var v2 = mid * gains.C;
+                target[i + 2] += v2;
+                var a2 = v2 < 0 ? -v2 : v2;
+                if (a2 > peak) peak = a2;
+            }
+            if (channels > 3)
+            {
+                var v3 = mid * gains.Lfe;
+                target[i + 3] += v3;
+                var a3 = v3 < 0 ? -v3 : v3;
+                if (a3 > peak) peak = a3;
+            }
+            if (channels > 4)
+            {
+                var v4 = l * gains.Ls;
+                target[i + 4] += v4;
+                var a4 = v4 < 0 ? -v4 : v4;
+                if (a4 > peak) peak = a4;
+            }
+            if (channels > 5)
+            {
+                var v5 = r * gains.Rs;
+                target[i + 5] += v5;
+                var a5 = v5 < 0 ? -v5 : v5;
+                if (a5 > peak) peak = a5;
+            }
+            if (channels > 6)
+            {
+                var v6 = l * gains.Sl;
+                target[i + 6] += v6;
+                var a6 = v6 < 0 ? -v6 : v6;
+                if (a6 > peak) peak = a6;
+            }
+            if (channels > 7)
+            {
+                var v7 = r * gains.Sr;
+                target[i + 7] += v7;
+                var a7 = v7 < 0 ? -v7 : v7;
+                if (a7 > peak) peak = a7;
+            }
+        }
+
+        return MaxWithRelease(peak, currentMeter);
+    }
+
     // note scheduler at the first event from there. Audio clips re-render from the new beat automatically.
     private void WrapPlayback(double target)
     {
-        for (var i = 0; i < _active.Count; i++) _active[i].Fire(on: false);
+        for (var i = 0; i < _active.Count; i++) _active[i].Fire(on: false, _midiOut);
         _active.Clear();
         AllNotesOff();
 
@@ -764,8 +1111,12 @@ public sealed class AudioEngine : IAudioEngine
 
         _currentBeat = target;
         _nextEvent = 0;
+        _nextCcEvent = 0;
+        ResetPlaybackMetronome(target);
         var events = _events;
         while (_nextEvent < events.Length && events[_nextEvent].OnBeat < target) _nextEvent++;
+        var ccEvents = _ccEvents;
+        while (_nextCcEvent < ccEvents.Length && ccEvents[_nextCcEvent].Beat < target) _nextCcEvent++;
         foreach (var st in _routing.ContentStates) st.SilentSamples = 0;
     }
 
@@ -779,13 +1130,23 @@ public sealed class AudioEngine : IAudioEngine
         return aware?.ToArray() ?? Array.Empty<IMidiAwareEffect>();
     }
 
+    private void ScheduleControlChanges(double curBeat)
+    {
+        var events = _ccEvents;
+        while (_nextCcEvent < events.Length && events[_nextCcEvent].Beat < curBeat)
+        {
+            events[_nextCcEvent].Fire(_midiOut);
+            _nextCcEvent++;
+        }
+    }
+
     private void ScheduleNotes(double curBeat)
     {
         var events = _events;
         while (_nextEvent < events.Length && events[_nextEvent].OnBeat < curBeat)
         {
             var ev = events[_nextEvent];
-            ev.Fire(on: true);
+            ev.Fire(on: true, _midiOut);
             _active.Add(ev);
             _nextEvent++;
         }
@@ -794,7 +1155,7 @@ public sealed class AudioEngine : IAudioEngine
         {
             if (_active[i].OffBeat <= curBeat)
             {
-                _active[i].Fire(on: false);
+                _active[i].Fire(on: false, _midiOut);
                 _active.RemoveAt(i);
             }
         }
@@ -802,6 +1163,21 @@ public sealed class AudioEngine : IAudioEngine
 
     // Advances the count-in by one block: fires a click at each beat boundary (accented on the
     // downbeat) and, once the full pre-roll has elapsed, hands over to content playback.
+    private void ProcessPlaybackMetronome(double prevBeat, double curBeat)
+    {
+        if (_metronomeNextBeat < 0)
+            _metronomeNextBeat = (int)Math.Ceiling(prevBeat - 1e-9);
+
+        while (_metronomeNextBeat <= curBeat + 1e-9)
+        {
+            TriggerClick(_metronomeNextBeat % _beatsPerBar == 0);
+            _metronomeNextBeat++;
+        }
+    }
+
+    private void ResetPlaybackMetronome(double beat)
+        => _metronomeNextBeat = (int)Math.Ceiling(beat - 1e-9);
+
     private void ProcessCountIn(int frames)
     {
         while (_countInClicks < _countInClicksTotal &&
@@ -884,6 +1260,8 @@ public sealed class AudioEngine : IAudioEngine
         _playing = false;
         _project.ProjectChanged -= RebuildTracks;
         _transport.StateChanged -= OnTransportStateChanged;
+        _playback.ActiveClipsChanged -= OnSessionClipsChanged;
+        _playback.ModeChanged -= OnPlaybackModeChanged;
         _output.FormatChanged -= RebuildTracks;
         _output.Stop();
         _output.Dispose();
@@ -899,11 +1277,19 @@ public sealed class AudioEngine : IAudioEngine
         public int SilentSamples;
         public bool HasContent;
         public bool Rendered;
+        public int PdcDelay;
+        public PdcDelayLine PdcLine = new();
+        public readonly List<(Guid DestId, float[] Samples)> PendingRoutes = new();
 
         public void EnsureCapacity(int length)
         {
             if (Buffer.Length < length) Buffer = new float[length];
             if (SlotScratch.Length < length) SlotScratch = new float[length];
+        }
+
+        public void EnsurePdc(int channels, int maxFrames)
+        {
+            PdcLine.Configure(PdcDelay, channels, maxFrames);
         }
     }
 
@@ -911,24 +1297,71 @@ public sealed class AudioEngine : IAudioEngine
     // MIDI-aware effects (gestures); either may be absent. Slots and MidiEffects are the track's
     // snapshots, captured when playback began (slot.Enabled is read live so toggles take effect).
     private readonly record struct ScheduledNote(Guid TrackId, double OnBeat, double OffBeat, InstrumentSlot[]? Slots,
-        IMidiAwareEffect[] MidiEffects, int Note, float Velocity)
+        IMidiAwareEffect[] MidiEffects, int Note, float Velocity, float Gain = 1f, float Pan = 0f,
+        bool ExternalMidi = false, int ExternalChannel = 1)
     {
-        public void Fire(bool on)
+        public void Fire(bool on, IMidiOutputService? midiOut)
+        {
+            if (on && Math.Abs(Pan) > 1e-6f)
+            {
+                var cc10 = (int)Math.Clamp((Pan + 1f) * 0.5f * 127f, 0f, 127f);
+                SendControlChange(10, cc10, midiOut);
+            }
+
+            var vel = Velocity * Gain;
+            if (Slots is not null)
+            {
+                foreach (var slot in Slots)
+                {
+                    if (!slot.Enabled) continue;
+                    if (on) slot.Instrument.NoteOn(Note, vel);
+                    else slot.Instrument.NoteOff(Note);
+                }
+            }
+
+            var midiVel = (byte)Math.Clamp((int)(vel * 127f), 0, 127);
+            if (ExternalMidi && midiOut is not null && midiOut.IsAvailable)
+                midiOut.SendNote(ExternalChannel, Note, on, midiVel);
+
+            if (MidiEffects.Length == 0) return;
+            var msg = new MidiMessage(on ? MidiMessageKind.NoteOn : MidiMessageKind.NoteOff, 0, (byte)Note, on ? midiVel : (byte)0);
+            foreach (var fx in MidiEffects) fx.HandleMidi(msg);
+        }
+
+        private void SendControlChange(int controller, int value, IMidiOutputService? midiOut)
         {
             if (Slots is not null)
             {
                 foreach (var slot in Slots)
                 {
                     if (!slot.Enabled) continue;
-                    if (on) slot.Instrument.NoteOn(Note, Velocity);
-                    else slot.Instrument.NoteOff(Note);
+                    slot.Instrument.ControlChange(controller, value);
                 }
             }
 
-            if (MidiEffects.Length == 0) return;
-            var vel = (byte)Math.Clamp((int)(Velocity * 127f), 0, 127);
-            var msg = new MidiMessage(on ? MidiMessageKind.NoteOn : MidiMessageKind.NoteOff, 0, (byte)Note, on ? vel : (byte)0);
-            foreach (var fx in MidiEffects) fx.HandleMidi(msg);
+            if (ExternalMidi && midiOut is not null && midiOut.IsAvailable)
+                midiOut.SendControlChange(ExternalChannel, controller, value);
+        }
+    }
+
+    private readonly record struct ScheduledControlChange(
+        Guid TrackId, double Beat, InstrumentSlot[]? Slots, int Controller, int Value,
+        bool ExternalMidi = false, int ExternalChannel = 1)
+    {
+        public void Fire(IMidiOutputService? midiOut)
+        {
+            var value = Math.Clamp(Value, 0, 127);
+            if (Slots is not null)
+            {
+                foreach (var slot in Slots)
+                {
+                    if (!slot.Enabled) continue;
+                    slot.Instrument.ControlChange(Controller, value);
+                }
+            }
+
+            if (ExternalMidi && midiOut is not null && midiOut.IsAvailable)
+                midiOut.SendControlChange(ExternalChannel, Controller, value);
         }
     }
 
@@ -938,7 +1371,9 @@ public sealed class AudioEngine : IAudioEngine
     {
         public AudioClipPlayback(Track track, double startBeat, double lengthBeats, AudioSampleBuffer samples,
             bool stretchToTempo, double sourceDurSeconds, double sourceOffsetSeconds,
-            double fadeInBeats, double fadeOutBeats, PitchShifter[]? pitchShifters)
+            double fadeInBeats, double fadeOutBeats, PitchShifter[]? pitchShifters,
+            WarpMap? warp, WarpMode warpMode, bool pitchCorrected, double araPitchOffsetSemitones = 0.0,
+            IReadOnlyList<PitchNoteSegment>? pitchSegments = null, float gain = 1f)
         {
             Track = track;
             StartBeat = startBeat;
@@ -950,6 +1385,12 @@ public sealed class AudioEngine : IAudioEngine
             FadeInBeats = fadeInBeats;
             FadeOutBeats = fadeOutBeats;
             PitchShifters = pitchShifters;
+            Warp = warp;
+            WarpMode = warpMode;
+            PitchCorrected = pitchCorrected;
+            AraPitchOffsetSemitones = araPitchOffsetSemitones;
+            PitchSegments = pitchSegments ?? Array.Empty<PitchNoteSegment>();
+            Gain = gain;
         }
 
         public readonly Track Track;
@@ -962,6 +1403,12 @@ public sealed class AudioEngine : IAudioEngine
         public readonly double FadeInBeats;
         public readonly double FadeOutBeats;
         public readonly PitchShifter[]? PitchShifters;
+        public readonly WarpMap? Warp;
+        public readonly WarpMode WarpMode;
+        public readonly bool PitchCorrected;
+        public readonly double AraPitchOffsetSemitones;
+        public readonly IReadOnlyList<PitchNoteSegment> PitchSegments;
+        public readonly float Gain;
 
         public double ReadPos;  // current read position in source frames
         public bool Started;    // false until the playhead first enters the clip (then ReadPos tracks live)
@@ -998,6 +1445,21 @@ public sealed class AudioEngine : IAudioEngine
     private static void RenderClipBlock(Span<float> temp, AudioClipPlayback acp, double blockStartBeat,
         double samplesPerBeat, int deviceSampleRate, int channels, double bpm)
     {
+        if (acp.Warp is { } warp && (warp.HasExplicitMarkers || acp.WarpMode != WarpMode.Beats))
+        {
+            Mixing.RenderWarpedAudioClip(temp, acp.Samples, warp, acp.StartBeat, acp.LengthBeats,
+                blockStartBeat, samplesPerBeat, deviceSampleRate, channels, acp.WarpMode,
+                acp.PitchCorrected, acp.FadeInBeats, acp.FadeOutBeats, acp.PitchShifters,
+                acp.AraPitchOffsetSemitones, acp.PitchSegments);
+            if (acp.Gain != 1f)
+            {
+                for (var i = 0; i < temp.Length; i++)
+                    temp[i] *= acp.Gain;
+            }
+
+            return;
+        }
+
         var samples = acp.Samples;
         var frameCount = samples.FrameCount;
         var frames = temp.Length / channels;
@@ -1011,14 +1473,17 @@ public sealed class AudioEngine : IAudioEngine
         var framesPerBeatSynced = acp.LengthBeats > 0 ? sourceFrames / acp.LengthBeats : 0.0;
         var advanceSynced = samplesPerBeat > 0 ? framesPerBeatSynced / samplesPerBeat : 0.0;
 
-        // Pitch-preserving stretch: undo the (live) stretch ratio so pitch holds while the clip is time-stretched.
         var shifters = acp.PitchShifters;
-        var usePitch = shifters is not null && acp.StretchToTempo;
-        if (usePitch)
+        var useSegments = AudioClipPitch.HasPitchSegments(acp.PitchSegments);
+        var usePitch = shifters is not null
+            && (acp.StretchToTempo || Math.Abs(acp.AraPitchOffsetSemitones) > 1e-6 || useSegments);
+        var lastRatio = useSegments ? -1.0 : 0.0;
+        if (usePitch && !useSegments)
         {
-            var stretch = TempoSync.Stretch(acp.SourceDurSeconds, bpm, acp.LengthBeats);
-            var pitchRatio = stretch > 0 ? 1.0 / stretch : 1.0;
-            foreach (var sh in shifters!) sh.SetRatio(pitchRatio);
+            var stretch = acp.StretchToTempo
+                ? TempoSync.Stretch(acp.SourceDurSeconds, bpm, acp.LengthBeats)
+                : 1.0;
+            AudioClipPitch.ApplyRatios(shifters!, stretch, acp.AraPitchOffsetSemitones);
         }
 
         for (var frame = 0; frame < frames; frame++)
@@ -1041,8 +1506,21 @@ public sealed class AudioEngine : IAudioEngine
             var f0 = (long)pos;
             if (f0 >= frameCount) break;
 
+            if (usePitch && useSegments)
+            {
+                var stretch = acp.StretchToTempo
+                    ? TempoSync.Stretch(acp.SourceDurSeconds, bpm, acp.LengthBeats)
+                    : 1.0;
+                var combined = AudioClipPitch.CombinedRatio(stretch, f0, acp.PitchSegments, acp.AraPitchOffsetSemitones);
+                if (Math.Abs(combined - lastRatio) > 1e-5)
+                {
+                    AudioClipPitch.ApplyCombinedRatio(shifters!, combined);
+                    lastRatio = combined;
+                }
+            }
+
             var frac = (float)(pos - f0);
-            var gain = Crossfade.Gain(localBeat, acp.LengthBeats, acp.FadeInBeats, acp.FadeOutBeats);
+            var gain = Crossfade.Gain(localBeat, acp.LengthBeats, acp.FadeInBeats, acp.FadeOutBeats) * acp.Gain;
             var baseIndex = frame * channels;
             for (var c = 0; c < channels; c++)
             {
@@ -1066,6 +1544,13 @@ public sealed class AudioEngine : IAudioEngine
         public Bus? Parent;
         public float[] Buffer = Array.Empty<float>();
         public int Depth;
+        public int PdcDelay;
+        public PdcDelayLine PdcLine = new();
+
+        public void EnsurePdc(int channels, int maxFrames)
+        {
+            PdcLine.Configure(PdcDelay, channels, maxFrames);
+        }
     }
 
     // Immutable snapshot of the bus graph, swapped in atomically when the topology changes.
@@ -1078,6 +1563,7 @@ public sealed class AudioEngine : IAudioEngine
         public Track? MasterTrack;
         public TrackState[] ContentStates = Array.Empty<TrackState>();
         public HashSet<Guid> SidechainSources = new();
+        public Dictionary<Guid, LatencyCompensator.Compensation> Pdc = new();
     }
 
     // Per-track MIDI note intervals built at playback start for skipping idle instrument tracks.

@@ -1,0 +1,71 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:controls="using:Ongenet.App.Controls"
+        x:Class="Ongenet.App.Views.Windows.SamplerZoneEditorWindow"
+        x:DataType="vm:SamplerZoneEditorViewModel"
+        Title="{Binding Title}"
+        Width="720" Height="560" MinWidth="480" MinHeight="400">
+
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,8">
+                <TextBlock Text="{Binding ZoneCount, StringFormat='{}{0} zone(s)'}"
+                           VerticalAlignment="Center" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <Button Content="{DynamicResource SamplerZone_Apply_changes}" Command="{Binding ApplyCommand}" Padding="12,4"/>
+            </StackPanel>
+
+            <controls:SamplerZoneMapControl Grid.Row="1" Height="180" Margin="0,0,0,8"
+                                            Zones="{Binding Zones}"/>
+
+            <Grid Grid.Row="2" ColumnDefinitions="*,56,56,56,56,56,56,56" Margin="0,0,0,4"
+                  ColumnSpacing="4">
+                <TextBlock Text="{DynamicResource SamplerZone_Sample}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Grid.Column="1" Text="{DynamicResource SamplerZone_Lo_key}" FontSize="10" HorizontalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Grid.Column="2" Text="{DynamicResource SamplerZone_Hi_key}" FontSize="10" HorizontalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Grid.Column="3" Text="{DynamicResource SamplerZone_Lo_vel}" FontSize="10" HorizontalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Grid.Column="4" Text="{DynamicResource SamplerZone_Hi_vel}" FontSize="10" HorizontalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Grid.Column="5" Text="{DynamicResource SamplerZone_Root}" FontSize="10" HorizontalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Grid.Column="6" Text="{DynamicResource SamplerZone_RR_len}" FontSize="10" HorizontalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Grid.Column="7" Text="{DynamicResource SamplerZone_RR_pos}" FontSize="10" HorizontalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+            </Grid>
+
+            <ScrollViewer Grid.Row="3">
+                <ItemsControl ItemsSource="{Binding Zones}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SamplerZoneRowViewModel">
+                            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4"
+                                    Background="{StaticResource CatppuccinSurface0}">
+                                <Grid ColumnDefinitions="*,56,56,56,56,56,56,56" ColumnSpacing="4">
+                                    <TextBlock Grid.Column="0" Text="{Binding SampleName}"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    <NumericUpDown Grid.Column="1" Value="{Binding LoKey, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
+                                    <NumericUpDown Grid.Column="2" Value="{Binding HiKey, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
+                                    <NumericUpDown Grid.Column="3" Value="{Binding LoVel, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
+                                    <NumericUpDown Grid.Column="4" Value="{Binding HiVel, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
+                                    <NumericUpDown Grid.Column="5" Value="{Binding RootKey, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
+                                    <NumericUpDown Grid.Column="6" Value="{Binding SeqLength, Mode=TwoWay}"
+                                                   Minimum="1" Maximum="128" Width="52" FontSize="10"/>
+                                    <NumericUpDown Grid.Column="7" Value="{Binding SeqPosition, Mode=TwoWay}"
+                                                   Minimum="1" Maximum="128" Width="52" FontSize="10"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

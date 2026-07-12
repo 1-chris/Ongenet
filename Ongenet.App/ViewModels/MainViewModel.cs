@@ -34,6 +34,10 @@ namespace Ongenet.App.ViewModels
             Library.EffectChainPresetLibraryViewModel chainPresets,
             Library.ProjectsLibraryViewModel projectsLibrary,
             ProjectClipsViewModel projectClips,
+            Panels.MixerViewModel mixer,
+            Panels.SessionViewModel session,
+            Panels.NotationViewModel notation,
+            Panels.VideoTrackViewModel video,
             IProjectFileService projectFile,
             Services.IHistoryService history,
             ObservableCollectionLoggerProvider? logProvider = null)
@@ -55,6 +59,10 @@ namespace Ongenet.App.ViewModels
             EffectChainPresets = chainPresets;
             ProjectsLibrary = projectsLibrary;
             ProjectClips = projectClips;
+            Mixer = mixer;
+            Session = session;
+            Notation = notation;
+            Video = video;
             _projectFile = projectFile;
             _history = history;
             _history.Changed += () =>
@@ -124,6 +132,18 @@ namespace Ongenet.App.ViewModels
 
         /// <summary>Left sidebar's Project Clips tab (unique clips across the project).</summary>
         public ProjectClipsViewModel ProjectClips { get; }
+
+        /// <summary>Dedicated mixer panel with channel strips and sends.</summary>
+        public Panels.MixerViewModel Mixer { get; }
+
+        /// <summary>Session view clip launcher grid.</summary>
+        public Panels.SessionViewModel Session { get; }
+
+        /// <summary>Staff notation view with MusicXML export.</summary>
+        public Panels.NotationViewModel Notation { get; }
+
+        /// <summary>Video track sync panel.</summary>
+        public Panels.VideoTrackViewModel Video { get; }
 
         /// <summary>Log entries captured by the in-app logger; surfaced by the Log window.</summary>
         public ObservableCollection<LogEntry> LogEntries => _logEntries;

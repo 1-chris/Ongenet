@@ -54,21 +54,29 @@ public sealed class ReverbEffect : IAudioEffect
     public void Prepare(AudioFormat format)
     {
         var scale = format.SampleRate / 44100.0;
-        _combL = new Comb[CombTuning.Length];
-        _combR = new Comb[CombTuning.Length];
+
+        // Build fully populated arrays before swapping fields so concurrent Process() calls
+        // never see a non-empty array with null elements (RebuildTracks can run on another thread).
+        var combL = new Comb[CombTuning.Length];
+        var combR = new Comb[CombTuning.Length];
         for (var i = 0; i < CombTuning.Length; i++)
         {
-            _combL[i] = new Comb((int)(CombTuning[i] * scale));
-            _combR[i] = new Comb((int)((CombTuning[i] + StereoSpread) * scale));
+            combL[i] = new Comb((int)(CombTuning[i] * scale));
+            combR[i] = new Comb((int)((CombTuning[i] + StereoSpread) * scale));
         }
 
-        _allpassL = new Allpass[AllpassTuning.Length];
-        _allpassR = new Allpass[AllpassTuning.Length];
+        var allpassL = new Allpass[AllpassTuning.Length];
+        var allpassR = new Allpass[AllpassTuning.Length];
         for (var i = 0; i < AllpassTuning.Length; i++)
         {
-            _allpassL[i] = new Allpass((int)(AllpassTuning[i] * scale));
-            _allpassR[i] = new Allpass((int)((AllpassTuning[i] + StereoSpread) * scale));
+            allpassL[i] = new Allpass((int)(AllpassTuning[i] * scale));
+            allpassR[i] = new Allpass((int)((AllpassTuning[i] + StereoSpread) * scale));
         }
+
+        _combL = combL;
+        _combR = combR;
+        _allpassL = allpassL;
+        _allpassR = allpassR;
     }
 
     public IAudioEffect Clone() => new ReverbEffect

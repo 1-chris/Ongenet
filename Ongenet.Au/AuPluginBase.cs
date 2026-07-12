@@ -19,7 +19,7 @@ namespace Ongenet.Au;
 /// (audio in → audio out, in place). All native failures are caught; a broken plugin simply produces
 /// silence / passes audio through. macOS only.
 /// </summary>
-public abstract unsafe partial class AuPluginBase : IPluginEditor, IDisposable
+public abstract unsafe partial class AuPluginBase : IPluginEditor, IDisposable, ILatencyProvider
 {
     protected const int MaxBlock = 8192;
     private const int MaxParamsShown = 256;
@@ -53,6 +53,11 @@ public abstract unsafe partial class AuPluginBase : IPluginEditor, IDisposable
     private bool _initialized;
     private double _initializedRate;
     private bool _disposed;
+
+    private int _reportedLatencySamples;
+
+    /// <inheritdoc />
+    public int ReportedLatencySamples => _reportedLatencySamples;
 
     private IReadOnlyList<Parameter>? _parameters;
 
@@ -155,6 +160,7 @@ public abstract unsafe partial class AuPluginBase : IPluginEditor, IDisposable
                 _initialized = true;
                 _initializedRate = format.SampleRate;
                 _sampleTime = 0;
+                RefreshLatency();
             }
             else
             {
@@ -165,6 +171,17 @@ public abstract unsafe partial class AuPluginBase : IPluginEditor, IDisposable
         {
             Log?.Invoke($"AU '{Name}': prepare failed: {ex.Message}");
         }
+    }
+
+    private void RefreshLatency()
+    {
+        _reportedLatencySamples = 0;
+        if (_unit == IntPtr.Zero) return;
+        var frames = 0u;
+        var size = (uint)sizeof(uint);
+        if (AudioUnitApi.AudioUnitGetProperty(_unit, AudioUnitApi.kAudioUnitProperty_Latency,
+                AudioUnitApi.kAudioUnitScope_Global, 0, &frames, ref size) == 0)
+            _reportedLatencySamples = (int)frames;
     }
 
     private static AudioUnitApi.AudioStreamBasicDescription CanonicalFormat(int sampleRate, int channels) => new()

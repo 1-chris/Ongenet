@@ -6,8 +6,8 @@ means and why it matters, and how the engine talks to each operating system's au
 (PipeWire/PulseAudio/JACK/ALSA on Linux, CoreAudio on macOS, WASAPI on Windows).
 
 It's written for people new to audio programming. If you haven't read
-[creating-instruments.md](creating-instruments.md) and [creating-effects.md](creating-effects.md) yet,
-they introduce the vocabulary (samples, frames, blocks, interleaving) used here.
+[creating-instruments.md](creating-instruments.md) and [creating-effects.md](creating-effects.md),
+start there — they introduce the vocabulary (samples, frames, blocks, interleaving) used here.
 
 The engine lives in [`Ongenet.Core/Audio`](../Ongenet.Core/Audio) (portable, no native code). The
 device drivers live in [`Ongenet.Audio`](../Ongenet.Audio) (the only project that P/Invokes native
@@ -119,9 +119,13 @@ Render(buffer):
           run the slot's PRE effects on scratch   # effect.Process(scratch)
           add scratch into the track buffer
       run the track's POST effects on the track buffer
+      pre-fader sends → return buses
+      apply PDC delay if needed
       apply track volume/pan, sum into the track's parent bus
+      post-fader sends → return buses
   for each bus, deepest first:
       run the bus's effects
+      apply PDC delay if needed
       apply bus volume/pan, sum into its parent (the master sums into the output buffer)
   master limiter + peak metering
 ```
@@ -152,34 +156,34 @@ flowchart TB
     G --> B[Parent bus]
 ```
 
-### Buses are a hierarchy, not sends
+### Buses, sends and the routing tree
 
-Ongenet does **not** have separate "send" faders. Instead, every track has a **parent**: its output
-sums into a *group bus*, and group buses sum into other buses or into the *master*. It's a tree.
-
-```26:33:Ongenet.Core/Models/Audio/Track.cs
-    /// The <see cref="Id"/> of the group/master bus this track's output routes into, or null to route
-    /// straight to the master.
-    public Guid? ParentId { get; set; }
-
-    /// <summary>True for a bus (group or master) that sums child output rather than carrying clips.</summary>
-    public bool IsBus => Kind is TrackKind.Group or TrackKind.Master;
-```
+Every track has a **parent**: its output sums into a *group bus*, and group buses sum into other buses or into the *master*. Return tracks sit in the same tree as parallel aux paths fed by **sends**.
 
 Track kinds are:
 
-```6:22:Ongenet.Core/Models/Audio/TrackKind.cs
+```6:25:Ongenet.Core/Models/Audio/TrackKind.cs
 public enum TrackKind
 {
     Audio,
     Instrument,
     Midi,
     Group,   // sums children
+    Return,  // aux bus fed by sends
     Master   // root bus
 }
 ```
 
-When the track layout changes, the engine builds a **routing snapshot** — a `Bus` per group/master,
+```26:34:Ongenet.Core/Models/Audio/Track.cs
+    /// The <see cref="Id"/> of the group/master bus this track's output routes into, or null to route
+    /// straight to the master.
+    public Guid? ParentId { get; set; }
+
+    /// <summary>True for a bus (group, return or master) that sums child output rather than carrying clips.</summary>
+    public bool IsBus => Kind is TrackKind.Group or TrackKind.Return or TrackKind.Master;
+```
+
+When the track layout changes, the engine builds a **routing snapshot** — a `Bus` per group/return/master,
 each linked to its parent, ordered *deepest-first*. Ordering deepest-first means one linear pass can mix
 children into groups, then groups into the master, with no recursion:
 
@@ -188,6 +192,66 @@ children into groups, then groups into the master, with no recursion:
     // ordered deepest-first so a block can be mixed children → groups → master in a single pass.
     private void BuildRouting(Track[] tracks)
     {
+```
+
+### Auxiliary sends
+
+In addition to the parent/child tree, each content track can have zero or more **sends** — level-controlled
+taps into **return** tracks (reverb, delay, parallel compression, etc.). Sends are configured in the track
+inspector and mixed by [`SendMixing`](../Ongenet.Core/Audio/SendMixing.cs):
+
+```6:20:Ongenet.Core/Models/Audio/TrackSend.cs
+public sealed class TrackSend
+{
+    public Guid TargetTrackId { get; set; }
+    public double Level { get; set; } = 0.5;
+    /// <summary>When true, taps the signal before the track fader; otherwise post-fader.</summary>
+    public bool PreFader { get; set; }
+    public bool Enabled { get; set; } = true;
+}
+```
+
+Each block the engine processes **pre-fader sends** right after a track renders (before PDC and the main
+fader), then **post-fader sends** after the track's volume/pan is applied to its parent bus. Return tracks
+run their own insert chains and sum into their parent like any other bus. Sends are independent of the
+sidechain tap (below) — sidechain is a cross-track *read*, sends are a parallel *write*.
+
+```mermaid
+flowchart TB
+    V[Instrument voices] --> S[Slot PRE effects]
+    S --> T[Sum slots → track buffer]
+    A[Audio clips] --> T
+    T --> PF[Pre-fader sends → return buses]
+    T --> P[Track POST effects]
+    P --> G[Track volume + pan]
+    G --> B[Parent group bus]
+    G --> PO[Post-fader sends → return buses]
+    R[Return bus FX] --> B
+```
+
+### Plugin delay compensation (PDC)
+
+Effects and instruments that report latency via [`ILatencyProvider`](../Ongenet.Core/Audio/ILatencyProvider.cs)
+shift their output in time. Without compensation, a heavy lookahead compressor on one track would sit
+*ahead* of a dry neighbour and smear transient alignment across the mix.
+
+[`LatencyCompensator`](../Ongenet.Core/Audio/LatencyCompensator.cs) walks the routing graph once per
+topology change and computes, for every content track and bus:
+
+1. **Path latency** — instrument/slot pre-FX + track post-FX + ancestor bus FX + send/return paths.
+2. **Delay samples** — `maxPathLatency − pathLatency`, applied with a per-track [`PdcDelayLine`](../Ongenet.Core/Audio/Dsp/PdcDelayLine.cs)
+   immediately before the track or bus is summed into its parent.
+
+All paths that reach the master therefore align at the mix point. PDC is honoured in live playback and in
+[`OfflineRenderer`](../Ongenet.Core/Audio/OfflineRenderer.cs) (export, clip render). Latency is summed
+from reported plugin values only — the engine does not guess.
+
+```211:231:Ongenet.Core/Audio/AudioEngine.cs
+            Pdc = LatencyCompensator.Compute(tracks)
+            ...
+                st.PdcDelay = comp.DelaySamples;
+            ...
+                bus.PdcDelay = comp.DelaySamples;
 ```
 
 ### How summing and panning work
@@ -206,9 +270,81 @@ no locks. It's a cross-track read, not a routing send. (See
 [creating-effects.md §8](creating-effects.md) and
 [`SidechainBus.cs`](../Ongenet.Core/Audio/Effects/SidechainBus.cs).)
 
+### Multi-output instruments
+
+Some hosted plugins (notably multi-out VST3 instruments) expose more than one stereo bus. Instruments
+implementing [`IMultiOutputInstrument`](../Ongenet.Core/Audio/Instruments/IMultiOutputInstrument.cs) render
+the main bus into the track as usual and deliver auxiliary buses through a callback. The engine routes
+each extra bus to a destination track configured in the project (`MultiOutputRoute` entries, keyed by
+source track + plugin bus index). After all tracks render in parallel, [`FlushMultiOutputRoutes`](../Ongenet.Core/Audio/AudioEngine.cs)
+adds the pending auxiliary audio into the destination track buffers before the mixdown phase — so a
+drum plugin's overhead mics can land on separate tracks with their own FX and sends.
+
 ---
 
-## 4. Real-time safety (the rules, and why)
+## 4. Playback schedulers
+
+Clip and note timing is not hard-coded into `Render`. Instead, each block builds an immutable
+[`PlaybackSchedule`](../Ongenet.Core/Audio/Scheduling/IPlaybackScheduler.cs) snapshot via a pluggable
+scheduler, chosen from the current [`PlaybackMode`](../Ongenet.Core/Services/Interfaces/IPlaybackModeService.cs):
+
+| Mode | Scheduler | What plays |
+| --- | --- | --- |
+| **Arrangement** | [`ArrangementScheduler`](../Ongenet.Core/Audio/Scheduling/ArrangementScheduler.cs) | Timeline clips only — MIDI notes and audio clips on the arrange view |
+| **Session** | [`SessionScheduler`](../Ongenet.Core/Audio/Scheduling/SessionScheduler.cs) | Launched session clips only (no timeline) |
+| **Hybrid** | [`HybridScheduler`](../Ongenet.Core/Audio/Scheduling/SessionScheduler.cs) | Arrangement timeline **plus** any live session overdubs merged together |
+
+In **Arrangement** and **Hybrid** modes, a second pass from [`PatternScheduler`](../Ongenet.Core/Audio/Scheduling/PatternScheduler.cs)
+is merged on top. Pattern clips on the timeline reference shared [`Pattern`](../Ongenet.Core/Models/Audio/Pattern.cs)
+objects; the scheduler expands step-sequencer data into scheduled MIDI notes on the pattern's target
+instrument tracks (respecting mutes and repeat length).
+
+```371:386:Ongenet.Core/Audio/AudioEngine.cs
+    private PlaybackSchedule BuildSchedule(PlaybackScheduleContext context)
+    {
+        ...
+        PlaybackSchedule schedule = _playback.Mode switch
+        {
+            PlaybackMode.Session => new SessionScheduler(sessionClips, launches).Build(context),
+            PlaybackMode.Hybrid => new HybridScheduler(sessionClips, launches).Build(context),
+            _ => _arrangementScheduler.Build(context)
+        };
+
+        if (_playback.Mode != PlaybackMode.Session)
+            schedule = HybridScheduler.MergeSchedules(schedule, _patternScheduler.Build(context));
+
+        return schedule;
+    }
+```
+
+Session clips carry launch modes (Trigger, Gate, Toggle, Repeat) and can reference a source arrangement
+clip by id. Launches are quantised to the beat grid via `IPlaybackModeService.LaunchQuantizeBeats`.
+
+---
+
+## 5. Warp maps and tempo-stretched audio
+
+Simple loops use uniform time-stretch (`StretchToTempo`). Clips with **warp markers** get a piecewise-linear
+[`WarpMap`](../Ongenet.Core/Audio/WarpMap.cs) that maps clip-local beat positions to source-file seconds.
+The map is built from explicit markers plus implicit endpoints at the clip start/end:
+
+```30:58:Ongenet.Core/Audio/WarpMap.cs
+    public static WarpMap FromClip(Clip clip, double sourceEndSeconds)
+    {
+        ...
+        foreach (var wm in clip.WarpMarkers)
+            list.Add((wm.BeatPosition, wm.SourceSeconds));
+        ...
+    }
+```
+
+During playback [`Mixing.RenderWarpedAudioClip`](../Ongenet.Core/Audio/Mixing.cs) walks the map segment by
+segment, applying the local source↔beat ratio (and optional pitch-corrected stretch via Rubber Band) so
+free-form tempo ramps and DJ-style marker edits stay sample-accurate on the audio thread.
+
+---
+
+## 6. Real-time safety (the rules, and why)
 
 The audio callback runs under a hard deadline on a high-priority thread. Three things will make it miss
 that deadline and produce audible glitches:
@@ -249,11 +385,11 @@ The same pattern appears as `ActiveInstruments`, `ActiveEffects`, `ActiveAutoLan
 
 There's a subtlety worth knowing: **live** notes (playing your keyboard) reach instruments on the
 preview path immediately, while **sequenced** notes (clips during playback) are fired on the audio
-thread by the engine's scheduler. Both end up calling the same `NoteOn`/`NoteOff` on your instrument.
+thread by the engine's scheduler (see §4). Both end up calling the same `NoteOn`/`NoteOff` on your instrument.
 
 ---
 
-## 5. The device layer: one seam, many backends
+## 7. The device layer: one seam, many backends
 
 The engine depends only on `IAudioOutput`. Everything OS-specific is hidden behind it:
 
@@ -286,7 +422,7 @@ driver simply probes for its system library at runtime and, if present, offers i
 
 ---
 
-## 6. Linux: four drivers in parallel
+## 8. Linux: four drivers in parallel
 
 Linux audio is fragmented, so Ongenet ships **four independent drivers** and exposes all of them at
 once. Each implements a small internal interface:
@@ -345,7 +481,7 @@ library can't be loaded, so a machine without JACK simply won't list JACK — no
 
 ---
 
-## 7. macOS & Windows
+## 9. macOS & Windows
 
 The same `IAudioOutput` seam, one backend each:
 
@@ -360,7 +496,7 @@ WASAPI's `IAudioRenderClient` buffer), the driver wraps it as a `Span<float>`, a
 
 ---
 
-## 8. Picking a device at startup
+## 10. Picking a device at startup
 
 The platform registers the one native backend for the OS; the
 [`AudioBackendManager`](../Ongenet.Core/Audio/AudioBackendManager.cs) selects it (the one with
@@ -375,7 +511,7 @@ simply reopens the stream.
 
 ---
 
-## 9. MIDI input (briefly)
+## 11. MIDI input (briefly)
 
 MIDI has the same shape: one seam, an OS-native implementation chosen at startup
 ([`MidiInputBackendFactory`](../Ongenet.Audio/Interop/MidiInputBackendFactory.cs)):
@@ -393,19 +529,44 @@ instrument already implements.
 
 ---
 
-## 10. Mental recap for DSP newcomers
+## 12. Mental recap for DSP newcomers
 
 1. **The sound card pulls.** The engine fills a buffer on demand; it never decides when it runs.
 2. **One format everywhere:** float32, interleaved, at the device sample rate. Read the rate; don't
    assume it.
 3. **Block size varies** — never assume a fixed number of frames.
 4. **Mixing is additive** into a pre-cleared buffer: instruments add, effects edit in place.
-5. **Routing is a tree:** track → parent group bus → master. No separate sends (sidechain is a
-   cross-track read).
-6. **The audio thread is sacred:** no allocations, no locks, no slow work. The UI talks to it via
+5. **Routing is a tree plus sends:** track → parent group bus → master; parallel **return** buses are
+   fed by pre/post-fader sends. Sidechain is a cross-track read, not a send.
+6. **PDC aligns paths:** latency-reporting plugins get delay-compensated so everything meets at the master
+   in phase.
+7. **Schedulers build the clip list:** arrangement, session, hybrid and pattern schedulers produce the
+   note/audio schedule each block; live MIDI still uses the preview path.
+8. **Warp maps** stretch audio non-uniformly when a clip has beat↔source markers.
+9. **Multi-out plugins** can route extra buses to other tracks via `MultiOutputRoute`.
+10. **The audio thread is sacred:** no allocations, no locks, no slow work. The UI talks to it via
    immutable snapshots and lock-free FIFOs.
-7. **The OS is hidden** behind `IAudioOutput`; Linux exposes PipeWire/PulseAudio/JACK/ALSA in parallel,
-   macOS uses CoreAudio, Windows uses WASAPI — all via P/Invoke, nothing to install.
+11. **The OS is hidden** behind `IAudioOutput`; Linux exposes PipeWire/PulseAudio/JACK/ALSA in parallel,
+   macOS uses CoreAudio, Windows uses **WASAPI** (default) and **ASIO** (registry-enumerated drivers in
+   Settings → Audio) — all via P/Invoke, nothing to install.
+
+---
+
+## 13. Immersive export (ADM BWF)
+
+For **5.1 / 7.1** surround exports, the **Export** dialog can write **ADM BWF** (ITU-R BS.2076): the
+master mix is offline-rendered through the same `OfflineRenderer` path as WAV export, then wrapped with
+open ADM metadata and an XML sidecar for broadcast handoff.
+
+**AAF/OMF handoff** exports structured timeline XML for Nuendo/Pro Tools pipelines.
+
+---
+
+## 14. Hybrid track scheduling
+
+`TrackKind.Hybrid` lanes accept both audio and MIDI clips. The arrangement scheduler emits instrument
+notes from MIDI clips and schedules audio clips on the same track — session/hybrid playback modes merge
+pattern and launcher schedules unchanged.
 
 ---
 
@@ -413,13 +574,19 @@ instrument already implements.
 
 | File | Role |
 | --- | --- |
-| [`Audio/AudioEngine.cs`](../Ongenet.Core/Audio/AudioEngine.cs) | The render loop, scheduling, automation, routing, master mix |
+| [`Audio/AudioEngine.cs`](../Ongenet.Core/Audio/AudioEngine.cs) | The render loop, scheduling, automation, routing, sends, PDC, master mix |
+| [`Audio/SendMixing.cs`](../Ongenet.Core/Audio/SendMixing.cs) | Pre/post-fader aux send accumulation |
+| [`Audio/LatencyCompensator.cs`](../Ongenet.Core/Audio/LatencyCompensator.cs) | Per-track/bus PDC delay computation |
+| [`Audio/Scheduling/`](../Ongenet.Core/Audio/Scheduling) | Arrangement, session, hybrid and pattern schedulers |
+| [`Audio/WarpMap.cs`](../Ongenet.Core/Audio/WarpMap.cs) | Beat↔source warp marker mapping |
+| [`Audio/MultiOutputRouter.cs`](../Ongenet.Core/Audio/MultiOutputRouter.cs) | Plugin multi-out bus routing |
 | [`Audio/IAudioOutput.cs`](../Ongenet.Core/Audio/IAudioOutput.cs) | The device seam + render callback |
 | [`Audio/Mixing.cs`](../Ongenet.Core/Audio/Mixing.cs) | Volume/pan gain laws and buffer summing |
 | [`Audio/AudioBackendManager.cs`](../Ongenet.Core/Audio/AudioBackendManager.cs) | Selects the active backend |
 | [`Models/Audio/Track.cs`](../Ongenet.Core/Models/Audio/Track.cs) / [`TrackKind.cs`](../Ongenet.Core/Models/Audio/TrackKind.cs) | Track model + parent routing |
 | [`Audio.Native/INativeAudioDriver.cs`](../Ongenet.Audio/Native/INativeAudioDriver.cs) / [`NativeDriverRegistry.cs`](../Ongenet.Audio/Native/NativeDriverRegistry.cs) | Linux driver seam + registry |
-| [`Audio.Native`](../Ongenet.Audio/Native) + [`Audio.Interop`](../Ongenet.Audio/Interop) | All the OS drivers and their P/Invoke layers |
+| [`Audio/Files/AdmBwfExporter.cs`](../Ongenet.Core/Audio/Files/AdmBwfExporter.cs) | ADM BWF immersive export (ITU-R BS.2076) |
+| [`Audio.Native/Win/AsioDeviceService.cs`](../Ongenet.Audio/Native/Win/AsioDeviceService.cs) | Windows ASIO driver enumeration |
 
 ---
 

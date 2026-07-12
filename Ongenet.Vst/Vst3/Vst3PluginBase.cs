@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Ongenet.Ara;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Parameters;
@@ -17,7 +18,7 @@ namespace Ongenet.Vst.Vst3;
 /// audio out, additive) and <see cref="Vst3Effect"/> (audio in → audio out, in place). All native
 /// failures are caught; a broken plugin produces silence / passes audio through.
 /// </summary>
-public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
+public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable, ILatencyProvider, IAraCapable
 {
     private const int MaxBlock = 8192;
     private const int MaxBusChannels = 8;
@@ -64,6 +65,8 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
     private Vst3Api.AudioBusBuffers* _outBuses;
     private int _numInBuses;
     private int _numOutBuses;
+    private PluginOutputBusDescriptor[] _outputBusDescriptors = Array.Empty<PluginOutputBusDescriptor>();
+    private float[]? _extraBusScratch;
     private readonly List<nint> _busAllocs = new(); // every Marshal.AllocHGlobal made for buses
 
     // Event input (audio thread reads these via the host IEventList).
@@ -87,6 +90,11 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
     private double _setupRate;
     private bool _disposed;
 
+    private int _reportedLatencySamples;
+
+    /// <inheritdoc />
+    public int ReportedLatencySamples => _reportedLatencySamples;
+
     private bool _hasEditor;
     private void* _view;
     private bool _editorOpen;
@@ -96,6 +104,9 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
     private nint _embedWindow;
 
     private IReadOnlyList<Parameter>? _parameters;
+
+    private bool _supportsAra;
+    private IAraDocument? _araDocument;
 
     protected Vst3PluginBase(string modulePath, string uid, string displayName)
     {
@@ -112,6 +123,18 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
     public IReadOnlyList<Parameter> Parameters
     {
         get { EnsureLoaded(); return _parameters ?? Array.Empty<Parameter>(); }
+    }
+
+    /// <summary>Number of audio output buses (main mix is bus 0).</summary>
+    public int OutputBusCount
+    {
+        get { EnsureLoaded(); return _numOutBuses; }
+    }
+
+    /// <summary>Metadata for each plugin output bus.</summary>
+    public IReadOnlyList<PluginOutputBusDescriptor> OutputBuses
+    {
+        get { EnsureLoaded(); return _outputBusDescriptors; }
     }
 
     // --- Loading ---
@@ -170,7 +193,9 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
             BuildParameters();
 
             _hasEditor = _controller != null && Ctrl->CreateView != null;
+            _supportsAra = Vst3Module.SupportsAra(ModulePath, Name);
             _loaded = true;
+            if (_supportsAra) Log?.Invoke($"VST3 '{Name}': ARA-capable plug-in detected.");
             Log?.Invoke($"VST3 '{Name}': loaded.");
             return true;
         }
@@ -250,6 +275,7 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
 
         _inBuses = BuildBusBuffers(Vst3Api.DirInput, _numInBuses);
         _outBuses = BuildBusBuffers(Vst3Api.DirOutput, _numOutBuses);
+        _outputBusDescriptors = BuildOutputBusDescriptors();
 
         // Negotiate stereo arrangements (best-effort; plugins keep their defaults if this is rejected).
         if (Proc->SetBusArrangements != null && (_numInBuses > 0 || _numOutBuses > 0))
@@ -291,6 +317,29 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
         if (Comp->GetBusInfo != null && Comp->GetBusInfo(_component, Vst3Api.MediaAudio, dir, index, &info) == Vst3Api.ResultOk)
             return Math.Clamp(info.ChannelCount, 1, MaxBusChannels);
         return 2;
+    }
+
+    private PluginOutputBusDescriptor[] BuildOutputBusDescriptors()
+    {
+        if (_numOutBuses <= 0) return Array.Empty<PluginOutputBusDescriptor>();
+        var list = new PluginOutputBusDescriptor[_numOutBuses];
+        for (var i = 0; i < _numOutBuses; i++)
+        {
+            var name = $"Out {i + 1}";
+            var channels = 2;
+            Vst3Api.BusInfo info;
+            if (Comp->GetBusInfo != null &&
+                Comp->GetBusInfo(_component, Vst3Api.MediaAudio, Vst3Api.DirOutput, i, &info) == Vst3Api.ResultOk)
+            {
+                channels = Math.Clamp(info.ChannelCount, 1, MaxBusChannels);
+                var busName = Vst3Api.ReadUtf16(info.Name, Vst3Api.Str128Bytes);
+                if (!string.IsNullOrWhiteSpace(busName)) name = busName;
+            }
+
+            list[i] = new PluginOutputBusDescriptor { Index = i, Name = name, ChannelCount = channels };
+        }
+
+        return list;
     }
 
     private void BuildParameters()
@@ -369,7 +418,23 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
         if (Proc->SetProcessing != null) Proc->SetProcessing(_processor, 1);
         _active = true;
         _setupRate = rate;
+        RefreshLatency();
         Log?.Invoke($"VST3 '{Name}': activated.");
+    }
+
+    private void RefreshLatency()
+    {
+        _reportedLatencySamples = 0;
+        if (!_active || _processor == null || Proc->GetLatencySamples == nint.Zero) return;
+        try
+        {
+            var getLatency = (delegate* unmanaged[Cdecl]<void*, uint>)Proc->GetLatencySamples;
+            _reportedLatencySamples = (int)getLatency(_processor);
+        }
+        catch
+        {
+            _reportedLatencySamples = 0;
+        }
     }
 
     private void Suspend()
@@ -381,7 +446,8 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
 
     // --- Audio thread ---
 
-    protected void RenderAudio(Span<float> buffer, bool feedInput, bool replace)
+    protected void RenderAudio(Span<float> buffer, bool feedInput, bool replace,
+        Action<int, ReadOnlySpan<float>>? extraBusCallback = null)
     {
         if (!_active || _processor == null || Proc->Process == null || _numOutBuses <= 0) return;
 
@@ -449,6 +515,29 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
                 if (replace) buffer[i + c] = v;
                 else buffer[i + c] += v;
             }
+        }
+
+        if (extraBusCallback is null || _numOutBuses <= 1) return;
+
+        for (var b = 1; b < _numOutBuses; b++)
+        {
+            var bus = &_outBuses[b];
+            var bufs = (float**)bus->ChannelBuffers;
+            var busCh = bus->NumChannels;
+            if (busCh <= 0) continue;
+
+            var interleavedLen = frames * busCh;
+            if (_extraBusScratch is null || _extraBusScratch.Length < interleavedLen)
+                _extraBusScratch = new float[interleavedLen];
+
+            for (var f = 0; f < frames; f++)
+            {
+                var baseIdx = f * busCh;
+                for (var c = 0; c < busCh; c++)
+                    _extraBusScratch[baseIdx + c] = bufs[c][f];
+            }
+
+            extraBusCallback(b, _extraBusScratch.AsSpan(0, interleavedLen));
         }
     }
 
@@ -861,4 +950,26 @@ public abstract unsafe class Vst3PluginBase : IPluginEditor, IDisposable
     }
 
     private readonly record struct NoteMsg(bool On, int Pitch, float Velocity);
+
+    // --- IAraCapable (Celemony ARA VST3 extension) ---
+
+    public bool SupportsAra
+    {
+        get { EnsureLoaded(); return _supportsAra; }
+    }
+
+    public IAraDocument? AraDocument => _araDocument;
+
+    public void BindAraDocument(IAraDocument document) => _araDocument = document;
+
+    public void OpenAraEditor()
+    {
+        if (_araDocument is { IsActive: true })
+        {
+            _araDocument.OpenEditor();
+            return;
+        }
+
+        Log?.Invoke($"VST3 '{Name}': ARA editor requested but no document is bound.");
+    }
 }

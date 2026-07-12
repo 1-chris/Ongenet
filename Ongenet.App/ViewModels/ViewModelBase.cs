@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Ongenet.App.Localization;
 
 namespace Ongenet.App.ViewModels
 {
@@ -38,5 +39,11 @@ namespace Ongenet.App.ViewModels
             OnPropertyChanged(propertyName);
             return true;
         }
+
+        /// <summary>Shorthand for <see cref="Loc.Get"/> in view models.</summary>
+        protected static string L(string key) => Loc.Get(key);
+
+        /// <summary>Shorthand for formatted localized strings.</summary>
+        protected static string L(string key, params object[] args) => Loc.Format(key, args);
     }
 }

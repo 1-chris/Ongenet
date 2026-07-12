@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+             xmlns:audio="using:Ongenet.Core.Models.Audio"
+             x:Class="Ongenet.App.Views.Panels.InstrumentRackView"
+             x:DataType="vm:InstrumentRackViewModel">
+    <StackPanel Spacing="6">
+        <TextBlock Text="{DynamicResource InstrumentRack_INSTRUMENT_RACK}" FontWeight="Bold" FontSize="11"
+                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <ComboBox SelectedItem="{Binding RackKind, Mode=TwoWay}" MinWidth="120">
+                <ComboBox.Items>
+                    <x:Static Member="audio:RackKind.Standard"/>
+                    <x:Static Member="audio:RackKind.DrumPadGrid"/>
+                </ComboBox.Items>
+            </ComboBox>
+            <Button Content="{DynamicResource InstrumentRack_Toggle_drum_grid}" Command="{Binding ToggleDrumRackCommand}" Padding="8,4"/>
+        </StackPanel>
+        <TextBlock Text="{DynamicResource InstrumentRack_Macros}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
+        <ItemsControl ItemsSource="{Binding Macros}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="audio:RackMacroKnob">
+                    <StackPanel Spacing="2" Margin="0,2">
+                        <DockPanel>
+                            <TextBlock Text="{Binding Label}" FontSize="10"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <TextBlock Text="{Binding Value, StringFormat='{}{0:P0}'}" DockPanel.Dock="Right"
+                                       FontSize="10" Foreground="{StaticResource CatppuccinSubtext1}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="1" Value="{Binding Value, Mode=TwoWay}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{DynamicResource InstrumentRack_Drum_pads}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"
+                   IsVisible="{Binding IsDrumRack}"/>
+        <ItemsControl ItemsSource="{Binding DrumPads}" IsVisible="{Binding IsDrumRack}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="4"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="audio:DrumPadSlot">
+                    <Border Margin="2" Padding="6" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center"/>
+                            <TextBlock FontSize="9" HorizontalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinOverlay1}">
+                                <Run Text="{DynamicResource InstrumentRack_N}"/><Run Text="{Binding MidiNote}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

@@ -23,6 +23,9 @@ namespace Ongenet.App.Views.Panels
         public LibraryListView()
         {
             InitializeComponent();
+            Ongenet.App.Accessibility.A11y.Landmark(this,
+                Ongenet.App.Localization.Loc.Get("A11y_LibraryBrowser_Name"),
+                Ongenet.App.Localization.Loc.Get("A11y_LibraryBrowser_Help"));
             NodeTree.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
             NodeTree.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel);
             NodeTree.AddHandler(DoubleTappedEvent, OnDoubleTapped);

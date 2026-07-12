@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -10,22 +9,34 @@ using Microsoft.Extensions.DependencyInjection;
 using Ongenet.App.Controls;
 using Ongenet.App.Services;
 using Ongenet.App.ViewModels;
+using Ongenet.App.Views.Windows;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.App.Views.Panels
 {
-    /// <summary>Top-bar transport controls. Refreshes the master meter + playhead time from the shared
-    /// PlaybackClock (pumped by the timeline's render-frame loop) — not its own timer, which competed
-    /// with the render frame and capped playback at 30fps.</summary>
+    /// <summary>Top-bar transport controls. Hosts the always-on UI heartbeat: pumps the shared
+    /// <see cref="IPlaybackClock"/> so mixer meters, inspectors and the master meter keep updating
+    /// even when the Arrangement tab (which also pumps during its own overlay work) is not visible.
+    /// Stays on the shared idle timer — only the timeline switches to vsync cadence during playback.</summary>
     public partial class TransportView : UserControl
     {
+        private readonly FrameTicker _ticker;
+        private IPlaybackClock? _clock;
+
         public TransportView()
         {
             InitializeComponent();
-            var clock = App.ServiceProvider?.GetService<IPlaybackClock>();
-            if (clock is not null) clock.Tick += () => (DataContext as TransportViewModel)?.RefreshMeters();
+            _clock = App.ServiceProvider?.GetService<IPlaybackClock>();
+            if (_clock is not null)
+                _clock.Tick += () => (DataContext as TransportViewModel)?.RefreshMeters();
+
+            _ticker = new FrameTicker(this, OnTick);
+
             AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
         }
+
+        private void OnTick() => _clock?.Pump();
 
         // Right-click the Tempo / Time editors → "Create automation track" on the master track, so tempo
         // and time signature automate through the same lane pipeline as any knob, fader or on/off switch.
@@ -52,45 +63,56 @@ namespace Ongenet.App.Views.Panels
             }
         }
 
-        // Render → choose a path/format → export off the UI thread. MP3/FLAC are offered only when a
-        // system ffmpeg is available; the export format follows the chosen file's extension.
+        // Export → open the export dialog (master, stems, region, bit depth).
         private async void OnRender(object? sender, RoutedEventArgs e)
         {
-            if (DataContext is not TransportViewModel vm) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top is Window owner)
+                await Windows.ExportDialog.ShowAsync(owner);
+        }
+
+        private static readonly FilePickerFileType MidiFileType =
+            new("MIDI files") { Patterns = new[] { "*.mid", "*.midi" } };
+
+        // Export all instrument-track notes to a single Standard MIDI File.
+        private async void OnExportMidi(object? sender, RoutedEventArgs e)
+        {
+            var timeline = App.ServiceProvider?.GetService<TimelineViewModel>();
+            var project = App.ServiceProvider?.GetService<IProjectService>();
+            if (timeline is null || project is null) return;
+
+            var (notes, length) = timeline.CollectProjectMidi();
             var top = TopLevel.GetTopLevel(this);
             if (top is null) return;
+            var owner = top as Window;
 
-            var types = new List<FilePickerFileType>
+            if (notes.Count == 0)
             {
-                new("WAV audio") { Patterns = new[] { "*.wav" } }
-            };
-            if (Core.Audio.Files.FfmpegEncoder.IsAvailable)
-            {
-                types.Add(new FilePickerFileType("MP3 audio (320 kbps)") { Patterns = new[] { "*.mp3" } });
-                types.Add(new FilePickerFileType("FLAC audio") { Patterns = new[] { "*.flac" } });
+                if (owner is not null)
+                    await MessageDialog.Notify(owner, "Nothing to export", "No MIDI notes on instrument tracks.");
+                return;
             }
 
+            var name = string.IsNullOrWhiteSpace(project.Current.Name) ? "project" : project.Current.Name;
             var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Render Audio",
-                SuggestedFileName = "render.wav",
-                DefaultExtension = "wav",
-                FileTypeChoices = types
+                Title = "Export project MIDI",
+                SuggestedFileName = $"{name}.mid",
+                DefaultExtension = "mid",
+                FileTypeChoices = new[] { MidiFileType }
             });
-
-            var path = file?.TryGetLocalPath();
-            if (string.IsNullOrEmpty(path)) return;
+            if (file is null) return;
 
             try
             {
-                await vm.RenderToFileAsync(path);
+                await using var stream = await file.OpenWriteAsync();
+                StandardMidiFile.Write(stream, notes, length,
+                    project.Current.Tempo.BeatsPerMinute, project.Current.TimeSignature);
             }
             catch (Exception ex)
             {
-                var logger = App.ServiceProvider?.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()
-                    ?.CreateLogger("Render");
-                if (logger is not null)
-                    Microsoft.Extensions.Logging.LoggerExtensions.LogError(logger, ex, "Render to '{Path}' failed.", path);
+                if (owner is not null)
+                    await MessageDialog.Notify(owner, "Couldn't export MIDI", ex.Message);
             }
         }
     }

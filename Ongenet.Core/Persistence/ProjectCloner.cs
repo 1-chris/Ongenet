@@ -1,10 +1,13 @@
 using System.IO;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Models.Audio;
+using Ongenet.Core.Models.Media;
+using Ongenet.Core.Audio.Scheduling;
 
 namespace Ongenet.Core.Persistence;
 
@@ -46,7 +49,148 @@ public static class ProjectCloner
             });
         }
 
+        foreach (var pat in src.Patterns)
+            dst.Patterns.Add(ClonePattern(pat));
+
+        foreach (var pc in src.PatternClips)
+            dst.PatternClips.Add(new PatternClip
+            {
+                Id = pc.Id,
+                PatternId = pc.PatternId,
+                TrackId = pc.TrackId,
+                StartBeat = pc.StartBeat,
+                LengthBeats = pc.LengthBeats
+            });
+
+        foreach (var sc in src.SessionClips)
+            dst.SessionClips.Add(CloneSessionClip(sc));
+
+        foreach (var r in src.MultiOutputRoutes)
+            dst.MultiOutputRoutes.Add(new MultiOutputRoute
+            {
+                SourceTrackId = r.SourceTrackId,
+                SlotIndex = r.SlotIndex,
+                PluginOutputBus = r.PluginOutputBus,
+                DestinationTrackId = r.DestinationTrackId,
+                Level = r.Level
+            });
+
+        dst.Mpe = new MpeSettings
+        {
+            Enabled = src.Mpe.Enabled,
+            MasterChannel = src.Mpe.MasterChannel,
+            MemberChannelStart = src.Mpe.MemberChannelStart,
+            MemberChannelCount = src.Mpe.MemberChannelCount
+        };
+
+        if (src.ActiveGroove is { } groove)
+            dst.ActiveGroove = new GrooveTemplate
+            {
+                Id = groove.Id,
+                Name = groove.Name,
+                SwingAmount = groove.SwingAmount,
+                Division = groove.Division
+            };
+
+        foreach (var dm in src.DrumMaps)
+            dst.DrumMaps.Add(CloneDrumMap(dm));
+
+        foreach (var vt in src.VideoTracks)
+            dst.VideoTracks.Add(new VideoTrack
+            {
+                Id = vt.Id,
+                FilePath = vt.FilePath,
+                OffsetSeconds = vt.OffsetSeconds,
+                Fps = vt.Fps,
+                Muted = vt.Muted
+            });
+
+        dst.PlaybackMode = src.PlaybackMode;
+        dst.LaunchQuantizeBeats = src.LaunchQuantizeBeats;
+        foreach (var marker in src.Markers)
+            dst.Markers.Add(new ArrangementMarker { Id = marker.Id, Name = marker.Name, Beat = marker.Beat });
+        foreach (var section in src.ArrangementSections)
+            dst.ArrangementSections.Add(new ArrangementSection { Id = section.Id, MarkerId = section.MarkerId });
+
         return dst;
+    }
+
+    private static Pattern ClonePattern(Pattern src)
+    {
+        var pat = new Pattern
+        {
+            Id = src.Id,
+            Name = src.Name,
+            LengthBeats = src.LengthBeats,
+            ColorIndex = src.ColorIndex
+        };
+        foreach (var ch in src.Channels)
+        {
+            pat.Channels.Add(new PatternChannel
+            {
+                Id = ch.Id,
+                Order = ch.Order,
+                SourceKind = ch.SourceKind,
+                TrackId = ch.TrackId,
+                SampleClipId = ch.SampleClipId,
+                Name = ch.Name,
+                Muted = ch.Muted,
+                Volume = ch.Volume,
+                Pan = ch.Pan
+            });
+        }
+        foreach (var seq in src.StepSequences)
+        {
+            var clone = new StepSequence
+            {
+                Id = seq.Id,
+                PatternChannelId = seq.PatternChannelId,
+                StepCount = seq.StepCount
+            };
+            foreach (var step in seq.Steps)
+            {
+                clone.Steps.Add(new StepData
+                {
+                    Active = step.Active,
+                    Note = step.Note,
+                    Velocity = step.Velocity,
+                    Pan = step.Pan,
+                    Probability = step.Probability,
+                    MicroTimingTicks = step.MicroTimingTicks
+                });
+            }
+            pat.StepSequences.Add(clone);
+        }
+        return pat;
+    }
+
+    private static SessionClip CloneSessionClip(SessionClip sc) => new()
+    {
+        Id = sc.Id,
+        TrackId = sc.TrackId,
+        SceneIndex = sc.SceneIndex,
+        Name = sc.Name,
+        LengthBeats = sc.LengthBeats,
+        LaunchMode = sc.LaunchMode,
+        SourceClipId = sc.SourceClipId,
+        FollowAction = sc.FollowAction,
+        LaunchQuantizeBeats = sc.LaunchQuantizeBeats
+    };
+
+    private static DrumMap CloneDrumMap(DrumMap dm)
+    {
+        var map = new DrumMap { Id = dm.Id, Name = dm.Name };
+        foreach (var e in dm.Entries)
+        {
+            map.Entries.Add(new DrumMapEntry
+            {
+                Note = e.Note,
+                Label = e.Label,
+                SampleClipId = e.SampleClipId,
+                VelocityScale = e.VelocityScale
+            });
+        }
+        return map;
     }
 
     private static Track? FindTrack(Project p, System.Guid id)
@@ -71,7 +215,8 @@ public static class ProjectCloner
             Pan = s.Pan,
             ColorKey = s.ColorKey,
             AutomationCollapsed = s.AutomationCollapsed,
-            GroupCollapsed = s.GroupCollapsed
+            GroupCollapsed = s.GroupCollapsed,
+            ActivePatternId = s.ActivePatternId
         };
 
         // Clone the instrument rack: a fresh instrument + its own effect chain per slot.
@@ -90,11 +235,28 @@ public static class ProjectCloner
             if (CloneAutoLane(lane, t, dst) is { } cloned)
                 t.AutoLanes.Add(cloned);
 
+        foreach (var mod in s.Modulators)
+            t.Modulators.Add(CloneModulator(mod));
+
         t.CommitInstruments();
         t.CommitEffects();
+        t.CommitMidiEffects();
         t.CommitAutoLanes();
+        t.CommitModulators();
         return t;
     }
+
+    private static TrackModulator CloneModulator(TrackModulator s)
+        => new()
+        {
+            Id = s.Id,
+            Kind = s.Kind,
+            Enabled = s.Enabled,
+            RateHz = s.RateHz,
+            Depth = s.Depth,
+            Wave = s.Wave,
+            Target = s.Target
+        };
 
     private static Clip CloneClip(Clip s)
     {
@@ -113,8 +275,20 @@ public static class ProjectCloner
             PitchCorrected = s.PitchCorrected,
             IsAudio = s.IsAudio,
             SourceOffsetSeconds = s.SourceOffsetSeconds,
-            SourceLengthSeconds = s.SourceLengthSeconds
+            SourceLengthSeconds = s.SourceLengthSeconds,
+            HasAraRegion = s.HasAraRegion,
+            AraPitchOffsetSemitones = s.AraPitchOffsetSemitones,
+            LinkedClipGroupId = s.LinkedClipGroupId
         };
+
+        foreach (var ps in s.PitchSegments)
+            c.PitchSegments.Add(new PitchNoteSegment
+            {
+                StartSample = ps.StartSample,
+                EndSample = ps.EndSample,
+                PitchCents = ps.PitchCents,
+                Amplitude = ps.Amplitude
+            });
 
         foreach (var n in s.Notes)
             c.Notes.Add(new MidiNote { Note = n.Note, StartBeat = n.StartBeat, LengthBeats = n.LengthBeats, Velocity = n.Velocity });

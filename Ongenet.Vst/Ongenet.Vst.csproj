@@ -8,5 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+    <ProjectReference Include="..\Ongenet.Ara\Ongenet.Ara.csproj" />
   </ItemGroup>
 </Project>

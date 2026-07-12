@@ -16,11 +16,18 @@
 
     <ItemGroup>
         <AvaloniaResource Include="Assets\**" />
+        <AvaloniaResource Include="Resources\**\*.axaml" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Scripts\**\*.cs" CopyToOutputDirectory="PreserveNewest" />
+        <Compile Remove="Scripts\**\*.cs" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Avalonia" Version="12.0.4" />
         <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
+        <PackageReference Include="Avalonia.Skia" Version="12.0.4" />
         <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
         <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
@@ -30,6 +37,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+        <ProjectReference Include="..\Ongenet.Link\Ongenet.Link.csproj" />
+        <ProjectReference Include="..\Ongenet.Ara\Ongenet.Ara.csproj" />
         <!-- Portable 3D scene model + engine contracts only. The native GPU engine (Ongenet.Engine3D) is
              referenced solely by the desktop head and injected via DI, so this stays clean for Web/Android. -->
         <ProjectReference Include="..\Ongenet.Engine3D.Abstractions\Ongenet.Engine3D.Abstractions.csproj" />

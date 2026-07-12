@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="200"
+             x:Class="Ongenet.App.Views.Settings.GeneralSettingsView"
+             x:DataType="vm:GeneralSettingsViewModel">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="18" Spacing="14">
+            <TextBlock Text="{DynamicResource Settings_TabGeneral}" FontSize="14" FontWeight="SemiBold"
+                       Foreground="{StaticResource CatppuccinText}"/>
+
+            <TextBlock Text="{DynamicResource Settings_Plugins}" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,8,0,0"/>
+
+            <CheckBox Content="{DynamicResource Settings_PluginIsolation}"
+                      IsChecked="{Binding PluginIsolationEnabled}"
+                      ToolTip.Tip="{DynamicResource Settings_PluginIsolationTip}"/>
+
+            <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource Settings_Language}"
+                           VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext1}"/>
+                <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding Locales}" SelectedItem="{Binding SelectedLocale}"
+                          ToolTip.Tip="{DynamicResource Settings_LanguageTip}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LocaleChoice">
+                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" TextWrapping="Wrap"
+                           FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"
+                           Text="{Binding RestartNote}"/>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

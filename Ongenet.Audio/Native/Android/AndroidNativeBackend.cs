@@ -217,6 +217,8 @@ internal sealed class AndroidAudioDeviceService : IAudioDeviceService
         }
     }
 
+    public bool LowLatencyExclusive { get; set; }
+
     public void Refresh() => DevicesChanged?.Invoke();
 
     public event Action? DevicesChanged;

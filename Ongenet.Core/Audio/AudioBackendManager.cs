@@ -154,6 +154,12 @@ public sealed class AudioBackendManager : IAudioBackendManager, IAudioOutput, IA
         set => _active.Devices.InputChannelMode = value;
     }
 
+    public bool LowLatencyExclusive
+    {
+        get => _active.Devices.LowLatencyExclusive;
+        set => _active.Devices.LowLatencyExclusive = value;
+    }
+
     public void Refresh() => _active.Devices.Refresh();
 
     public event Action? DevicesChanged;

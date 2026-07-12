@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Ongenet.App.Localization;
 using Ongenet.App.Theming;
 
 namespace Ongenet.App.Views.Windows
@@ -67,9 +68,11 @@ namespace Ongenet.App.Views.Windows
 
         /// <summary>Shows a Yes/No-style confirmation; resolves true when the confirm button is clicked.</summary>
         public static async Task<bool> Confirm(Window owner, string title, string message,
-            string confirmText = "OK", string cancelText = "Cancel")
+            string? confirmText = null, string? cancelText = null)
         {
-            var dialog = new MessageDialog(title, message, confirmText, cancelText);
+            var dialog = new MessageDialog(title, message,
+                confirmText ?? Loc.Get("Dialog_OK"),
+                cancelText ?? Loc.Get("Dialog_Cancel"));
             await dialog.ShowDialog(owner);
             return dialog._result;
         }
@@ -77,7 +80,7 @@ namespace Ongenet.App.Views.Windows
         /// <summary>Shows a single-button notification.</summary>
         public static Task Notify(Window owner, string title, string message)
         {
-            var dialog = new MessageDialog(title, message, "OK", null);
+            var dialog = new MessageDialog(title, message, Loc.Get("Dialog_OK"), null);
             return dialog.ShowDialog(owner);
         }
     }

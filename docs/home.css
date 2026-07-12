@@ -84,22 +84,25 @@ code {
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--surface0);
 }
-.topbar .wrap {
-  display: flex; align-items: center; justify-content: space-between;
-  height: 60px; gap: 16px;
+.topbar-inner {
+  display: flex; align-items: center; gap: 20px;
+  height: 60px;
+  width: fit-content; max-width: 100%;
+  min-width: min(1080px, 100%);
+  margin: 0 auto;
 }
 .brand {
   font-weight: 700; font-size: 1.25rem; letter-spacing: 0.5px;
   color: var(--text); flex-shrink: 0;
 }
 .brand .dot { color: var(--mauve); }
-.topbar-right {
-  display: flex; align-items: center; gap: 14px; min-width: 0;
+.navlinks {
+  display: flex; align-items: center; gap: 16px; flex-wrap: nowrap;
+  flex: 1 1 auto; justify-content: center;
 }
-.navlinks { display: flex; gap: 18px; flex-wrap: nowrap; overflow-x: auto; }
 .navlinks a {
   color: var(--subtext0); font-size: 0.88rem; font-weight: 500;
-  text-decoration: none; white-space: nowrap;
+  text-decoration: none; white-space: nowrap; flex-shrink: 0;
 }
 .navlinks a:hover { color: var(--lavender); }
 

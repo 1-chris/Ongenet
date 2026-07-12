@@ -1,0 +1,104 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+             x:Class="Ongenet.App.Views.Panels.PatternEditorView"
+             x:DataType="vm:PatternEditorViewModel">
+    <UserControl.Styles>
+        <Style Selector="Button.step">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Margin" Value="1"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinSurface2}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.step.active">
+            <Setter Property="Background" Value="{StaticResource CatppuccinGreen}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinGreen}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Background="{StaticResource CatppuccinBase}">
+        <TextBlock Text="{DynamicResource PatternEditor_Select_a_pattern_clip_or_pattern_track_to_edit_s}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontSize="12" Foreground="{StaticResource CatppuccinOverlay1}"
+                   IsVisible="{Binding !HasPattern}"/>
+
+        <DockPanel IsVisible="{Binding HasPattern}" Margin="8">
+            <Border DockPanel.Dock="Top" Padding="0,0,0,8">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="{Binding PatternTitle}" FontWeight="SemiBold" FontSize="13"
+                               VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource PatternEditor_Length_beats}" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinOverlay1}" VerticalAlignment="Center"/>
+                        <NumericUpDown Value="{Binding LengthBeats, Mode=TwoWay}" Minimum="1" Maximum="256"
+                                       Increment="1" Width="72" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource PatternEditor_Steps}" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinOverlay1}" VerticalAlignment="Center"/>
+                        <ComboBox Width="64" FontSize="11" SelectedItem="{Binding StepCount, Mode=TwoWay}"
+                                  ItemsSource="{x:Static vm:PatternEditorViewModel.StepCountOptions}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="2">
+                    <Grid ColumnDefinitions="120,Auto">
+                        <TextBlock Grid.Column="0" Text="{DynamicResource PatternEditor_Channel}" FontSize="10"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <ItemsControl Grid.Column="1" ItemsSource="{Binding StepHeaders}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Width="40" Text="{Binding StringFormat='{}{0}'}"
+                                               FontSize="9" HorizontalAlignment="Center"
+                                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PatternGridRowViewModel">
+                                <Grid ColumnDefinitions="120,Auto" Margin="0,2">
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="11"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource CatppuccinText}"/>
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Steps}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:StepCellViewModel">
+                                                <StackPanel Spacing="2" Width="40">
+                                                    <Button Classes="step" Classes.active="{Binding IsActive}"
+                                                            Command="{Binding ToggleCommand}"
+                                                            Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                                    <Slider Minimum="0" Maximum="1" Value="{Binding Velocity, Mode=TwoWay}"
+                                                            Height="40" Orientation="Vertical"
+                                                            IsEnabled="{Binding IsActive}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Grid>
+</UserControl>

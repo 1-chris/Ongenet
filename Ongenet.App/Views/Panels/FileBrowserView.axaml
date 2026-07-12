@@ -28,9 +28,9 @@
                         <!-- DockPanel (not a horizontal StackPanel) so the name fills the remaining width
                              and wraps; the icon stays pinned at the top-left. -->
                         <DockPanel Margin="0,1">
-                            <TextBlock DockPanel.Dock="Left" Text="📁" IsVisible="{Binding IsDirectory}"
+                            <TextBlock DockPanel.Dock="Left" Text="{DynamicResource FileBrowser_Text}" IsVisible="{Binding IsDirectory}"
                                        VerticalAlignment="Top" Margin="0,0,6,0"/>
-                            <TextBlock DockPanel.Dock="Left" Text="🎵" IsVisible="{Binding !IsDirectory}"
+                            <TextBlock DockPanel.Dock="Left" Text="{DynamicResource FileBrowser_Text_2}" IsVisible="{Binding !IsDirectory}"
                                        VerticalAlignment="Top" Margin="0,0,6,0"/>
                             <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center"/>
                         </DockPanel>

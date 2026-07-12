@@ -6,9 +6,22 @@
     UI reads it back at runtime (see Ongenet.Desktop/AppInfo.cs) to show it in the title bar.
   -->
   <PropertyGroup>
-    <Version>0.31.0</Version>
+    <Version>0.32.0</Version>
     <Product>Ongenet</Product>
     <Company>Ongenet</Company>
+  </PropertyGroup>
+
+  <!--
+    Auto-enable libabl-link when the shared library is present (see DEVELOPMENT.md § Ableton Link).
+    Override with -p:OngenetLinkNative=false or force ONGENET_LINK_NATIVE via DefineConstants.
+  -->
+  <PropertyGroup Condition="'$(OngenetLinkNative)' == '' and '$(DefineConstants)' != '' and $(DefineConstants.Contains('ONGENET_LINK_NATIVE'))">
+    <OngenetLinkNative>true</OngenetLinkNative>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OngenetLinkNative)' == ''">
+    <_LinkLibDir>$(MSBuildThisFileDirectory)third_party/link/build</_LinkLibDir>
+    <_LinkLibDir Condition="!Exists('$(_LinkLibDir)/libabl-link.dylib') and !Exists('$(_LinkLibDir)/libabl-link.so') and !Exists('$(_LinkLibDir)/abl-link.dll')">$(MSBuildThisFileDirectory)build/link</_LinkLibDir>
+    <OngenetLinkNative Condition="Exists('$(_LinkLibDir)/libabl-link.dylib') or Exists('$(_LinkLibDir)/libabl-link.so') or Exists('$(_LinkLibDir)/abl-link.dll')">true</OngenetLinkNative>
   </PropertyGroup>
 
 </Project>

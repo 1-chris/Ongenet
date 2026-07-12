@@ -95,6 +95,7 @@ public sealed unsafe class Vst3Module : IDisposable
         using var module = new Vst3Module(path);
         var factory = module._factory;
         var list = new List<VstPluginDescriptor>();
+        var araFactories = ReadAraFactoryNames(path);
 
         var baseV = *(Vst3Api.PluginFactoryVtbl**)factory;
         // getClassInfo2 (with sub-categories) lives on IPluginFactory2; query for it.
@@ -135,8 +136,10 @@ public sealed unsafe class Vst3Module : IDisposable
 
                 var isInstrument = sub.Contains("Instrument", StringComparison.OrdinalIgnoreCase)
                                    || sub.Contains("Synth", StringComparison.OrdinalIgnoreCase);
+                var supportsAra = sub.Contains(AraConstants.OnlyAraSubCategory, StringComparison.Ordinal)
+                                  || araFactories.Any(f => string.Equals(f, name, StringComparison.Ordinal));
                 var uid = ToHex(cid);
-                list.Add(new VstPluginDescriptor(VstFormat.Vst3, path, uid, name, vendor, isInstrument, !isInstrument));
+                list.Add(new VstPluginDescriptor(VstFormat.Vst3, path, uid, name, vendor, isInstrument, !isInstrument, supportsAra));
             }
         }
         finally
@@ -145,6 +148,39 @@ public sealed unsafe class Vst3Module : IDisposable
         }
 
         return list;
+    }
+
+    /// <summary>Reads ARA Main Factory class names exported by a VST3 bundle (Celemony ARAVST3.h).</summary>
+    public static IReadOnlyList<string> ReadAraFactoryNames(string path)
+    {
+        if (ResolveBinary(path) is null) return Array.Empty<string>();
+
+        using var module = new Vst3Module(path);
+        var factory = module._factory;
+        var list = new List<string>();
+
+        var baseV = *(Vst3Api.PluginFactoryVtbl**)factory;
+        var count = baseV->CountClasses != null ? baseV->CountClasses(factory) : 0;
+        for (var i = 0; i < count; i++)
+        {
+            Vst3Api.PClassInfo info;
+            if (baseV->GetClassInfo == null || baseV->GetClassInfo(factory, i, &info) != Vst3Api.ResultOk)
+                continue;
+            var category = Vst3Api.ReadAscii(info.Category, 32);
+            if (!string.Equals(category, AraConstants.MainFactoryClass, StringComparison.Ordinal))
+                continue;
+            list.Add(Vst3Api.ReadAscii(info.Name, 64));
+        }
+
+        return list;
+    }
+
+    /// <summary>True when an ARA Main Factory class name matches the audio processor class name.</summary>
+    public static bool SupportsAra(string path, string audioClassName)
+    {
+        if (string.IsNullOrWhiteSpace(audioClassName)) return false;
+        return ReadAraFactoryNames(path)
+            .Any(n => string.Equals(n, audioClassName, StringComparison.Ordinal));
     }
 
     private static byte[] ReadCid(byte* cid)

@@ -6,6 +6,7 @@ using Avalonia.Styling;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Localization;
 using Ongenet.App.Theming;
 
 namespace Ongenet.App.Services;
@@ -25,11 +26,13 @@ public sealed class AppSettingsService : IAppSettingsService
     private readonly IMidiInputService _midi;
     private readonly IRecordingService _recording;
     private readonly ITransportMapService _transport;
+    private readonly ILocalizationService _localization;
 
     private bool _suppress;
 
     public AppSettingsService(IThemeService theme, IAudioDeviceService audio, IAudioBackendManager audioBackend,
-        IMidiInputService midi, IRecordingService recording, ITransportMapService transport)
+        IMidiInputService midi, IRecordingService recording, ITransportMapService transport,
+        ILocalizationService localization)
     {
         _theme = theme;
         _audio = audio;
@@ -37,6 +40,7 @@ public sealed class AppSettingsService : IAppSettingsService
         _midi = midi;
         _recording = recording;
         _transport = transport;
+        _localization = localization;
 
         FilePath = AppPaths.SettingsFile();
         Current = Load(FilePath);
@@ -59,6 +63,7 @@ public sealed class AppSettingsService : IAppSettingsService
         _suppress = true;
         try
         {
+            ApplyLocalization();
             ApplyTheme();
             // Select the backend first so the device list ApplyAudio matches against is the right one.
             // Empty = unset → leave the manager's OS-aware default (Native on Linux/macOS) in place.
@@ -82,6 +87,7 @@ public sealed class AppSettingsService : IAppSettingsService
         Current.AudioOutputDevice = _audio.SelectedOutput?.Name;
         Current.AudioInputDevice = _audio.SelectedInput?.Name;
         Current.InputChannelMode = _audio.InputChannelMode.ToString();
+        Current.WasapiExclusiveMode = _audio.LowLatencyExclusive;
         Current.MidiInputDevice = _midi.SelectedDevice?.DisplayName;
         Current.ThemeName = _theme.Current.Name;
         Current.ThemeIsLight = _theme.Current.Variant == ThemeVariant.Light;
@@ -109,6 +115,24 @@ public sealed class AppSettingsService : IAppSettingsService
         CaptureAndSave();
     }
 
+    private void ApplyLocalization()
+    {
+        _localization.Apply(Current.UiCulture);
+    }
+
+    public void SetUiCulture(string cultureId)
+    {
+        Current.UiCulture = cultureId;
+        _localization.Apply(cultureId);
+        Save();
+    }
+
+    public void SetPluginIsolationEnabled(bool enabled)
+    {
+        Current.PluginIsolationEnabled = enabled;
+        Save();
+    }
+
     private void ApplyTheme()
     {
         if (string.IsNullOrEmpty(Current.ThemeName)) return;
@@ -134,6 +158,8 @@ public sealed class AppSettingsService : IAppSettingsService
 
         if (Enum.TryParse<AudioInputChannelMode>(Current.InputChannelMode, out var mode))
             _audio.InputChannelMode = mode;
+
+        _audio.LowLatencyExclusive = Current.WasapiExclusiveMode;
     }
 
     private void ApplyMidi()

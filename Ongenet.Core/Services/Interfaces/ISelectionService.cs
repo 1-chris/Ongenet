@@ -21,10 +21,13 @@ public interface ISelectionService
     /// <summary>The selected clip, or null.</summary>
     Clip? SelectedClip { get; }
 
-    /// <summary>Raised whenever <see cref="SelectedTrack"/> or <see cref="SelectedClip"/> changes.</summary>
+    /// <summary>The selected pattern playlist block, or null.</summary>
+    PatternClip? SelectedPatternClip { get; }
+
+    /// <summary>Raised whenever selection changes.</summary>
     event Action? SelectionChanged;
 
-    /// <summary>Selects a single track (and clears any clip and multi-selection).</summary>
+    /// <summary>Selects a single track (and clears any clip and pattern-clip selection).</summary>
     void SelectTrack(Track? track);
 
     /// <summary>Toggles a track's membership in the multi-selection (Ctrl+click); makes it the primary when added.</summary>
@@ -32,4 +35,7 @@ public interface ISelectionService
 
     /// <summary>Selects a clip and the track that owns it.</summary>
     void SelectClip(Clip? clip, Track? owner);
+
+    /// <summary>Selects a pattern playlist block and its host pattern track.</summary>
+    void SelectPatternClip(PatternClip? clip, Track? owner);
 }

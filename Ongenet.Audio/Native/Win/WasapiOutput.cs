@@ -95,7 +95,10 @@ internal sealed class WasapiOutput : IAudioOutput
             var channels = wfx.nChannels;
             var rate = (int)wfx.nSamplesPerSec;
 
-            Check(client.Initialize(W.AUDCLNT_SHAREMODE_SHARED, W.AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, fmt, IntPtr.Zero), "Initialize");
+            var shareMode = _devices is WasapiDeviceService ws && ws.UseExclusiveMode
+                ? W.AUDCLNT_SHAREMODE_EXCLUSIVE
+                : W.AUDCLNT_SHAREMODE_SHARED;
+            Check(client.Initialize(shareMode, W.AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, fmt, IntPtr.Zero), "Initialize");
 
             evt = W.CreateEventW(IntPtr.Zero, false, false, null);
             if (evt == IntPtr.Zero) throw new InvalidOperationException("CreateEvent failed.");

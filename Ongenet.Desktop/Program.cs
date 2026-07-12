@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Native;
 using System;
 
 namespace Ongenet.Desktop;
@@ -20,7 +21,8 @@ class Program
     }
 
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<SharedApp>()
+    {
+        var builder = AppBuilder.Configure<SharedApp>()
             .UsePlatformDetect()
             .WithInterFont()
             .With(new FontManagerOptions
@@ -32,6 +34,24 @@ class Program
                 {
                     new FontFallback { FontFamily = "avares://Ongenet.App/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji" }
                 }
-            })
-            .LogToTrace();
+            });
+
+        // Avalonia 12 defaults to Metal on macOS. Its async presentation can drop frames under load,
+        // which reads as a subtle whole-window brightness flicker (see Avalonia #4500 / #21204).
+        // OpenGL was the stable default in v11; prefer it unless explicitly overridden.
+        if (OperatingSystem.IsMacOS() && Environment.GetEnvironmentVariable("ONGENET_METAL") != "1")
+        {
+            builder = builder.With(new AvaloniaNativePlatformOptions
+            {
+                RenderingMode =
+                [
+                    AvaloniaNativeRenderingMode.OpenGl,
+                    AvaloniaNativeRenderingMode.Metal,
+                    AvaloniaNativeRenderingMode.Software
+                ]
+            });
+        }
+
+        return builder.LogToTrace();
+    }
 }

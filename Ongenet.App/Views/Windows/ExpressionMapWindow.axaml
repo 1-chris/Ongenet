@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        xmlns:audio="using:Ongenet.Core.Models.Audio"
+        x:Class="Ongenet.App.Views.Windows.ExpressionMapWindow"
+        x:DataType="vm:ExpressionMapViewModel"
+        Title="{DynamicResource ExpressionMap_VST_Expression_Maps_Title}" Width="500" Height="420">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="{DynamicResource ExpressionMap_Add_map}" Command="{Binding AddMapCommand}"/>
+                <Button Content="{DynamicResource ExpressionMap_Add_articulation}" Command="{Binding AddEntryCommand}"/>
+            </StackPanel>
+            <ComboBox ItemsSource="{Binding Maps}" SelectedItem="{Binding Selected}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="audio:VstExpressionMap">
+                        <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </StackPanel>
+        <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Entries}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ExpressionMapEntryRow">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" Margin="0,3">
+                            <TextBox Text="{Binding Articulation}"/>
+                            <NumericUpDown Grid.Column="1" Value="{Binding KeyswitchNote}" Minimum="0" Maximum="127" Width="80"/>
+                            <Button Grid.Column="2" Content="{DynamicResource ExpressionMap_Remove}" Command="{Binding RemoveCommand}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

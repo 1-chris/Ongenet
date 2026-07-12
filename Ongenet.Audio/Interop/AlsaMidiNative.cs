@@ -22,6 +22,7 @@ internal static class AlsaMidiNative
 
     // snd_rawmidi_stream enum.
     public const int SND_RAWMIDI_STREAM_INPUT = 1;
+    public const int SND_RAWMIDI_STREAM_OUTPUT = 2;
 
     // poll() event flag and the errno values snd_rawmidi_read returns negated.
     public const short POLLIN = 0x001;
@@ -81,9 +82,9 @@ internal static class AlsaMidiNative
 
     // --- rawmidi open / read / poll ------------------------------------------------------
 
-    // outputp is passed IntPtr.Zero (NULL) to open input only.
+    // outputp is passed IntPtr.Zero (NULL) to open input only, or out _ for output-only.
     [DllImport(Asound, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-    public static extern int snd_rawmidi_open(out IntPtr inputp, IntPtr outputp, string name, int mode);
+    public static extern int snd_rawmidi_open(out IntPtr inputp, out IntPtr outputp, string name, int mode);
 
     [DllImport(Asound, CallingConvention = CallingConvention.Cdecl)]
     public static extern int snd_rawmidi_close(IntPtr rmidi);
@@ -91,6 +92,9 @@ internal static class AlsaMidiNative
     // ssize_t snd_rawmidi_read(snd_rawmidi_t*, void* buffer, size_t size). Returns bytes read or -errno.
     [DllImport(Asound, CallingConvention = CallingConvention.Cdecl)]
     public static extern nint snd_rawmidi_read(IntPtr rmidi, IntPtr buffer, nuint size);
+
+    [DllImport(Asound, CallingConvention = CallingConvention.Cdecl)]
+    public static extern nint snd_rawmidi_write(IntPtr rmidi, IntPtr buffer, nuint size);
 
     [DllImport(Asound, CallingConvention = CallingConvention.Cdecl)]
     public static extern int snd_rawmidi_poll_descriptors_count(IntPtr rmidi);

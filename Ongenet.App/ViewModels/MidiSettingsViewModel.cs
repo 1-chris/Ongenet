@@ -5,6 +5,7 @@ using System.Linq;
 using Avalonia.Threading;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Localization;
 using Ongenet.App.Services;
 
 namespace Ongenet.App.ViewModels;
@@ -24,15 +25,18 @@ public sealed class MidiSettingsViewModel : ViewModelBase
     private readonly ITransportMapService _transport;
     private readonly IRecordingService _recording;
     private readonly IAppSettingsService _settings;
+    private readonly KeyboardShortcutService _shortcuts;
 
     public MidiSettingsViewModel(IMidiInputService midi, IMidiMappingService mappings,
-        ITransportMapService transport, IRecordingService recording, IAppSettingsService settings)
+        ITransportMapService transport, IRecordingService recording, IAppSettingsService settings,
+        KeyboardShortcutService shortcuts)
     {
         _midi = midi;
         _mappings = mappings;
         _transport = transport;
         _recording = recording;
         _settings = settings;
+        _shortcuts = shortcuts;
 
         _midi.DevicesChanged += () => Dispatcher.UIThread.Post(RaiseDevices);
         _midi.SelectedDeviceChanged += () => Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(SelectedDevice)));
@@ -40,6 +44,7 @@ public sealed class MidiSettingsViewModel : ViewModelBase
         _mappings.MappingsChanged += () => Dispatcher.UIThread.Post(RefreshMappings);
         _transport.MappingsChanged += () => Dispatcher.UIThread.Post(RefreshTransport);
         _transport.LearnStateChanged += () => Dispatcher.UIThread.Post(RefreshTransport);
+        _shortcuts.BindingsChanged += () => Dispatcher.UIThread.Post(RefreshShortcuts);
 
         QuantizeOptions = new[]
         {
@@ -56,8 +61,10 @@ public sealed class MidiSettingsViewModel : ViewModelBase
 
         Mappings = new ObservableCollection<MidiMappingRow>();
         TransportRows = new ObservableCollection<TransportMapRow>();
+        ShortcutRows = new ObservableCollection<KeyboardShortcutRow>();
         RefreshMappings();
         RefreshTransport();
+        RefreshShortcuts();
     }
 
     public IReadOnlyList<MidiDeviceInfo> Devices => _midi.Devices;
@@ -101,6 +108,7 @@ public sealed class MidiSettingsViewModel : ViewModelBase
 
     public ObservableCollection<MidiMappingRow> Mappings { get; }
     public ObservableCollection<TransportMapRow> TransportRows { get; }
+    public ObservableCollection<KeyboardShortcutRow> ShortcutRows { get; }
 
     public void RefreshDevices() => _midi.RefreshDevices();
 
@@ -109,6 +117,8 @@ public sealed class MidiSettingsViewModel : ViewModelBase
     public void LearnTransport(TransportAction action) => _transport.BeginLearn(action);
 
     public void ClearTransport(TransportAction action) => _transport.ClearMapping(action);
+
+    public void ResetShortcut(AppShortcutAction action) => _shortcuts.ResetBinding(action);
 
     private void RaiseDevices()
     {
@@ -127,6 +137,13 @@ public sealed class MidiSettingsViewModel : ViewModelBase
         TransportRows.Clear();
         foreach (var a in TransportActions)
             TransportRows.Add(new TransportMapRow(a, _transport.MappingFor(a), _transport.LearnAction == a));
+    }
+
+    private void RefreshShortcuts()
+    {
+        ShortcutRows.Clear();
+        foreach (var row in _shortcuts.AllRows())
+            ShortcutRows.Add(row);
     }
 
     private static string Describe(MidiMessage m) => $"{m.Kind}  ch {m.Channel + 1}  ({m.Data1}, {m.Data2})";
@@ -157,13 +174,13 @@ public sealed class TransportMapRow
         Action = action;
         ActionName = action switch
         {
-            TransportAction.PlayPause => "Play / Pause",
-            TransportAction.Stop => "Stop",
-            TransportAction.Record => "Record",
+            TransportAction.PlayPause => Loc.Get("TransportAction_PlayPause"),
+            TransportAction.Stop => Loc.Get("TransportAction_Stop"),
+            TransportAction.Record => Loc.Get("TransportAction_Record"),
             _ => action.ToString(),
         };
-        Binding = mapping is null ? "—" : mapping.IsNote ? $"Note {mapping.Number}" : $"CC {mapping.Number}";
-        LearnText = learning ? "Listening…" : "Learn";
+        Binding = mapping is null ? Loc.Get("Status_EmDash") : mapping.IsNote ? $"Note {mapping.Number}" : $"CC {mapping.Number}";
+        LearnText = learning ? Loc.Get("TransportMap_Listening") : Loc.Get("TransportMap_Learn");
     }
 
     public TransportAction Action { get; }

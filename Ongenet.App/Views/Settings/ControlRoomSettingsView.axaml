@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:audio="using:Ongenet.Core.Models.Audio"
+             x:Class="Ongenet.App.Views.Settings.ControlRoomSettingsView"
+             x:DataType="vm:ControlRoomSettingsViewModel">
+    <ScrollViewer>
+        <StackPanel Spacing="10" Margin="8">
+            <TextBlock Text="{DynamicResource SettingsControlRoom_Monitor_and_cue_mix_profiles_for_post_broadcast_}"
+                       TextWrapping="Wrap" Foreground="{StaticResource CatppuccinSubtext0}"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="{DynamicResource SettingsControlRoom_Add_profile}" Command="{Binding AddProfileCommand}"/>
+                <Button Content="{DynamicResource SettingsControlRoom_Remove}" Command="{Binding RemoveProfileCommand}"/>
+            </StackPanel>
+            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding Selected}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="audio:ControlRoomProfile">
+                        <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <StackPanel Spacing="6" IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{DynamicResource SettingsControlRoom_Name}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBox Text="{Binding Selected.Name}"/>
+                </StackPanel>
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{DynamicResource SettingsControlRoom_Main_volume}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <Slider Minimum="0" Maximum="2" Value="{Binding Selected.MainVolume}"/>
+                </StackPanel>
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{DynamicResource SettingsControlRoom_Cue_volume}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <Slider Minimum="0" Maximum="2" Value="{Binding Selected.CueVolume}"/>
+                </StackPanel>
+                <CheckBox Content="{DynamicResource SettingsControlRoom_Dim_enabled}" IsChecked="{Binding Selected.DimEnabled}"/>
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{DynamicResource SettingsControlRoom_Dim_amount_dB}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <NumericUpDown Value="{Binding Selected.DimAmountDb}" Minimum="-60" Maximum="0" Increment="1"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

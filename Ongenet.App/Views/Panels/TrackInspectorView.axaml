@@ -3,6 +3,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:controls="using:Ongenet.App.Controls"
+             xmlns:views="using:Ongenet.App.Views.Panels"
+             xmlns:audio="using:Ongenet.Core.Models.Audio"
              mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="600"
              x:Class="Ongenet.App.Views.Panels.TrackInspectorView"
              x:DataType="vm:TrackInspectorViewModel">
@@ -19,54 +22,122 @@
     <Border Background="{StaticResource CatppuccinMantle}" Padding="10,8">
         <Grid>
             <!-- Empty state -->
-            <TextBlock Text="Select a track to edit its settings."
+            <TextBlock Text="{DynamicResource TrackInspector_Select_a_track_to_edit_its_settings}"
                        IsVisible="{Binding !HasTrack}"
                        TextWrapping="Wrap" VerticalAlignment="Top"
-                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                       Foreground="{StaticResource CatppuccinSubtext0}"
+                       ToolTip.Tip="{DynamicResource TrackInspector_Track_Controls_shows_mix_and_routing_settings_fo_Tip}"/>
 
             <!-- Track settings -->
             <ScrollViewer IsVisible="{Binding HasTrack}"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="4">
-                    <TextBlock Text="TRACK" FontWeight="Bold" FontSize="11"
-                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    <views:PatternTrackInspectorView DataContext="{Binding PatternTrackInspector}"
+                                                     IsVisible="{Binding IsPatternTrack}"/>
+
+                    <StackPanel Spacing="4" IsVisible="{Binding !IsPatternTrack}">
+                    <TextBlock Text="{DynamicResource TrackInspector_TRACK}" FontWeight="Bold" FontSize="11"
+                               Foreground="{StaticResource CatppuccinOverlay1}"
+                               ToolTip.Tip="{DynamicResource TrackInspector_Basic_track_identity_and_mix_settings_how_the_tr_Tip}"/>
 
                     <StackPanel Spacing="1">
-                        <TextBlock Text="Name" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                        <TextBox Text="{Binding Name}"/>
+                        <TextBlock Text="{DynamicResource TrackInspector_Name}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_The_label_shown_on_the_timeline_track_header_in__Tip}"/>
+                        <TextBox Text="{Binding Name}"
+                                 ToolTip.Tip="{DynamicResource TrackInspector_Edit_the_track_name_This_is_for_organization_onl_Tip}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ToggleButton Content="Mute" IsChecked="{Binding IsMuted}" Width="80"/>
-                        <ToggleButton Content="Solo" IsChecked="{Binding IsSoloed}" Width="80"/>
+                        <ToggleButton Content="{DynamicResource TrackInspector_Mute}" IsChecked="{Binding IsMuted}" Width="80"
+                                      ToolTip.Tip="{DynamicResource TrackInspector_Mute_silences_this_track_during_playback_and_exp_Tip}"/>
+                        <ToggleButton Content="{DynamicResource TrackInspector_Solo}" IsChecked="{Binding IsSoloed}" Width="80"
+                                      ToolTip.Tip="{DynamicResource TrackInspector_Solo_isolates_this_track_when_any_track_is_soloe_Tip}"/>
                     </StackPanel>
 
                     <StackPanel Spacing="1">
-                        <DockPanel>
-                            <TextBlock Text="Volume" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_Track_fader_overall_output_level_after_clip_gain_Tip}">
+                            <TextBlock Text="{DynamicResource TrackInspector_Volume}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Track_fader_overall_output_level_after_clip_gain_Tip_2}"/>
                             <TextBlock Text="{Binding Volume, StringFormat='{}{0:P0}'}"
                                        HorizontalAlignment="Right"
-                                       Foreground="{StaticResource CatppuccinSubtext1}"/>
+                                       Foreground="{StaticResource CatppuccinSubtext1}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Current_track_fader_level_as_a_percentage_of_uni_Tip}"/>
                         </DockPanel>
-                        <Slider Name="VolumeSlider" Value="{Binding Volume}" Minimum="0" Maximum="1"/>
+                        <Slider Name="VolumeSlider" Value="{Binding Volume}" Minimum="0" Maximum="1"
+                                ToolTip.Tip="{DynamicResource TrackInspector_Drag_to_set_how_loud_this_track_plays_relative_t_Tip}"/>
                     </StackPanel>
 
                     <StackPanel Spacing="1">
-                        <DockPanel>
-                            <TextBlock Text="Pan" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_Stereo_pan_positions_the_track_between_left_and__Tip}">
+                            <TextBlock Text="{DynamicResource TrackInspector_Pan}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Stereo_pan_positions_the_track_between_left_and__Tip_2}"/>
                             <TextBlock Text="{Binding Pan, StringFormat='{}{0:0.00}'}"
                                        HorizontalAlignment="Right"
-                                       Foreground="{StaticResource CatppuccinSubtext1}"/>
+                                       Foreground="{StaticResource CatppuccinSubtext1}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Current_pan_position_negative_left_0_center_posi_Tip}"/>
                         </DockPanel>
-                        <Slider Name="PanSlider" Value="{Binding Pan}" Minimum="-1" Maximum="1"/>
+                        <Slider Name="PanSlider" Value="{Binding Pan}" Minimum="-1" Maximum="1"
+                                ToolTip.Tip="{DynamicResource TrackInspector_Move_the_track_in_the_stereo_field_Pan_is_applie_Tip}"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasTrack}">
+                        <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_Surround_panning_for_51_mixes_places_this_track__Tip}">
+                            <TextBlock Text="{DynamicResource TrackInspector_Surround_51}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Surround_panning_for_51_output_positions_the_tra_Tip}"/>
+                            <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource CatppuccinSubtext1}" FontSize="10"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Surround_width_higher_values_spread_the_source_a_Tip}">
+                                <Run Text="{DynamicResource TrackInspector_W}"/><Run Text="{Binding SurroundWidth, StringFormat='{}{0:0.00}'}"/>
+                            </TextBlock>
+                        </DockPanel>
+                        <controls:SurroundPanControl Pan="{Binding Pan, Mode=TwoWay}"
+                                                     PanWidth="{Binding SurroundWidth, Mode=TwoWay}"
+                                                     Height="100"
+                                                     ToolTip.Tip="{DynamicResource TrackInspector_Drag_the_puck_to_place_the_track_in_the_51_field_Tip}"/>
+                        <Expander Header="{DynamicResource TrackInspector_Per_channel_gains}" IsExpanded="False"
+                                  ToolTip.Tip="{DynamicResource TrackInspector_Override_individual_51_speaker_levels_when_the_m_Tip}">
+                            <StackPanel Spacing="4" Margin="0,4,0,0">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource TrackInspector_FL}" FontSize="10"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_Front_left_channel_gain_Tip}"/>
+                                    <Slider Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="2" Value="{Binding SurroundFrontLeft}"
+                                            ToolTip.Tip="{DynamicResource TrackInspector_Front_left_speaker_level_0200_Tip}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource TrackInspector_FR}" FontSize="10"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_Front_right_channel_gain_Tip}"/>
+                                    <Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="2" Value="{Binding SurroundFrontRight}"
+                                            ToolTip.Tip="{DynamicResource TrackInspector_Front_right_speaker_level_0200_Tip}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource TrackInspector_C_LFE}" FontSize="10"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_Center_and_subwoofer_LFE_gains_Tip}"/>
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundCenter}" Width="80"
+                                                ToolTip.Tip="{DynamicResource TrackInspector_Center_channel_level_0200_Tip}"/>
+                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundLfe}" Width="80"
+                                                ToolTip.Tip="{DynamicResource TrackInspector_Low_frequency_effects_subwoofer_level_0200_Tip}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource TrackInspector_SL_SR_RL_RR}" FontSize="10"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_Side_and_rear_surround_channel_gains_Tip}"/>
+                                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundSideLeft}" Width="48"
+                                                ToolTip.Tip="{DynamicResource TrackInspector_Side_left_level_0200_Tip}"/>
+                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundSideRight}" Width="48"
+                                                ToolTip.Tip="{DynamicResource TrackInspector_Side_right_level_0200_Tip}"/>
+                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundRearLeft}" Width="48"
+                                                ToolTip.Tip="{DynamicResource TrackInspector_Rear_left_level_0200_Tip}"/>
+                                        <Slider Minimum="0" Maximum="2" Value="{Binding SurroundRearRight}" Width="48"
+                                                ToolTip.Tip="{DynamicResource TrackInspector_Rear_right_level_0200_Tip}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Expander>
                     </StackPanel>
 
                     <StackPanel Spacing="1">
-                        <TextBlock Text="Colour" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <TextBlock Text="{DynamicResource TrackInspector_Colour}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_Timeline_colour_helps_you_visually_group_related_Tip}"/>
                         <ComboBox ItemsSource="{Binding ColorKeys}"
                                   SelectedItem="{Binding ColorKey}"
-                                  HorizontalAlignment="Stretch">
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="{DynamicResource TrackInspector_Choose_an_accent_colour_for_this_tracks_header_a_Tip}">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -77,6 +148,203 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" Margin="0,8,0,0" IsVisible="{Binding IsInstrumentTrack}">
+                        <views:InstrumentRackView DataContext="{Binding InstrumentRack}"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" Margin="0,8,0,0" IsVisible="{Binding IsInstrumentTrack}">
+                        <TextBlock Text="{DynamicResource TrackInspector_DRUM_MAP}" FontWeight="Bold" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_Drum_maps_translate_MIDI_note_numbers_into_reada_Tip}"/>
+                        <ComboBox ItemsSource="{Binding DrumMaps}" SelectedValue="{Binding DrumMapId}"
+                                  SelectedValueBinding="{Binding Id}" PlaceholderText="{DynamicResource TrackInspector_none}"
+                                  ToolTip.Tip="{DynamicResource TrackInspector_Select_which_drum_map_labels_this_tracks_MIDI_no_Tip}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="audio:DrumMap">
+                                    <TextBlock Text="{Binding Name}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" Margin="0,8,0,0" IsVisible="{Binding IsInstrumentTrack}">
+                        <TextBlock Text="{DynamicResource TrackInspector_EXTERNAL_MIDI}" FontWeight="Bold" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_External_MIDI_routing_sends_this_tracks_notes_an_Tip}"/>
+                        <CheckBox Content="{DynamicResource TrackInspector_Route_to_MIDI_output}" IsChecked="{Binding RouteToExternalMidi}"
+                                  ToolTip.Tip="{DynamicResource TrackInspector_Enable_to_drive_an_external_MIDI_device_from_thi_Tip}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding RouteToExternalMidi}">
+                            <TextBlock Text="{DynamicResource TrackInspector_Channel}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_MIDI_channel_on_the_external_port_must_match_the_Tip}"/>
+                            <NumericUpDown Value="{Binding ExternalMidiChannel}" Minimum="1" Maximum="16" Width="70"
+                                           ToolTip.Tip="{DynamicResource TrackInspector_Set_the_MIDI_channel_sent_to_the_external_device_Tip}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" Margin="0,8,0,0" IsVisible="{Binding !IsPatternTrack}">
+                        <TextBlock Text="{DynamicResource TrackInspector_MODULATION}" FontWeight="Bold" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_Track_modulation_applies_automatic_movement_to_m_Tip}"/>
+                        <StackPanel Spacing="1">
+                            <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_Modulation_macro_one_knob_that_scales_every_LFO__Tip}">
+                                <TextBlock Text="{DynamicResource TrackInspector_Macro}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                           ToolTip.Tip="{DynamicResource TrackInspector_Master_depth_control_for_all_track_LFOs_scales_e_Tip}"/>
+                                <TextBlock Text="{Binding ModulationMacro, StringFormat='{}{0:P0}'}"
+                                           HorizontalAlignment="Right"
+                                           ToolTip.Tip="{DynamicResource TrackInspector_Current_macro_amount_0_bypasses_all_LFO_depth_10_Tip}"/>
+                            </DockPanel>
+                            <Slider Minimum="0" Maximum="1" Value="{Binding ModulationMacro}"
+                                    ToolTip.Tip="{DynamicResource TrackInspector_Scale_all_track_LFO_depths_at_once_Handy_for_rid_Tip}"/>
+                        </StackPanel>
+                        <StackPanel Spacing="4" IsVisible="{Binding !HasVolumeLfo}">
+                            <Button Content="{DynamicResource TrackInspector_Add_volume_LFO}" Command="{Binding AddVolumeLfoCommand}" Padding="8,4"
+                                    ToolTip.Tip="{DynamicResource TrackInspector_Add_a_volume_LFO_that_rhythmically_raises_and_lo_Tip}"/>
+                            <TextBlock Text="{DynamicResource TrackInspector_Slow_LFO_on_track_volume_proof_of_concept_modula}"
+                                       FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Volume_LFOs_repeat_a_cyclic_level_change_tremolo_Tip}"/>
+                        </StackPanel>
+                        <StackPanel Spacing="4" IsVisible="{Binding HasVolumeLfo}">
+                            <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_Volume_LFO_cyclically_modulates_track_level_Adju_Tip}">
+                                <TextBlock Text="{DynamicResource TrackInspector_Volume_LFO}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                           ToolTip.Tip="{DynamicResource TrackInspector_Low_frequency_oscillator_affecting_track_volume__Tip}"/>
+                                <Button DockPanel.Dock="Right" Content="{DynamicResource TrackInspector_Remove}" Command="{Binding RemoveVolumeLfoCommand}"
+                                        Padding="6,2" HorizontalAlignment="Right"
+                                        ToolTip.Tip="{DynamicResource TrackInspector_Remove_the_volume_LFO_from_this_track_entirely_Tip}"/>
+                            </DockPanel>
+                            <CheckBox Content="{DynamicResource TrackInspector_Enabled}" IsChecked="{Binding VolumeLfoEnabled}"
+                                      ToolTip.Tip="{DynamicResource TrackInspector_Bypass_the_volume_LFO_without_deleting_its_setti_Tip}"/>
+                            <CheckBox Content="{DynamicResource TrackInspector_Sync_to_tempo}" IsChecked="{Binding VolumeLfoTempoSync}"
+                                      ToolTip.Tip="{DynamicResource TrackInspector_Lock_LFO_speed_to_the_project_tempo_eg_quarter_n_Tip}"/>
+                            <StackPanel Spacing="1">
+                                <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_LFO_rate_in_Hz_how_many_full_cycles_per_second_t_Tip}">
+                                    <TextBlock Text="{DynamicResource TrackInspector_Rate_Hz}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_LFO_speed_in_cycles_per_second_ignored_when_Sync_Tip}"/>
+                                    <TextBlock Text="{Binding VolumeLfoRate, StringFormat='{}{0:0.00}'}"
+                                               HorizontalAlignment="Right"
+                                               Foreground="{StaticResource CatppuccinSubtext1}"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_Current_LFO_rate_in_hertz_Tip}"/>
+                                </DockPanel>
+                                <Slider Minimum="0.01" Maximum="8" Value="{Binding VolumeLfoRate}"
+                                        ToolTip.Tip="{DynamicResource TrackInspector_Set_how_fast_the_volume_LFO_cycles_Very_low_rate_Tip}"/>
+                            </StackPanel>
+                            <StackPanel Spacing="1">
+                                <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_LFO_depth_how_far_volume_deviates_from_the_fader_Tip}">
+                                    <TextBlock Text="{DynamicResource TrackInspector_Depth}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_How_strongly_the_LFO_affects_volume_higher_more__Tip}"/>
+                                    <TextBlock Text="{Binding VolumeLfoDepth, StringFormat='{}{0:P0}'}"
+                                               HorizontalAlignment="Right"
+                                               Foreground="{StaticResource CatppuccinSubtext1}"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_Current_volume_LFO_depth_as_a_percentage_Tip}"/>
+                                </DockPanel>
+                                <Slider Minimum="0" Maximum="1" Value="{Binding VolumeLfoDepth}"
+                                        ToolTip.Tip="{DynamicResource TrackInspector_Control_how_much_the_LFO_moves_the_fader_Start_a_Tip}"/>
+                            </StackPanel>
+                            <StackPanel Spacing="1">
+                                <TextBlock Text="{DynamicResource TrackInspector_Wave}" Foreground="{StaticResource CatppuccinSubtext0}"
+                                           ToolTip.Tip="{DynamicResource TrackInspector_LFO_waveform_determines_the_shape_of_each_cycle__Tip}"/>
+                                <ComboBox ItemsSource="{Binding LfoWaveNames}"
+                                          SelectedIndex="{Binding VolumeLfoWave}"
+                                          ToolTip.Tip="{DynamicResource TrackInspector_Pick_the_LFO_shape_sine_triangle_for_smooth_swel_Tip}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Button Content="{DynamicResource TrackInspector_Add_pan_LFO}" Command="{Binding AddPanLfoCommand}" Padding="8,4"
+                                IsVisible="{Binding !HasPanLfo}"
+                                ToolTip.Tip="{DynamicResource TrackInspector_Add_a_pan_LFO_that_automatically_sweeps_the_trac_Tip}"/>
+                        <Border IsVisible="{Binding HasPanLfo}" Padding="6" CornerRadius="4"
+                                Background="{StaticResource CatppuccinSurface0}"
+                                ToolTip.Tip="{DynamicResource TrackInspector_Pan_LFO_rhythmically_moves_the_track_across_the__Tip}">
+                            <StackPanel Spacing="4">
+                                <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_Pan_LFO_controls_adjust_rate_and_depth_to_sweep__Tip}">
+                                    <TextBlock Text="{DynamicResource TrackInspector_Pan_LFO}" VerticalAlignment="Center"
+                                               ToolTip.Tip="{DynamicResource TrackInspector_Low_frequency_oscillator_modulating_stereo_pan_p_Tip}"/>
+                                    <Button DockPanel.Dock="Right" Content="{DynamicResource TrackInspector_Remove}"
+                                            Command="{Binding RemovePanLfoCommand}" Padding="6,2"
+                                            ToolTip.Tip="{DynamicResource TrackInspector_Remove_the_pan_LFO_from_this_track_Tip}"/>
+                                </DockPanel>
+                                <CheckBox Content="{DynamicResource TrackInspector_Enabled}" IsChecked="{Binding PanLfoEnabled}"
+                                          ToolTip.Tip="{DynamicResource TrackInspector_Enable_or_bypass_the_pan_LFO_without_losing_its__Tip}"/>
+                                <TextBlock Text="{Binding PanLfoRate, StringFormat='Rate {0:0.00} Hz'}" FontSize="10"
+                                           ToolTip.Tip="{DynamicResource TrackInspector_Current_pan_LFO_speed_cycles_per_second_the_pan__Tip}"/>
+                                <Slider Minimum="0.01" Maximum="8" Value="{Binding PanLfoRate}"
+                                        ToolTip.Tip="{DynamicResource TrackInspector_Pan_LFO_rate_slow_rates_0105_Hz_for_wide_stereo__Tip}"/>
+                                <TextBlock Text="{Binding PanLfoDepth, StringFormat='Depth {0:P0}'}" FontSize="10"
+                                           ToolTip.Tip="{DynamicResource TrackInspector_Current_pan_LFO_depth_how_far_pan_swings_from_ce_Tip}"/>
+                                <Slider Minimum="0" Maximum="1" Value="{Binding PanLfoDepth}"
+                                        ToolTip.Tip="{DynamicResource TrackInspector_Pan_LFO_depth_how_wide_the_auto_pan_swing_is_Low_Tip}"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" Margin="0,8,0,0" IsVisible="{Binding !IsPatternTrack}"
+                                ToolTip.Tip="{DynamicResource TrackInspector_Freeze_is_a_CPU_saving_bounce_Ongenet_renders_ev_Tip}">
+                        <TextBlock Text="{DynamicResource TrackInspector_FREEZE}" FontWeight="Bold" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_Track_freeze_temporarily_converts_a_track_to_aud_Tip}"/>
+                        <TextBlock Text="{DynamicResource TrackInspector_Renders_clips_instruments_and_effects_to_one_aud}"
+                                   FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding !IsFrozen}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_Typical_workflow_finish_writing_on_a_CPU_heavy_t_Tip}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="{DynamicResource TrackInspector_Freeze_track}" Command="{Binding FreezeTrackCommand}" Padding="8,4"
+                                    IsVisible="{Binding !IsFrozen}"
+                                    ToolTip.Tip="{DynamicResource TrackInspector_Freeze_track_offline_render_all_clips_instrument_Tip}"/>
+                            <Button Content="{DynamicResource TrackInspector_Unfreeze}" Command="{Binding UnfreezeTrackCommand}" Padding="8,4"
+                                    IsVisible="{Binding IsFrozen}"
+                                    ToolTip.Tip="{DynamicResource TrackInspector_Unfreeze_discard_the_frozen_audio_clip_and_resto_Tip}"/>
+                        </StackPanel>
+                        <TextBlock Text="{DynamicResource TrackInspector_This_track_is_frozen_only_level_pan_mute_solo_an}"
+                                   FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding IsFrozen}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_Frozen_tracks_play_from_the_bounced_audio_clip_C_Tip}"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" Margin="0,8,0,0">
+                        <DockPanel ToolTip.Tip="{DynamicResource TrackInspector_Sends_tap_this_tracks_signal_to_return_tracks_au_Tip}">
+                            <TextBlock Text="{DynamicResource TrackInspector_SENDS}" FontWeight="Bold" FontSize="11"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"
+                                       ToolTip.Tip="{DynamicResource TrackInspector_Auxiliary_sends_route_part_of_this_track_to_retu_Tip}"/>
+                            <Button DockPanel.Dock="Right" Content="{DynamicResource TrackInspector_Text}" Command="{Binding AddSendCommand}"
+                                    Width="28" Padding="0" HorizontalAlignment="Right"
+                                    ToolTip.Tip="{DynamicResource TrackInspector_Add_a_send_to_an_existing_return_track_Returns_m_Tip}"/>
+                        </DockPanel>
+
+                        <ItemsControl ItemsSource="{Binding Sends}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:TrackSendEditorViewModel">
+                                    <Border Margin="0,4,0,0" Padding="6"
+                                            Background="{StaticResource CatppuccinSurface0}" CornerRadius="4"
+                                            ToolTip.Tip="{DynamicResource TrackInspector_Send_to_a_return_bus_controls_how_much_of_this_t_Tip}">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding TargetName}" FontSize="11"
+                                                       Foreground="{StaticResource CatppuccinSubtext0}"
+                                                       ToolTip.Tip="{DynamicResource TrackInspector_Return_track_receiving_this_send_the_aux_bus_whe_Tip}"/>
+                                            <Slider Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
+                                                    ToolTip.Tip="{DynamicResource TrackInspector_Send_level_how_much_signal_goes_to_the_return_0__Tip}"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <CheckBox Content="{DynamicResource TrackInspector_Pre_fader}" IsChecked="{Binding PreFader, Mode=TwoWay}"
+                                                          ToolTip.Tip="{DynamicResource TrackInspector_Pre_fader_send_taps_the_signal_before_the_track__Tip}"/>
+                                                <CheckBox Content="{DynamicResource TrackInspector_Enabled}" IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                                          ToolTip.Tip="{DynamicResource TrackInspector_Mute_this_send_without_removing_it_handy_for_A_B_Tip}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="{DynamicResource TrackInspector_Add_a_reverb_or_delay_return_in_the_mixer_to_cre}"
+                                   TextWrapping="Wrap" FontSize="10"
+                                   IsVisible="{Binding !HasSends}"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"
+                                   ToolTip.Tip="{DynamicResource TrackInspector_Sends_need_a_destination_return_track_In_the_mix_Tip}"/>
+                    </StackPanel>
+
+                    <views:GrooveSettingsView DataContext="{Binding Groove}"/>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

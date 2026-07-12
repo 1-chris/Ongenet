@@ -31,7 +31,7 @@
 
     <Border Background="{StaticResource CatppuccinMantle}" Padding="12" Name="Root">
         <Grid>
-            <TextBlock Text="Select an instrument track." IsVisible="{Binding !HasInstrumentTrack}"
+            <TextBlock Text="{DynamicResource InstrumentInspector_Select_an_instrument_track}" IsVisible="{Binding !HasInstrumentTrack}"
                        Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
 
             <!-- Rows: header (add menu) / rack (fills + scrolls) / keyboard -->
@@ -39,7 +39,7 @@
 
                 <!-- Header: add-instrument menu + caption -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
-                    <Button Content="+ Add instrument" Background="{StaticResource CatppuccinSurface0}">
+                    <Button Content="{DynamicResource InstrumentInspector_Add_instrument}" Background="{StaticResource CatppuccinSurface0}">
                         <Button.Flyout>
                             <Flyout>
                                 <ScrollViewer MaxHeight="420">
@@ -69,7 +69,7 @@
                     </Button>
                     <TextBlock Text="{Binding TrackName}" VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <TextBlock Text="all instruments play together · drag from the Instruments panel to add"
+                    <TextBlock Text="{DynamicResource InstrumentInspector_all_instruments_play_together_drag_from_the_Inst}"
                                VerticalAlignment="Center" FontSize="11" FontStyle="Italic"
                                Foreground="{StaticResource CatppuccinOverlay1}"/>
                 </StackPanel>
@@ -82,9 +82,9 @@
                                 BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="2"
                                 Background="{StaticResource CatppuccinCrust}">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
-                                <TextBlock Text="No instruments yet" FontWeight="Bold" HorizontalAlignment="Center"
+                                <TextBlock Text="{DynamicResource InstrumentInspector_No_instruments_yet}" FontWeight="Bold" HorizontalAlignment="Center"
                                            Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                <TextBlock Text="Drag an instrument here from the Instruments panel, or use “+ Add instrument”."
+                                <TextBlock Text="{DynamicResource InstrumentInspector_Drag_an_instrument_here_from_the_Instruments_pan}"
                                            FontSize="11" HorizontalAlignment="Center" TextWrapping="Wrap"
                                            Foreground="{StaticResource CatppuccinOverlay1}"/>
                             </StackPanel>
@@ -102,7 +102,7 @@
 
                 <!-- Shared mini keyboard: plays every enabled instrument at once -->
                 <StackPanel Grid.Row="2" Spacing="4" Margin="0,8,0,0">
-                    <TextBlock Text="Click keys to play" FontSize="11"
+                    <TextBlock Text="{DynamicResource InstrumentInspector_Click_keys_to_play}" FontSize="11"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                         <ItemsControl ItemsSource="{Binding Keys}" Name="Keyboard">

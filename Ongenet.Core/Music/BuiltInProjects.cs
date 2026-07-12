@@ -23,6 +23,18 @@ public static class BuiltInProjects
         new BuiltInProjectInfo(DarkDnbSongFactory.SongName,
             "Dark drum & bass · F minor · 170 BPM", DarkDnbSongFactory.Create),
         new BuiltInProjectInfo(UpliftingTranceSongFactory.SongName,
-            "Uplifting progressive trance · A minor · 138 BPM", UpliftingTranceSongFactory.Create)
+            "Uplifting progressive trance · A minor · 138 BPM", UpliftingTranceSongFactory.Create),
+        new BuiltInProjectInfo(LoFiBeatSongFactory.SongName,
+            "Lo-fi hip-hop · D minor · 88 BPM", LoFiBeatSongFactory.Create),
+        new BuiltInProjectInfo(HouseStarterSongFactory.SongName,
+            "Four-on-the-floor house template · A minor · 124 BPM", HouseStarterSongFactory.Create),
+        new BuiltInProjectInfo(TechnoStarterSongFactory.SongName,
+            "Driving techno template · A minor · 130 BPM", TechnoStarterSongFactory.Create),
+        new BuiltInProjectInfo(TrapBeatSongFactory.SongName,
+            "Modern trap sketch · F minor · 140 BPM", TrapBeatSongFactory.Create),
+        new BuiltInProjectInfo(FieldModularSongFactory.SongName,
+            "Field modular synth sketch · D minor · 120 BPM", FieldModularSongFactory.Create),
+        new BuiltInProjectInfo(StaticBloomSongFactory.SongName,
+            "Ambient electronica · E minor · 76 BPM", StaticBloomSongFactory.Create)
     };
 }

@@ -17,14 +17,14 @@ public static class FieldBuiltInPatches
     {
         "Oscillator", "3x Osc", "FM Synth", "Wavetable", "Padda", "Basic Sampler", "Kicka", "Granular", "Sampler (SFZ)",
         "Perca", "Prism Lead", "Reese Bass", "Nova Saw", "Crystal Pluck", "Aether Lead", "Solace Lead", "Acid Bass",
-        "Comet Riser"
+        "Comet Riser", "Scale Lead", "Ambient Pad"
     };
 
     public static readonly IReadOnlyList<string> EffectPatchNames = new[]
     {
         "EQ", "Filter", "Compressor", "Limiter", "Gate", "Sidechain", "Chorus", "Phaser", "Flanger", "Tremolo",
         "Stuttero", "Delay", "Reverb", "Distortion", "Bitcrusher", "Vocoder", "Auto-Tune", "Stereo Width",
-        "Live Difference", "Utility", "3D Scope"
+        "Live Difference", "Utility", "3D Scope", "Ducked Delay"
     };
 
     public static void BuildInstrument(int index, FieldGraph g, IFieldNodeRegistry reg)
@@ -50,6 +50,8 @@ public static class FieldBuiltInPatches
             case 15: SolaceLead(g); break;
             case 16: AcidBass(g); break;
             case 17: CometRiser(g); break;
+            case 18: ScaleLead(g); break;
+            case 19: AmbientPad(g); break;
             default: Oscillator(g); break;
         }
     }
@@ -65,6 +67,7 @@ public static class FieldBuiltInPatches
             case "Bitcrusher": StereoBitcrush(g); break;
             case "Tremolo": Tremolo(g); break;
             case "Compressor": StereoCompressor(g); break;
+            case "Ducked Delay": DuckedDelay(g); break;
             default: ModuleEffect(g, reg, EffectIdFor(index)); break;
         }
     }
@@ -685,6 +688,68 @@ public static class FieldBuiltInPatches
         g.AddNode(mod);
         g.Connect(mod.Id, "l", outN.Id, "l");
         g.Connect(mod.Id, "r", outN.Id, "r");
+    }
+
+    /// <summary>Minor-scale quantised saw lead with slow filter movement.</summary>
+    private static void ScaleLead(FieldGraph g)
+    {
+        var note = Add(g, new NoteInNode { X = 40, Y = 160 });
+        var scale = Add(g, new ScaleQuantizeNode { X = 240, Y = 120, Root = 9, ScaleIndex = 1 });
+        var osc = Add(g, new WaveOscNode { X = 440, Y = 120, WaveIndex = 2, Level = 0.55 });
+        var adsr = Add(g, new AdsrNode { X = 440, Y = 300, Attack = 0.01, Decay = 0.25, Sustain = 0.6, Release = 0.35 });
+        var lfo = Add(g, new LfoNode { X = 240, Y = 420, Rate = 0.15, Depth = 0.4 });
+        var filt = Add(g, new BiquadFilterNode { X = 640, Y = 160, ModeIndex = 0, Cutoff = 1800, Resonance = 0.9 });
+        var vca = Add(g, new GainNode { X = 840, Y = 160, Amount = 0.65 });
+        var outN = Add(g, new AudioOutNode { X = 1040, Y = 160 });
+
+        g.Connect(note.Id, "pitch", scale.Id, "pitch");
+        g.Connect(scale.Id, "out", osc.Id, "pitch");
+        g.Connect(note.Id, "gate", adsr.Id, "gate");
+        g.Connect(osc.Id, "out", vca.Id, "in");
+        g.Connect(adsr.Id, "out", vca.Id, "cv");
+        g.Connect(vca.Id, "out", filt.Id, "in");
+        g.Connect(lfo.Id, "out", filt.Id, "mod:0");
+        g.Connect(filt.Id, "out", outN.Id, "l");
+        g.Connect(filt.Id, "out", outN.Id, "r");
+    }
+
+    /// <summary>Soft pad: two detuned saws through a long ADSR and gentle low-pass.</summary>
+    private static void AmbientPad(FieldGraph g)
+    {
+        var note = Add(g, new NoteInNode { X = 40, Y = 180 });
+        var osc1 = Add(g, new WaveOscNode { X = 260, Y = 120, WaveIndex = 2, Fine = -8, Level = 0.45 });
+        var osc2 = Add(g, new WaveOscNode { X = 260, Y = 240, WaveIndex = 2, Fine = 8, Level = 0.45 });
+        var mix = Add(g, new MixNode { X = 460, Y = 180, Mix = 0.5 });
+        var adsr = Add(g, new AdsrNode { X = 460, Y = 360, Attack = 0.8, Decay = 0.4, Sustain = 0.75, Release = 1.2 });
+        var filt = Add(g, new BiquadFilterNode { X = 660, Y = 180, ModeIndex = 0, Cutoff = 1200, Resonance = 0.4 });
+        var vca = Add(g, new GainNode { X = 860, Y = 180, Amount = 0.7 });
+        var outN = Add(g, new AudioOutNode { X = 1060, Y = 180 });
+
+        g.Connect(note.Id, "pitch", osc1.Id, "pitch");
+        g.Connect(note.Id, "pitch", osc2.Id, "pitch");
+        g.Connect(note.Id, "gate", adsr.Id, "gate");
+        g.Connect(osc1.Id, "out", mix.Id, "a");
+        g.Connect(osc2.Id, "out", mix.Id, "b");
+        g.Connect(mix.Id, "out", filt.Id, "in");
+        g.Connect(adsr.Id, "out", vca.Id, "cv");
+        g.Connect(filt.Id, "out", vca.Id, "in");
+        g.Connect(vca.Id, "out", outN.Id, "l");
+        g.Connect(vca.Id, "out", outN.Id, "r");
+    }
+
+    /// <summary>Stereo delay send with dry/wet mix.</summary>
+    private static void DuckedDelay(FieldGraph g)
+    {
+        var input = Add(g, new AudioInNode { X = 40, Y = 160 });
+        var delay = Add(g, new DelayNode { X = 280, Y = 160, TimeMs = 380, Feedback = 0.42, Mix = 1.0 });
+        var mix = Add(g, new MixNode { X = 680, Y = 160, Mix = 0.45 });
+        var outN = Add(g, new AudioOutNode { X = 880, Y = 160 });
+
+        g.Connect(input.Id, "l", delay.Id, "in");
+        g.Connect(input.Id, "l", mix.Id, "a");
+        g.Connect(delay.Id, "out", mix.Id, "b");
+        g.Connect(mix.Id, "out", outN.Id, "l");
+        g.Connect(mix.Id, "out", outN.Id, "r");
     }
 
     private static FieldNode Module(FieldGraph g, IFieldNodeRegistry reg, string fxId, double x, double y)

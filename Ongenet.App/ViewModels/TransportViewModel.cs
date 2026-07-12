@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
+using Ongenet.Core.Music;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Services;
+using Ongenet.Link;
 
 namespace Ongenet.App.ViewModels
 {
@@ -22,12 +26,18 @@ namespace Ongenet.App.ViewModels
         private readonly OfflineRenderer _renderer;
         private readonly IRecordingService _recording;
         private readonly ISystemMetricsSampler _metrics;
+        private readonly ILinkSession _link;
+        private readonly IPlaybackModeService _playback;
+        private readonly TimelineViewModel _timeline;
         private bool _isRendering;
+        private bool _syncingLinkTempo;
+        private readonly Queue<long> _tapTimes = new();
 
         public TransportViewModel(ITransportService transport, IAudioEngine engine,
             IProjectService project, IEventAggregator events, IEditModeService editMode,
             OfflineRenderer renderer, IRecordingService recording, AudioDevicesViewModel devices,
-            ISystemMetricsSampler metrics)
+            ISystemMetricsSampler metrics, ILinkSession link, IPlaybackModeService playback,
+            TimelineViewModel timeline)
         {
             _transport = transport;
             _engine = engine;
@@ -37,11 +47,15 @@ namespace Ongenet.App.ViewModels
             _renderer = renderer;
             _recording = recording;
             _metrics = metrics;
+            _link = link;
+            _playback = playback;
+            _timeline = timeline;
             Devices = devices;
 
             _metrics.Updated += OnMetricsUpdated;
+            _link.SyncChanged += OnLinkSyncChanged;
 
-            _transport.StateChanged += _ => OnStateChanged();
+            _transport.StateChanged += OnTransportStateChanged;
             _transport.TempoChanged += _ => OnTempoChanged();
             _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSliceMode));
             // Recording state may flip from the audio thread (count-in finishing) — marshal to UI.
@@ -51,11 +65,147 @@ namespace Ongenet.App.ViewModels
             PlayCommand = new RelayCommand(_transport.Play);
             StopCommand = new RelayCommand(OnStop);
             RecordCommand = new RelayCommand(_recording.StartRecording);
+            TapTempoCommand = new RelayCommand(TapTempo);
             SetLoopStartCommand = new RelayCommand(() => _transport.LoopStart = _transport.StartBeat);
             SetLoopEndCommand = new RelayCommand(() => _transport.LoopEnd = _transport.StartBeat);
+            SetPunchInCommand = new RelayCommand(() => _transport.PunchInBeat = _transport.StartBeat);
+            SetPunchOutCommand = new RelayCommand(() => _transport.PunchOutBeat = _transport.StartBeat);
+            ClearPunchCommand = new RelayCommand(ClearPunch);
+            AddMarkerAtPlayheadCommand = new RelayCommand(AddMarkerAtPlayhead);
+            GoToNextMarkerCommand = new RelayCommand(GoToNextMarker, () => _project.Current.Markers.Count > 0);
+            GoToPreviousMarkerCommand = new RelayCommand(GoToPreviousMarker, () => _project.Current.Markers.Count > 0);
+            CaptureRetrospectiveMidiCommand = new RelayCommand(() => _timeline.CaptureRetrospectiveMidi());
 
             _transport.LoopChanged += () => OnPropertyChanged(nameof(IsLooping));
+            _transport.PunchChanged += OnPunchChanged;
+            _transport.MetronomeChanged += () => OnPropertyChanged(nameof(MetronomeEnabled));
+            _playback.ModeChanged += () => OnPropertyChanged(nameof(PlaybackMode));
+
+            _link.Quantum = Math.Max(1, _project.Current.TimeSignature.Numerator);
         }
+
+        public Array PlaybackModes => Enum.GetValues<PlaybackMode>();
+
+        public PlaybackMode PlaybackMode
+        {
+            get => _playback.Mode;
+            set => _playback.Mode = value;
+        }
+
+        private void ClearPunch()
+        {
+            _transport.PunchInBeat = null;
+            _transport.PunchOutBeat = null;
+        }
+
+        private void OnPunchChanged()
+        {
+            OnPropertyChanged(nameof(LoopRecording));
+            OnPropertyChanged(nameof(PunchInBeat));
+            OnPropertyChanged(nameof(PunchOutBeat));
+            OnPropertyChanged(nameof(HasPunchRegion));
+            OnPropertyChanged(nameof(PunchInfo));
+        }
+
+        /// <summary>Sets punch-in to the current start marker.</summary>
+        public RelayCommand SetPunchInCommand { get; }
+
+        /// <summary>Sets punch-out to the current start marker.</summary>
+        public RelayCommand SetPunchOutCommand { get; }
+
+        /// <summary>Clears the punch region.</summary>
+        public RelayCommand ClearPunchCommand { get; }
+
+        public RelayCommand AddMarkerAtPlayheadCommand { get; }
+        public RelayCommand GoToNextMarkerCommand { get; }
+        public RelayCommand GoToPreviousMarkerCommand { get; }
+        public RelayCommand CaptureRetrospectiveMidiCommand { get; }
+
+        /// <summary>Global key root (0 = C) for scale-aware editing.</summary>
+        public int KeyRootIndex
+        {
+            get => _project.Current.KeyRootPitchClass;
+            set
+            {
+                var clamped = ((value % 12) + 12) % 12;
+                if (_project.Current.KeyRootPitchClass == clamped) return;
+                _project.Current.KeyRootPitchClass = clamped;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>Global project scale/mode.</summary>
+        public ScaleType KeyScale
+        {
+            get => _project.Current.KeyScale;
+            set
+            {
+                if (_project.Current.KeyScale == value) return;
+                _project.Current.KeyScale = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public IReadOnlyList<string> KeyRootNotes { get; } = MusicTheory.NoteNames;
+        public IReadOnlyList<ScaleType> KeyScales { get; } = (ScaleType[])Enum.GetValues(typeof(ScaleType));
+
+        public bool LoopRecording
+        {
+            get => _transport.LoopRecording;
+            set => _transport.LoopRecording = value;
+        }
+
+        public double? PunchInBeat
+        {
+            get => _transport.PunchInBeat;
+            set => _transport.PunchInBeat = value;
+        }
+
+        public double? PunchOutBeat
+        {
+            get => _transport.PunchOutBeat;
+            set => _transport.PunchOutBeat = value;
+        }
+
+        public bool HasPunchRegion => PunchInBeat is { } pi && PunchOutBeat is { } po && po > pi;
+
+        public string PunchInfo => HasPunchRegion
+            ? $"Punch {PunchInBeat:0.##} – {PunchOutBeat:0.##} beats"
+            : "No punch region";
+
+        /// <summary>True when libabl-link is available (desktop build with native library).</summary>
+        public bool ShowLink => _link.IsAvailable;
+
+        /// <summary>Whether Ableton Link session participation is enabled.</summary>
+        public bool IsLinkEnabled
+        {
+            get => _link.IsEnabled;
+            set
+            {
+                if (_link.IsEnabled == value) return;
+                _link.IsEnabled = value;
+                if (value)
+                {
+                    _link.Quantum = Math.Max(1, TimeSigNumerator);
+                    PushTempoToLink();
+                }
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(LinkPeerText));
+                OnPropertyChanged(nameof(LinkPhaseText));
+            }
+        }
+
+        /// <summary>Formatted Link peer count for the transport bar.</summary>
+        public string LinkPeerText => _link.PeerCount == 0 ? "Link" : $"Link ({_link.PeerCount})";
+
+        /// <summary>Shared Link phase within the current quantum (shown when Link is enabled).</summary>
+        public string LinkPhaseText => _link.IsEnabled
+            ? $"Phase {_link.Phase:0.0}/{_link.Quantum:0.0}"
+            : "";
+
+        public string LinkSessionBeatText => _link.IsEnabled && IsPlaying
+            ? $"Link beat {_link.SessionBeat:0.00}"
+            : "";
 
         /// <summary>Sets the loop start ("[") to the current start marker.</summary>
         public RelayCommand SetLoopStartCommand { get; }
@@ -158,6 +308,22 @@ namespace Ongenet.App.ViewModels
         public RelayCommand PlayCommand { get; }
         public RelayCommand StopCommand { get; }
         public RelayCommand RecordCommand { get; }
+        public RelayCommand TapTempoCommand { get; }
+
+        private void TapTempo()
+        {
+            var now = Environment.TickCount64;
+            if (_tapTimes.Count > 0 && now - _tapTimes.Last() > 2000)
+                _tapTimes.Clear();
+            _tapTimes.Enqueue(now);
+            while (_tapTimes.Count > 4) _tapTimes.Dequeue();
+            if (_tapTimes.Count < 2) return;
+
+            var taps = _tapTimes.ToArray();
+            var averageMs = (taps[^1] - taps[0]) / (double)(taps.Length - 1);
+            if (averageMs <= 0) return;
+            Bpm = Math.Clamp(60_000.0 / averageMs, 20.0, 300.0);
+        }
 
         public bool IsPlaying => _transport.State == TransportState.Playing;
         public bool IsRecording => _recording.IsRecording;
@@ -176,6 +342,7 @@ namespace Ongenet.App.ViewModels
                 App.ServiceProvider?.GetService<IHistoryService>()?.Capture("Change tempo");
                 _transport.Tempo = new Tempo(value);
                 _project.Current.Tempo = new Tempo(value); // keep the project model in sync
+                PushTempoToLink();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(TotalTime));
             }
@@ -204,6 +371,7 @@ namespace Ongenet.App.ViewModels
             {
                 if (value < 1 || value == TimeSigNumerator) return;
                 _project.Current.TimeSignature = new TimeSignature(value, TimeSigDenominator);
+                _link.Quantum = Math.Max(1, value);
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(TotalTime));
                 _events.Publish(new ArrangementLengthChangedEvent());
@@ -235,6 +403,29 @@ namespace Ongenet.App.ViewModels
         public double MasterLevelLeft => _engine.MasterLevelLeft;
         public double MasterLevelRight => _engine.MasterLevelRight;
 
+        /// <summary>Standalone metronome click during playback (independent of record count-in).</summary>
+        public bool MetronomeEnabled
+        {
+            get => _transport.MetronomeEnabled;
+            set => _transport.MetronomeEnabled = value;
+        }
+
+        /// <summary>Master bus output gain (0..1), bound to the master track volume.</summary>
+        public double MasterVolume
+        {
+            get => _project.Current.Master?.Volume ?? Track.DefaultVolume;
+            set
+            {
+                var master = _project.Current.Master;
+                if (master is null) return;
+                var clamped = value < 0 ? 0 : value > 1 ? 1 : value;
+                if (Math.Abs(master.Volume - clamped) < 1e-9) return;
+                App.ServiceProvider?.GetService<IHistoryService>()?.Capture("Change master volume");
+                master.Volume = clamped;
+                OnPropertyChanged();
+            }
+        }
+
         /// <summary>True when the host exposes process CPU/RAM sampling (desktop).</summary>
         public bool ShowSystemMetrics => _metrics.IsAvailable;
 
@@ -245,14 +436,27 @@ namespace Ongenet.App.ViewModels
         public string RamText => FormatBytes(_metrics.MemoryBytes);
 
         private long _lastTimeRefreshMs;
+        private double _lastMasterL = -1;
+        private double _lastMasterR = -1;
 
         /// <summary>Refreshes the polled values — called once per render frame via the PlaybackClock.
         /// Meters (cheap, no text) refresh every call; the sub-second time readout is throttled to ~10Hz
         /// because re-shaping its text every frame makes the compositor miss vsync (drops to 30fps).</summary>
         public void RefreshMeters()
         {
-            OnPropertyChanged(nameof(MasterLevelLeft));
-            OnPropertyChanged(nameof(MasterLevelRight));
+            var l = MasterLevelLeft;
+            var r = MasterLevelRight;
+            if (Math.Abs(l - _lastMasterL) >= 0.002)
+            {
+                _lastMasterL = l;
+                OnPropertyChanged(nameof(MasterLevelLeft));
+            }
+
+            if (Math.Abs(r - _lastMasterR) >= 0.002)
+            {
+                _lastMasterR = r;
+                OnPropertyChanged(nameof(MasterLevelRight));
+            }
 
             var now = Environment.TickCount64;
             if (now - _lastTimeRefreshMs >= 100) // ~10Hz
@@ -268,7 +472,47 @@ namespace Ongenet.App.ViewModels
                     OnPropertyChanged(nameof(TotalTime));
                     OnPropertyChanged(nameof(TimeSigNumerator));
                 }
+
+                if (_link.IsEnabled)
+                {
+                    _link.RefreshSessionState();
+                    OnPropertyChanged(nameof(LinkPeerText));
+                    OnPropertyChanged(nameof(LinkPhaseText));
+                    if (IsPlaying)
+                    {
+                        OnPropertyChanged(nameof(LinkSessionBeatText));
+                        var drift = Math.Abs(_transport.PlayheadBeats - _link.SessionBeat);
+                        if (drift > 0.05)
+                            _transport.NotifyPlayhead(_link.SessionBeat);
+                    }
+                }
             }
+        }
+
+        private void AddMarkerAtPlayhead()
+        {
+            var n = _project.Current.Markers.Count + 1;
+            _timeline.AddMarkerAtPlayhead($"Marker {n}");
+            GoToNextMarkerCommand.RaiseCanExecuteChanged();
+            GoToPreviousMarkerCommand.RaiseCanExecuteChanged();
+        }
+
+        private void GoToNextMarker()
+        {
+            var markers = _project.Current.Markers.OrderBy(m => m.Beat).ToList();
+            if (markers.Count == 0) return;
+            var beat = _transport.PlayheadBeats;
+            var next = markers.FirstOrDefault(m => m.Beat > beat + 1e-6) ?? markers[0];
+            _timeline.GoToMarker(next);
+        }
+
+        private void GoToPreviousMarker()
+        {
+            var markers = _project.Current.Markers.OrderBy(m => m.Beat).ToList();
+            if (markers.Count == 0) return;
+            var beat = _transport.PlayheadBeats;
+            var prev = markers.LastOrDefault(m => m.Beat < beat - 1e-6) ?? markers[^1];
+            _timeline.GoToMarker(prev);
         }
 
         private int BeatsPerBar => Math.Max(1, _project.Current.TimeSignature.Numerator);
@@ -296,6 +540,63 @@ namespace Ongenet.App.ViewModels
                 OnPropertyChanged(nameof(CpuText));
                 OnPropertyChanged(nameof(RamText));
             });
+
+        private void OnTransportStateChanged(TransportState state)
+        {
+            if (_link.IsEnabled)
+            {
+                if (state == TransportState.Playing)
+                {
+                    var beat = _transport.StartBeat;
+                    if (_link.Quantum > 0)
+                    {
+                        // Snap the start marker to the shared downbeat when joining a Link session.
+                        var q = _link.Quantum;
+                        beat = Math.Floor(beat / q) * q + _link.Phase;
+                    }
+                    _link.StartAtBeat(beat);
+                }
+                else _link.Stop();
+            }
+
+            OnStateChanged();
+        }
+
+        private void OnLinkSyncChanged()
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                OnPropertyChanged(nameof(LinkPeerText));
+                OnPropertyChanged(nameof(LinkPhaseText));
+                if (!_link.IsEnabled || _syncingLinkTempo) return;
+
+                var remote = _link.Tempo;
+                if (remote <= 0) return;
+                if (Math.Abs(_project.Current.Tempo.BeatsPerMinute - remote) < 0.01) return;
+
+                _syncingLinkTempo = true;
+                try
+                {
+                    _transport.Tempo = new Tempo(remote);
+                    _project.Current.Tempo = new Tempo(remote);
+                    OnPropertyChanged(nameof(Bpm));
+                    OnPropertyChanged(nameof(TotalTime));
+                    OnPropertyChanged(nameof(PlayheadTime));
+                }
+                finally
+                {
+                    _syncingLinkTempo = false;
+                }
+            });
+        }
+
+        private void PushTempoToLink()
+        {
+            if (!_link.IsEnabled || _syncingLinkTempo) return;
+            _syncingLinkTempo = true;
+            try { _link.Tempo = _project.Current.Tempo.BeatsPerMinute; }
+            finally { _syncingLinkTempo = false; }
+        }
 
         private void OnStateChanged()
         {

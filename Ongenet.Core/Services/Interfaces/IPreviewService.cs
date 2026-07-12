@@ -31,6 +31,15 @@ public interface IPreviewService
     /// <summary>Sends channel aftertouch (pressure, 0..127) to the selected instrument.</summary>
     void ChannelAftertouch(int value);
 
+    /// <summary>Per-note pitch bend (14-bit, centre 8192) for MPE member-channel expression.</summary>
+    void NotePitchBend(int midiNote, int value14);
+
+    /// <summary>Per-note pressure (0..127) for MPE member-channel expression.</summary>
+    void NotePressure(int midiNote, int value);
+
+    /// <summary>Per-note timbre via CC74 (0..127) for MPE member-channel expression.</summary>
+    void NoteTimbre(int midiNote, int value);
+
     /// <summary>Raised whenever the set of active notes changes (marshalled to the UI thread).</summary>
     event Action? ActiveNotesChanged;
 

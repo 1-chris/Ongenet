@@ -5,11 +5,12 @@
         xmlns:vm="using:Ongenet.App.ViewModels"
         xmlns:settings="using:Ongenet.App.Views.Settings"
         xmlns:controls="using:Ongenet.App.Controls"
+        xmlns:Automation="using:Avalonia.Automation"
         mc:Ignorable="d" d:DesignWidth="540" d:DesignHeight="660"
         x:Class="Ongenet.App.Views.Windows.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Width="540" Height="660" MinWidth="420" MinHeight="380"
-        Title="Settings"
+        Title="{DynamicResource Settings_Settings_Title}"
         TransparencyLevelHint="Transparent"
         Background="Transparent"
         ExtendClientAreaToDecorationsHint="True">
@@ -42,12 +43,12 @@
                         <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
                                     VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
                             <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
-                                    Click="CloseButton_Click" ToolTip.Tip="Close">
+                                    Click="CloseButton_Click" ToolTip.Tip="{DynamicResource Settings_Close_Tip}">
                                 <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
                                       VerticalAlignment="Center" HorizontalAlignment="Center"/>
                             </Button>
                         </StackPanel>
-                        <TextBlock Text="Settings" Margin="10,0" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{DynamicResource Settings_Settings}" Margin="10,0" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
                     </StackPanel>
                     <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
                         <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
@@ -58,23 +59,48 @@
                 </Grid>
 
                 <TabControl Grid.Row="1" Margin="8" Background="{StaticResource CatppuccinMantle}">
-                    <TabItem Header="Audio">
+                    <TabItem Header="{DynamicResource Settings_TabGeneral}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_TabGeneral_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_TabGeneral_A11yHelp}">
+                        <settings:GeneralSettingsView DataContext="{Binding General}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource Settings_Audio}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_Audio_settings_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_Audio_device_and_backend_settings}">
                         <settings:AudioSettingsView DataContext="{Binding Audio}"/>
                     </TabItem>
-                    <TabItem Header="MIDI">
+                    <TabItem Header="{DynamicResource Settings_MIDI}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_MIDI_settings_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_MIDI_input_device_and_transport_mapping}">
                         <settings:MidiSettingsView DataContext="{Binding Midi}"/>
                     </TabItem>
-                    <TabItem Header="Theme">
+                    <TabItem Header="{DynamicResource Settings_Control_Surface}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_Control_surface_settings_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_MIDI_control_surface_profile}">
+                        <settings:ControlSurfaceSettingsView DataContext="{Binding ControlSurface}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource Settings_Control_Room}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_Control_Room_settings_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_Monitor_and_cue_mix_profiles}">
+                        <settings:ControlRoomSettingsView DataContext="{Binding ControlRoom}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource Settings_Theme}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_Theme_settings_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_Application_color_theme}">
                         <settings:ThemeEditorView DataContext="{Binding Theme}"/>
                     </TabItem>
-                    <TabItem Header="Library">
+                    <TabItem Header="{DynamicResource Settings_Library}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_Library_settings_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_Sample_and_soundfont_scan_paths}">
                         <settings:LibrarySettingsView DataContext="{Binding Library}"/>
                     </TabItem>
-                    <TabItem Header="3D">
+                    <TabItem Header="{DynamicResource Settings_N3D}"
+                             Automation:AutomationProperties.Name="{DynamicResource Settings_N3D_engine_preview_A11yName}"
+                             Automation:AutomationProperties.HelpText="{DynamicResource Settings_GPU_3D_engine_demo_view}">
                         <Grid RowDefinitions="Auto,*" Margin="4">
                             <TextBlock Grid.Row="0" Margin="6,4,6,8" TextWrapping="Wrap"
                                        Foreground="{StaticResource CatppuccinSubtext0}"
-                                       Text="GPU 3D engine preview (Vulkan / MoltenVK). Drag to orbit, scroll to zoom."/>
+                                       Text="{DynamicResource Settings_GPU_3D_engine_preview_Vulkan_MoltenVK_Drag_to_or}"/>
                             <Border Grid.Row="1" CornerRadius="6" ClipToBounds="True"
                                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                                 <controls:Engine3DDemoView/>

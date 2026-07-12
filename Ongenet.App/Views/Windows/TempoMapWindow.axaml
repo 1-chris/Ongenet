@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels"
+        x:Class="Ongenet.App.Views.Windows.TempoMapWindow"
+        x:DataType="vm:TempoMapViewModel"
+        Width="420" Height="420" Title="{DynamicResource TempoMap_Tempo_Map_Title}">
+    <DockPanel Margin="12">
+        <Button DockPanel.Dock="Top" Content="{DynamicResource TempoMap_Add_tempo_point_at_playhead}"
+                Command="{Binding AddAtPlayheadCommand}" Margin="0,0,0,8"/>
+        <ItemsControl ItemsSource="{Binding Points}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TempoPointRow">
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6" Margin="0,3">
+                        <TextBlock Grid.Column="0" Text="{DynamicResource TempoMap_Beat}" VerticalAlignment="Center"/>
+                        <NumericUpDown Grid.Column="1" Value="{Binding Beat}" Minimum="0" Maximum="100000"/>
+                        <TextBlock Grid.Column="2" Text="{DynamicResource TempoMap_BPM}" VerticalAlignment="Center"/>
+                        <NumericUpDown Grid.Column="3" Value="{Binding Bpm}" Minimum="1" Maximum="999"/>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </DockPanel>
+</Window>

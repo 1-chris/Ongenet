@@ -4,6 +4,7 @@ using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Implementation;
 using Ongenet.Core.Services.Interfaces;
 
@@ -39,11 +40,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITransportService, TransportService>();
         services.AddSingleton<ISelectionService, SelectionService>();
         services.AddSingleton<IEditModeService, EditModeService>();
+        services.AddSingleton<IPlaybackModeService, PlaybackModeService>();
+        services.AddSingleton<ISessionCaptureService, SessionCaptureService>();
+        services.AddSingleton<SectionPlaylistService>();
         services.AddSingleton<IPreviewService, PreviewService>();
         services.AddSingleton<IRecordingService, RecordingService>();
+        services.AddSingleton<IInputMonitorService, InputMonitorService>();
+        services.AddSingleton<StemSeparationService>();
+        services.AddSingleton<MidiRetrospectiveCapture>();
 
         // Audio engine. The concrete IAudioOutput device is registered by the host app
         // (Ongenet.Desktop references the OS-native backend); the engine depends only on the seam.
+        services.AddSingleton<IMidiOutputService, NullMidiOutputService>();
         services.AddSingleton<IAuditionPlayer, AuditionPlayer>();
         services.AddSingleton<IAudioEngine, AudioEngine>();
 

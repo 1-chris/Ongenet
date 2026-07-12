@@ -5,9 +5,12 @@
              xmlns:vm="using:Ongenet.App.ViewModels"
              xmlns:tl="using:Ongenet.App.ViewModels.Timeline"
              xmlns:controls="using:Ongenet.App.Controls"
+             xmlns:Automation="using:Avalonia.Automation"
              mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="400"
              x:Class="Ongenet.App.Views.Panels.TimelineView"
-             x:DataType="vm:TimelineViewModel">
+             x:DataType="vm:TimelineViewModel"
+             Automation:AutomationProperties.Name="{DynamicResource Timeline_Timeline_A11yName}"
+             Automation:AutomationProperties.HelpText="{DynamicResource Timeline_Arrangement_timeline_with_track_lanes_and_clips}">
 
     <UserControl.Resources>
         <x:Double x:Key="HeaderWidth">140</x:Double>
@@ -30,6 +33,15 @@
             <Setter Property="BorderBrush" Value="{StaticResource CatppuccinOverlay1}"/>
             <Setter Property="Opacity" Value="0.85"/>
         </Style>
+        <Style Selector="Border.pattern-clip">
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinText}"/>
+            <Setter Property="Opacity" Value="0.92"/>
+        </Style>
+        <Style Selector="Border.pattern-clip.selected">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinText}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
     </UserControl.Styles>
 
     <Border Background="{StaticResource CatppuccinCrust}">
@@ -40,7 +52,7 @@
                     Width="{StaticResource HeaderWidth}" Height="{StaticResource RulerHeight}"
                     Background="{StaticResource CatppuccinMantle}"
                     BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,1,1">
-                <TextBlock Text="Tracks" Margin="8,0" VerticalAlignment="Center" FontSize="11"
+                <TextBlock Text="{DynamicResource Timeline_Tracks}" Margin="8,0" VerticalAlignment="Center" FontSize="11"
                            Foreground="{StaticResource CatppuccinOverlay1}"/>
             </Border>
 
@@ -134,20 +146,22 @@
                                     Classes.selected="{Binding IsSelected}">
                                 <Border.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="Group tracks" Command="{Binding GroupTracksCommand}"/>
-                                        <MenuItem Header="Detach from group" Command="{Binding DetachFromGroupCommand}"
+                                        <MenuItem Header="{DynamicResource Timeline_Group_tracks}" Command="{Binding GroupTracksCommand}"/>
+                                        <MenuItem Header="{DynamicResource Timeline_Detach_from_group}" Command="{Binding DetachFromGroupCommand}"
                                                   IsVisible="{Binding IsInGroup}"/>
-                                        <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"
+                                        <MenuItem Header="{DynamicResource Timeline_Duplicate}" Command="{Binding DuplicateCommand}"
                                                   IsVisible="{Binding !IsBus}"/>
-                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}"
+                                        <MenuItem Header="{DynamicResource Timeline_Delete}" Command="{Binding DeleteCommand}"
                                                   IsVisible="{Binding !IsBus}"/>
-                                        <MenuItem Header="Delete group (keep tracks)" Command="{Binding DeleteGroupKeepChildrenCommand}"
+                                        <MenuItem Header="{DynamicResource Timeline_Delete_group_keep_tracks}" Command="{Binding DeleteGroupKeepChildrenCommand}"
                                                   IsVisible="{Binding IsGroup}"/>
-                                        <MenuItem Header="Delete group + child tracks" Command="{Binding DeleteGroupAndChildrenCommand}"
+                                        <MenuItem Header="{DynamicResource Timeline_Delete_group_child_tracks}" Command="{Binding DeleteGroupAndChildrenCommand}"
                                                   IsVisible="{Binding IsGroup}"/>
                                         <Separator/>
-                                        <MenuItem Header="Add Instrument Track" Command="{Binding AddInstrumentTrackCommand}"/>
-                                        <MenuItem Header="Add Audio Track" Command="{Binding AddAudioTrackCommand}"/>
+                                        <MenuItem Header="{DynamicResource Timeline_Add_Instrument_Track}" Command="{Binding AddInstrumentTrackCommand}"/>
+                                        <MenuItem Header="{DynamicResource Timeline_Add_Audio_Track}" Command="{Binding AddAudioTrackCommand}"/>
+                                        <MenuItem Header="{DynamicResource Timeline_Add_Hybrid_Track}" Command="{Binding AddHybridTrackCommand}"/>
+                                        <MenuItem Header="{DynamicResource Timeline_Add_Pattern_Track}" Command="{Binding AddPatternTrackCommand}"/>
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <!-- Transparent fill makes the whole header row clickable for selection
@@ -168,7 +182,7 @@
                                     <StackPanel Grid.Column="1" Margin="8,6" Spacing="6" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" Spacing="3">
                                             <Button Classes="chev" Content="{Binding CollapseGlyph}"
-                                                    ToolTip.Tip="Collapse / expand"
+                                                    ToolTip.Tip="{DynamicResource Timeline_Collapse_expand_Tip}"
                                                     IsVisible="{Binding ShowCollapse}"
                                                     Command="{Binding ToggleCollapseCommand}"/>
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
@@ -176,13 +190,13 @@
                                                        TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <ToggleButton Classes="ms" Content="M" ToolTip.Tip="Mute"
+                                            <ToggleButton Classes="ms" Content="{DynamicResource Timeline_M}" ToolTip.Tip="{DynamicResource Timeline_Mute_Tip}"
                                                           IsChecked="{Binding IsMuted, Mode=TwoWay}"
                                                           Foreground="{StaticResource CatppuccinRed}"/>
-                                            <ToggleButton Classes="ms" Content="S" ToolTip.Tip="Solo"
+                                            <ToggleButton Classes="ms" Content="{DynamicResource Timeline_S}" ToolTip.Tip="{DynamicResource Timeline_Solo_Tip}"
                                                           IsChecked="{Binding IsSoloed, Mode=TwoWay}"
                                                           Foreground="{StaticResource CatppuccinYellow}"/>
-                                            <ToggleButton Classes="ms rec" Content="●" ToolTip.Tip="Arm for recording"
+                                            <ToggleButton Classes="ms rec" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_for_recording_Tip}"
                                                           IsChecked="{Binding IsArmed, Mode=TwoWay}"
                                                           IsVisible="{Binding !IsBus}"
                                                           Foreground="{StaticResource CatppuccinRed}"/>
@@ -220,18 +234,39 @@
                                         <TextBlock Text="{Binding Name}" FontSize="11"
                                                    Foreground="{StaticResource CatppuccinSubtext0}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <ToggleButton Classes="ms rec" Content="●" ToolTip.Tip="Arm to record control moves"
+                                        <ToggleButton Classes="ms rec" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_to_record_control_moves_Tip}"
                                                       IsChecked="{Binding IsArmed, Mode=TwoWay}"
                                                       Foreground="{StaticResource CatppuccinRed}"
                                                       HorizontalAlignment="Left"/>
                                     </StackPanel>
-                                    <Button Grid.Column="2" Classes="xbtn" Content="✕" ToolTip.Tip="Remove automation"
+                                    <Button Grid.Column="2" Classes="xbtn" Content="{DynamicResource Timeline_Text_2}" ToolTip.Tip="{DynamicResource Timeline_Remove_automation_Tip}"
                                             VerticalAlignment="Top" Margin="0,4,4,0"
                                             Command="{Binding RemoveCommand}"/>
                                     <!-- inter-row divider, content only (keeps the gutter rail unbroken) -->
                                     <Border Grid.Column="1" Grid.ColumnSpan="2" IsHitTestVisible="False"
                                             BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"/>
                                 </Grid>
+                            </Border>
+                        </DataTemplate>
+                        <!-- Take lane header -->
+                        <DataTemplate DataType="tl:TakeLaneViewModel">
+                            <Border Height="{Binding Height}" BorderBrush="{StaticResource CatppuccinCrust}"
+                                    BorderThickness="0,0,1,0" Background="{StaticResource CatppuccinCrust}">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{DynamicResource Timeline_Promote_take}" Command="{Binding PromoteTakeCommand}"/>
+                                        <MenuItem Header="{DynamicResource Timeline_Flatten_comp}" Command="{Binding FlattenCompCommand}"/>
+                                        <MenuItem Header="{DynamicResource Timeline_Split_comp_at_playhead}" Command="{Binding SplitCompAtPlayheadCommand}"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,8,0" VerticalAlignment="Center">
+                                    <Button Classes="chev" Content="{Binding CollapseGlyph}" Command="{Binding ToggleExpandCommand}"
+                                            Width="16" Height="16" Padding="0"/>
+                                    <TextBlock Text="{Binding Name}" FontSize="10"
+                                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                    <TextBlock Text="{Binding CompSummary}" FontSize="9"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.DataTemplates>
@@ -255,8 +290,13 @@
                 <!-- Right-clicking blank space below the tracks offers to add a track. -->
                 <ListBox.ContextMenu>
                     <ContextMenu>
-                        <MenuItem Header="Add Instrument Track" Command="{Binding AddInstrumentTrackCommand}"/>
-                        <MenuItem Header="Add Audio Track" Command="{Binding AddAudioTrackCommand}"/>
+                        <MenuItem Header="{DynamicResource Timeline_Ripple_insert}" Command="{Binding RippleInsertCommand}"/>
+                        <MenuItem Header="{DynamicResource Timeline_Ripple_delete}" Command="{Binding RippleDeleteCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="{DynamicResource Timeline_Logical_MIDI_edit}" Command="{Binding OpenLogicalMidiEditCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="{DynamicResource Timeline_Add_Instrument_Track}" Command="{Binding AddInstrumentTrackCommand}"/>
+                        <MenuItem Header="{DynamicResource Timeline_Add_Audio_Track}" Command="{Binding AddAudioTrackCommand}"/>
                     </ContextMenu>
                 </ListBox.ContextMenu>
                 <ListBox.Styles>
@@ -303,14 +343,42 @@
                                                     Classes.selected="{Binding IsSelected}">
                                                 <Border.ContextMenu>
                                                     <ContextMenu>
-                                                        <MenuItem Header="Rename…" Command="{Binding RenameCommand}"/>
-                                                        <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
-                                                        <MenuItem Header="Make unique" Command="{Binding MakeUniqueCommand}"/>
-                                                        <MenuItem Header="Reverse" Command="{Binding ReverseCommand}"
+                                                        <MenuItem Header="{DynamicResource Timeline_Rename}" Command="{Binding RenameCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Duplicate}" Command="{Binding DuplicateCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Create_linked_copy}"
+                                                                  Command="{Binding CreateLinkedCopyCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Unlink}" Command="{Binding UnlinkClipCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Make_unique}" Command="{Binding MakeUniqueCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Reverse}" Command="{Binding ReverseCommand}"
                                                                   IsVisible="{Binding IsAudio}"/>
-                                                        <MenuItem Header="Render clip to new track"
+                                                        <MenuItem Header="{DynamicResource Timeline_Render_clip_to_new_track}"
                                                                   Command="{Binding RenderToNewTrackCommand}"/>
-                                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Open_in_Audio_Editor}"
+                                                                  Command="{Binding OpenInAudioEditorCommand}"
+                                                                  IsVisible="{Binding IsAudio}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Open_Pitch_Editor}"
+                                                                  Command="{Binding OpenPitchEditorCommand}"
+                                                                  IsVisible="{Binding IsAudio}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Open_ARA_Editor}"
+                                                                  Command="{Binding OpenAraEditorCommand}"
+                                                                  IsVisible="{Binding HasAraSupport}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Send_to_Session_Slot}"
+                                                                  Command="{Binding SendToSessionSlotCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Convert_to_MIDI}"
+                                                                  Command="{Binding ConvertToMidiCommand}"
+                                                                  IsVisible="{Binding IsAudio}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Convert_to_poly_MIDI}"
+                                                                  Command="{Binding ConvertToPolyMidiCommand}"
+                                                                  IsVisible="{Binding IsAudio}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Separate_stems_4_way}"
+                                                                  Command="{Binding SeparateStemsCommand}"
+                                                                  IsVisible="{Binding IsAudio}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Bounce_in_place}"
+                                                                  Command="{Binding BounceInPlaceCommand}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Logical_MIDI_edit}"
+                                                                  Command="{Binding LogicalMidiEditCommand}"
+                                                                  IsVisible="{Binding IsMidi}"/>
+                                                        <MenuItem Header="{DynamicResource Timeline_Delete}" Command="{Binding DeleteCommand}"/>
                                                     </ContextMenu>
                                                 </Border.ContextMenu>
                                                 <Grid>
@@ -335,15 +403,33 @@
                                                                               FadeOutWaveform="{Binding FadeOutWaveform}"
                                                                               Revision="{Binding FadeRevision}"
                                                                               IsVisible="{Binding IsAudio}"
-                                                                              IsHitTestVisible="False"
+                                                                              IsSelected="{Binding IsSelected}"
+                                                                              ClipLengthBeats="{Binding ClipLengthBeats}"
+                                                                              PixelsPerBeat="{Binding PixelsPerBeat}"
                                                                               ClipBackground="{Binding Owner.ColorKey, Converter={StaticResource ColorKeyToBrush}}"
                                                                               WaveFill="{StaticResource CatppuccinCrust}"
                                                                               Stroke="Black"/>
+                                                    <controls:WarpMarkerControl Markers="{Binding WarpMarkers}"
+                                                                                  ClipLengthBeats="{Binding ClipLengthBeats}"
+                                                                                  SourceDurationSeconds="{Binding SourceDurationSeconds}"
+                                                                                  SourceOffsetSeconds="{Binding SourceOffsetSeconds}"
+                                                                                  IsSelected="{Binding IsSelected}"
+                                                                                  Revision="{Binding WarpRevision}"
+                                                                                  IsVisible="{Binding IsAudio}"/>
                                                     <TextBlock Text="{Binding Name}" Margin="6,3" FontSize="11"
                                                                TextTrimming="CharacterEllipsis"
                                                                IsHitTestVisible="False"
                                                                VerticalAlignment="Top"
                                                                Foreground="{StaticResource CatppuccinCrust}"/>
+                                                    <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                            Margin="4" Padding="4,1" CornerRadius="3"
+                                                            IsVisible="{Binding HasAraRegion}"
+                                                            IsHitTestVisible="False"
+                                                            Background="{StaticResource CatppuccinMauve}"
+                                                            Opacity="0.85">
+                                                        <TextBlock Text="{DynamicResource Timeline_ARA}" FontSize="8" FontWeight="Bold"
+                                                                   Foreground="{StaticResource CatppuccinCrust}"/>
+                                                    </Border>
                                                     <Border Width="{Binding RenderProgressWidth}"
                                                             HorizontalAlignment="Left"
                                                             IsVisible="{Binding IsRendering}"
@@ -354,6 +440,47 @@
                                                             Opacity="0.35"/>
                                                 </Grid>
                                             </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- Pattern blocks (playlist) — distinct dashed blocks -->
+                            <ItemsControl ItemsSource="{Binding PatternClips}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemContainerTheme>
+                                    <ControlTheme TargetType="ContentPresenter" x:DataType="tl:PatternClipViewModel">
+                                        <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                        <Setter Property="Canvas.Top" Value="{StaticResource ClipTopInset}"/>
+                                        <Setter Property="Width" Value="{Binding Width}"/>
+                                        <Setter Property="Height" Value="{StaticResource ClipHeight}"/>
+                                    </ControlTheme>
+                                </ItemsControl.ItemContainerTheme>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="tl:PatternClipViewModel">
+                                        <Border Classes="pattern-clip" CornerRadius="4" ClipToBounds="True"
+                                                Classes.selected="{Binding IsSelected}"
+                                                Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"
+                                                BorderBrush="{StaticResource CatppuccinCrust}">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="{DynamicResource Timeline_Duplicate}" Command="{Binding DuplicateCommand}"/>
+                                                    <MenuItem Header="{DynamicResource Timeline_Delete}" Command="{Binding DeleteCommand}"/>
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                            <Grid>
+                                                <Rectangle Stroke="{StaticResource CatppuccinCrust}"
+                                                           StrokeDashArray="4,3" StrokeThickness="1"
+                                                           Margin="3" IsHitTestVisible="False"/>
+                                                <StackPanel Margin="6,4" Spacing="2" IsHitTestVisible="False">
+                                                    <TextBlock Text="{DynamicResource Timeline_PATTERN}" FontSize="8" FontWeight="Bold"
+                                                               Foreground="{StaticResource CatppuccinCrust}" Opacity="0.7"/>
+                                                    <TextBlock Text="{Binding Name}" FontSize="11"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{StaticResource CatppuccinCrust}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -376,12 +503,12 @@
                                                 Background="{StaticResource CatppuccinSurface0}">
                                             <Border.ContextMenu>
                                                 <ContextMenu>
-                                                    <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
-                                                    <MenuItem Header="Reverse" Command="{Binding ReverseCommand}"
+                                                    <MenuItem Header="{DynamicResource Timeline_Duplicate}" Command="{Binding DuplicateCommand}"/>
+                                                    <MenuItem Header="{DynamicResource Timeline_Reverse}" Command="{Binding ReverseCommand}"
                                                               IsVisible="{Binding IsAllAudio}"/>
-                                                    <MenuItem Header="Render clip to new track"
+                                                    <MenuItem Header="{DynamicResource Timeline_Render_clip_to_new_track}"
                                                               Command="{Binding RenderToNewTrackCommand}"/>
-                                                    <MenuItem Header="Delete" Command="{Binding DeleteCommand}"/>
+                                                    <MenuItem Header="{DynamicResource Timeline_Delete}" Command="{Binding DeleteCommand}"/>
                                                 </ContextMenu>
                                             </Border.ContextMenu>
                                             <Grid>
@@ -458,6 +585,43 @@
                             </Grid>
                         </Border>
                     </DataTemplate>
+                    <!-- Take lane -->
+                    <DataTemplate DataType="tl:TakeLaneViewModel">
+                        <Border Width="{Binding LaneWidth}" Height="{Binding Height}" HorizontalAlignment="Left"
+                                Background="{StaticResource CatppuccinCrust}"
+                                BorderBrush="{StaticResource CatppuccinMantle}" BorderThickness="0,0,0,1">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{DynamicResource Timeline_Promote_take}" Command="{Binding PromoteTakeCommand}"/>
+                                    <MenuItem Header="{DynamicResource Timeline_Flatten_comp}" Command="{Binding FlattenCompCommand}"/>
+                                    <MenuItem Header="{DynamicResource Timeline_Split_comp_at_playhead}" Command="{Binding SplitCompAtPlayheadCommand}"/>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <ItemsControl ItemsSource="{Binding Takes}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemContainerTheme>
+                                    <ControlTheme TargetType="ContentPresenter" x:DataType="tl:TakeViewModel">
+                                        <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                        <Setter Property="Canvas.Top" Value="8"/>
+                                        <Setter Property="Width" Value="{Binding Width}"/>
+                                        <Setter Property="Height" Value="20"/>
+                                    </ControlTheme>
+                                </ItemsControl.ItemContainerTheme>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="tl:TakeViewModel">
+                                        <Button Command="{Binding SelectCommand}" Padding="4,2" CornerRadius="3"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Background="{StaticResource CatppuccinSurface1}">
+                                            <TextBlock Text="{Binding Label}" FontSize="9"
+                                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </DataTemplate>
                 </ListBox.DataTemplates>
             </ListBox>
 
@@ -468,7 +632,7 @@
                         BorderBrush="{StaticResource CatppuccinGreen}" BorderThickness="2">
                     <Grid>
                         <Rectangle Fill="{StaticResource CatppuccinGreen}" Opacity="0.2"/>
-                        <TextBlock Name="NewTrackGhostLabel" Text="New audio track" Margin="10,0"
+                        <TextBlock Name="NewTrackGhostLabel" Text="{DynamicResource Timeline_New_audio_track}" Margin="10,0"
                                    VerticalAlignment="Center"
                                    FontWeight="SemiBold" Foreground="{StaticResource CatppuccinGreen}"/>
                     </Grid>
@@ -496,8 +660,27 @@
             <Canvas Grid.Row="0" Grid.Column="1" Name="RulerOverlay" IsHitTestVisible="False" ClipToBounds="True">
                 <Rectangle Name="LoopRegionRuler" IsVisible="False" Height="{StaticResource RulerHeight}"
                            Fill="{StaticResource CatppuccinSky}" Opacity="0.25"/>
+                <Border Name="PunchBracketLeft" IsVisible="False" Width="2" Height="{StaticResource RulerHeight}"
+                        BorderBrush="{StaticResource CatppuccinRed}" BorderThickness="2,0,0,0"/>
+                <Border Name="PunchBracketRight" IsVisible="False" Width="2" Height="{StaticResource RulerHeight}"
+                        BorderBrush="{StaticResource CatppuccinRed}" BorderThickness="0,0,2,0"/>
                 <Path Name="StartMarkerIcon" IsVisible="False" Data="M0,0 L9,5 L0,10 Z"
                       Fill="{StaticResource CatppuccinGreen}"/>
+                <ItemsControl ItemsSource="{Binding Markers}" IsHitTestVisible="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Canvas/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="tl:ArrangementMarkerViewModel">
+                            <StackPanel Canvas.Left="{Binding Left}" Spacing="0">
+                                <Path Data="M0,0 L8,0 L4,8 Z" Fill="{StaticResource CatppuccinYellow}" Width="8" Height="8"/>
+                                <TextBlock Text="{Binding Name}" FontSize="9" Foreground="{StaticResource CatppuccinYellow}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </Canvas>
 
             <!-- Track-reorder drag indicator: a horizontal insertion line spanning headers + lanes,

@@ -97,6 +97,7 @@ public sealed class EffectModuleNode : FieldNode, IProjectStatefulComponent, ISa
 
     private readonly IAudioEffect _fx;
     private readonly EffectContext _effCtx = new();
+    private readonly InlineSidechainBus _inlineSidechain = new();
     private float[] _temp = Array.Empty<float>();
 
     public EffectModuleNode(IAudioEffect effect)
@@ -104,6 +105,8 @@ public sealed class EffectModuleNode : FieldNode, IProjectStatefulComponent, ISa
         _fx = effect;
         AddInput("l", "L");
         AddInput("r", "R");
+        AddInput("sc_l", "SC L");
+        AddInput("sc_r", "SC R");
         AddOutput("l", "L");
         AddOutput("r", "R");
         foreach (var p in _fx.Parameters) AddParam(p);
@@ -145,7 +148,14 @@ public sealed class EffectModuleNode : FieldNode, IProjectStatefulComponent, ISa
             _effCtx.Bpm = ctx.Bpm;
             _effCtx.PlayheadBeats = ctx.PlayheadBeats;
             _effCtx.Playing = ctx.Playing;
-            _effCtx.Sidechain = SidechainBus.Empty;
+            var scL = ctx.Input(2);
+            var scR = ctx.Input(3);
+            var hasSidechainInput = SidechainHasSignal(scL, scR, ctx.Frames);
+            if (hasSidechainInput)
+                _inlineSidechain.Set(scL, scR, ctx.Frames, channels);
+            else
+                _inlineSidechain.Set(ctx.SidechainLeft, ctx.SidechainRight, ctx.Frames, channels);
+            _effCtx.Sidechain = _inlineSidechain;
             contextual.SetContext(_effCtx);
         }
 
@@ -176,5 +186,53 @@ public sealed class EffectModuleNode : FieldNode, IProjectStatefulComponent, ISa
     {
         if (!reader.ReadBool()) return;
         reader.ReadChunk(c => (_fx as IProjectStatefulComponent)?.ReadProjectState(c));
+    }
+
+    private static bool SidechainHasSignal(float[] left, float[] right, int frames)
+    {
+        for (var i = 0; i < frames; i++)
+            if (left[i] != 0f || right[i] != 0f) return true;
+        return false;
+    }
+}
+
+/// <summary>Publishes wired sidechain buffers to wrapped contextual effects inside a Field graph.</summary>
+internal sealed class InlineSidechainBus : ISidechainBus
+{
+    public static readonly Guid TapId = Guid.Parse("6f3e2a1b-9c4d-4e5f-a6b7-8c9d0e1f2a3b");
+
+    private float[] _interleaved = Array.Empty<float>();
+    private int _length;
+    private int _channels = 2;
+
+    public void Set(float[] left, float[] right, int frames, int channels)
+    {
+        _channels = channels < 1 ? 1 : channels;
+        var len = frames * _channels;
+        if (_interleaved.Length < len) _interleaved = new float[len];
+        for (var f = 0; f < frames; f++)
+        {
+            var b = f * _channels;
+            _interleaved[b] = left[f];
+            if (_channels > 1) _interleaved[b + 1] = right[f];
+        }
+        _length = len;
+    }
+
+    public void Request(Guid trackId) { _ = trackId; }
+
+    public bool IsRequested(Guid trackId) => trackId == TapId || trackId != Guid.Empty;
+
+    public void Publish(Guid trackId, ReadOnlySpan<float> interleaved, int channels)
+    {
+        _ = trackId;
+        _ = channels;
+        _ = interleaved.Length;
+    }
+
+    public ReadOnlySpan<float> Read(Guid trackId, out int channels)
+    {
+        channels = _channels;
+        return _length > 0 ? _interleaved.AsSpan(0, _length) : ReadOnlySpan<float>.Empty;
     }
 }

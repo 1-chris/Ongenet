@@ -2,6 +2,7 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Ongenet.App.Localization;
 using Ongenet.App.ViewModels;
 
 namespace Ongenet.App.Views.Settings
@@ -38,7 +39,7 @@ namespace Ongenet.App.Views.Settings
             if (top is null) return null;
             var folders = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Choose a folder to scan",
+                Title = Loc.Get("SettingsLibrary_ChooseFolderScan"),
                 AllowMultiple = false
             });
             return folders.FirstOrDefault()?.TryGetLocalPath();

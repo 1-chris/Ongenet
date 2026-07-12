@@ -40,6 +40,15 @@ public interface IInstrument : ISampleSource
     /// <summary>Channel aftertouch (pressure), 0..127. Default no-op.</summary>
     void ChannelAftertouch(int value) { }
 
+    /// <summary>Per-note pitch bend (14-bit, centre 8192). Default no-op.</summary>
+    void NotePitchBend(int midiNote, int value14) { }
+
+    /// <summary>Per-note pressure (0..127). Default no-op.</summary>
+    void NotePressure(int midiNote, int value) { }
+
+    /// <summary>Per-note timbre via CC74 (0..127). Default no-op.</summary>
+    void NoteTimbre(int midiNote, int value) { }
+
     /// <summary>Creates a fresh copy of this instrument with the same parameters (for track duplication).</summary>
     IInstrument Clone();
 }

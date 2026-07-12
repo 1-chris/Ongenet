@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <Description>Ableton Link integration for Ongenet (GPL isolated assembly)</Description>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OngenetLinkNative)' == 'true'">
+    <DefineConstants>$(DefineConstants);ONGENET_LINK_NATIVE</DefineConstants>
+  </PropertyGroup>
+</Project>

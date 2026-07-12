@@ -126,6 +126,9 @@ internal static class SongBuilder
             track.CommitInstruments();
             track.CommitEffects();
             track.CommitAutoLanes();
+            track.CommitModulators();
         }
     }
+
+    public static (double Offset, float Velocity)[] BarPattern(params (double, float)[] hits) => hits;
 }

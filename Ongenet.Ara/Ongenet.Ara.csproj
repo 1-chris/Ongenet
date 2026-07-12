@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <Description>ARA2 hosting seam for Ongenet desktop</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+  </ItemGroup>
+</Project>

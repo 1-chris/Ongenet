@@ -11,6 +11,7 @@ namespace Ongenet.App.ViewModels.Timeline
         void DeleteTrack(TrackLaneViewModel lane);
         void AddInstrumentTrack();
         void AddAudioTrack();
+        void AddPatternTrack();
 
         /// <summary>Notifies that a track's properties changed (so other views resync).</summary>
         void NotifyTrackChanged(Track track);

@@ -44,6 +44,7 @@ public sealed class ProjectFileService : IProjectFileService
         events.Subscribe<ClipNotesChangedEvent>(_ => MarkDirty());
         events.Subscribe<AutomationChangedEvent>(_ => MarkDirty());
         events.Subscribe<ArrangementLengthChangedEvent>(_ => MarkDirty());
+        events.Subscribe<SessionClipsChangedEvent>(_ => MarkDirty());
         _transport.TempoChanged += _ => MarkDirty();
         _transport.StartBeatChanged += MarkDirty;
         _transport.LoopChanged += MarkDirty;

@@ -43,6 +43,24 @@ public interface ITransportService
     /// <summary>True when a usable loop region is set (<see cref="LoopEnd"/> &gt; <see cref="LoopStart"/>).</summary>
     bool IsLoopActive { get; }
 
+    /// <summary>Loop recording: automatically restart at loop start when recording reaches loop end.</summary>
+    bool LoopRecording { get; set; }
+
+    /// <summary>
+    /// When true, the engine emits metronome clicks on beat boundaries during playback (independent of
+    /// the recording count-in). Does not affect count-in behaviour when <see cref="CountInBeats"/> &gt; 0.
+    /// </summary>
+    bool MetronomeEnabled { get; set; }
+
+    /// <summary>Raised when <see cref="MetronomeEnabled"/> changes.</summary>
+    event Action? MetronomeChanged;
+
+    /// <summary>Punch-in beat (recording starts here when set).</summary>
+    double? PunchInBeat { get; set; }
+
+    /// <summary>Punch-out beat (recording stops here when set).</summary>
+    double? PunchOutBeat { get; set; }
+
     /// <summary>Raised when <see cref="State"/> changes.</summary>
     event Action<TransportState>? StateChanged;
 
@@ -54,6 +72,9 @@ public interface ITransportService
 
     /// <summary>Raised when <see cref="LoopStart"/> or <see cref="LoopEnd"/> changes.</summary>
     event Action? LoopChanged;
+
+    /// <summary>Raised when punch/loop-recording settings change.</summary>
+    event Action? PunchChanged;
 
     /// <summary>Raised (from the audio thread) when the count-in finishes and content playback begins.</summary>
     event Action? CountInFinished;

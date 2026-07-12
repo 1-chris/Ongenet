@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+             x:Class="Ongenet.App.Views.Panels.StepSequencerView"
+             x:DataType="vm:StepSequencerViewModel">
+    <UserControl.Styles>
+        <Style Selector="Button.step">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="72"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinSurface2}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.step.active">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinGreen}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*" Background="{StaticResource CatppuccinBase}">
+        <Border Grid.Row="0" Padding="8,6" Background="{StaticResource CatppuccinMantle}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{Binding ChannelLabel}" FontSize="12" FontWeight="SemiBold"
+                           Foreground="{StaticResource CatppuccinText}" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                            IsVisible="{Binding HasSequence}">
+                    <TextBlock Text="{DynamicResource StepSeq_Length}" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"
+                               VerticalAlignment="Center"/>
+                    <NumericUpDown Value="{Binding LengthBeats, Mode=TwoWay}" Minimum="1" Maximum="256"
+                                   Increment="1" Width="72" FontSize="11"/>
+                    <TextBlock Text="{DynamicResource StepSeq_Steps}" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"
+                               VerticalAlignment="Center"/>
+                    <ComboBox Width="64" FontSize="11" SelectedItem="{Binding StepCount, Mode=TwoWay}"
+                              ItemsSource="{x:Static vm:PatternEditorViewModel.StepCountOptions}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Panel Grid.Row="1">
+            <TextBlock Text="{DynamicResource StepSeq_Select_a_channel_to_edit_steps}" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" FontSize="12"
+                       Foreground="{StaticResource CatppuccinOverlay1}"
+                       IsVisible="{Binding !HasSequence}"/>
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                          IsVisible="{Binding HasSequence}" Margin="8">
+                <ItemsControl ItemsSource="{Binding Steps}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StepCellViewModel">
+                            <StackPanel Spacing="2" Width="44">
+                                <Button Classes="step" Classes.active="{Binding IsActive}"
+                                        Command="{Binding ToggleCommand}"
+                                        Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                <Slider Minimum="0" Maximum="1" Value="{Binding Velocity, Mode=TwoWay}"
+                                        Height="40" Orientation="Vertical"
+                                        IsEnabled="{Binding IsActive}"/>
+                                <Slider Minimum="-1" Maximum="1" Value="{Binding Pan, Mode=TwoWay}"
+                                        Height="28" Orientation="Vertical"
+                                        IsEnabled="{Binding IsActive}"
+                                        ToolTip.Tip="{DynamicResource StepSeq_Step_pan_Tip}"/>
+                                <NumericUpDown Value="{Binding MicroTimingTicks, Mode=TwoWay}"
+                                               Minimum="-48" Maximum="48" Increment="1"
+                                               Width="40" FontSize="9"
+                                               IsEnabled="{Binding IsActive}"
+                                               ToolTip.Tip="{DynamicResource StepSeq_Micro_timing_offset_ticks_Tip}"/>
+                                <TextBlock Text="{Binding Index, StringFormat='{}{0}'}" FontSize="9"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Panel>
+    </Grid>
+</UserControl>

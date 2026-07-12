@@ -47,6 +47,8 @@ internal sealed class MacAudioDeviceService : IAudioDeviceService
         set { lock (_lock) { if (_inputChannelMode == value) return; _inputChannelMode = value; } InputChanged?.Invoke(); }
     }
 
+    public bool LowLatencyExclusive { get; set; }
+
     public event Action? DevicesChanged;
     public event Action? OutputChanged;
     public event Action? InputChanged;

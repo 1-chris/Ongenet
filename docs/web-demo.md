@@ -36,25 +36,30 @@ compilation of the UI is needed.
 - This is deliberately **not** an `AudioWorklet` + `SharedArrayBuffer` ring buffer. A worklet ring would
   need cross-origin isolation (COOP/COEP headers), which **GitHub Pages cannot set**. The ScriptProcessor
   runs on the main thread and needs no special headers, so it works from plain static hosting. The cost is
-  glitching when the UI is busy — acceptable for a demo. Upgrading to a worklet is the future perf path if
-  real headers ever become available (e.g. behind a CDN that can set them, or a `coi-serviceworker` shim).
+  glitching when the UI is busy — acceptable for a demo. A worklet-based path improves performance when
+  cross-origin isolation headers are available (e.g. behind a CDN that can set them, or a `coi-serviceworker` shim).
 - The `AudioContext` starts suspended until a user gesture; `ongen-audio.js` resumes it on first interaction.
-- Audio **input/recording** is not implemented (no `getUserMedia` capture yet).
+- Audio **input/recording** is not implemented (no `getUserMedia` capture).
 
 ## What's dropped or stubbed in the browser
 
 - **CLAP / LV2 plugins** — native code, impossible in WASM. Built-in instruments and effects (3xOsc, Padda,
   Kicka, Granular, Sampler, all effects) work — they come from the in-process registries, not native libs.
 - **MIDI input** — `BrowserMidiInputService` reports no devices. Web MIDI (`navigator.requestMIDIAccess`)
-  is the eventual replacement.
+  is the intended Web MIDI replacement when browser support is wired up.
 - **Filesystem** — no library scan, no preset files (`Browser{LibraryScan,Preset,AppSettings}Service` are
   empty/in-memory). Built-in instruments/effects still populate their library tabs.
-- **Project open/save (`.ongen`)** — not wired in the browser shell yet. The format is `Stream`-based, so a
-  download/upload path is straightforward to add later.
+- **Project open/save (`.ongen`)** — not wired in the browser shell. The format is `Stream`-based, so a
+  download/upload path is straightforward to add.
 - **Multiple windows** — the browser is single-canvas. `MainView` hosts the workspace; secondary windows
   (Settings/History/Log/plugin GUIs) are not shown.
 - **ffmpeg import** — desktop shells out to `ffmpeg`; there is no subprocess in the browser. WAV imports via
   the built-in parser; other formats would need `ffmpeg.wasm` or the browser's `decodeAudioData`.
+- **Audio Editor window** — desktop-only standalone multitrack sample editor (`NullScriptingHost` pattern;
+  use the bottom Sample Inspector for basic waveform view in browser if sample editing is wired).
+- **Polyphonic pitch editor** — desktop-only; requires full audio clip model and offline pitch pipeline.
+- **C# scripting (Tools → Scripts)** — `NullScriptingHost` on web/Android; Roslyn host is desktop-only.
+- **Plugin crash isolation (`Ongenet.PluginHost`)** — native child process; impossible in WASM.
 
 ## Build & deploy
 

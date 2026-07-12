@@ -32,4 +32,10 @@ public sealed class InstrumentSlot
 
     /// <summary>Publishes the current <see cref="Effects"/> list to the audio thread.</summary>
     public void CommitEffects() => _activeEffects = Effects.ToArray();
+
+    /// <summary>Optional multi-output bus index (0 = default mix to track).</summary>
+    public int OutputBusIndex { get; set; }
+
+    /// <summary>When set, this slot's output is routed to another track instead of summing on the owner.</summary>
+    public Guid? OutputTrackId { get; set; }
 }

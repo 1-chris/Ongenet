@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Ongenet.App.Services;
+using Ongenet.App.ViewModels;
+using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Field.Nodes;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Persistence;
 
 namespace Ongenet.App.ViewModels.Field;
 
@@ -20,10 +26,16 @@ public sealed class FieldEditorViewModel : ViewModelBase
     private readonly Action _recompile;
     private readonly IReadOnlyList<string> _presetNames;
     private readonly Action<int> _loadPreset;
+    private readonly IHistoryService? _history;
+    private readonly Func<IInstrument?>? _instrumentHost;
+    private readonly Func<FieldEffect?>? _effectHost;
     private FieldNode? _selectedNode;
+    private Guid? _navigationGroupId;
+    private string _patchName = string.Empty;
 
     public FieldEditorViewModel(FieldGraph graph, IFieldNodeRegistry registry, Action recompile,
-        IReadOnlyList<string> presetNames, Action<int> loadPreset, Func<CompiledGraph?> compiled, bool isInstrument)
+        IReadOnlyList<string> presetNames, Action<int> loadPreset, Func<CompiledGraph?> compiled, bool isInstrument,
+        Func<IInstrument?>? instrumentHost = null, Func<FieldEffect?>? effectHost = null)
     {
         Graph = graph;
         Registry = registry;
@@ -32,6 +44,9 @@ public sealed class FieldEditorViewModel : ViewModelBase
         _loadPreset = loadPreset;
         CompiledAccessor = compiled;
         IsInstrument = isInstrument;
+        _history = App.ServiceProvider?.GetService<IHistoryService>();
+        _instrumentHost = instrumentHost;
+        _effectHost = effectHost;
         BuildPalette();
     }
 
@@ -46,7 +61,42 @@ public sealed class FieldEditorViewModel : ViewModelBase
     /// <summary>Grouped node palette (category → available node types).</summary>
     public ObservableCollection<FieldPaletteGroup> PaletteGroups { get; } = new();
 
+    /// <summary>Inspector parameters for <see cref="SelectedNode"/>.</summary>
+    public ObservableCollection<ParameterViewModel> SelectedParameters { get; } = new();
+
     public IReadOnlyList<string> PresetNames => _presetNames;
+
+    /// <summary>When set, the canvas shows only nodes inside this group (sub-patch navigation).</summary>
+    public Guid? NavigationGroupId
+    {
+        get => _navigationGroupId;
+        private set
+        {
+            if (!SetField(ref _navigationGroupId, value)) return;
+            OnPropertyChanged(nameof(CanExitGroup));
+            OnPropertyChanged(nameof(BreadcrumbText));
+            SelectedNode = null;
+            RaiseStructureChanged();
+        }
+    }
+
+    public bool CanExitGroup => NavigationGroupId.HasValue;
+
+    public string BreadcrumbText
+    {
+        get
+        {
+            if (NavigationGroupId is not { } gid) return "Root";
+            var group = Graph.Groups.FirstOrDefault(g => g.Id == gid);
+            return group is null ? "Root" : $"Root › {group.Name}";
+        }
+    }
+
+    public string PatchName
+    {
+        get => _patchName;
+        set => SetField(ref _patchName, value);
+    }
 
     private int _selectedPreset = -1;
     public int SelectedPreset
@@ -57,6 +107,7 @@ public sealed class FieldEditorViewModel : ViewModelBase
             if (!SetField(ref _selectedPreset, value)) return;
             if (value >= 0 && value < _presetNames.Count)
             {
+                CaptureHistory("Load built-in Field patch");
                 _loadPreset(value);
                 SelectedNode = null;
                 RaiseStructureChanged();
@@ -96,6 +147,33 @@ public sealed class FieldEditorViewModel : ViewModelBase
         _ => ""
     };
 
+    /// <summary>Nodes visible at the current navigation level.</summary>
+    public IEnumerable<FieldNode> VisibleNodes()
+    {
+        if (NavigationGroupId is { } gid)
+        {
+            var group = Graph.Groups.FirstOrDefault(g => g.Id == gid);
+            if (group is null) return Graph.Nodes;
+            var ids = group.NodeIds.ToHashSet();
+            return Graph.Nodes.Where(n => ids.Contains(n.Id));
+        }
+
+        return Graph.Nodes;
+    }
+
+    /// <summary>Connections visible at the current navigation level.</summary>
+    public IEnumerable<FieldConnection> VisibleConnections()
+    {
+        var ids = VisibleNodes().Select(n => n.Id).ToHashSet();
+        return Graph.Connections.Where(c => ids.Contains(c.SourceNode) && ids.Contains(c.DestNode));
+    }
+
+    public void EnterGroup(FieldGroup group) => NavigationGroupId = group.Id;
+
+    public void ExitGroup() => NavigationGroupId = null;
+
+    public void CaptureHistory(string label) => _history?.Capture(label);
+
     /// <summary>Loads a decoded sample into the selected sample-host node (wavetable/sample player).</summary>
     public void LoadSampleIntoSelected(AudioSampleBuffer buffer, string name)
     {
@@ -108,9 +186,6 @@ public sealed class FieldEditorViewModel : ViewModelBase
     /// <summary>Re-reads the selected resource node's status line (after a load completes).</summary>
     public void RefreshSelectedResourceStatus() => OnPropertyChanged(nameof(SelectedResourceStatus));
 
-    /// <summary>Parameters of the selected node, shown in the inspector.</summary>
-    public ObservableCollection<ParameterViewModel> SelectedParameters { get; } = new();
-
     /// <summary>Recompiles the audio graph and repaints the canvas after a structural change.</summary>
     public void NotifyStructureChanged()
     {
@@ -121,20 +196,24 @@ public sealed class FieldEditorViewModel : ViewModelBase
     public void RaiseStructureChanged() => StructureChanged?.Invoke();
 
     /// <summary>Creates a node of the given type at a canvas position and selects it.</summary>
-    public FieldNode? AddNode(string typeId, double x, double y)
+    public FieldNode? AddNode(string typeId, double x, double y, bool captureHistory = true)
     {
+        if (captureHistory) CaptureHistory("Add Field node");
         var node = Registry.TryCreate(typeId);
         if (node is null) return null;
         node.X = x;
         node.Y = y;
         Graph.AddNode(node);
+        if (NavigationGroupId is { } gid && Graph.Groups.FirstOrDefault(g => g.Id == gid) is { } group)
+            group.NodeIds.Add(node.Id);
         SelectedNode = node;
         NotifyStructureChanged();
         return node;
     }
 
-    public void RemoveNode(FieldNode node)
+    public void RemoveNode(FieldNode node, bool captureHistory = true)
     {
+        if (captureHistory) CaptureHistory("Delete Field node");
         Graph.RemoveNode(node.Id);
         if (ReferenceEquals(_selectedNode, node)) SelectedNode = null;
         NotifyStructureChanged();
@@ -145,9 +224,114 @@ public sealed class FieldEditorViewModel : ViewModelBase
         if (_selectedNode is { } n) RemoveNode(n);
     }
 
+    public void FinishMoveNode(FieldNode node)
+    {
+        _ = node;
+        Graph.Touch();
+        NotifyStructureChanged();
+    }
+
+    public void FinishWireChange()
+    {
+        CaptureHistory("Wire Field node");
+        NotifyStructureChanged();
+    }
+
+    /// <summary>Saves the current graph to a user-selected preset file.</summary>
+    public bool SavePatchToFile(string path, string? displayName = null)
+    {
+        var display = string.IsNullOrWhiteSpace(displayName) ? PatchName.Trim() : displayName.Trim();
+        if (display.Length == 0) display = System.IO.Path.GetFileNameWithoutExtension(path);
+
+        try
+        {
+            using var fs = File.Create(path);
+            if (IsInstrument && _instrumentHost?.Invoke() is { } inst)
+                PresetFile.SaveFieldPatch(inst, display, Environment.UserName, fs);
+            else if (!IsInstrument && _effectHost?.Invoke() is { } fx)
+                PresetFile.SaveEffect(fx, display, Environment.UserName, fs);
+            else return false;
+        }
+        catch
+        {
+            return false;
+        }
+
+        App.ServiceProvider?.GetService<IPresetLibrary>()?.Rescan();
+        return true;
+    }
+
+    /// <summary>Saves the current graph as a user Field patch preset in the library folder.</summary>
+    public string? SavePatch(string? name = null)
+    {
+        var display = string.IsNullOrWhiteSpace(name) ? PatchName.Trim() : name.Trim();
+        if (display.Length == 0) display = IsInstrument ? "Field Patch" : "Field FX Patch";
+
+        if (IsInstrument && _instrumentHost?.Invoke() is { } inst)
+        {
+            var lib = App.ServiceProvider?.GetService<IPresetLibrary>();
+            return lib?.SaveFieldPatch(inst, display);
+        }
+
+        if (!IsInstrument && _effectHost?.Invoke() is { } fx)
+        {
+            var lib = App.ServiceProvider?.GetService<IPresetLibrary>();
+            return lib?.SaveFieldEffectPatch(fx, display);
+        }
+
+        return null;
+    }
+
+    /// <summary>Replaces the live graph from a saved Field patch file.</summary>
+    public bool LoadPatchFromFile(string path)
+    {
+        var instruments = App.ServiceProvider?.GetService<IInstrumentRegistry>();
+        var effects = App.ServiceProvider?.GetService<IEffectRegistry>();
+        if (instruments is null || effects is null) return false;
+
+        PresetLoadResult? loaded;
+        try
+        {
+            using var fs = File.OpenRead(path);
+            loaded = PresetFile.Load(fs, instruments, effects);
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (loaded is null) return false;
+
+        CaptureHistory("Load Field patch");
+
+        if (IsInstrument && loaded.Instrument is FieldInstrument fi && _instrumentHost?.Invoke() is FieldInstrument hostInst)
+        {
+            using var ms = new MemoryStream();
+            using (var w = new OngenWriter(ms)) FieldGraphSerializer.Write(w, fi.Graph);
+            ms.Position = 0;
+            using (var r = new OngenReader(ms)) FieldGraphSerializer.Read(r, hostInst.Graph, Registry);
+            hostInst.Recompile();
+        }
+        else if (!IsInstrument && loaded.Effect is FieldEffect fe && _effectHost?.Invoke() is FieldEffect hostFx)
+        {
+            using var ms = new MemoryStream();
+            using (var w = new OngenWriter(ms)) FieldGraphSerializer.Write(w, fe.Graph);
+            ms.Position = 0;
+            using (var r = new OngenReader(ms)) FieldGraphSerializer.Read(r, hostFx.Graph, Registry);
+            hostFx.Recompile();
+        }
+        else return false;
+
+        NavigationGroupId = null;
+        SelectedNode = null;
+        NotifyStructureChanged();
+        return true;
+    }
+
     /// <summary>Adds an LFO modulator wired into the selected node's parameter modulation inlet.</summary>
     public void AddModulatorTo(FieldNode node, int paramIndex)
     {
+        CaptureHistory("Add Field modulator");
         var modPort = node.ModPortForParam(paramIndex);
         if (modPort < 0) return;
         var lfo = new LfoNode { X = node.X - 180, Y = node.Y + 40 + paramIndex * 20 };

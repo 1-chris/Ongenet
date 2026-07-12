@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
+using Ongenet.Core.Music;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.ViewModels.PianoRoll;
 
@@ -32,6 +35,13 @@ namespace Ongenet.App.ViewModels
 
         private Clip? _clip;
         private Track? _track;
+        private Pattern? _syncPattern;
+        private StepSequence? _syncSequence;
+        private bool _suppressPatternSync;
+        private Action? _onPatternStepsSynced;
+
+        private bool _scaleSnapEnabled;
+        private bool _showExpressionLane;
 
         public PianoRollViewModel(IProjectService project, ISelectionService selection,
             IEventAggregator events, IEditModeService editMode, IPreviewService preview,
@@ -43,6 +53,12 @@ namespace Ongenet.App.ViewModels
             _editMode = editMode;
             _preview = preview;
             _history = history;
+            _history.NoteSelectionRestored += keys =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => RestoreNoteSelection(keys));
+            QuantizeClipCommand = new RelayCommand(QuantizeClip, () => _clip is not null);
+            ApplyGrooveCommand = new RelayCommand(ApplyGroove, () => _clip is not null);
+            HumanizeClipCommand = new RelayCommand(HumanizeClip, () => _clip is not null);
+            ApplyChanceCommand = new RelayCommand(ApplyChance, () => _clip is not null);
 
             Keys = BuildKeys();
 
@@ -52,11 +68,19 @@ namespace Ongenet.App.ViewModels
             // transport bar), exactly as the arrange view does.
             _events.Subscribe<ArrangementLengthChangedEvent>(_ => SyncTimeSignature());
             _project.ProjectChanged += SyncTimeSignature;
+            _project.ProjectChanged += SyncKeySignature;
             _editMode.ModeChanged += RaiseModeProperties;
             _preview.ActiveNotesChanged += UpdateKeyHighlights;
 
             SyncTimeSignature();
+            SyncKeySignature();
             Bind(_selection.SelectedClip, _selection.SelectedTrack);
+        }
+
+        private void SyncKeySignature()
+        {
+            OnPropertyChanged(nameof(ScaleRootIndex));
+            OnPropertyChanged(nameof(SelectedScale));
         }
 
         /// <summary>Pulls beats-per-bar from the project time signature into the editor metrics.</summary>
@@ -108,16 +132,195 @@ namespace Ongenet.App.ViewModels
         /// <summary>The notes currently shown.</summary>
         public ObservableCollection<NoteViewModel> Notes { get; } = new();
 
+        public ObservableCollection<ExpressionLanePoint> ExpressionPoints { get; } = new();
+
+        public RelayCommand QuantizeClipCommand { get; }
+        public RelayCommand ApplyGrooveCommand { get; }
+        public RelayCommand HumanizeClipCommand { get; }
+        public RelayCommand ApplyChanceCommand { get; }
+
+        public float NoteChance { get; set; } = 1f;
+        public int HumanizeMaxTicks { get; set; } = 12;
+
+        public bool ShowExpressionLane
+        {
+            get => _showExpressionLane;
+            set
+            {
+                if (!SetField(ref _showExpressionLane, value)) return;
+                RebuildExpressionLane();
+            }
+        }
+
         /// <summary>Shared time/pitch↔pixel mapping.</summary>
         public PianoRollMetrics Metrics { get; } = new();
+
+        /// <summary>When true, note pitches snap to the selected key/scale.</summary>
+        public bool ScaleSnapEnabled
+        {
+            get => _scaleSnapEnabled;
+            set => SetField(ref _scaleSnapEnabled, value);
+        }
+
+        /// <summary>Scale root pitch class (0 = C) — synced with the project transport key.</summary>
+        public int ScaleRootIndex
+        {
+            get => _project.Current.KeyRootPitchClass;
+            set
+            {
+                var clamped = ((value % 12) + 12) % 12;
+                if (_project.Current.KeyRootPitchClass == clamped) return;
+                _project.Current.KeyRootPitchClass = clamped;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>Scale/mode used for pitch snapping — synced with the project transport key.</summary>
+        public ScaleType SelectedScale
+        {
+            get => _project.Current.KeyScale;
+            set
+            {
+                if (_project.Current.KeyScale == value) return;
+                _project.Current.KeyScale = value;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>Pitch-class names for the scale-root combo.</summary>
+        public IReadOnlyList<string> ScaleRootNotes { get; } = MusicTheory.NoteNames;
+
+        /// <summary>All scales/modes for the scale-mode combo.</summary>
+        public IReadOnlyList<ScaleType> Scales { get; } = (ScaleType[])Enum.GetValues(typeof(ScaleType));
+
+        private void QuantizeClip()
+        {
+            if (_clip is null) return;
+            _history.Capture("Quantize MIDI clip");
+            LogicalMidiEdit.QuantizeClip(_clip, Math.Max(1.0 / 64.0, Metrics.SnapBeats));
+            RebuildNotes();
+            Publish();
+        }
+
+        private void ApplyGroove()
+        {
+            if (_clip is null || _project.Current.ActiveGroove is not { } groove) return;
+            _history.Capture("Apply groove to MIDI clip");
+            foreach (var note in _clip.Notes)
+                note.StartBeat = Math.Max(0, GrooveMath.Apply(note.StartBeat, groove));
+            RebuildNotes();
+            Publish();
+        }
+
+        private void HumanizeClip()
+        {
+            if (_clip is null) return;
+            _history.Capture("Humanize MIDI clip");
+            LogicalMidiEdit.HumanizeClip(_clip, HumanizeMaxTicks);
+            RebuildNotes();
+            Publish();
+        }
+
+        private void ApplyChance()
+        {
+            if (_clip is null) return;
+            _history.Capture("Apply note chance");
+            LogicalMidiEdit.ApplyChance(_clip, NoteChance);
+            RebuildNotes();
+            Publish();
+        }
 
         /// <summary>True when a MIDI clip is selected (drives bottom-panel visibility).</summary>
         public bool IsVisible => _clip is not null;
 
+        /// <summary>Whether the editor is bound to a pattern channel (scratch clip, not arrangement).</summary>
+        public bool IsPatternSyncActive => _syncPattern is not null;
+
         /// <summary>Name of the clip being edited, for the header.</summary>
         public string ClipName => _clip?.Name ?? string.Empty;
 
+        /// <summary>Binds the piano roll to a pattern channel for bidirectional step-grid sync.</summary>
+        public void BeginPatternSync(Pattern pattern, StepSequence sequence, Action onStepsSynced)
+        {
+            _syncPattern = pattern;
+            _syncSequence = sequence;
+            _onPatternStepsSynced = onStepsSynced;
+            LoadPatternNotesFromSteps();
+        }
+
+        /// <summary>Ends pattern-channel sync and restores selection-based binding.</summary>
+        public void EndPatternSync()
+        {
+            if (_syncPattern is null) return;
+            _syncPattern = null;
+            _syncSequence = null;
+            _onPatternStepsSynced = null;
+            OnSelectionChanged();
+        }
+
+        /// <summary>Rebuilds piano-roll notes from the bound step sequence.</summary>
+        public void SyncFromSteps()
+        {
+            if (_syncPattern is null || _syncSequence is null) return;
+            LoadPatternNotesFromSteps();
+        }
+
+        /// <summary>Replaces the bound clip's notes from the current step sequence.</summary>
+        public void SendToPianoRoll(StepSequence sequence, double patternLengthBeats, string label)
+        {
+            if (_clip is null) return;
+            _history.Capture(label);
+            var notes = StepPatternConverter.ToNotes(sequence, patternLengthBeats);
+            ReplaceNotesInternal(notes, patternLengthBeats);
+        }
+
+        /// <summary>Writes the bound clip's notes back into a step sequence.</summary>
+        public void SendToStepSequence(StepSequence sequence, double patternLengthBeats)
+        {
+            if (_clip is null) return;
+            StepPatternConverter.FromNotes(_clip.Notes, sequence, patternLengthBeats);
+            _onPatternStepsSynced?.Invoke();
+        }
+
+        private void LoadPatternNotesFromSteps()
+        {
+            if (_syncPattern is null || _syncSequence is null) return;
+
+            _suppressPatternSync = true;
+            try
+            {
+                var scratch = new Clip
+                {
+                    Name = _syncPattern.Name,
+                    LengthBeats = _syncPattern.LengthBeats,
+                    IsAudio = false
+                };
+                foreach (var note in StepPatternConverter.ToNotes(_syncSequence, _syncPattern.LengthBeats))
+                    scratch.Notes.Add(note);
+
+                Bind(scratch, null);
+            }
+            finally
+            {
+                _suppressPatternSync = false;
+            }
+        }
+
+        private void ReplaceNotesInternal(IReadOnlyList<MidiNote> notes, double lengthBeats)
+        {
+            if (_clip is null) return;
+            _clip.Notes.Clear();
+            _clip.Notes.AddRange(notes);
+            GrowClipToFit(lengthBeats);
+            RebuildNotes();
+            Publish();
+        }
+
         // --- Editing ---
+
+        /// <summary>Snaps a MIDI note to the active scale when scale snap is enabled.</summary>
+        public int SnapPitch(int pitch) =>
+            ScaleSnapEnabled ? MusicTheory.SnapToScale(pitch, ScaleRootIndex, SelectedScale) : pitch;
 
         /// <summary>Adds a note at the given clip-local beat and pitch; returns its view model.</summary>
         public NoteViewModel? AddNote(double beat, int note)
@@ -125,6 +328,7 @@ namespace Ongenet.App.ViewModels
             if (_clip is null) return null;
             _history.Capture("Add note");
 
+            note = SnapPitch(note);
             var model = new MidiNote
             {
                 Note = note,
@@ -145,7 +349,7 @@ namespace Ongenet.App.ViewModels
         {
             if (_clip is null) return;
             note.Model.StartBeat = Math.Max(0, Metrics.Snap(beat));
-            note.Model.Note = pitch;
+            note.Model.Note = SnapPitch(pitch);
             note.RefreshFromModel();
             Publish();
         }
@@ -216,6 +420,23 @@ namespace Ongenet.App.ViewModels
         /// <summary>The notes currently marked selected.</summary>
         public IReadOnlyList<NoteViewModel> SelectedNotes => Notes.Where(n => n.IsSelected).ToList();
 
+        /// <summary>Restores piano-roll note selection after a history jump (matches start beat + pitch).</summary>
+        public void RestoreNoteSelection(IReadOnlyList<Services.NoteSelectionKey>? keys)
+        {
+            if (keys is null || keys.Count == 0)
+            {
+                foreach (var n in Notes) n.IsSelected = false;
+                return;
+            }
+
+            foreach (var note in Notes)
+            {
+                note.IsSelected = keys.Any(k =>
+                    k.Pitch == note.Model.Note
+                    && Math.Abs(k.StartBeat - note.Model.StartBeat) < 1e-6);
+            }
+        }
+
         /// <summary>How many notes are currently selected.</summary>
         public int SelectedCount => Notes.Count(n => n.IsSelected);
 
@@ -242,7 +463,7 @@ namespace Ongenet.App.ViewModels
             foreach (var (note, start, _, pitch) in _selectionBaseline)
             {
                 note.Model.StartBeat = Math.Max(0, start + snappedDelta);
-                note.Model.Note = Math.Clamp(pitch + deltaPitch, 0, 127);
+                note.Model.Note = SnapPitch(Math.Clamp(pitch + deltaPitch, 0, 127));
                 note.RefreshFromModel();
             }
 
@@ -400,10 +621,34 @@ namespace Ongenet.App.ViewModels
         private void Publish()
         {
             if (_clip is not null) _events.Publish(new ClipNotesChangedEvent(_clip));
+            RebuildExpressionLane();
+            SyncPatternStepsFromNotes();
+        }
+
+        private void RebuildExpressionLane()
+        {
+            ExpressionPoints.Clear();
+            if (!_showExpressionLane || _clip is null) return;
+
+            var values = _clip.ControlChanges
+                .Where(c => c.Controller == 74)
+                .GroupBy(c => (int)Math.Floor(c.StartBeat))
+                .ToDictionary(g => g.Key, g => g.Average(c => c.Value) / 127.0);
+            var beats = Math.Max(1, (int)Math.Ceiling(_clip.LengthBeats));
+            for (var beat = 0; beat < beats; beat++)
+                ExpressionPoints.Add(new ExpressionLanePoint(beat, values.GetValueOrDefault(beat)));
+        }
+
+        private void SyncPatternStepsFromNotes()
+        {
+            if (_suppressPatternSync || _syncPattern is null || _syncSequence is null || _clip is null) return;
+            StepPatternConverter.FromNotes(_clip.Notes, _syncSequence, _syncPattern.LengthBeats);
+            _onPatternStepsSynced?.Invoke();
         }
 
         private void OnSelectionChanged()
         {
+            if (_syncPattern is not null) return;
             var clip = _selection.SelectedClip;
             Bind(clip is { IsMidi: true } ? clip : null, _selection.SelectedTrack);
         }
@@ -415,8 +660,14 @@ namespace Ongenet.App.ViewModels
                 _clip = null;
                 _track = null;
                 Notes.Clear();
+                ExpressionPoints.Clear();
                 OnPropertyChanged(nameof(IsVisible));
                 OnPropertyChanged(nameof(ClipName));
+                QuantizeClipCommand.RaiseCanExecuteChanged();
+                ApplyGrooveCommand.RaiseCanExecuteChanged();
+                HumanizeClipCommand.RaiseCanExecuteChanged();
+                ApplyChanceCommand.RaiseCanExecuteChanged();
+                ApplyGrooveCommand.RaiseCanExecuteChanged();
                 return;
             }
 
@@ -432,6 +683,11 @@ namespace Ongenet.App.ViewModels
 
             OnPropertyChanged(nameof(IsVisible));
             OnPropertyChanged(nameof(ClipName));
+            QuantizeClipCommand.RaiseCanExecuteChanged();
+            ApplyGrooveCommand.RaiseCanExecuteChanged();
+            HumanizeClipCommand.RaiseCanExecuteChanged();
+            ApplyChanceCommand.RaiseCanExecuteChanged();
+            RebuildExpressionLane();
             ClipBound?.Invoke();
         }
 
@@ -454,4 +710,6 @@ namespace Ongenet.App.ViewModels
             return keys;
         }
     }
+
+    public sealed record ExpressionLanePoint(int Beat, double Value);
 }

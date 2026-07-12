@@ -5,6 +5,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.App.Localization;
 using Ongenet.App.Controls.Engine3D;
 using Ongenet.App.Theming;
 using Ongenet.App.Views.Windows;
@@ -42,7 +43,7 @@ namespace Ongenet.App.Controls
 
             _popOut = new Button
             {
-                Content = "⤢ Open in window",
+                Content = Loc.Get("Control_OpenInWindow"),
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(8),

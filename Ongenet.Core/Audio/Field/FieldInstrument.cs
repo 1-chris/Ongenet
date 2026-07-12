@@ -20,13 +20,17 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
     public const string Id = "field";
     private const int InitialMaxBlock = 2048;
 
-    private enum EvType { On, Off, AllOff, Bend }
+    private enum EvType { On, Off, AllOff, Bend, Cc }
     private readonly struct NoteEvent
     {
         public readonly EvType Type;
         public readonly int Note;
         public readonly float Value;
-        public NoteEvent(EvType type, int note, float value) { Type = type; Note = note; Value = value; }
+        public readonly int Controller;
+        public NoteEvent(EvType type, int note, float value, int controller = 0)
+        {
+            Type = type; Note = note; Value = value; Controller = controller;
+        }
     }
 
     private readonly IFieldNodeRegistry _registry;
@@ -93,6 +97,9 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
         Enqueue(new NoteEvent(EvType.Bend, 0, (float)semis));
     }
 
+    public void ControlChange(int controller, int value)
+        => Enqueue(new NoteEvent(EvType.Cc, 0, value, controller));
+
     private void Enqueue(in NoteEvent ev) => _events.Enqueue(ev);
 
     public void Render(Span<float> buffer)
@@ -111,6 +118,7 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
                     case EvType.Off: compiled.NoteOff(ev.Note); break;
                     case EvType.AllOff: compiled.AllNotesOff(); break;
                     case EvType.Bend: compiled.PitchBend(ev.Value); break;
+                    case EvType.Cc: compiled.ControlChange(ev.Controller, (int)ev.Value); break;
                 }
             }
         }

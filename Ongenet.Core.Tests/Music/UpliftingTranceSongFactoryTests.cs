@@ -423,12 +423,18 @@ public class UpliftingTranceSongFactoryTests
     }
 
     [Fact]
-    public void CatalogListsAllThreeBuiltInProjects()
+    public void CatalogListsAllBuiltInProjects()
     {
         var names = BuiltInProjects.All.Select(p => p.Name).ToList();
-        Assert.Equal(3, names.Count);
+        Assert.Equal(9, names.Count);
         Assert.Contains("First Light", names);
         Assert.Contains("Undertow", names);
         Assert.Contains("Ascension", names);
+        Assert.Contains("Dust & Vinyl", names);
+        Assert.Contains("House Starter", names);
+        Assert.Contains("Static Bloom", names);
+        Assert.Contains("Techno Starter", names);
+        Assert.Contains("Trap Beat", names);
+        Assert.Contains("Field Modular", names);
     }
 }

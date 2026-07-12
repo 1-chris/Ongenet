@@ -74,11 +74,15 @@ public sealed class ProjectClipItemViewModel : ViewModelBase
         {
             var bars = Representative.LengthBeats / 4.0;
             var length = bars >= 1
-                ? $"{bars.ToString(bars % 1 == 0 ? "0" : "0.#", CultureInfo.InvariantCulture)} bar{(Math.Abs(bars - 1) < 1e-9 ? "" : "s")}"
-                : $"{Representative.LengthBeats.ToString("0.#", CultureInfo.InvariantCulture)} beats";
-            var kind = Representative.IsAudio ? "Audio" : $"MIDI · {Representative.Notes.Count} notes";
-            var count = Instances.Count > 1 ? $" · ×{Instances.Count}" : "";
-            return $"{kind} · {length}{count}";
+                ? L(Math.Abs(bars - 1) < 1e-9 ? "ProjectClips_BarSingular" : "ProjectClips_BarPlural",
+                    bars.ToString(bars % 1 == 0 ? "0" : "0.#", CultureInfo.InvariantCulture))
+                : L("ProjectClips_Beats",
+                    Representative.LengthBeats.ToString("0.#", CultureInfo.InvariantCulture));
+            var kind = Representative.IsAudio
+                ? L("ProjectClips_Audio")
+                : L("ProjectClips_MidiNotes", Representative.Notes.Count);
+            var count = Instances.Count > 1 ? L("ProjectClips_InstanceCount", Instances.Count) : "";
+            return L("ProjectClips_Detail", kind, length, count);
         }
     }
 

@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
         x:Class="Ongenet.App.Views.Windows.LogWindow"
         x:DataType="vm:MainViewModel"
-        Title="Debug Logs"
+        Title="{DynamicResource Log_Debug_Logs_Title}"
         TransparencyLevelHint="Blur, AcrylicBlur, Transparent"
         Background="Transparent"
         ExtendClientAreaToDecorationsHint="True">
@@ -73,12 +73,12 @@
                     <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
                                 VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
                         <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
-                                Click="CloseButton_Click" ToolTip.Tip="Close">
+                                Click="CloseButton_Click" ToolTip.Tip="{DynamicResource Log_Close_Tip}">
                             <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
                                   VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Button>
                     </StackPanel>
-                    <TextBlock Text="Debug Logs" Margin="10,0" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
+                    <TextBlock Text="{DynamicResource Log_Debug_Logs}" Margin="10,0" FontSize="12" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
                 </StackPanel>
                 <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
                     <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
@@ -92,11 +92,11 @@
             <Viewbox Width="20" Height="20">
                 <Path Data="M3,5H21V7H3M3,11H21V13H3M3,17H21V19H3" Fill="{StaticResource CatppuccinMauve}"/>
             </Viewbox>
-            <TextBlock Text="DEBUG LOGS" FontSize="{DynamicResource FontSize14}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinText}"/>
+            <TextBlock Text="{DynamicResource Log_DEBUG_LOGS}" FontSize="{DynamicResource FontSize14}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinText}"/>
         </StackPanel>
 
         <TabControl Grid.Row="1" Name="LogTabs" SelectionChanged="LogTabs_SelectionChanged">
-            <TabItem Header="All">
+            <TabItem Header="{DynamicResource Log_All}">
                 <ListBox ItemsSource="{Binding LogEntries}" Name="LogListBoxAll"
                          FontSize="{DynamicResource FontSize11}">
                     <ListBox.ItemTemplate>
@@ -106,7 +106,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </TabItem>
-            <TabItem Header="Debug">
+            <TabItem Header="{DynamicResource Log_Debug}">
                 <ListBox Name="LogListBoxDebug"
                          FontSize="{DynamicResource FontSize11}">
                     <ListBox.ItemTemplate>
@@ -116,7 +116,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </TabItem>
-            <TabItem Header="Info">
+            <TabItem Header="{DynamicResource Log_Info}">
                 <ListBox Name="LogListBoxInfo"
                          FontSize="{DynamicResource FontSize11}">
                     <ListBox.ItemTemplate>
@@ -126,7 +126,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </TabItem>
-            <TabItem Header="Warning">
+            <TabItem Header="{DynamicResource Log_Warning}">
                 <ListBox Name="LogListBoxWarning"
                          FontSize="{DynamicResource FontSize11}">
                     <ListBox.ItemTemplate>
@@ -136,7 +136,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </TabItem>
-            <TabItem Header="Error">
+            <TabItem Header="{DynamicResource Log_Error}">
                 <ListBox Name="LogListBoxError"
                          FontSize="{DynamicResource FontSize11}">
                     <ListBox.ItemTemplate>
@@ -149,8 +149,8 @@
         </TabControl>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0" Spacing="10">
-            <Button Content="Copy to Clipboard" Classes="Action" Click="CopyLogs_Click"/>
-            <Button Content="Clear Logs" Classes="Action" Click="ClearLogs_Click"/>
+            <Button Content="{DynamicResource Log_Copy_to_Clipboard}" Classes="Action" Click="CopyLogs_Click"/>
+            <Button Content="{DynamicResource Log_Clear_Logs}" Classes="Action" Click="ClearLogs_Click"/>
         </StackPanel>
     </Grid>
         </Grid>

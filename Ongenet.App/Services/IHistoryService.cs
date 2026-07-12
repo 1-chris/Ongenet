@@ -13,7 +13,7 @@ namespace Ongenet.App.Services
     /// engine (the same path project load uses). The history is a single linear timeline with a cursor, so a
     /// history window can list every action and jump to any point (a bulk undo/redo).
     /// </summary>
-    public interface IHistoryService
+    public interface IHistoryService : Core.Services.IHistoryCapture
     {
         bool CanUndo { get; }
         bool CanRedo { get; }
@@ -24,8 +24,8 @@ namespace Ongenet.App.Services
         /// <summary>Raised after the timeline or cursor changes (so UI can refresh).</summary>
         event Action? Changed;
 
-        /// <summary>Snapshots the current state under <paramref name="label"/>, before a mutation. No-op while restoring.</summary>
-        void Capture(string label);
+        /// <summary>Raised after undo/redo/jump with note keys to re-select in the piano roll.</summary>
+        event Action<IReadOnlyList<NoteSelectionKey>>? NoteSelectionRestored;
 
         void Undo();
         void Redo();
@@ -36,4 +36,7 @@ namespace Ongenet.App.Services
         /// <summary>Drops all history (e.g. on New / Open).</summary>
         void Clear();
     }
+
+    /// <summary>Identifies a MIDI note within a clip for selection restore.</summary>
+    public readonly record struct NoteSelectionKey(double StartBeat, int Pitch);
 }

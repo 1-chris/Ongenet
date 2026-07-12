@@ -17,7 +17,8 @@ public sealed class FieldEffectViewModel : EffectViewModel
     {
         var registry = App.ServiceProvider?.GetService<IFieldNodeRegistry>() ?? new FieldNodeRegistry();
         FieldEditor = new FieldEditorViewModel(effect.Graph, registry, effect.Recompile,
-            FieldEffect.BuiltInPatchNames, effect.LoadBuiltInPatch, () => effect.Compiled, isInstrument: false);
+            FieldEffect.BuiltInPatchNames, effect.LoadBuiltInPatch, () => effect.Compiled, isInstrument: false,
+            effectHost: () => effect);
     }
 
     /// <summary>The node-graph editor for this effect's Field graph.</summary>

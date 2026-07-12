@@ -13,7 +13,7 @@
             Padding="12">
         <Grid>
             <!-- Empty state -->
-            <TextBlock Text="Select a clip to edit its settings."
+            <TextBlock Text="{DynamicResource ClipInspector_Select_a_clip_to_edit_its_settings}"
                        IsVisible="{Binding !HasClip}"
                        VerticalAlignment="Center" HorizontalAlignment="Center"
                        Foreground="{StaticResource CatppuccinSubtext0}"/>
@@ -21,7 +21,7 @@
             <!-- Clip settings -->
             <StackPanel IsVisible="{Binding HasClip}" Spacing="12">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="CLIP" FontWeight="Bold" FontSize="11"
+                    <TextBlock Text="{DynamicResource ClipInspector_CLIP}" FontWeight="Bold" FontSize="11"
                                VerticalAlignment="Center"
                                Foreground="{StaticResource CatppuccinOverlay1}"/>
                     <TextBlock Text="{Binding TrackName}" VerticalAlignment="Center"
@@ -30,15 +30,15 @@
 
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <StackPanel Spacing="4" Width="220">
-                        <TextBlock Text="Name" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <TextBlock Text="{DynamicResource ClipInspector_Name}" Foreground="{StaticResource CatppuccinSubtext0}"/>
                         <TextBox Text="{Binding Name}"/>
                     </StackPanel>
                     <StackPanel Spacing="4" Width="120">
-                        <TextBlock Text="Start (beats)" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <TextBlock Text="{DynamicResource ClipInspector_Start_beats}" Foreground="{StaticResource CatppuccinSubtext0}"/>
                         <NumericUpDown Value="{Binding StartBeat}" Minimum="0" Increment="1" FormatString="0.##"/>
                     </StackPanel>
                     <StackPanel Spacing="4" Width="120">
-                        <TextBlock Text="Length (beats)" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <TextBlock Text="{DynamicResource ClipInspector_Length_beats}" Foreground="{StaticResource CatppuccinSubtext0}"/>
                         <NumericUpDown Value="{Binding LengthBeats}" Minimum="0.25" Increment="1" FormatString="0.##"/>
                     </StackPanel>
                 </StackPanel>
