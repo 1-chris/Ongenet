@@ -37,6 +37,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.PluginHost", "Ongen
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Scripting", "Ongenet.Scripting\Ongenet.Scripting.csproj", "{EC8DC1BA-739C-4F59-B758-15EF5EEA5FBC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ongenet.Scripting.Editor", "Ongenet.Scripting.Editor\Ongenet.Scripting.Editor.csproj", "{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -251,6 +253,18 @@ Global
 		{EC8DC1BA-739C-4F59-B758-15EF5EEA5FBC}.Release|x64.Build.0 = Release|Any CPU
 		{EC8DC1BA-739C-4F59-B758-15EF5EEA5FBC}.Release|x86.ActiveCfg = Release|Any CPU
 		{EC8DC1BA-739C-4F59-B758-15EF5EEA5FBC}.Release|x86.Build.0 = Release|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Debug|x64.Build.0 = Debug|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Debug|x86.Build.0 = Debug|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Release|x64.ActiveCfg = Release|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Release|x64.Build.0 = Release|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Release|x86.ActiveCfg = Release|Any CPU
+		{6B6AF25A-EBC3-4C44-94AE-72F551429FFE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

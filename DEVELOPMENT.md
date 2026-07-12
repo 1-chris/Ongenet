@@ -23,7 +23,7 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 | [The theming system](docs/theming.md) | How live theming works: the semantic colour tokens, in-place brush mutation, `ThemedControl`, JSON import/export, and how to add tokens, themes and theme-aware controls. |
 | [The audio engine & OS audio APIs](docs/audio-engine.md) | How the engine renders a block, the signal flow (instruments → effects → buses → master), real-time safety, and how the device layer hooks into PipeWire/PulseAudio/JACK/ALSA, CoreAudio and WASAPI. |
 | [Audio Editor](docs/audio-editor.md) | Standalone multitrack sample editor — waveform tools, lanes, relationship to Sample Inspector. |
-| [Scripting](docs/scripting.md) | C# automation scripts, `IScriptingApi`, factory scripts, security limits. |
+| [Scripting](docs/scripting.md) | C# automation scripts, expanded `IScriptingApi`, portable project/preset export, factory scripts, security limits. |
 | [Polyphonic pitch editing](docs/polyphonic-pitch.md) | Built-in VariAudio-class editor — analyze, edit segments, playback and flatten. |
 | [Plugin crash isolation](docs/plugin-isolation.md) | Optional out-of-process VST3 effect hosting via `Ongenet.PluginHost`. |
 
@@ -631,7 +631,7 @@ Ongenet targets a **feature-complete open-source DAW**.
 
 - **Audio Editor** — standalone multitrack window ([docs/audio-editor.md](docs/audio-editor.md))
 - **Polyphonic pitch** — built-in note-segment editor ([docs/polyphonic-pitch.md](docs/polyphonic-pitch.md))
-- **Scripting** — Tools → Scripts, Roslyn host ([docs/scripting.md](docs/scripting.md))
+- **Scripting** — Scripting centre tab: in-app IDE (`Ongenet.Scripting.Editor`), expanded `IScriptingApi`, **Export project/preset** (`ProjectScriptExporter`, `PresetScriptExporter`), live handlers, output console, pop-out window, user scripts folder ([docs/scripting.md](docs/scripting.md))
 - **Plugin isolation** — optional VST3 effect sandbox ([docs/plugin-isolation.md](docs/plugin-isolation.md))
 
 ### Competitor glossary

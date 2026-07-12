@@ -123,15 +123,6 @@
                             </MenuFlyout>
                         </Button.Flyout>
                     </Button>
-                    <Button Content="{DynamicResource Main_Tools} ▾" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Tools_Tip}">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuItem Header="{DynamicResource Main_Scripts}" Click="OpenScripts_Click"/>
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
                     <Button Content="↶" Click="OnUndo_Click" FontSize="13" Padding="8,2"
                             IsEnabled="{Binding CanUndo}"
                             Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
@@ -253,6 +244,9 @@
                         </TabItem>
                         <TabItem Header="{DynamicResource Main_Video}">
                             <views:VideoTrackView DataContext="{Binding Video}"/>
+                        </TabItem>
+                        <TabItem Header="{DynamicResource Main_Scripting}">
+                            <views:ScriptingPanelView DataContext="{Binding Scripting}"/>
                         </TabItem>
                     </TabControl>
 

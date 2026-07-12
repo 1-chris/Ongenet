@@ -160,8 +160,10 @@ namespace Ongenet.App
             services.AddSingleton<ChordTrackViewModel>();
             services.AddSingleton<ExpressionMapViewModel>();
             services.AddSingleton<ControlRoomSettingsViewModel>();
-            services.AddSingleton<ScriptsViewModel>();
+            services.AddSingleton<Platform.IScriptEditorFactory, Platform.NullScriptEditorFactory>();
+            services.AddSingleton<ViewModels.Panels.ScriptingPanelViewModel>();
             services.AddSingleton<Core.Services.IScriptingHost, Core.Services.NullScriptingHost>();
+            services.AddSingleton<Core.Services.IScriptingApi, Core.Services.NullScriptingApi>();
 
             services.AddTransient<GuideViewModel>();
             services.AddSingleton<MainViewModel>();

@@ -1,0 +1,30 @@
+<views:ChromedWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:Ongenet.App.Views.Windows"
+        xmlns:panels="using:Ongenet.App.Views.Panels"
+        xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+        x:Class="Ongenet.App.Views.Windows.ScriptingPopOutWindow"
+        x:DataType="vm:ScriptingPanelViewModel"
+        Width="960" Height="640" MinWidth="640" MinHeight="420"
+        Title="{DynamicResource Scripts_Title}"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True">
+    <Panel>
+        <Border Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}"
+                BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+            <Grid RowDefinitions="Auto, *">
+                <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto"
+                      PointerPressed="TitleBar_PointerPressed">
+                    <TextBlock Grid.Column="0" Text="{DynamicResource Scripts_Title}" Margin="14,0" FontSize="12"
+                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinOverlay2}" FontWeight="SemiBold"/>
+                    <Button Grid.Column="2" Classes="TitleBarButton Close" Click="CloseButton_Click">
+                        <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10"
+                              Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                    </Button>
+                </Grid>
+                <panels:ScriptingPanelView Grid.Row="1" DataContext="{Binding}"/>
+            </Grid>
+        </Border>
+    </Panel>
+</views:ChromedWindow>

@@ -35,6 +35,17 @@ public static class AppPaths
         return dir;
     }
 
+    /// <summary>User C# scripts directory (<c>Documents/Ongenet/Scripts</c>); created on demand.</summary>
+    public static string UserScriptsDirectory()
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            AppFolder,
+            "Scripts");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
     public static string ConfigDirectory()
     {
         if (OperatingSystem.IsWindows())

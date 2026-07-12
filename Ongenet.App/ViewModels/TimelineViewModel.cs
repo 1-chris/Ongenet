@@ -102,6 +102,7 @@ namespace Ongenet.App.ViewModels
                 OpenLogicalMidiEditCommand.RaiseCanExecuteChanged();
             };
             events.Subscribe<TrackChangedEvent>(e => RefreshTrack(e.Track));
+            events.Subscribe<TracksChangedEvent>(_ => Rebuild());
             events.Subscribe<ClipChangedEvent>(e => RefreshClip(e.Clip));
             events.Subscribe<ClipNotesChangedEvent>(e => RefreshClipNotes(e.Clip));
             events.Subscribe<ClipAddedEvent>(e => OnClipAdded(e.Track, e.Clip));

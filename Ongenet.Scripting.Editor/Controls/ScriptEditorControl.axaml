@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:editor="using:Ongenet.Scripting.Editor"
+             x:Class="Ongenet.Scripting.Editor.Controls.ScriptEditorControl"
+             Classes="script-editor">
+    <UserControl.Styles>
+        <!-- Keep the editing surface transparent so the highlight overlay stays visible when focused. -->
+        <Style Selector="TextBox.script-editor-input">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="SelectionBrush" Value="{x:Static editor:ScriptEditorTheme.SelectionFill}"/>
+            <Setter Property="SelectionForegroundBrush" Value="Transparent"/>
+            <Setter Property="CaretBrush" Value="{x:Static editor:ScriptEditorTheme.Caret}"/>
+        </Style>
+        <Style Selector="TextBox.script-editor-input:focus">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBox.script-editor-input:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.script-editor-input:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid x:Name="EditorRoot" ColumnDefinitions="Auto, *" Background="{x:Static editor:ScriptEditorTheme.EditorBackground}">
+        <ScrollViewer x:Name="GutterScroll" Grid.Column="0" Width="40" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Hidden" IsHitTestVisible="False">
+            <TextBlock x:Name="LineNumbers" FontFamily="Consolas, Menlo, monospace" FontSize="12"
+                       Foreground="{x:Static editor:ScriptEditorTheme.Gutter}" TextAlignment="Right"
+                       Padding="4,8,6,8"/>
+        </ScrollViewer>
+
+        <ScrollViewer x:Name="EditorScroll" Grid.Column="1" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <Grid MinHeight="200">
+                <TextBlock x:Name="HighlightLayer" FontFamily="Consolas, Menlo, monospace" FontSize="12"
+                           TextWrapping="Wrap" Padding="8" IsHitTestVisible="False"/>
+                <TextBox x:Name="EditorBox" Classes="script-editor-input"
+                         AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                         FontFamily="Consolas, Menlo, monospace" FontSize="12"
+                         Padding="8"/>
+            </Grid>
+        </ScrollViewer>
+
+        <Popup x:Name="CompletionPopup" PlacementTarget="{Binding #EditorBox}" IsLightDismissEnabled="True">
+            <Border x:Name="CompletionBorder" Background="{x:Static editor:ScriptEditorTheme.PopupBackground}"
+                    BorderBrush="{x:Static editor:ScriptEditorTheme.PopupBorder}"
+                    BorderThickness="1" CornerRadius="4" MaxHeight="220">
+                <ListBox x:Name="CompletionList" MinWidth="220" MaxHeight="220" FontSize="11"/>
+            </Border>
+        </Popup>
+
+        <Popup x:Name="SignaturePopup" PlacementTarget="{Binding #EditorBox}" IsLightDismissEnabled="True">
+            <Border x:Name="SignatureBorder" Background="{x:Static editor:ScriptEditorTheme.PopupBackground}"
+                    BorderBrush="{x:Static editor:ScriptEditorTheme.PopupBorder}"
+                    BorderThickness="1" CornerRadius="4" Padding="8,4">
+                <TextBlock x:Name="SignatureText" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                           Foreground="{x:Static editor:ScriptEditorTheme.PopupForeground}"/>
+            </Border>
+        </Popup>
+    </Grid>
+</UserControl>

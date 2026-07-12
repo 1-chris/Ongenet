@@ -38,6 +38,7 @@ namespace Ongenet.App.ViewModels
             Panels.SessionViewModel session,
             Panels.NotationViewModel notation,
             Panels.VideoTrackViewModel video,
+            Panels.ScriptingPanelViewModel scripting,
             IProjectFileService projectFile,
             Services.IHistoryService history,
             ObservableCollectionLoggerProvider? logProvider = null)
@@ -63,6 +64,7 @@ namespace Ongenet.App.ViewModels
             Session = session;
             Notation = notation;
             Video = video;
+            Scripting = scripting;
             _projectFile = projectFile;
             _history = history;
             _history.Changed += () =>
@@ -144,6 +146,9 @@ namespace Ongenet.App.ViewModels
 
         /// <summary>Video track sync panel.</summary>
         public Panels.VideoTrackViewModel Video { get; }
+
+        /// <summary>In-app scripting IDE (script list, editor, output).</summary>
+        public Panels.ScriptingPanelViewModel Scripting { get; }
 
         /// <summary>Log entries captured by the in-app logger; surfaced by the Log window.</summary>
         public ObservableCollection<LogEntry> LogEntries => _logEntries;

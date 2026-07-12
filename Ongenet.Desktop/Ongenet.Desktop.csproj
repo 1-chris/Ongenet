@@ -47,6 +47,7 @@
         <ProjectReference Include="..\Ongenet.Link\Ongenet.Link.csproj" />
         <ProjectReference Include="..\Ongenet.Ara\Ongenet.Ara.csproj" />
         <ProjectReference Include="..\Ongenet.Scripting\Ongenet.Scripting.csproj" />
+        <ProjectReference Include="..\Ongenet.Scripting.Editor\Ongenet.Scripting.Editor.csproj" />
         <ProjectReference Include="..\Ongenet.PluginHost\Ongenet.PluginHost.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>

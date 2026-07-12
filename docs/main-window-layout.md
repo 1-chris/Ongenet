@@ -221,7 +221,7 @@ clips — Ableton/Bitwig-style hybrid workflows without duplicating tracks.
 | **Expression Maps** | VST expression / keyswitch articulation maps |
 | **Audio Editor** | Edison-class multitrack sample editor — clip list + shared waveform tools ([audio-editor.md](audio-editor.md)) |
 | **Pitch Editor** | Polyphonic note-segment pitch correction on audio clips (timeline → **Open Pitch Editor**) |
-| **Scripts** | Tools → Scripts — run C# automation against the open project ([scripting.md](scripting.md)) |
+| **Scripts** | **Scripting** centre tab — in-app C# IDE with syntax highlighting and IntelliSense ([scripting.md](scripting.md)) |
 
 **Settings → General → Plugins → Isolate plugins in separate process** enables optional VST3 effect
 crash isolation via `Ongenet.PluginHost` ([plugin-isolation.md](plugin-isolation.md)).

@@ -8,6 +8,7 @@ using Ongenet.Clap;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.Core.Services.Implementation;
 using Ongenet.App.Platform;
@@ -19,7 +20,10 @@ using Ongenet.Engine3D;
 using Ongenet.Engine3D.Abstractions;
 using Ongenet.Link;
 using Ongenet.Lv2;
+using Ongenet.App.Theming;
 using Ongenet.Scripting;
+using Ongenet.Scripting.Export;
+using Ongenet.Scripting.Editor;
 using Ongenet.Vst;
 using Ongenet.Vst.Vst2;
 using Ongenet.Vst.Vst3;
@@ -69,9 +73,12 @@ public sealed class DesktopPlatform : IPlatformServices
         services.AddSingleton<IAraHost, AraHost>();
 
         // Roslyn user scripting (replaces NullScriptingHost from the shared App composition root).
+        services.AddSingleton<IProjectScriptExporter, ProjectScriptExporter>();
+        services.AddSingleton<IPresetScriptExporter, PresetScriptExporter>();
         services.AddSingleton<ScriptingApi>();
         services.AddSingleton<Core.Services.IScriptingApi>(sp => sp.GetRequiredService<ScriptingApi>());
         services.AddSingleton<Core.Services.IScriptingHost, RoslynScriptingHost>();
+        services.AddSingleton<IScriptEditorFactory, ScriptEditorFactory>();
 
         // Plugin crash isolation bridge (scaffold — out-of-process host when enabled).
         services.AddSingleton<Core.Services.IPluginProcessHost, OutOfProcessPluginHost>();
@@ -138,6 +145,8 @@ public sealed class DesktopPlatform : IPlatformServices
         _ = services.GetRequiredService<MidiClockOutputService>();
         _ = services.GetRequiredService<Core.Services.TimecodeSyncService>();
         services.GetRequiredService<OscControlService>().Start();
+
+        ThemePalette.Changed += ScriptEditorTheme.NotifyThemeChanged;
 
         // Verify out-of-process plugin host when isolation is enabled.
         _ = services.GetRequiredService<Core.Services.IPluginProcessHost>().TryLaunchPluginHostAsync();

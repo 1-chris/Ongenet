@@ -35,7 +35,6 @@ namespace Ongenet.App.Views.Windows
         private SectionPlaylistWindow? _sectionPlaylistWindow;
         private ChordTrackWindow? _chordTrackWindow;
         private ExpressionMapWindow? _expressionMapWindow;
-        private ScriptsWindow? _scriptsWindow;
 
         // FL-Studio-style typing-keyboard note input: tracks which physical keys are currently
         // held (→ which MIDI notes are sounding) so auto-repeat KeyDowns don't re-trigger.
@@ -508,14 +507,6 @@ namespace Ongenet.App.Views.Windows
             {
                 _historyWindow.Activate();
             }
-        }
-
-        private void OpenScripts_Click(object? sender, RoutedEventArgs e)
-        {
-            if (_scriptsWindow is not null) { _scriptsWindow.Activate(); return; }
-            _scriptsWindow = new ScriptsWindow();
-            _scriptsWindow.Closed += (_, _) => _scriptsWindow = null;
-            _scriptsWindow.Show(this);
         }
 
         private void OpenTempoMap_Click(object? sender, RoutedEventArgs e)

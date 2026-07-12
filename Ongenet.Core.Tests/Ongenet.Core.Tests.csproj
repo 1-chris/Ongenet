@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Ongenet.App\Ongenet.App.csproj" />
     <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
     <ProjectReference Include="..\Ongenet.Scripting\Ongenet.Scripting.csproj" />
     <ProjectReference Include="..\Ongenet.Lv2\Ongenet.Lv2.csproj" />
