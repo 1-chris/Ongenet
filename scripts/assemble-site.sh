@@ -37,6 +37,12 @@ fi
 # Marketing homepage replaces DocFX index.md output.
 cp "${ROOT}/site/homepage/index.html" "$OUT/index.html"
 
+# Legal pages (Privacy Policy, EULA).
+if [[ -d "${ROOT}/site/legal" ]]; then
+  mkdir -p "$OUT/legal"
+  cp -r "${ROOT}/site/legal/." "$OUT/legal/"
+fi
+
 # Screenshots (theme-cap images on homepage).
 cp -r "${ROOT}/docs/caps" "$OUT/caps"
 

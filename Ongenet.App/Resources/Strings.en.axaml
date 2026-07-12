@@ -757,6 +757,10 @@
     <system:String x:Key="Settings_Display">Display</system:String>
     <system:String x:Key="Settings_WaveformBandColors">Colour waveforms by frequency band</system:String>
     <system:String x:Key="Settings_WaveformBandColorsTip">Show bass, mids, and treble in separate theme colours across timeline and editor waveforms</system:String>
+    <system:String x:Key="Settings_Legal">Legal</system:String>
+    <system:String x:Key="Settings_PrivacyPolicy">Privacy Policy</system:String>
+    <system:String x:Key="Settings_Eula">End User License Agreement</system:String>
+    <system:String x:Key="Settings_OpenSourceLicense">Open Source License (MIT)</system:String>
     <system:String x:Key="Settings_Theme">Theme</system:String>
     <system:String x:Key="Settings_Theme_settings_A11yName">Theme settings</system:String>
     <system:String x:Key="Status_Detecting">Detecting…</system:String>

@@ -6,6 +6,18 @@
              mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="200"
              x:Class="Ongenet.App.Views.Settings.GeneralSettingsView"
              x:DataType="vm:GeneralSettingsViewModel">
+    <UserControl.Styles>
+        <Style Selector="Button.LegalLink">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinSapphire}"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="Button.LegalLink:pointerover">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinBlue}"/>
+        </Style>
+        <Style Selector="Button.LegalLink /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="TextBlock.TextDecorations" Value="Underline"/>
+        </Style>
+    </UserControl.Styles>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="18" Spacing="14">
             <TextBlock Text="{DynamicResource Settings_TabGeneral}" FontSize="14" FontWeight="SemiBold"
@@ -42,6 +54,24 @@
                            FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"
                            Text="{Binding RestartNote}"/>
             </Grid>
+
+            <TextBlock Text="{DynamicResource Settings_Legal}" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{StaticResource CatppuccinSubtext0}" Margin="0,8,0,0"/>
+
+            <StackPanel Spacing="4">
+                <Button Classes="LegalLink" Content="{DynamicResource Settings_PrivacyPolicy}"
+                        Tag="https://onge.net/legal/privacy.html" Click="OpenLink_Click"
+                        HorizontalAlignment="Left" Padding="0" Background="Transparent"
+                        BorderThickness="0" Cursor="Hand"/>
+                <Button Classes="LegalLink" Content="{DynamicResource Settings_Eula}"
+                        Tag="https://onge.net/legal/eula.html" Click="OpenLink_Click"
+                        HorizontalAlignment="Left" Padding="0" Background="Transparent"
+                        BorderThickness="0" Cursor="Hand"/>
+                <Button Classes="LegalLink" Content="{DynamicResource Settings_OpenSourceLicense}"
+                        Tag="https://github.com/1-chris/Ongenet/blob/main/LICENSE" Click="OpenLink_Click"
+                        HorizontalAlignment="Left" Padding="0" Background="Transparent"
+                        BorderThickness="0" Cursor="Hand"/>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

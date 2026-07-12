@@ -53,6 +53,9 @@ jobs:
           test -f _site/docfx/docfx.min.js
           test -f _site/api/index.html
           head -1 _site/api/index.html | grep -q '<!DOCTYPE html>'
+          test -f _site/legal/privacy.html
+          test -f _site/legal/eula.html
+          head -1 _site/legal/privacy.html | grep -q '<!DOCTYPE html>'
           echo "Assembled site:"; find _site -maxdepth 2 -mindepth 1 | sort | head -30
 
       - name: Upload Pages artifact
