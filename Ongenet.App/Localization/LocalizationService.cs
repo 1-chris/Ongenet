@@ -102,6 +102,11 @@ public sealed class LocalizationService : ILocalizationService
 
     private static void ApplyThreadCulture(string cultureId)
     {
+        // WASM demo builds set InvariantGlobalization (no ICU data). Our strings come from merged
+        // axaml dictionaries, so skipping thread culture there is fine — only .NET formatting APIs care.
+        if (AppContext.TryGetSwitch("System.Globalization.Invariant", out var invariant) && invariant)
+            return;
+
         var culture = CultureInfo.GetCultureInfo(cultureId);
         CultureInfo.CurrentUICulture = culture;
         CultureInfo.CurrentCulture = culture;
