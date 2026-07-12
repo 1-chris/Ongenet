@@ -5,24 +5,32 @@ using Ongenet.Core.Audio.Midi;
 namespace Ongenet.Audio.Interop;
 
 /// <summary>
-/// Platform MIDI-input backend: enumerates input ports and, while started, delivers parsed
-/// <see cref="MidiMessage"/>s on a dedicated background thread. One backend per process; the
-/// concrete implementation is chosen by <see cref="MidiInputBackendFactory"/> per operating system.
+/// Platform MIDI-input backend: enumerates input ports and delivers parsed
+/// <see cref="MidiMessage"/>s on dedicated background threads.
 /// </summary>
 public interface IMidiInputBackend : IDisposable
 {
-    /// <summary>Enumerates the available MIDI input ports.</summary>
     IReadOnlyList<MidiDeviceInfo> EnumerateDevices();
 
-    /// <summary>
-    /// Opens <paramref name="device"/> and begins delivering messages via <paramref name="onMessage"/>,
-    /// invoked on the backend's own thread (not the UI or audio thread). Stops any prior capture first.
-    /// </summary>
-    void Start(MidiDeviceInfo device, Action<MidiMessage> onMessage);
+    /// <summary>Subscribes to <paramref name="device"/>; messages are tagged with its <see cref="MidiDeviceInfo.OpenId"/>.</summary>
+    void Connect(MidiDeviceInfo device, Action<MidiMessage> onMessage);
 
-    /// <summary>Closes the open device and stops the delivery thread.</summary>
-    void Stop();
+    void Disconnect(MidiDeviceInfo device);
 
-    /// <summary>Whether a device is open and the read thread is running.</summary>
+    void DisconnectAll();
+
+    IReadOnlyList<MidiDeviceInfo> ConnectedDevices { get; }
+
+    /// <summary>Whether at least one device is connected.</summary>
     bool IsCapturing { get; }
+
+    /// <summary>Opens a single device (disconnects all others first).</summary>
+    void Start(MidiDeviceInfo device, Action<MidiMessage> onMessage)
+    {
+        DisconnectAll();
+        Connect(device, onMessage);
+    }
+
+    /// <summary>Disconnects all devices.</summary>
+    void Stop() => DisconnectAll();
 }

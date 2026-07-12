@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "akai-apc-key-25-mk2",
+  "name": "Akai APC Key 25 mkII",
+  "match": {
+    "portNameContains": [ "APC Key 25", "APC Key25", "APC25" ]
+  },
+  "ports": [ "Session", "Transport" ],
+  "bindings": [
+    { "action": "PlayPause", "isNote": false, "channel": 0, "number": 91 },
+    { "action": "Stop", "isNote": false, "channel": 0, "number": 92 },
+    { "action": "Record", "isNote": false, "channel": 0, "number": 93 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 0, "sceneIndex": 0 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 1, "sceneIndex": 1 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 2, "sceneIndex": 2 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 3, "sceneIndex": 3 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 4, "sceneIndex": 4 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 5, "sceneIndex": 5 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 6, "sceneIndex": 6 },
+    { "action": "LaunchScene", "isNote": true, "channel": 0, "number": 7, "sceneIndex": 7 },
+    { "action": "StopAll", "isNote": true, "channel": 0, "number": 8 }
+  ],
+  "feedback": []
+}

@@ -321,7 +321,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="tl:ClipViewModel">
                                             <Border Classes="clip" CornerRadius="4" ClipToBounds="True"
-                                                    Background="{Binding Owner.ColorKey, Converter={StaticResource ColorKeyToBrush}}"
+                                                    Background="{Binding DisplayColorKey, Converter={StaticResource ColorKeyToBrush}}"
                                                     Classes.selected="{Binding IsSelected}">
                                                 <Border.ContextMenu>
                                                     <ContextMenu>

@@ -22,6 +22,7 @@
     <ItemGroup>
         <None Include="Scripts\**\*.cs" CopyToOutputDirectory="PreserveNewest" />
         <Compile Remove="Scripts\**\*.cs" />
+        <None Include="Controllers\Factory\**\*.ongencontroller" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>

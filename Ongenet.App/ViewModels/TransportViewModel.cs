@@ -29,6 +29,9 @@ namespace Ongenet.App.ViewModels
         private readonly ILinkSession _link;
         private readonly IPlaybackModeService _playback;
         private readonly TimelineViewModel _timeline;
+        private readonly IMidiInputService _midi;
+        private readonly IAppSettingsService _appSettings;
+        private readonly ISessionCaptureService _capture;
         private bool _isRendering;
         private bool _syncingLinkTempo;
         private readonly Queue<long> _tapTimes = new();
@@ -37,7 +40,8 @@ namespace Ongenet.App.ViewModels
             IProjectService project, IEventAggregator events, IEditModeService editMode,
             OfflineRenderer renderer, IRecordingService recording, AudioDevicesViewModel devices,
             ISystemMetricsSampler metrics, ILinkSession link, IPlaybackModeService playback,
-            TimelineViewModel timeline)
+            TimelineViewModel timeline, IMidiInputService midi, IAppSettingsService appSettings,
+            ISessionCaptureService capture)
         {
             _transport = transport;
             _engine = engine;
@@ -50,6 +54,9 @@ namespace Ongenet.App.ViewModels
             _link = link;
             _playback = playback;
             _timeline = timeline;
+            _midi = midi;
+            _appSettings = appSettings;
+            _capture = capture;
             Devices = devices;
 
             _metrics.Updated += OnMetricsUpdated;
@@ -79,7 +86,8 @@ namespace Ongenet.App.ViewModels
             _transport.LoopChanged += () => OnPropertyChanged(nameof(IsLooping));
             _transport.PunchChanged += OnPunchChanged;
             _transport.MetronomeChanged += () => OnPropertyChanged(nameof(MetronomeEnabled));
-            _playback.ModeChanged += () => OnPropertyChanged(nameof(PlaybackMode));
+            _playback.ModeChanged += OnPlaybackModeChanged;
+            _capture.SessionRecordArmedChanged += OnSessionRecordArmedChanged;
 
             _link.Quantum = Math.Max(1, _project.Current.TimeSignature.Numerator);
         }
@@ -91,6 +99,41 @@ namespace Ongenet.App.ViewModels
             get => _playback.Mode;
             set => _playback.Mode = value;
         }
+
+        /// <summary>When true, session clip launches are logged for capture to the arrangement.</summary>
+        public bool SessionRecordArmed
+        {
+            get => _capture.SessionRecordArmed;
+            set => _capture.SetSessionRecordArmed(value);
+        }
+
+        /// <summary>When true, MIDI notes/CC are routed to the selected instrument track.</summary>
+        public bool MidiInstrumentInputEnabled
+        {
+            get => _midi.InstrumentInputEnabled;
+            set
+            {
+                if (_midi.InstrumentInputEnabled == value) return;
+                if (_appSettings is AppSettingsService svc)
+                {
+                    svc.SetMidiInstrumentInputEnabled(value);
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private void OnPlaybackModeChanged()
+        {
+            OnPropertyChanged(nameof(PlaybackMode));
+            if (_appSettings.Current.MidiInstrumentInputEnabled is null)
+            {
+                _midi.InstrumentInputEnabled = _playback.Mode == PlaybackMode.Arrangement;
+                OnPropertyChanged(nameof(MidiInstrumentInputEnabled));
+            }
+        }
+
+        private void OnSessionRecordArmedChanged() =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(SessionRecordArmed)));
 
         private void ClearPunch()
         {

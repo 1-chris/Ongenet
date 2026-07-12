@@ -18,6 +18,18 @@ public sealed class AppSettings
     public string? AudioInputDevice { get; set; }
     public string InputChannelMode { get; set; } = "Stereo";
     public string? MidiInputDevice { get; set; }
+
+    /// <summary>Display names of enabled MIDI input ports (multi-select).</summary>
+    public List<string> MidiInputDevices { get; set; } = new();
+
+    /// <summary>
+    /// When set, controls whether MIDI notes/CC reach the selected instrument. Null = auto (off in
+    /// Session/Hybrid, on in Arrangement).
+    /// </summary>
+    public bool? MidiInstrumentInputEnabled { get; set; }
+
+    /// <summary>When true, pending session captures are committed when transport stops.</summary>
+    public bool CommitSessionCaptureOnStop { get; set; }
     public bool MidiClockEnabled { get; set; }
     public string? ThemeName { get; set; }
     public bool ThemeIsLight { get; set; }
@@ -44,6 +56,9 @@ public sealed class AppSettings
 
     /// <summary>Control surface profile name; null/empty = legacy MCU + Launchpad combined mapping.</summary>
     public string? ControlSurfaceProfile { get; set; }
+
+    /// <summary>Active control-surface definition id (<c>.ongencontroller</c>); preferred over legacy profile.</summary>
+    public string? ControlSurfaceDefinitionId { get; set; }
 
     /// <summary>When true, Windows WASAPI uses exclusive mode for lower latency.</summary>
     public bool WasapiExclusiveMode { get; set; }

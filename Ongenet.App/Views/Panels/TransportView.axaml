@@ -137,6 +137,14 @@
                           ToolTip.Tip="{DynamicResource Transport_Global_scale_mode_for_the_piano_roll_Tip}"/>
                 <Button Classes="flat compact" Content="{DynamicResource Transport_Cap_MIDI}" Command="{Binding CaptureRetrospectiveMidiCommand}"
                         ToolTip.Tip="{DynamicResource Transport_Capture_recently_played_MIDI_into_a_clip_at_the__Tip}"/>
+                <ToggleButton Classes="toggle" IsChecked="{Binding SessionRecordArmed}"
+                              ToolTip.Tip="Arm session capture — logs clip launches during playback for materializing to the arrangement">
+                    <TextBlock Text="Session Rec" VerticalAlignment="Center" FontSize="11"/>
+                </ToggleButton>
+                <ToggleButton Classes="toggle" IsChecked="{Binding MidiInstrumentInputEnabled}"
+                              ToolTip.Tip="Route MIDI notes and controllers to the selected instrument (disable for session/controller use)">
+                    <TextBlock Text="MIDI Keys" VerticalAlignment="Center" FontSize="11"/>
+                </ToggleButton>
             </StackPanel>
 
             <!-- Col 4: metronome + render progress + MIDI export -->

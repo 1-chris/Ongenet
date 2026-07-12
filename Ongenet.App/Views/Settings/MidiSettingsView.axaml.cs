@@ -36,6 +36,12 @@ public partial class MidiSettingsView : UserControl
             vm.RemoveMapping(row);
     }
 
+    private void RemoveSessionMapping_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MidiSettingsViewModel vm && (sender as Control)?.DataContext is SessionMidiMapRow row)
+            vm.RemoveSessionMapping(row);
+    }
+
     private void ResetShortcut_Click(object? sender, RoutedEventArgs e)
     {
         if (DataContext is MidiSettingsViewModel vm && (sender as Control)?.DataContext is KeyboardShortcutRow row)

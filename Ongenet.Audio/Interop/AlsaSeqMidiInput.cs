@@ -22,6 +22,8 @@ public sealed class AlsaSeqMidiInput : IMidiInputBackend
 
     // snd_seq_event_t field offsets (LP64): type@0; data union@16. note_t: channel@16, note@17, vel@18.
     // ctrl_t: channel@16, param(uint)@20, value(int)@24.
+    private const int OffSourceClient = 12;
+    private const int OffSourcePort = 14;
     private const int OffType = 0;
     private const int OffChannel = 16;
     private const int OffNote = 17;
@@ -32,13 +34,16 @@ public sealed class AlsaSeqMidiInput : IMidiInputBackend
     private readonly object _lock = new();
     private readonly List<MidiMessage> _batch = new(32);
 
+    private readonly Dictionary<string, (int Client, int Port)> _connections = new(StringComparer.Ordinal);
+    private readonly Dictionary<(int Client, int Port), string> _addrToOpenId = new();
+    private readonly List<MidiDeviceInfo> _connectedList = new();
+
     private IntPtr _handle;
     private int _port = -1;
     private int _clientId = -1;
     private Thread? _thread;
     private Action<MidiMessage>? _onMessage;
     private volatile bool _running;
-    private (int Client, int Port)? _connected;
 
     private AlsaSeqMidiInput(IntPtr handle, int clientId, int port)
     {
@@ -118,51 +123,87 @@ public sealed class AlsaSeqMidiInput : IMidiInputBackend
         return list;
     }
 
-    public void Start(MidiDeviceInfo device, Action<MidiMessage> onMessage)
-    {
-        Stop();
+    public IReadOnlyList<MidiDeviceInfo> ConnectedDevices => _connectedList;
 
+    public void Connect(MidiDeviceInfo device, Action<MidiMessage> onMessage)
+    {
         var (client, port) = ParseAddr(device.OpenId);
         if (client < 0) throw new InvalidOperationException($"Invalid MIDI port id '{device.OpenId}'.");
 
         lock (_lock)
         {
+            if (_connections.ContainsKey(device.OpenId)) return;
+
             var rc = AlsaMidiNative.snd_seq_connect_from(_handle, _port, client, port);
             if (rc < 0)
                 throw new InvalidOperationException(
                     $"snd_seq_connect_from({client}:{port}) failed: {AlsaMidiNative.ErrorText(rc)}");
 
-            _connected = (client, port);
+            _connections[device.OpenId] = (client, port);
+            _addrToOpenId[(client, port)] = device.OpenId;
+            _connectedList.Add(device);
             _onMessage = onMessage;
-            _running = true;
-            _thread = new Thread(ReadLoop) { IsBackground = true, Name = "ALSA seq MIDI In" };
-            _thread.Start();
+
+            if (!_running)
+            {
+                _running = true;
+                _thread = new Thread(ReadLoop) { IsBackground = true, Name = "ALSA seq MIDI In" };
+                _thread.Start();
+            }
+
             IsCapturing = true;
         }
     }
 
-    public void Stop()
+    public void Disconnect(MidiDeviceInfo device)
     {
-        Thread? thread;
         lock (_lock)
         {
-            if (!_running && _thread is null) return;
-            _running = false;
-            thread = _thread;
-            _thread = null;
-        }
-
-        thread?.Join(1000);
-
-        lock (_lock)
-        {
-            if (_connected is { } c && _handle != IntPtr.Zero)
-                AlsaMidiNative.snd_seq_disconnect_from(_handle, _port, c.Client, c.Port);
-            _connected = null;
-            _onMessage = null;
-            IsCapturing = false;
+            if (!_connections.Remove(device.OpenId, out var addr)) return;
+            _addrToOpenId.Remove(addr);
+            _connectedList.RemoveAll(d => d.OpenId == device.OpenId);
+            if (_handle != IntPtr.Zero)
+                AlsaMidiNative.snd_seq_disconnect_from(_handle, _port, addr.Client, addr.Port);
+            if (_connections.Count == 0)
+                StopReadLoopLocked();
         }
     }
+
+    public void DisconnectAll()
+    {
+        lock (_lock)
+        {
+            foreach (var (_, addr) in _connections)
+            {
+                if (_handle != IntPtr.Zero)
+                    AlsaMidiNative.snd_seq_disconnect_from(_handle, _port, addr.Client, addr.Port);
+            }
+
+            _connections.Clear();
+            _addrToOpenId.Clear();
+            _connectedList.Clear();
+            StopReadLoopLocked();
+        }
+    }
+
+    private void StopReadLoopLocked()
+    {
+        if (!_running && _thread is null) return;
+        _running = false;
+        var thread = _thread;
+        _thread = null;
+        thread?.Join(1000);
+        _onMessage = null;
+        IsCapturing = false;
+    }
+
+    public void Start(MidiDeviceInfo device, Action<MidiMessage> onMessage)
+    {
+        DisconnectAll();
+        Connect(device, onMessage);
+    }
+
+    public void Stop() => DisconnectAll();
 
     private unsafe void ReadLoop()
     {
@@ -198,8 +239,13 @@ public sealed class AlsaSeqMidiInput : IMidiInputBackend
                     while (true)
                     {
                         var rc = AlsaMidiNative.snd_seq_event_input(_handle, out var ev);
-                        if (rc < 0 || ev == IntPtr.Zero) break; // -EAGAIN when empty
-                        if (TryDecode((byte*)ev, out var msg)) _batch.Add(msg);
+                        if (rc < 0 || ev == IntPtr.Zero) break;
+                        var srcClient = *(short*)((byte*)ev + OffSourceClient);
+                        var srcPort = *(short*)((byte*)ev + OffSourcePort);
+                        string? openId = null;
+                        _addrToOpenId.TryGetValue((srcClient, srcPort), out openId);
+                        if (TryDecode((byte*)ev, out var msg))
+                            _batch.Add(msg.WithSource(openId));
                     }
                 }
 
@@ -274,7 +320,7 @@ public sealed class AlsaSeqMidiInput : IMidiInputBackend
 
     public void Dispose()
     {
-        Stop();
+        DisconnectAll();
         lock (_lock)
         {
             if (_handle != IntPtr.Zero)

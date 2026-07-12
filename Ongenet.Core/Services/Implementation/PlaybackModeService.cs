@@ -69,7 +69,11 @@ public sealed class PlaybackModeService : IPlaybackModeService
     public event Action? ModeChanged;
     public event Action? ActiveClipsChanged;
 
-    public void LaunchClip(Guid sessionClipId) => LaunchClipInternal(sessionClipId, forceImmediate: false);
+    public void LaunchClip(Guid sessionClipId)
+    {
+        EnsureSessionPlaybackActive();
+        LaunchClipInternal(sessionClipId, forceImmediate: false);
+    }
 
     public void QueueClip(Guid sessionClipId)
     {
@@ -99,6 +103,7 @@ public sealed class PlaybackModeService : IPlaybackModeService
 
         if (held)
         {
+            EnsureSessionPlaybackActive();
             _gated.Add(sessionClipId);
             LaunchClipInternal(sessionClipId, forceImmediate: true);
         }
@@ -159,8 +164,9 @@ public sealed class PlaybackModeService : IPlaybackModeService
 
         if (byTrack.Count == 0) return;
 
+        EnsureSessionPlaybackActive();
         foreach (var sc in byTrack.Values)
-            LaunchClip(sc.Id);
+            LaunchClipInternal(sc.Id, forceImmediate: false);
     }
 
     public void StopAll()
@@ -318,4 +324,19 @@ public sealed class PlaybackModeService : IPlaybackModeService
     }
 
     private void NotifyActiveChanged() => ActiveClipsChanged?.Invoke();
+
+    /// <summary>Session launches should be audible — switch out of arrangement-only and start transport.</summary>
+    private void EnsureSessionPlaybackActive()
+    {
+        if (_mode == PlaybackMode.Arrangement)
+        {
+            Mode = PlaybackMode.Hybrid;
+            SessionCrossfader = 0.5;
+        }
+        else if (_mode == PlaybackMode.Hybrid && _sessionCrossfader < 0.25)
+            SessionCrossfader = 0.5;
+
+        if (_transport.State != TransportState.Playing)
+            _transport.Play();
+    }
 }

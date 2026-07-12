@@ -121,4 +121,10 @@ public sealed class Clip
     /// buffer). Duplicating as a linked copy keeps content in sync until unlinked.
     /// </summary>
     public Guid? LinkedClipGroupId { get; set; }
+
+    /// <summary>Provenance: arrangement-authored vs session-performance capture.</summary>
+    public ClipOrigin Origin { get; set; } = ClipOrigin.Arrangement;
+
+    /// <summary>When <see cref="Origin"/> is <see cref="ClipOrigin.CapturedSession"/>, the session slot that was launched.</summary>
+    public Guid? CapturedFromSessionClipId { get; set; }
 }

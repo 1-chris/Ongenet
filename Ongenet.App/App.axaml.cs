@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -74,6 +75,12 @@ namespace Ongenet.App
             services.AddSingleton<IUiThreadDispatcher, Services.AvaloniaUiDispatcher>();
             services.AddSingleton<IMidiMappingService, Services.MidiMappingService>();
             services.AddSingleton<ITransportMapService, Services.TransportMapService>();
+            services.AddSingleton<ISessionMidiMapService, Services.SessionMidiMapService>();
+
+            // Control-surface definition catalog, routing, and import.
+            services.AddSingleton<Services.ControlSurfaceLibrary>();
+            services.AddSingleton<Services.ControlSurfaceRouter>();
+            services.AddSingleton<Services.ControlSurface.ControlSurfaceImportService>();
 
             // App-wide settings persisted to the per-user config file (device/theme/quantize/transport).
             services.AddSingleton<Services.IAppSettingsService, Services.AppSettingsService>();
@@ -335,9 +342,9 @@ namespace Ongenet.App
                 var midi = ServiceProvider!.GetRequiredService<IMidiInputService>();
                 var logger = ServiceProvider!.GetService<ILoggerFactory>()?.CreateLogger("Midi");
                 logger?.LogInformation(
-                    midi.SelectedDevice is { } d
-                        ? $"MIDI input: {midi.Devices.Count} device(s); listening on \"{d.DisplayName}\"."
-                        : $"MIDI input: {midi.Devices.Count} device(s); none selected.");
+                    midi.EnabledDevices.Count > 0
+                        ? $"MIDI input: {midi.Devices.Count} device(s); listening on {midi.EnabledDevices.Count} port(s): {string.Join(", ", midi.EnabledDevices.Select(d => d.DisplayName))}."
+                        : $"MIDI input: {midi.Devices.Count} device(s); none enabled.");
                 return midi;
             }
             catch (Exception ex)

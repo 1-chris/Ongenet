@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "novation-launchpad-session",
+  "name": "Novation Launchpad (Session)",
+  "match": {
+    "portNameContains": [ "Launchpad", "LPX", "Launchpad Mini" ]
+  },
+  "ports": [ "Session" ],
+  "bindings": [
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 36, "sceneIndex": 0 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 37, "sceneIndex": 1 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 38, "sceneIndex": 2 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 39, "sceneIndex": 3 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 40, "sceneIndex": 4 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 41, "sceneIndex": 5 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 42, "sceneIndex": 6 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 43, "sceneIndex": 7 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 44, "sceneIndex": 8 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 45, "sceneIndex": 9 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 46, "sceneIndex": 10 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 47, "sceneIndex": 11 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 48, "sceneIndex": 12 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 49, "sceneIndex": 13 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 50, "sceneIndex": 14 },
+    { "action": "LaunchScene", "isNote": true, "channel": -1, "number": 51, "sceneIndex": 15 },
+    { "action": "StopAll", "isNote": true, "channel": -1, "number": 52 }
+  ],
+  "feedback": []
+}

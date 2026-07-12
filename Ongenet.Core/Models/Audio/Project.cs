@@ -36,6 +36,9 @@ public sealed class Project
     /// <summary>MIDI-controller mappings ("MIDI learn"): CC → parameter. Managed by the mapping service.</summary>
     public List<MidiMapping> MidiMappings { get; } = new();
 
+    /// <summary>Learned MIDI bindings for session clip/scene actions.</summary>
+    public List<SessionMidiMapping> SessionMidiMappings { get; } = new();
+
     /// <summary>FL-style patterns for the channel rack.</summary>
     public List<Pattern> Patterns { get; } = new();
 

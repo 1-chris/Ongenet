@@ -93,6 +93,11 @@ namespace Ongenet.App.ViewModels.Timeline
 
         public string Name => Model.LinkedClipGroupId is null ? Model.Name : $"{Model.Name} 🔗";
 
+        /// <summary>Theme color key for clip background (captured session clips use peach).</summary>
+        public string DisplayColorKey => Model.Origin == ClipOrigin.CapturedSession
+            ? "CatppuccinPeach"
+            : Owner.ColorKey;
+
         /// <summary>Left edge of the clip on the lane canvas, in pixels.</summary>
         public double Left => _metrics.BeatsToPixels(Model.StartBeat);
 

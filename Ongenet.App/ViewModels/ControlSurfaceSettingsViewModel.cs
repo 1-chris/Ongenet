@@ -3,49 +3,72 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Threading;
 using Ongenet.App.Services;
+using Ongenet.App.Services.ControlSurface;
+using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.App.ViewModels;
 
-/// <summary>Control surface profile picker and mixer CC learn UI for the Settings window.</summary>
+/// <summary>Control surface definition picker, legacy profile fallback, mixer CC learn, and import UI.</summary>
 public sealed class ControlSurfaceSettingsViewModel : ViewModelBase
 {
     private readonly ControlSurfaceService _controlSurface;
     private readonly IAppSettingsService _settings;
+    private readonly ControlSurfaceImportService _import;
 
-    public ControlSurfaceSettingsViewModel(ControlSurfaceService controlSurface, IAppSettingsService settings)
+    public ControlSurfaceSettingsViewModel(ControlSurfaceService controlSurface, IAppSettingsService settings,
+        ControlSurfaceImportService import)
     {
         _controlSurface = controlSurface;
         _settings = settings;
-        Profiles = new ObservableCollection<ControlSurfaceProfileOption>
+        _import = import;
+
+        DefinitionRows = new ObservableCollection<ControlSurfaceDefinitionRow>();
+        LegacyProfiles = new ObservableCollection<ControlSurfaceProfileOption>
         {
-            new(null, "Legacy (MCU + Launchpad)"),
+            new(null, "Legacy (MCU + HUI only)"),
             new(ControlSurfaceProfile.McuTransport, "MCU Transport"),
             new(ControlSurfaceProfile.McuMixer, "MCU Mixer (8 + bank)"),
-            new(ControlSurfaceProfile.LaunchpadSession, "Launchpad Session"),
             new(ControlSurfaceProfile.HuiTransport, "HUI Transport"),
             new(ControlSurfaceProfile.HuiMixer, "HUI Mixer (8 + bank)"),
             new(ControlSurfaceProfile.Push2, "Ableton Push 2"),
             new(ControlSurfaceProfile.Apc40, "Akai APC40")
         };
-        _selectedProfile = Profiles.FirstOrDefault(p => p.Profile == _controlSurface.Profile) ?? Profiles[0];
+        _selectedLegacyProfile = LegacyProfiles.FirstOrDefault(p => p.Profile == _controlSurface.LegacyProfile)
+                                 ?? LegacyProfiles[0];
         MappingRows = new ObservableCollection<ControlSurfaceMappingRow>();
 
         _controlSurface.LearnStateChanged += () => Dispatcher.UIThread.Post(RefreshMappings);
+        RefreshDefinitions();
         RefreshMappings();
     }
 
-    public ObservableCollection<ControlSurfaceProfileOption> Profiles { get; }
+    public ObservableCollection<ControlSurfaceDefinitionRow> DefinitionRows { get; }
+    public ObservableCollection<ControlSurfaceProfileOption> LegacyProfiles { get; }
     public ObservableCollection<ControlSurfaceMappingRow> MappingRows { get; }
 
-    private ControlSurfaceProfileOption _selectedProfile;
-    public ControlSurfaceProfileOption SelectedProfile
+    private ControlSurfaceDefinitionRow? _selectedDefinition;
+    public ControlSurfaceDefinitionRow? SelectedDefinition
     {
-        get => _selectedProfile;
+        get => _selectedDefinition;
         set
         {
-            if (!SetField(ref _selectedProfile, value) || value is null) return;
-            _controlSurface.Profile = value.Profile;
+            if (!SetField(ref _selectedDefinition, value)) return;
+            _controlSurface.DefinitionId = value?.Definition?.Id;
+            OnPropertyChanged(nameof(ShowLegacyProfile));
+            OnPropertyChanged(nameof(ShowMixerMappings));
+            RefreshMappings();
+        }
+    }
+
+    private ControlSurfaceProfileOption _selectedLegacyProfile;
+    public ControlSurfaceProfileOption SelectedLegacyProfile
+    {
+        get => _selectedLegacyProfile;
+        set
+        {
+            if (!SetField(ref _selectedLegacyProfile, value) || value is null) return;
+            _controlSurface.LegacyProfile = value.Profile;
             OnPropertyChanged(nameof(ShowMixerMappings));
             RefreshMappings();
         }
@@ -62,14 +85,24 @@ public sealed class ControlSurfaceSettingsViewModel : ViewModelBase
         }
     }
 
+    public bool ShowLegacyProfile => SelectedDefinition is null;
+
     public bool ShowMixerMappings =>
-        _controlSurface.Profile is ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40;
+        ShowLegacyProfile && _controlSurface.LegacyProfile is ControlSurfaceProfile.Push2
+            or ControlSurfaceProfile.Apc40;
+
+    private string _importReport = "";
+    public string ImportReport
+    {
+        get => _importReport;
+        private set => SetField(ref _importReport, value);
+    }
 
     public void LearnMapping(int mixerChannel, string target) => _controlSurface.BeginLearn(mixerChannel, target);
 
     public void ClearMapping(int mixerChannel, string target)
     {
-        if (_controlSurface.Profile is not { } profile) return;
+        if (_controlSurface.LegacyProfile is not { } profile) return;
         var key = profile.ToString();
         _settings.Current.ControlSurfaceMappings.RemoveAll(m =>
             m.Profile == key && m.MixerChannel == mixerChannel && m.Target == target);
@@ -77,12 +110,39 @@ public sealed class ControlSurfaceSettingsViewModel : ViewModelBase
         RefreshMappings();
     }
 
+    public void ImportFromFile(string path)
+    {
+        var result = _import.Import(path);
+        ImportReport = string.Join(Environment.NewLine, result.Report.Messages);
+        if (result.Success)
+        {
+            _controlSurface.RescanDefinitions();
+            RefreshDefinitions();
+            if (result.DefinitionId is { } id)
+                SelectedDefinition = DefinitionRows.FirstOrDefault(r => r.Definition?.Id == id);
+        }
+    }
+
+    private void RefreshDefinitions()
+    {
+        var selectedId = _settings.Current.ControlSurfaceDefinitionId;
+        DefinitionRows.Clear();
+        DefinitionRows.Add(new ControlSurfaceDefinitionRow(null, "None (legacy MCU/HUI)"));
+        foreach (var def in _controlSurface.AvailableDefinitions)
+            DefinitionRows.Add(new ControlSurfaceDefinitionRow(def, def.Name));
+        _selectedDefinition = DefinitionRows.FirstOrDefault(r => r.Definition?.Id == selectedId)
+                              ?? DefinitionRows.FirstOrDefault();
+        OnPropertyChanged(nameof(SelectedDefinition));
+        OnPropertyChanged(nameof(ShowLegacyProfile));
+        OnPropertyChanged(nameof(ShowMixerMappings));
+    }
+
     private void RefreshMappings()
     {
         MappingRows.Clear();
         if (!ShowMixerMappings) return;
 
-        var profile = _controlSurface.Profile!.Value.ToString();
+        var profile = _controlSurface.LegacyProfile!.Value.ToString();
         var custom = _settings.Current.ControlSurfaceMappings.Where(m => m.Profile == profile).ToList();
 
         for (var ch = 1; ch <= 8; ch++)
@@ -98,6 +158,18 @@ public sealed class ControlSurfaceSettingsViewModel : ViewModelBase
             }
         }
     }
+}
+
+public sealed class ControlSurfaceDefinitionRow
+{
+    public ControlSurfaceDefinitionRow(ControlSurfaceDefinition? definition, string label)
+    {
+        Definition = definition;
+        Label = label;
+    }
+
+    public ControlSurfaceDefinition? Definition { get; }
+    public string Label { get; }
 }
 
 public sealed record ControlSurfaceProfileOption(ControlSurfaceProfile? Profile, string Label);

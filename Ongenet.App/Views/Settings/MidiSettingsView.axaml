@@ -26,19 +26,19 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="18" Spacing="10">
 
-            <!-- Input device -->
+            <!-- Input devices -->
             <TextBlock Classes="Section" Text="{DynamicResource SettingsMidi_MIDI_input}" Margin="0"/>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <ComboBox Width="280" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}"
-                          ToolTip.Tip="{DynamicResource SettingsMidi_MIDI_input_device_Tip}">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="midi:MidiDeviceInfo">
-                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
                 <Button Classes="Small" Content="{DynamicResource SettingsMidi_Refresh}" Click="RefreshDevices_Click"/>
             </StackPanel>
+            <ItemsControl ItemsSource="{Binding DeviceRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MidiDeviceRow">
+                        <CheckBox Content="{Binding Device.DisplayName}" IsChecked="{Binding IsEnabled}"
+                                  Margin="0,2" Foreground="{StaticResource CatppuccinText}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
             <TextBlock Text="{Binding BackendNote}" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
             <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Text="{DynamicResource SettingsMidi_Activity}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
@@ -92,6 +92,22 @@
                             <TextBlock Grid.Column="1" Text="{Binding Binding}" VerticalAlignment="Center"
                                        Foreground="{StaticResource CatppuccinSubtext0}"/>
                             <Button Grid.Column="2" Classes="Small" Content="{DynamicResource SettingsMidi_Reset}" Click="ResetShortcut_Click"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Session MIDI mappings (per project) -->
+            <TextBlock Classes="Section" Text="Session MIDI mappings"/>
+            <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource CatppuccinOverlay1}"
+                       Text="Learn bindings from the Session view (slot/scene context menu) or remove them here. Saved with the project."/>
+            <ItemsControl ItemsSource="{Binding SessionMappingRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SessionMidiMapRow">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,3" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" Foreground="{StaticResource CatppuccinText}"/>
+                            <Button Grid.Column="1" Classes="Small" Content="{DynamicResource SettingsMidi_Remove}" Click="RemoveSessionMapping_Click"/>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

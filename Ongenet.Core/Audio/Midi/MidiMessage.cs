@@ -5,7 +5,12 @@ namespace Ongenet.Core.Audio.Midi;
 /// feeding raw bytes through <see cref="MidiRunningStatusParser"/> (ALSA/CoreMIDI) or by translating
 /// already-parsed short messages (winmm). A value type, so routing it across threads never allocates.
 /// </summary>
-public readonly record struct MidiMessage(MidiMessageKind Kind, byte Channel, byte Data1, byte Data2)
+public readonly record struct MidiMessage(
+    MidiMessageKind Kind,
+    byte Channel,
+    byte Data1,
+    byte Data2,
+    string? SourceDeviceId = null)
 {
     /// <summary>Note number (0..127) for note and poly-aftertouch messages.</summary>
     public int Note => Data1;

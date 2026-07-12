@@ -7,17 +7,35 @@
              x:DataType="vm:SessionViewModel">
     <UserControl.Styles>
         <Style Selector="Button.slot">
-            <Setter Property="MinWidth" Value="88"/>
-            <Setter Property="MinHeight" Value="52"/>
             <Setter Property="Margin" Value="2"/>
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="60"/>
             <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
             <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
             <Setter Property="BorderBrush" Value="{StaticResource CatppuccinSurface2}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            MinHeight="60">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
         </Style>
         <Style Selector="Button.slot.empty">
             <Setter Property="Opacity" Value="0.45"/>
@@ -39,29 +57,63 @@
             <Setter Property="BorderBrush" Value="{StaticResource CatppuccinBlue}"/>
             <Setter Property="BorderThickness" Value="2"/>
         </Style>
-        <Style Selector="Button.scene">
-            <Setter Property="MinWidth" Value="88"/>
-            <Setter Property="MinHeight" Value="28"/>
+        <Style Selector="Border.scene-column">
             <Setter Property="Margin" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="MinHeight" Value="60"/>
+        </Style>
+        <Style Selector="Border.scene-column Button.scene">
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="MinHeight" Value="28"/>
             <Setter Property="Padding" Value="6,2"/>
             <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="{StaticResource CatppuccinCrust}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Border.scene-column Button.scene-stop">
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="MinHeight" Value="20"/>
+            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinRed}"/>
         </Style>
     </UserControl.Styles>
 
     <Grid ColumnDefinitions="*,220" Background="{StaticResource CatppuccinBase}">
-        <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*">
+        <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,*">
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,8,12,4" Spacing="8">
                 <TextBlock Text="{DynamicResource Session_Session}" FontSize="13" FontWeight="SemiBold"
                            Foreground="{StaticResource CatppuccinText}" VerticalAlignment="Center"/>
                 <Button Classes="compact" Content="{DynamicResource Session_Stop_All}" Command="{Binding StopAllCommand}"/>
+                <Button Classes="compact" Content="{DynamicResource Session_Auto_fill}"
+                        Command="{Binding AutoFillFromArrangementCommand}"
+                        ToolTip.Tip="{DynamicResource Session_Auto_fill_Tip}"/>
                 <Button Classes="compact" Content="{DynamicResource Session_Capture}" Command="{Binding CaptureCommand}"
+                        IsVisible="{Binding ShowCaptureControls}"
                         ToolTip.Tip="{DynamicResource Session_Materialize_session_launches_to_the_arrangement_Tip}"/>
                 <TextBlock Text="{Binding PendingCaptureCount, StringFormat='({0} pending)'}"
                            FontSize="10" VerticalAlignment="Center"
                            Foreground="{StaticResource CatppuccinOverlay1}"
-                           IsVisible="{Binding !!PendingCaptureCount}"/>
+                           IsVisible="{Binding ShowCaptureControls}"/>
             </StackPanel>
 
             <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="12,0,12,8" Spacing="8">
@@ -73,7 +125,7 @@
                         TickFrequency="0.25" IsSnapToTickEnabled="True"/>
                 <TextBlock Text="{DynamicResource Session_Ses}" FontSize="9" VerticalAlignment="Center"
                            Foreground="{StaticResource CatppuccinOverlay0}"/>
-                <TextBlock Text="{DynamicResource Session_Quantize}" FontSize="10" VerticalAlignment="Center" Margin="12,0,0,0"
+                <TextBlock Text="{DynamicResource Session_Quantize_project}" FontSize="10" VerticalAlignment="Center" Margin="12,0,0,0"
                            Foreground="{StaticResource CatppuccinOverlay1}"/>
                 <ComboBox SelectedIndex="{Binding ProjectLaunchQuantizeIndex}" Width="100" FontSize="11">
                     <ComboBoxItem Content="{DynamicResource Session_Off}"/>
@@ -85,42 +137,77 @@
                 </ComboBox>
             </StackPanel>
 
-            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto"
+            <StackPanel Grid.Row="2" Margin="12,0,12,8" Spacing="6">
+                <Border Background="{StaticResource CatppuccinYellow}" CornerRadius="4" Padding="8,6" Opacity="0.9"
+                        IsVisible="{Binding ShowArrangementModeWarning}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{DynamicResource Session_Arrangement_mode_warning}"
+                                   TextWrapping="Wrap" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinCrust}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Classes="compact" Margin="8,0,0,0"
+                                Content="{DynamicResource Session_Switch_to_Hybrid}"
+                                Command="{Binding SwitchToHybridModeCommand}"
+                                VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                <Border Background="{StaticResource CatppuccinPeach}" CornerRadius="4" Padding="8,6" Opacity="0.9"
+                        IsVisible="{Binding ShowCrossfaderWarning}">
+                    <TextBlock Text="{DynamicResource Session_Crossfader_warning}"
+                               TextWrapping="Wrap" FontSize="11"
+                               Foreground="{StaticResource CatppuccinCrust}"/>
+                </Border>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto" Margin="8">
                 <StackPanel Spacing="2">
-                    <StackPanel Orientation="Horizontal" Spacing="0">
-                        <Border Width="120" MinHeight="32" Margin="2"
+                    <Border Margin="122,2,2,6" Padding="10,8" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface2}" BorderThickness="1"
+                            IsVisible="{Binding !HasAnySessionClips}">
+                        <TextBlock Text="{DynamicResource Session_Empty_state_hint}"
+                                   TextWrapping="Wrap" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    </Border>
+
+                    <Grid ColumnDefinitions="120,Auto" Margin="0,0,0,2">
+                        <Border Grid.Column="0" Width="120" Height="60" Margin="2"
                                 Background="{StaticResource CatppuccinMantle}" CornerRadius="4">
                             <TextBlock Text="{DynamicResource Session_Scenes}" Margin="8,0" VerticalAlignment="Center" FontSize="11"
                                        Foreground="{StaticResource CatppuccinOverlay1}"/>
                         </Border>
-                        <ItemsControl ItemsSource="{Binding SceneColumns}">
+                        <ItemsControl Grid.Column="1" ItemsSource="{Binding SceneColumns}"
+                                      MinWidth="{Binding SceneGridWidth}" HorizontalAlignment="Left">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal"/>
+                                    <UniformGrid Rows="1" Columns="{Binding SceneCount}"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SessionSceneColumnViewModel">
-                                    <StackPanel Orientation="Horizontal" Spacing="2">
-                                        <Button Classes="scene" Content="{Binding Label}"
-                                                Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"
-                                                Command="{Binding LaunchCommand}" ToolTip.Tip="{DynamicResource Session_Launch_scene_Tip}"/>
-                                        <Button Content="{DynamicResource Session_Text}" FontSize="9" Padding="6,2" Margin="0,2,2,2"
-                                                Command="{Binding StopCommand}" ToolTip.Tip="{DynamicResource Session_Stop_scene_Tip}"
-                                                Background="{StaticResource CatppuccinSurface1}"
-                                                Foreground="{StaticResource CatppuccinRed}"/>
-                                    </StackPanel>
+                                    <Border Classes="scene-column">
+                                        <StackPanel Spacing="2">
+                                            <Button Classes="scene"
+                                                    Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"
+                                                    Command="{Binding LaunchCommand}" ToolTip.Tip="{DynamicResource Session_Launch_scene_Tip}">
+                                                <TextBlock Text="{Binding Label}" Foreground="{Binding LabelForeground}"
+                                                           FontSize="11" FontWeight="SemiBold"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+                                            <Button Classes="scene-stop" Content="{DynamicResource Session_Text}"
+                                                    Command="{Binding StopCommand}" ToolTip.Tip="{DynamicResource Session_Stop_scene_Tip}"/>
+                                        </StackPanel>
+                                    </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </StackPanel>
+                    </Grid>
 
                     <ItemsControl ItemsSource="{Binding TrackRows}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SessionTrackRowViewModel">
-                                <StackPanel Orientation="Horizontal" Spacing="0">
-                                    <Border Width="120" MinHeight="56" Margin="2" CornerRadius="4"
+                                <Grid ColumnDefinitions="120,Auto" Margin="0,0,0,2">
+                                    <Border Grid.Column="0" Width="120" Height="60" Margin="2" CornerRadius="4"
                                             Background="{StaticResource CatppuccinMantle}"
                                             BorderBrush="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"
                                             BorderThickness="3,0,0,0">
@@ -128,10 +215,11 @@
                                                    FontSize="11" TextTrimming="CharacterEllipsis"
                                                    Foreground="{StaticResource CatppuccinText}"/>
                                     </Border>
-                                    <ItemsControl ItemsSource="{Binding Slots}">
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Slots}"
+                                                  MinWidth="{Binding SlotsGridWidth}" HorizontalAlignment="Left">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal"/>
+                                                <UniformGrid Rows="1" Columns="{Binding SceneCount}"/>
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
@@ -141,10 +229,12 @@
                                                         Classes.playing="{Binding IsPlaying}"
                                                         Classes.queued="{Binding IsQueued}"
                                                         Classes.selected="{Binding IsSelected}"
-                                                        ToolTip.Tip="{DynamicResource Session_Shift_click_inspect_Tip}">
+                                                        ToolTip.Tip="{Binding SlotToolTip}">
                                                     <Button.ContextMenu>
                                                         <ContextMenu>
                                                             <MenuItem Header="{DynamicResource Session_Launch}" Command="{Binding LaunchCommand}"
+                                                                      IsVisible="{Binding !IsEmpty}"/>
+                                                            <MenuItem Header="{Binding LearnLaunchText}" Command="{Binding LearnLaunchCommand}"
                                                                       IsVisible="{Binding !IsEmpty}"/>
                                                             <MenuItem Header="{DynamicResource Session_Assign_selected_clip}"
                                                                       Command="{Binding AssignFromSelectedCommand}"
@@ -159,24 +249,36 @@
                                                                       IsVisible="{Binding !IsEmpty}"/>
                                                         </ContextMenu>
                                                     </Button.ContextMenu>
-                                                    <StackPanel Spacing="2">
-                                                        <TextBlock Text="{Binding DisplayName}" FontSize="10"
-                                                                   TextTrimming="CharacterEllipsis"
-                                                                   Foreground="{StaticResource CatppuccinText}"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="4"
+                                                    <Panel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="+" FontSize="18" FontWeight="SemiBold"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                   Foreground="{StaticResource CatppuccinOverlay1}"
+                                                                   IsVisible="{Binding IsEmpty}"/>
+                                                        <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                     IsVisible="{Binding !IsEmpty}">
-                                                            <TextBlock Text="▶" FontSize="9" Opacity="0.7"
-                                                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
-                                                            <TextBlock Text="{DynamicResource Session_Q}" FontSize="9"
-                                                                       IsVisible="{Binding IsQueued}"
-                                                                       Foreground="{StaticResource CatppuccinYellow}"/>
+                                                            <TextBlock Text="{Binding DisplayName}" FontSize="10"
+                                                                       TextTrimming="CharacterEllipsis" MaxWidth="76"
+                                                                       HorizontalAlignment="Center"
+                                                                       Foreground="{StaticResource CatppuccinText}"/>
+                                                            <Panel>
+                                                                <controls:SessionSlotGlowControl
+                                                                    Level="{Binding MeterLevel}"
+                                                                    IsActive="{Binding IsPlaying}"
+                                                                    Accent="{Binding TrackColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                                                <TextBlock Text="{DynamicResource Session_Q}" FontSize="9"
+                                                                           FontWeight="Bold"
+                                                                           HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                                           Margin="0,0,4,0"
+                                                                           IsVisible="{Binding IsQueued}"
+                                                                           Foreground="{StaticResource CatppuccinYellow}"/>
+                                                            </Panel>
                                                         </StackPanel>
-                                                    </StackPanel>
+                                                    </Panel>
                                                 </controls:SessionSlotButton>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                </StackPanel>
+                                </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -187,49 +289,58 @@
         <!-- Session clip inspector -->
         <Border Grid.Column="1" Margin="0,8,8,8" Padding="12" CornerRadius="6"
                 Background="{StaticResource CatppuccinMantle}"
-                BorderBrush="{StaticResource CatppuccinSurface2}" BorderThickness="1"
-                IsVisible="{Binding HasSelection}">
-            <StackPanel Spacing="10">
-                <TextBlock Text="{DynamicResource Session_Clip}" FontSize="12" FontWeight="SemiBold"
-                           Foreground="{StaticResource CatppuccinText}"/>
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{DynamicResource Session_Name}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <TextBox Text="{Binding InspectorName}" FontSize="11"/>
+                BorderBrush="{StaticResource CatppuccinSurface2}" BorderThickness="1">
+            <Panel>
+                <StackPanel Spacing="10" IsVisible="{Binding HasSelection}">
+                    <TextBlock Text="{DynamicResource Session_Clip}" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{StaticResource CatppuccinText}"/>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{DynamicResource Session_Name}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <TextBox Text="{Binding InspectorName}" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{DynamicResource Session_Source}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <TextBlock Text="{Binding InspectorSourceName}" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinText}" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{DynamicResource Session_Length}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <NumericUpDown Value="{Binding InspectorLengthBeats}" Minimum="0.25" Increment="0.25"
+                                         FormatString="0.##" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{DynamicResource Session_Launch_mode}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <ComboBox ItemsSource="{Binding LaunchModes}" SelectedItem="{Binding LaunchMode}"
+                                  HorizontalAlignment="Stretch" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{DynamicResource Session_Quantize_clip}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <ComboBox SelectedIndex="{Binding LaunchQuantizeIndex}" HorizontalAlignment="Stretch" FontSize="11">
+                            <ComboBoxItem Content="{DynamicResource Session_Project_default}"/>
+                            <ComboBoxItem Content="{DynamicResource Session_N1_16_note}"/>
+                            <ComboBoxItem Content="{DynamicResource Session_N1_8_note}"/>
+                            <ComboBoxItem Content="{DynamicResource Session_N1_4_note}"/>
+                            <ComboBoxItem Content="{DynamicResource Session_N1_2_note}"/>
+                            <ComboBoxItem Content="{DynamicResource Session_N1_bar}"/>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{DynamicResource Session_Follow_action}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <ComboBox ItemsSource="{Binding FollowActions}" SelectedItem="{Binding FollowAction}"
+                                  HorizontalAlignment="Stretch" FontSize="11"/>
+                    </StackPanel>
+                    <Button Classes="compact" Content="{DynamicResource Session_Clear_slot}"
+                            Command="{Binding ClearSelectedSlotCommand}" HorizontalAlignment="Stretch"/>
                 </StackPanel>
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{DynamicResource Session_Source}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <TextBlock Text="{Binding InspectorSourceName}" FontSize="11"
-                               Foreground="{StaticResource CatppuccinText}" TextTrimming="CharacterEllipsis"/>
+
+                <StackPanel Spacing="8" IsVisible="{Binding !HasSelection}" VerticalAlignment="Top">
+                    <TextBlock Text="{DynamicResource Session_Clip}" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{StaticResource CatppuccinText}"/>
+                    <TextBlock Text="{DynamicResource Session_Inspector_placeholder}"
+                               TextWrapping="Wrap" FontSize="11"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
                 </StackPanel>
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{DynamicResource Session_Length}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <NumericUpDown Value="{Binding InspectorLengthBeats}" Minimum="0.25" Increment="0.25"
-                                     FormatString="0.##" FontSize="11"/>
-                </StackPanel>
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{DynamicResource Session_Launch_mode}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <ComboBox ItemsSource="{Binding LaunchModes}" SelectedItem="{Binding LaunchMode}"
-                              HorizontalAlignment="Stretch" FontSize="11"/>
-                </StackPanel>
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{DynamicResource Session_Quantize}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <ComboBox SelectedIndex="{Binding LaunchQuantizeIndex}" HorizontalAlignment="Stretch" FontSize="11">
-                        <ComboBoxItem Content="{DynamicResource Session_Project_default}"/>
-                        <ComboBoxItem Content="{DynamicResource Session_N1_16_note}"/>
-                        <ComboBoxItem Content="{DynamicResource Session_N1_8_note}"/>
-                        <ComboBoxItem Content="{DynamicResource Session_N1_4_note}"/>
-                        <ComboBoxItem Content="{DynamicResource Session_N1_2_note}"/>
-                        <ComboBoxItem Content="{DynamicResource Session_N1_bar}"/>
-                    </ComboBox>
-                </StackPanel>
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{DynamicResource Session_Follow_action}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <ComboBox ItemsSource="{Binding FollowActions}" SelectedItem="{Binding FollowAction}"
-                              HorizontalAlignment="Stretch" FontSize="11"/>
-                </StackPanel>
-                <Button Classes="compact" Content="{DynamicResource Session_Clear_slot}"
-                        Command="{Binding ClearSelectedSlotCommand}" HorizontalAlignment="Stretch"/>
-            </StackPanel>
+            </Panel>
         </Border>
     </Grid>
 </UserControl>

@@ -69,12 +69,13 @@ public sealed class BrowserPresetLibrary : IPresetLibrary
 public sealed class BrowserMidiInputService : IMidiInputService
 {
     public IReadOnlyList<MidiDeviceInfo> Devices { get; } = Array.Empty<MidiDeviceInfo>();
-    public MidiDeviceInfo? SelectedDevice => null;
+    public IReadOnlyList<MidiDeviceInfo> EnabledDevices { get; } = Array.Empty<MidiDeviceInfo>();
     public bool IsRunning => false;
+    public bool InstrumentInputEnabled { get; set; } = true;
     public void RefreshDevices() => DevicesChanged?.Invoke();
-    public void Select(MidiDeviceInfo? device) => SelectedDeviceChanged?.Invoke();
+    public void SetEnabledDevices(IReadOnlyList<MidiDeviceInfo> devices) => EnabledDevicesChanged?.Invoke();
     public event Action? DevicesChanged;
-    public event Action? SelectedDeviceChanged;
+    public event Action? EnabledDevicesChanged;
     public event Action<MidiMessage>? MessageReceived { add { } remove { } }
     public void Dispose() { }
 }

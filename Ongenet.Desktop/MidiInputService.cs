@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Ongenet.Audio.Interop;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services;
@@ -14,47 +15,48 @@ namespace Ongenet.Desktop.Services;
 /// <see cref="IPreviewService"/>, so hardware playing is recorded and lights the on-screen keyboard.
 /// Messages arrive on the backend thread; the downstream services are thread-safe / marshal as needed.
 ///
-/// The device selection is restored from app settings at startup; if none is saved, the first available
-/// port is opened so a freshly plugged-in controller just works.
+/// Enabled devices are restored from app settings at startup; if none are saved, all enumerated ports
+/// are opened so split controllers (e.g. APC Key 25 Control + Keys) work out of the box.
 /// </summary>
 public sealed class MidiInputService : IMidiInputService
 {
     private readonly IPreviewService _preview;
     private readonly IMidiMappingService _mappings;
     private readonly ITransportMapService _transport;
+    private readonly ISessionMidiMapService _session;
     private readonly IProjectService _project;
     private readonly MidiRetrospectiveCapture _retrospective;
     private readonly IMidiInputBackend? _backend;
     private readonly MpeZoneRouter _mpeRouter;
     private readonly List<MpeRoutedAction> _mpeActions = new();
+    private readonly List<MidiDeviceInfo> _enabled = new();
 
     private List<MidiDeviceInfo> _devices = new();
-    private MidiDeviceInfo? _selected;
 
     public MidiInputService(IPreviewService preview, IMidiMappingService mappings, ITransportMapService transport,
-        IProjectService project, MidiRetrospectiveCapture retrospective)
+        ISessionMidiMapService session, IProjectService project, MidiRetrospectiveCapture retrospective)
     {
         _preview = preview;
         _mappings = mappings;
         _transport = transport;
+        _session = session;
         _project = project;
         _retrospective = retrospective;
         _mpeRouter = new MpeZoneRouter(project.Current.Mpe);
         _backend = MidiInputBackendFactory.Create();
         RefreshDevices();
-
-        // Auto-open the first port so live playing works out of the box; app settings may reselect later.
-        if (_selected is null && _devices.Count > 0) Select(_devices[0]);
     }
 
     public IReadOnlyList<MidiDeviceInfo> Devices => _devices;
 
-    public MidiDeviceInfo? SelectedDevice => _selected;
+    public IReadOnlyList<MidiDeviceInfo> EnabledDevices => _enabled;
 
     public bool IsRunning => _backend?.IsCapturing ?? false;
 
+    public bool InstrumentInputEnabled { get; set; } = true;
+
     public event Action? DevicesChanged;
-    public event Action? SelectedDeviceChanged;
+    public event Action? EnabledDevicesChanged;
     public event Action<MidiMessage>? MessageReceived;
 
     public void RefreshDevices()
@@ -63,14 +65,31 @@ public sealed class MidiInputService : IMidiInputService
         DevicesChanged?.Invoke();
     }
 
-    public void Select(MidiDeviceInfo? device)
+    public void SetEnabledDevices(IReadOnlyList<MidiDeviceInfo> devices)
     {
         if (_backend is null) return;
 
-        _backend.Stop();
-        _selected = device;
-        if (device is not null) _backend.Start(device, OnMidi);
-        SelectedDeviceChanged?.Invoke();
+        _backend.DisconnectAll();
+        _enabled.Clear();
+
+        foreach (var device in devices)
+        {
+            var resolved = _devices.FirstOrDefault(d => d.OpenId == device.OpenId)
+                           ?? _devices.FirstOrDefault(d => d.DisplayName == device.DisplayName);
+            if (resolved is null) continue;
+
+            try
+            {
+                _backend.Connect(resolved, OnMidi);
+                _enabled.Add(resolved);
+            }
+            catch
+            {
+                // Skip ports that fail to open (unplugged, in use, etc.).
+            }
+        }
+
+        EnabledDevicesChanged?.Invoke();
     }
 
     // Invoked on the backend's read thread. Keep it quick: route and return.
@@ -87,25 +106,26 @@ public sealed class MidiInputService : IMidiInputService
         switch (m.Kind)
         {
             case MidiMessageKind.NoteOn:
-                // A note bound to a transport control triggers it instead of sounding the instrument.
-                if (!_transport.HandleMessage(m)) _preview.NoteOn(m.Note, m.Velocity);
+                if (!_transport.HandleMessage(m) && !_session.HandleMessage(m))
+                {
+                    if (InstrumentInputEnabled) _preview.NoteOn(m.Note, m.Velocity);
+                }
                 break;
             case MidiMessageKind.NoteOff:
-                _preview.NoteOff(m.Note); // harmless if the note never sounded (e.g. a transport-mapped note)
+                if (!_session.HandleMessage(m) && InstrumentInputEnabled) _preview.NoteOff(m.Note);
                 break;
             case MidiMessageKind.ControlChange:
-                // Transport buttons first, then learn / mapped parameters; an unmapped CC falls through
-                // to the instrument so mod wheel, sustain, etc. still work.
                 if (_transport.HandleMessage(m)) break;
-                if (!_mappings.HandleControlChange(m)) _preview.ControlChange(m.Controller, m.Value);
+                if (_session.HandleMessage(m)) break;
+                if (!_mappings.HandleControlChange(m) && InstrumentInputEnabled)
+                    _preview.ControlChange(m.Controller, m.Value);
                 break;
             case MidiMessageKind.PitchBend:
-                _preview.PitchBend(m.PitchBend14);
+                if (InstrumentInputEnabled) _preview.PitchBend(m.PitchBend14);
                 break;
             case MidiMessageKind.ChannelAftertouch:
-                _preview.ChannelAftertouch(m.Pressure);
+                if (InstrumentInputEnabled) _preview.ChannelAftertouch(m.Pressure);
                 break;
-            // PolyAftertouch / ProgramChange: not routed yet.
         }
 
         MessageReceived?.Invoke(m);
@@ -117,20 +137,20 @@ public sealed class MidiInputService : IMidiInputService
         {
             case MpeRoutedActionKind.NoteOn:
                 if (!_transport.HandleMessage(new MidiMessage(MidiMessageKind.NoteOn, 0, (byte)action.Note,
-                        (byte)Math.Clamp((int)(action.Velocity * 127f), 0, 127))))
+                        (byte)Math.Clamp((int)(action.Velocity * 127f), 0, 127))) && InstrumentInputEnabled)
                     _preview.NoteOn(action.Note, action.Velocity);
                 break;
             case MpeRoutedActionKind.NoteOff:
-                _preview.NoteOff(action.Note);
+                if (InstrumentInputEnabled) _preview.NoteOff(action.Note);
                 break;
             case MpeRoutedActionKind.NotePitchBend:
-                _preview.NotePitchBend(action.Note, action.Value);
+                if (InstrumentInputEnabled) _preview.NotePitchBend(action.Note, action.Value);
                 break;
             case MpeRoutedActionKind.NotePressure:
-                _preview.NotePressure(action.Note, action.Value);
+                if (InstrumentInputEnabled) _preview.NotePressure(action.Note, action.Value);
                 break;
             case MpeRoutedActionKind.NoteTimbre:
-                _preview.NoteTimbre(action.Note, action.Value);
+                if (InstrumentInputEnabled) _preview.NoteTimbre(action.Note, action.Value);
                 break;
         }
     }

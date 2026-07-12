@@ -14,10 +14,11 @@ public sealed class ControlSurfaceService
     private readonly IMidiInputService _input;
     private readonly IMidiOutputService _output;
     private readonly IProjectService _project;
-    private readonly IPlaybackModeService _playback;
     private readonly ITransportService _transport;
     private readonly IAppSettingsService _settings;
     private readonly IEventAggregator _events;
+    private readonly ControlSurfaceLibrary _library;
+    private readonly ControlSurfaceRouter _router;
     private long _lastFeedbackMs;
     private int _faderBank;
     private (int MixerChannel, string Target)? _learnTarget;
@@ -28,17 +29,21 @@ public sealed class ControlSurfaceService
     public (int MixerChannel, string Target)? LearnTarget => _learnTarget;
 
     public ControlSurfaceService(IMidiInputService input, IMidiOutputService output, IProjectService project,
-        IPlaybackModeService playback, ITransportService transport, IAppSettingsService settings,
-        IEventAggregator events, IPlaybackClock clock)
+        ITransportService transport, IAppSettingsService settings, IEventAggregator events, IPlaybackClock clock,
+        ControlSurfaceLibrary library, ControlSurfaceRouter router)
     {
         _input = input;
         _output = output;
         _project = project;
-        _playback = playback;
         _transport = transport;
         _settings = settings;
         _events = events;
+        _library = library;
+        _router = router;
+        _library.Rescan();
+        ApplyActiveDefinition();
         _input.MessageReceived += OnMessage;
+        _input.EnabledDevicesChanged += OnDevicesChanged;
         _transport.StateChanged += SendTransportFeedback;
         _events.Subscribe<TrackChangedEvent>(e => SendTrackFeedback(e.Track));
         clock.Tick += () =>
@@ -53,28 +58,76 @@ public sealed class ControlSurfaceService
 
     public bool IsEnabled { get; set; } = true;
 
-    /// <summary>Active profile; null settings value keeps legacy MCU + Launchpad behavior.</summary>
-    public ControlSurfaceProfile? Profile
+    /// <summary>Active controller definition id; null/empty uses legacy MCU/HUI profile behavior.</summary>
+    public string? DefinitionId
+    {
+        get => _settings.Current.ControlSurfaceDefinitionId;
+        set
+        {
+            _settings.Current.ControlSurfaceDefinitionId = string.IsNullOrWhiteSpace(value) ? null : value;
+            _faderBank = 0;
+            ApplyActiveDefinition();
+            EnsureDefaultMixerMappings(LegacyProfile);
+            _settings.CaptureAndSave();
+        }
+    }
+
+    /// <summary>Legacy profile enum; used when no JSON definition is selected.</summary>
+    public ControlSurfaceProfile? LegacyProfile
     {
         get => ParseProfile(_settings.Current.ControlSurfaceProfile);
         set
         {
             _settings.Current.ControlSurfaceProfile = value?.ToString();
             _faderBank = 0;
+            ApplyActiveDefinition();
             EnsureDefaultMixerMappings(value);
             _settings.CaptureAndSave();
         }
     }
 
+    /// <summary>Active profile; null settings value keeps legacy MCU + Launchpad behavior.</summary>
+    [Obsolete("Use DefinitionId and ControlSurfaceLibrary instead.")]
+    public ControlSurfaceProfile? Profile
+    {
+        get => LegacyProfile;
+        set => LegacyProfile = value;
+    }
+
+    public IReadOnlyList<ControlSurfaceDefinition> AvailableDefinitions => _library.Definitions;
+
     private static ControlSurfaceProfile? ParseProfile(string? value)
         => Enum.TryParse<ControlSurfaceProfile>(value, out var profile) ? profile : null;
 
-    private bool UsesLegacyCombined => Profile is null;
+    private bool UsesJsonDefinition => _router.ActiveDefinition is not null;
 
-    private bool UsesMcuFamily => UsesLegacyCombined || Profile is ControlSurfaceProfile.McuTransport or ControlSurfaceProfile.McuMixer;
-    private bool UsesHuiFamily => Profile is ControlSurfaceProfile.HuiTransport or ControlSurfaceProfile.HuiMixer;
-    private bool UsesMixerProfile => Profile is ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40
-        or ControlSurfaceProfile.McuMixer or ControlSurfaceProfile.HuiMixer;
+    private bool UsesLegacyCombined => !UsesJsonDefinition && LegacyProfile is null;
+
+    private bool UsesMcuFamily => !UsesJsonDefinition && (UsesLegacyCombined
+        || LegacyProfile is ControlSurfaceProfile.McuTransport or ControlSurfaceProfile.McuMixer);
+    private bool UsesHuiFamily => !UsesJsonDefinition && LegacyProfile is ControlSurfaceProfile.HuiTransport
+        or ControlSurfaceProfile.HuiMixer;
+    private bool UsesMixerProfile => !UsesJsonDefinition && LegacyProfile is ControlSurfaceProfile.Push2
+        or ControlSurfaceProfile.Apc40 or ControlSurfaceProfile.McuMixer or ControlSurfaceProfile.HuiMixer;
+
+    private void OnDevicesChanged()
+    {
+        if (!string.IsNullOrEmpty(_settings.Current.ControlSurfaceDefinitionId)) return;
+        var match = _library.MatchDevice(_input.EnabledDevices.Select(d => d.DisplayName));
+        if (match is not null)
+        {
+            _settings.Current.ControlSurfaceDefinitionId = match.Id;
+            ApplyActiveDefinition();
+        }
+    }
+
+    private void ApplyActiveDefinition()
+    {
+        var id = _settings.Current.ControlSurfaceDefinitionId;
+        _router.ActiveDefinition = _library.FindById(id)
+            ?? _library.MatchDevice(_input.EnabledDevices.Select(d => d.DisplayName));
+        _router.FaderBank = _faderBank;
+    }
 
     private void SendTransportFeedback(TransportState state)
     {
@@ -99,13 +152,13 @@ public sealed class ControlSurfaceService
         if (index < 0) return;
 
         var midiChannel = index + 1;
-        if (Profile is ControlSurfaceProfile.McuMixer or ControlSurfaceProfile.HuiMixer)
+        if (LegacyProfile is ControlSurfaceProfile.McuMixer or ControlSurfaceProfile.HuiMixer)
         {
             SendFaderFeedback(midiChannel, changed.Volume);
             return;
         }
 
-        foreach (var mapping in GetMappingsForProfile(Profile!.Value).Where(m => m.MixerChannel == midiChannel))
+        foreach (var mapping in GetMappingsForProfile(LegacyProfile!.Value).Where(m => m.MixerChannel == midiChannel))
         {
             var normalized = string.Equals(mapping.Target, "Pan", StringComparison.OrdinalIgnoreCase)
                 ? (changed.Pan + 1.0) * 0.5
@@ -117,7 +170,7 @@ public sealed class ControlSurfaceService
 
     private void SendMixerBankFeedback()
     {
-        if (Profile is not (ControlSurfaceProfile.McuMixer or ControlSurfaceProfile.HuiMixer)) return;
+        if (LegacyProfile is not (ControlSurfaceProfile.McuMixer or ControlSurfaceProfile.HuiMixer)) return;
         var tracks = TracksInBank();
         for (var i = 0; i < 8; i++)
         {
@@ -143,39 +196,24 @@ public sealed class ControlSurfaceService
 
         if (TryCompleteLearn(msg)) return;
 
-        if (UsesLegacyCombined || Profile == ControlSurfaceProfile.LaunchpadSession)
-            HandleLaunchpadSession(msg);
+        if (UsesJsonDefinition && _router.HandleMessage(msg)) return;
 
         if (UsesMcuFamily)
         {
             HandleMcuTransport(msg);
-            if (Profile == ControlSurfaceProfile.McuMixer)
+            if (LegacyProfile == ControlSurfaceProfile.McuMixer)
                 HandleMcuMixer(msg);
         }
 
         if (UsesHuiFamily)
         {
             HandleHuiTransport(msg);
-            if (Profile == ControlSurfaceProfile.HuiMixer)
+            if (LegacyProfile == ControlSurfaceProfile.HuiMixer)
                 HandleHuiMixer(msg);
         }
 
-        if (Profile is ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40)
+        if (LegacyProfile is ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40)
             HandleMixerCc(msg);
-    }
-
-    private void HandleLaunchpadSession(MidiMessage msg)
-    {
-        if (msg.Kind != MidiMessageKind.NoteOn || msg.Velocity <= 0) return;
-        if (msg.Data1 is not (>= 36 and <= 51)) return;
-
-        var scene = msg.Data1 - 36;
-        var clip = _project.Current.SessionClips
-            .Where(c => c.SceneIndex == scene)
-            .OrderBy(c => c.TrackId)
-            .FirstOrDefault();
-        if (clip is not null)
-            _playback.LaunchClip(clip.Id);
     }
 
     private void HandleMcuTransport(MidiMessage msg)
@@ -246,7 +284,7 @@ public sealed class ControlSurfaceService
 
     private void HandleMixerCc(MidiMessage msg)
     {
-        if (msg.Kind != MidiMessageKind.ControlChange || Profile is not { } profile) return;
+        if (msg.Kind != MidiMessageKind.ControlChange || LegacyProfile is not { } profile) return;
 
         var midiChannel = msg.Channel + 1;
         if (midiChannel is < 1 or > 8) return;
@@ -274,6 +312,7 @@ public sealed class ControlSurfaceService
         var trackCount = _project.Current.Tracks.Count(t => !t.IsBus);
         var maxBank = Math.Max(0, (trackCount - 1) / 8);
         _faderBank = Math.Clamp(_faderBank + delta, 0, maxBank);
+        _router.FaderBank = _faderBank;
         SendMixerBankFeedback();
     }
 
@@ -299,15 +338,15 @@ public sealed class ControlSurfaceService
     /// <summary>Stores a learned CC mapping for the active mixer profile.</summary>
     public void BeginLearn(int mixerChannel, string target)
     {
-        if (Profile is not (ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40)) return;
+        if (LegacyProfile is not (ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40)) return;
         _learnTarget = (mixerChannel, target);
         LearnStateChanged?.Invoke();
     }
 
     public void LearnMapping(int mixerChannel, int ccNumber, string target)
     {
-        if (Profile is not (ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40)) return;
-        var profile = Profile.Value.ToString();
+        if (LegacyProfile is not (ControlSurfaceProfile.Push2 or ControlSurfaceProfile.Apc40)) return;
+        var profile = LegacyProfile.Value.ToString();
         _settings.Current.ControlSurfaceMappings.RemoveAll(m =>
             m.Profile == profile && m.MixerChannel == mixerChannel && m.Target == target);
         _settings.Current.ControlSurfaceMappings.Add(new ControlSurfaceMappingDto
@@ -357,5 +396,12 @@ public sealed class ControlSurfaceService
             yield return new ControlSurfaceMappingDto { Profile = key, MixerChannel = ch, CcNumber = 7, Target = "Volume" };
             yield return new ControlSurfaceMappingDto { Profile = key, MixerChannel = ch, CcNumber = 10, Target = "Pan" };
         }
+    }
+
+    /// <summary>Refreshes the definition catalog (after import).</summary>
+    public void RescanDefinitions()
+    {
+        _library.Rescan();
+        ApplyActiveDefinition();
     }
 }

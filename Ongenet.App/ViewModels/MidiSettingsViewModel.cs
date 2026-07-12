@@ -1,18 +1,17 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Threading;
+using Ongenet.App.Services;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Localization;
-using Ongenet.App.Services;
 
 namespace Ongenet.App.ViewModels;
 
 /// <summary>
-/// Backs the MIDI tab of the Settings window: input-device selection, an input-activity readout, the
-/// record input-quantize grid, the list of CC→parameter "MIDI learn" mappings (with removal), and the
+/// Backs the MIDI tab of the Settings window: multi-device input selection, an input-activity readout,
+/// the record input-quantize grid, the list of CC→parameter "MIDI learn" mappings (with removal), and the
 /// transport-control mappings (play/pause, stop, record) with per-action learn/clear.
 /// </summary>
 public sealed class MidiSettingsViewModel : ViewModelBase
@@ -23,27 +22,31 @@ public sealed class MidiSettingsViewModel : ViewModelBase
     private readonly IMidiInputService _midi;
     private readonly IMidiMappingService _mappings;
     private readonly ITransportMapService _transport;
+    private readonly ISessionMidiMapService _sessionMaps;
     private readonly IRecordingService _recording;
     private readonly IAppSettingsService _settings;
     private readonly KeyboardShortcutService _shortcuts;
 
     public MidiSettingsViewModel(IMidiInputService midi, IMidiMappingService mappings,
-        ITransportMapService transport, IRecordingService recording, IAppSettingsService settings,
-        KeyboardShortcutService shortcuts)
+        ITransportMapService transport, ISessionMidiMapService sessionMaps, IRecordingService recording,
+        IAppSettingsService settings, KeyboardShortcutService shortcuts)
     {
         _midi = midi;
         _mappings = mappings;
         _transport = transport;
+        _sessionMaps = sessionMaps;
         _recording = recording;
         _settings = settings;
         _shortcuts = shortcuts;
 
-        _midi.DevicesChanged += () => Dispatcher.UIThread.Post(RaiseDevices);
-        _midi.SelectedDeviceChanged += () => Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(SelectedDevice)));
+        _midi.DevicesChanged += () => Dispatcher.UIThread.Post(RefreshDeviceRows);
+        _midi.EnabledDevicesChanged += () => Dispatcher.UIThread.Post(RefreshDeviceRows);
         _midi.MessageReceived += m => Dispatcher.UIThread.Post(() => Activity = Describe(m));
         _mappings.MappingsChanged += () => Dispatcher.UIThread.Post(RefreshMappings);
         _transport.MappingsChanged += () => Dispatcher.UIThread.Post(RefreshTransport);
         _transport.LearnStateChanged += () => Dispatcher.UIThread.Post(RefreshTransport);
+        _sessionMaps.MappingsChanged += () => Dispatcher.UIThread.Post(RefreshSessionMappings);
+        _sessionMaps.LearnStateChanged += () => Dispatcher.UIThread.Post(RefreshSessionMappings);
         _shortcuts.BindingsChanged += () => Dispatcher.UIThread.Post(RefreshShortcuts);
 
         QuantizeOptions = new[]
@@ -59,31 +62,24 @@ public sealed class MidiSettingsViewModel : ViewModelBase
         _selectedQuantize = QuantizeOptions.FirstOrDefault(q => Math.Abs(q.Beats - _recording.InputQuantizeBeats) < 1e-6)
                             ?? QuantizeOptions[0];
 
+        DeviceRows = new ObservableCollection<MidiDeviceRow>();
         Mappings = new ObservableCollection<MidiMappingRow>();
         TransportRows = new ObservableCollection<TransportMapRow>();
+        SessionMappingRows = new ObservableCollection<SessionMidiMapRow>();
         ShortcutRows = new ObservableCollection<KeyboardShortcutRow>();
+        RefreshDeviceRows();
         RefreshMappings();
         RefreshTransport();
+        RefreshSessionMappings();
         RefreshShortcuts();
     }
 
-    public IReadOnlyList<MidiDeviceInfo> Devices => _midi.Devices;
+    public ObservableCollection<MidiDeviceRow> DeviceRows { get; }
 
-    public MidiDeviceInfo? SelectedDevice
-    {
-        get => _midi.SelectedDevice;
-        set
-        {
-            if (value is null || Equals(value, _midi.SelectedDevice)) return;
-            _midi.Select(value);
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>A short note about the platform backend's scope (shown under the device picker).</summary>
+    /// <summary>A short note about the platform backend's scope (shown under the device list).</summary>
     public string BackendNote => OperatingSystem.IsLinux()
-        ? "ALSA: shows hardware/USB MIDI ports."
-        : "";
+        ? "ALSA: shows hardware/USB MIDI ports. Enable multiple ports for split controllers (e.g. APC Key 25 Control + Keys)."
+        : "Enable multiple ports for split controllers (e.g. APC Key 25 Control + Keys).";
 
     private string _activity = "—";
     public string Activity
@@ -108,9 +104,32 @@ public sealed class MidiSettingsViewModel : ViewModelBase
 
     public ObservableCollection<MidiMappingRow> Mappings { get; }
     public ObservableCollection<TransportMapRow> TransportRows { get; }
+    public ObservableCollection<SessionMidiMapRow> SessionMappingRows { get; }
     public ObservableCollection<KeyboardShortcutRow> ShortcutRows { get; }
 
-    public void RefreshDevices() => _midi.RefreshDevices();
+    public void RefreshDevices()
+    {
+        _midi.RefreshDevices();
+        RefreshDeviceRows();
+    }
+
+    internal void SetDeviceEnabled(MidiDeviceInfo device, bool enabled)
+    {
+        var current = _midi.EnabledDevices.ToList();
+        if (enabled)
+        {
+            if (current.All(d => d.OpenId != device.OpenId))
+                current.Add(device);
+        }
+        else
+        {
+            current.RemoveAll(d => d.OpenId == device.OpenId);
+        }
+
+        _midi.SetEnabledDevices(current);
+        _settings.CaptureAndSave();
+        RefreshDeviceRows();
+    }
 
     public void RemoveMapping(MidiMappingRow row) => _mappings.Remove(row.Mapping);
 
@@ -118,12 +137,17 @@ public sealed class MidiSettingsViewModel : ViewModelBase
 
     public void ClearTransport(TransportAction action) => _transport.ClearMapping(action);
 
+    public void RemoveSessionMapping(SessionMidiMapRow row)
+        => _sessionMaps.ClearMapping(row.Mapping.Action, row.Mapping.TrackId, row.Mapping.SceneIndex);
+
     public void ResetShortcut(AppShortcutAction action) => _shortcuts.ResetBinding(action);
 
-    private void RaiseDevices()
+    private void RefreshDeviceRows()
     {
-        OnPropertyChanged(nameof(Devices));
-        OnPropertyChanged(nameof(SelectedDevice));
+        var enabledIds = _midi.EnabledDevices.Select(d => d.OpenId).ToHashSet(StringComparer.Ordinal);
+        DeviceRows.Clear();
+        foreach (var d in _midi.Devices)
+            DeviceRows.Add(new MidiDeviceRow(d, enabledIds.Contains(d.OpenId), this));
     }
 
     private void RefreshMappings()
@@ -139,6 +163,13 @@ public sealed class MidiSettingsViewModel : ViewModelBase
             TransportRows.Add(new TransportMapRow(a, _transport.MappingFor(a), _transport.LearnAction == a));
     }
 
+    private void RefreshSessionMappings()
+    {
+        SessionMappingRows.Clear();
+        foreach (var m in _sessionMaps.Mappings)
+            SessionMappingRows.Add(new SessionMidiMapRow(m));
+    }
+
     private void RefreshShortcuts()
     {
         ShortcutRows.Clear();
@@ -146,7 +177,63 @@ public sealed class MidiSettingsViewModel : ViewModelBase
             ShortcutRows.Add(row);
     }
 
-    private static string Describe(MidiMessage m) => $"{m.Kind}  ch {m.Channel + 1}  ({m.Data1}, {m.Data2})";
+    private static string Describe(MidiMessage m)
+    {
+        var src = string.IsNullOrEmpty(m.SourceDeviceId) ? "" : $"  [{m.SourceDeviceId}]";
+        return $"{m.Kind}  ch {m.Channel + 1}  ({m.Data1}, {m.Data2}){src}";
+    }
+}
+
+/// <summary>A row in the session MIDI mapping list.</summary>
+public sealed class SessionMidiMapRow
+{
+    public SessionMidiMapRow(SessionMidiMapping mapping)
+    {
+        Mapping = mapping;
+        var control = mapping.IsNote ? $"Note {mapping.Number}" : $"CC {mapping.Number}";
+        var target = mapping.Action switch
+        {
+            SessionMidiAction.LaunchSlot => $"Launch slot (scene {(mapping.SceneIndex ?? 0) + 1})",
+            SessionMidiAction.LaunchScene => $"Launch scene {(mapping.SceneIndex ?? 0) + 1}",
+            SessionMidiAction.QueueSlot => $"Queue slot (scene {(mapping.SceneIndex ?? 0) + 1})",
+            SessionMidiAction.StopSlot => $"Stop slot (scene {(mapping.SceneIndex ?? 0) + 1})",
+            SessionMidiAction.StopScene => $"Stop scene {(mapping.SceneIndex ?? 0) + 1}",
+            SessionMidiAction.StopAll => "Stop all",
+            SessionMidiAction.GateOn => $"Gate on (scene {(mapping.SceneIndex ?? 0) + 1})",
+            SessionMidiAction.GateOff => $"Gate off (scene {(mapping.SceneIndex ?? 0) + 1})",
+            _ => mapping.Action.ToString()
+        };
+        Label = $"{target}  —  {control}";
+    }
+
+    public SessionMidiMapping Mapping { get; }
+    public string Label { get; }
+}
+
+/// <summary>A row in the MIDI input device checklist.</summary>
+public sealed class MidiDeviceRow : ViewModelBase
+{
+    private readonly MidiSettingsViewModel _owner;
+
+    public MidiDeviceRow(MidiDeviceInfo device, bool isEnabled, MidiSettingsViewModel owner)
+    {
+        Device = device;
+        _isEnabled = isEnabled;
+        _owner = owner;
+    }
+
+    public MidiDeviceInfo Device { get; }
+
+    private bool _isEnabled;
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            if (!SetField(ref _isEnabled, value)) return;
+            _owner.SetDeviceEnabled(Device, value);
+        }
+    }
 }
 
 /// <summary>An input-quantize grid choice (label + grid size in beats; 0 = off).</summary>

@@ -11,9 +11,23 @@ namespace Ongenet.Core.Tests.Audio;
 public sealed class SessionCaptureTests
 {
     [Fact]
+    public void LaunchWhileDisarmed_DoesNotLog()
+    {
+        var (playback, transport, capture, sessionClip) = Setup();
+        transport.StartBeat = 0;
+        transport.Play();
+        transport.NotifyPlayhead(2);
+
+        playback.LaunchClip(sessionClip.Id);
+
+        Assert.Equal(0, capture.PendingLaunchCount);
+    }
+
+    [Fact]
     public void LaunchDuringPlayback_LogsPendingCapture()
     {
         var (playback, transport, capture, sessionClip) = Setup();
+        capture.SetSessionRecordArmed(true);
         transport.StartBeat = 0;
         transport.Play();
         transport.NotifyPlayhead(2);
@@ -27,6 +41,7 @@ public sealed class SessionCaptureTests
     public void Capture_CreatesClipAtLoggedBeat()
     {
         var (playback, transport, capture, sessionClip, track) = SetupWithTrack();
+        capture.SetSessionRecordArmed(true);
         transport.StartBeat = 0;
         transport.Play();
         transport.NotifyPlayhead(4);
@@ -39,12 +54,15 @@ public sealed class SessionCaptureTests
         var captured = track.Clips.First(c => c.StartBeat > 0);
         Assert.Equal(4, captured.StartBeat, 3);
         Assert.Equal("Src", captured.Name);
+        Assert.Equal(ClipOrigin.CapturedSession, captured.Origin);
     }
 
     [Fact]
     public void TransportStop_AutoMaterializesPendingLaunches()
     {
         var (playback, transport, capture, sessionClip, track) = SetupWithTrack();
+        capture.SetSessionRecordArmed(true);
+        capture.CommitOnTransportStop = true;
         transport.Play();
         transport.NotifyPlayhead(8);
         playback.LaunchClip(sessionClip.Id);

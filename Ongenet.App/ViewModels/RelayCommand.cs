@@ -73,7 +73,11 @@ namespace Ongenet.App.ViewModels
 
         public static void InvalidateRequerySuggested()
         {
-            RequerySuggested?.Invoke(null, EventArgs.Empty);
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                RequerySuggested?.Invoke(null, EventArgs.Empty);
+            else
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    RequerySuggested?.Invoke(null, EventArgs.Empty));
         }
     }
 }

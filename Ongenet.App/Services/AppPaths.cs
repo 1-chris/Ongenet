@@ -35,6 +35,18 @@ public static class AppPaths
         return dir;
     }
 
+    /// <summary>Factory control-surface definitions shipped with the app bundle.</summary>
+    public static string FactoryControllersDirectory()
+        => Path.Combine(AppContext.BaseDirectory, "Controllers", "Factory");
+
+    /// <summary>User-imported or custom control-surface definitions.</summary>
+    public static string UserControllersDirectory()
+    {
+        var dir = Path.Combine(ConfigDirectory(), "Controllers");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
     /// <summary>User C# scripts directory (<c>Documents/Ongenet/Scripts</c>); created on demand.</summary>
     public static string UserScriptsDirectory()
     {

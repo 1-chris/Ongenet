@@ -7,13 +7,7 @@ using Ongenet.Core.Audio.Midi;
 namespace Ongenet.Audio.Interop;
 
 /// <summary>
-/// Linux MIDI input via ALSA rawmidi. Enumerates hardware/USB input ports through the control API,
-/// then opens the chosen port non-blocking and drains it on a dedicated thread that waits with
-/// <c>poll()</c>. Raw bytes are fed through a <see cref="MidiRunningStatusParser"/>.
-///
-/// Shutdown is race-free: <see cref="Stop"/> flips a flag and joins; the read thread notices on its
-/// next poll timeout, exits, and closes the handle on its own thread (closing a handle another thread
-/// is blocked in is unsafe, hence the non-blocking + poll-timeout design rather than a blocking read).
+/// Linux MIDI input via ALSA rawmidi. Supports multiple simultaneous input ports.
 /// </summary>
 public sealed class AlsaMidiInput : IMidiInputBackend
 {
@@ -21,14 +15,13 @@ public sealed class AlsaMidiInput : IMidiInputBackend
     private const int PollTimeoutMs = 100;
 
     private readonly object _lock = new();
-    private readonly MidiRunningStatusParser _parser = new();
-
-    private IntPtr _handle;
-    private Thread? _thread;
+    private readonly Dictionary<string, DeviceConnection> _connections = new(StringComparer.Ordinal);
+    private readonly List<MidiDeviceInfo> _connectedList = new();
     private Action<MidiMessage>? _onMessage;
-    private volatile bool _running;
 
     public bool IsCapturing { get; private set; }
+
+    public IReadOnlyList<MidiDeviceInfo> ConnectedDevices => _connectedList;
 
     public IReadOnlyList<MidiDeviceInfo> EnumerateDevices()
     {
@@ -45,7 +38,7 @@ public sealed class AlsaMidiInput : IMidiInputBackend
                 while (AlsaMidiNative.snd_ctl_rawmidi_next_device(ctl, ref dev) == 0 && dev >= 0)
                 {
                     var port = InputPortName(ctl, dev);
-                    if (port is null) continue; // device has no input stream
+                    if (port is null) continue;
                     var display = port.Length == 0 || port == cardName ? cardName : $"{cardName} — {port}";
                     list.Add(new MidiDeviceInfo(display, $"hw:{card},{dev}"));
                 }
@@ -74,7 +67,6 @@ public sealed class AlsaMidiInput : IMidiInputBackend
         }
     }
 
-    // Returns the input port name for the device, or null when the device has no input stream.
     private static string? InputPortName(IntPtr ctl, int dev)
     {
         if (AlsaMidiNative.snd_rawmidi_info_malloc(out var info) != 0) return null;
@@ -93,68 +85,74 @@ public sealed class AlsaMidiInput : IMidiInputBackend
         }
     }
 
-    public void Start(MidiDeviceInfo device, Action<MidiMessage> onMessage)
+    public void Connect(MidiDeviceInfo device, Action<MidiMessage> onMessage)
     {
-        Stop(); // tear down any previous session (joins its thread) before reopening
-
         lock (_lock)
         {
-            var rc = AlsaMidiNative.snd_rawmidi_open(out _handle, out _, device.OpenId,
+            _onMessage = onMessage;
+            if (_connections.ContainsKey(device.OpenId)) return;
+
+            var rc = AlsaMidiNative.snd_rawmidi_open(out var handle, out _, device.OpenId,
                 AlsaMidiNative.SND_RAWMIDI_NONBLOCK);
             if (rc < 0)
-            {
-                _handle = IntPtr.Zero;
                 throw new InvalidOperationException(
                     $"snd_rawmidi_open({device.OpenId}) failed: {AlsaMidiNative.ErrorText(rc)}");
-            }
 
-            _onMessage = onMessage;
-            _parser.Reset();
-            _running = true;
-            _thread = new Thread(ReadLoop) { IsBackground = true, Name = "ALSA MIDI In" };
-            _thread.Start();
+            var parser = new MidiRunningStatusParser();
+            var conn = new DeviceConnection(device, handle, parser);
+            conn.Running = true;
+            conn.Thread = new Thread(() => ReadLoop(conn)) { IsBackground = true, Name = $"ALSA MIDI In ({device.DisplayName})" };
+            conn.Thread.Start();
+            _connections[device.OpenId] = conn;
+            _connectedList.Add(device);
             IsCapturing = true;
         }
     }
 
-    public void Stop()
+    public void Disconnect(MidiDeviceInfo device)
     {
-        Thread? thread;
         lock (_lock)
         {
-            if (!_running && _thread is null) return;
-            _running = false;
-            thread = _thread;
-            _thread = null;
-        }
-
-        thread?.Join(1000);
-
-        lock (_lock)
-        {
-            // The read thread normally closes the handle itself on exit; close defensively if it didn't.
-            if (_handle != IntPtr.Zero)
+            if (!_connections.Remove(device.OpenId, out var conn)) return;
+            conn.Running = false;
+            conn.Thread?.Join(1000);
+            if (conn.Handle != IntPtr.Zero)
             {
-                AlsaMidiNative.snd_rawmidi_close(_handle);
-                _handle = IntPtr.Zero;
+                AlsaMidiNative.snd_rawmidi_close(conn.Handle);
+                conn.Handle = IntPtr.Zero;
             }
 
-            _onMessage = null;
+            _connectedList.RemoveAll(d => d.OpenId == device.OpenId);
+            IsCapturing = _connections.Count > 0;
+        }
+    }
+
+    public void DisconnectAll()
+    {
+        lock (_lock)
+        {
+            foreach (var conn in _connections.Values)
+            {
+                conn.Running = false;
+                conn.Thread?.Join(1000);
+                if (conn.Handle != IntPtr.Zero)
+                {
+                    AlsaMidiNative.snd_rawmidi_close(conn.Handle);
+                    conn.Handle = IntPtr.Zero;
+                }
+            }
+
+            _connections.Clear();
+            _connectedList.Clear();
             IsCapturing = false;
         }
     }
 
-    private unsafe void ReadLoop()
+    private unsafe void ReadLoop(DeviceConnection conn)
     {
-        IntPtr handle;
-        Action<MidiMessage>? onMessage;
-        lock (_lock)
-        {
-            handle = _handle;
-            onMessage = _onMessage;
-        }
-
-        if (handle == IntPtr.Zero || onMessage is null) return;
+        var handle = conn.Handle;
+        var openId = conn.Device.OpenId;
+        if (handle == IntPtr.Zero) return;
 
         var count = AlsaMidiNative.snd_rawmidi_poll_descriptors_count(handle);
         if (count < 1) count = 1;
@@ -166,7 +164,7 @@ public sealed class AlsaMidiInput : IMidiInputBackend
         {
             if (AlsaMidiNative.snd_rawmidi_poll_descriptors(handle, pfds, (uint)count) < 0) return;
 
-            while (_running)
+            while (conn.Running)
             {
                 var pr = AlsaMidiNative.poll(pfds, (nuint)count, PollTimeoutMs);
                 if (pr < 0)
@@ -175,25 +173,24 @@ public sealed class AlsaMidiInput : IMidiInputBackend
                     break;
                 }
 
-                if (pr == 0) continue; // timeout — re-check _running
+                if (pr == 0) continue;
 
-                // Drain everything currently available before polling again.
                 while (true)
                 {
                     var n = AlsaMidiNative.snd_rawmidi_read(handle, buf, (nuint)BufSize);
                     if (n > 0)
                     {
                         var span = new ReadOnlySpan<byte>((void*)buf, (int)n);
-                        _parser.Push(span, onMessage);
-                        if ((int)n < BufSize) break; // likely drained
-                        continue;                     // buffer was full — read more
+                        var cb = _onMessage;
+                        if (cb is not null)
+                            conn.Parser.Push(span, m => cb(m.WithSource(openId)));
+                        if ((int)n < BufSize) break;
+                        continue;
                     }
 
-                    if (n == -AlsaMidiNative.EAGAIN) break;  // nothing more right now
+                    if (n == -AlsaMidiNative.EAGAIN) break;
                     if (n == -AlsaMidiNative.EINTR) continue;
-
-                    // Any other negative result (e.g. -ENODEV on unplug) ends the session.
-                    _running = false;
+                    conn.Running = false;
                     break;
                 }
             }
@@ -204,14 +201,30 @@ public sealed class AlsaMidiInput : IMidiInputBackend
             Marshal.FreeHGlobal(pfds);
             lock (_lock)
             {
-                if (_handle != IntPtr.Zero)
+                if (conn.Handle != IntPtr.Zero)
                 {
-                    AlsaMidiNative.snd_rawmidi_close(_handle);
-                    _handle = IntPtr.Zero;
+                    AlsaMidiNative.snd_rawmidi_close(conn.Handle);
+                    conn.Handle = IntPtr.Zero;
                 }
             }
         }
     }
 
-    public void Dispose() => Stop();
+    public void Dispose() => DisconnectAll();
+
+    private sealed class DeviceConnection
+    {
+        public DeviceConnection(MidiDeviceInfo device, IntPtr handle, MidiRunningStatusParser parser)
+        {
+            Device = device;
+            Handle = handle;
+            Parser = parser;
+        }
+
+        public MidiDeviceInfo Device { get; }
+        public IntPtr Handle { get; set; }
+        public MidiRunningStatusParser Parser { get; }
+        public Thread? Thread { get; set; }
+        public volatile bool Running;
+    }
 }

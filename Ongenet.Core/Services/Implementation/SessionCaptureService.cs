@@ -21,16 +21,29 @@ public sealed class SessionCaptureService : ISessionCaptureService
         _transport = transport;
         _events = events;
         _transport.StateChanged += OnTransportStateChanged;
-        _project.ProjectChanged += ClearLog;
+        _project.ProjectChanged += () => { if (_log.Count > 0) ClearLog(); };
     }
+
+    public bool SessionRecordArmed { get; private set; }
+
+    public bool CommitOnTransportStop { get; set; }
 
     public int PendingLaunchCount => _log.Count;
 
+    public event Action? SessionRecordArmedChanged;
     public event Action? PendingChanged;
+
+    public void SetSessionRecordArmed(bool armed)
+    {
+        if (SessionRecordArmed == armed) return;
+        SessionRecordArmed = armed;
+        if (!armed) ClearLog();
+        SessionRecordArmedChanged?.Invoke();
+    }
 
     public void LogLaunch(Guid sessionClipId, double launchBeat)
     {
-        if (_transport.State != TransportState.Playing) return;
+        if (!SessionRecordArmed || _transport.State != TransportState.Playing) return;
 
         var sc = _project.Current.SessionClips.FirstOrDefault(c => c.Id == sessionClipId);
         if (sc?.SourceClipId is null) return;
@@ -43,15 +56,14 @@ public sealed class SessionCaptureService : ISessionCaptureService
 
     public void OnTransportStopped()
     {
-        if (_log.Count > 0) Materialize();
+        if (CommitOnTransportStop && SessionRecordArmed && _log.Count > 0)
+            Materialize();
     }
 
     private void OnTransportStateChanged(TransportState state)
     {
         if (state == TransportState.Stopped)
             OnTransportStopped();
-        else if (state == TransportState.Playing)
-            ClearLog();
     }
 
     private void ClearLog()
@@ -73,7 +85,7 @@ public sealed class SessionCaptureService : ISessionCaptureService
             var source = track.Clips.FirstOrDefault(c => c.Id == launch.SourceClipId);
             if (source is null) continue;
 
-            var clip = CloneToArrangement(source, launch.LaunchBeat, launch.LengthBeats);
+            var clip = CloneToArrangement(source, launch.LaunchBeat, launch.LengthBeats, launch.SessionClipId);
             track.Clips.Add(clip);
             _events.Publish(new ClipAddedEvent(track, clip));
         }
@@ -82,7 +94,7 @@ public sealed class SessionCaptureService : ISessionCaptureService
         PendingChanged?.Invoke();
     }
 
-    private static Clip CloneToArrangement(Clip source, double startBeat, double lengthBeats)
+    private static Clip CloneToArrangement(Clip source, double startBeat, double lengthBeats, Guid sessionClipId)
     {
         var clip = new Clip
         {
@@ -101,7 +113,9 @@ public sealed class SessionCaptureService : ISessionCaptureService
             Waveform = source.Waveform,
             WarpMode = source.WarpMode,
             UserFadeInBeats = source.UserFadeInBeats,
-            UserFadeOutBeats = source.UserFadeOutBeats
+            UserFadeOutBeats = source.UserFadeOutBeats,
+            Origin = ClipOrigin.CapturedSession,
+            CapturedFromSessionClipId = sessionClipId
         };
 
         foreach (var wm in source.WarpMarkers)

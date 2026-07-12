@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -27,13 +28,15 @@ public sealed class AppSettingsService : IAppSettingsService
     private readonly IMidiInputService _midi;
     private readonly IRecordingService _recording;
     private readonly ITransportMapService _transport;
+    private readonly ISessionCaptureService _capture;
     private readonly ILocalizationService _localization;
+    private readonly IPlaybackModeService _playback;
 
     private bool _suppress;
 
     public AppSettingsService(IThemeService theme, IAudioDeviceService audio, IAudioBackendManager audioBackend,
         IMidiInputService midi, IRecordingService recording, ITransportMapService transport,
-        ILocalizationService localization)
+        ISessionCaptureService capture, ILocalizationService localization, IPlaybackModeService playback)
     {
         _theme = theme;
         _audio = audio;
@@ -41,7 +44,9 @@ public sealed class AppSettingsService : IAppSettingsService
         _midi = midi;
         _recording = recording;
         _transport = transport;
+        _capture = capture;
         _localization = localization;
+        _playback = playback;
 
         FilePath = AppPaths.SettingsFile();
         Current = Load(FilePath);
@@ -51,7 +56,7 @@ public sealed class AppSettingsService : IAppSettingsService
         // Switching backend swaps the device list, so re-apply the saved device selection on the new one.
         _audioBackend.BackendChanged += OnBackendChanged;
         _theme.ThemeChanged += CaptureAndSave;
-        _midi.SelectedDeviceChanged += CaptureAndSave;
+        _midi.EnabledDevicesChanged += CaptureAndSave;
         _transport.MappingsChanged += CaptureAndSave;
     }
 
@@ -71,8 +76,10 @@ public sealed class AppSettingsService : IAppSettingsService
             if (!string.IsNullOrEmpty(Current.AudioBackend)) _audioBackend.Switch(Current.AudioBackend);
             ApplyAudio();
             ApplyMidi();
+            ApplyMidiInstrumentInput();
             _recording.InputQuantizeBeats = Current.InputQuantizeBeats;
             _transport.SetMappings(Current.TransportMappings.Select(ToMapping).OfType<TransportMapping>());
+            _capture.CommitOnTransportStop = Current.CommitSessionCaptureOnStop;
             WaveformDisplayPreferences.Apply(Current.WaveformBandColorsEnabled);
         }
         finally
@@ -90,7 +97,8 @@ public sealed class AppSettingsService : IAppSettingsService
         Current.AudioInputDevice = _audio.SelectedInput?.Name;
         Current.InputChannelMode = _audio.InputChannelMode.ToString();
         Current.WasapiExclusiveMode = _audio.LowLatencyExclusive;
-        Current.MidiInputDevice = _midi.SelectedDevice?.DisplayName;
+        Current.MidiInputDevices = _midi.EnabledDevices.Select(d => d.DisplayName).ToList();
+        Current.MidiInputDevice = Current.MidiInputDevices.Count == 1 ? Current.MidiInputDevices[0] : null;
         Current.ThemeName = _theme.Current.Name;
         Current.ThemeIsLight = _theme.Current.Variant == ThemeVariant.Light;
         Current.InputQuantizeBeats = _recording.InputQuantizeBeats;
@@ -171,11 +179,39 @@ public sealed class AppSettingsService : IAppSettingsService
         _audio.LowLatencyExclusive = Current.WasapiExclusiveMode;
     }
 
+    private void ApplyMidiInstrumentInput()
+    {
+        _midi.InstrumentInputEnabled = Current.MidiInstrumentInputEnabled
+                                       ?? (_playback.Mode == PlaybackMode.Arrangement);
+    }
+
+    /// <summary>Effective instrument-input state (explicit setting or playback-mode default).</summary>
+    public bool ResolveMidiInstrumentInputEnabled()
+        => Current.MidiInstrumentInputEnabled ?? (_playback.Mode == PlaybackMode.Arrangement);
+
+    public void SetMidiInstrumentInputEnabled(bool? enabled)
+    {
+        Current.MidiInstrumentInputEnabled = enabled;
+        _midi.InstrumentInputEnabled = enabled ?? (_playback.Mode == PlaybackMode.Arrangement);
+        Save();
+    }
+
     private void ApplyMidi()
     {
-        if (string.IsNullOrEmpty(Current.MidiInputDevice)) return;
-        var dev = _midi.Devices.FirstOrDefault(x => x.DisplayName == Current.MidiInputDevice);
-        if (dev is not null) _midi.Select(dev);
+        var names = Current.MidiInputDevices;
+        if (names.Count == 0 && !string.IsNullOrEmpty(Current.MidiInputDevice))
+            names = new List<string> { Current.MidiInputDevice };
+
+        if (names.Count == 0)
+        {
+            if (_midi.Devices.Count > 0)
+                _midi.SetEnabledDevices(_midi.Devices);
+            return;
+        }
+
+        var enabled = _midi.Devices.Where(d => names.Contains(d.DisplayName)).ToList();
+        if (enabled.Count > 0)
+            _midi.SetEnabledDevices(enabled);
     }
 
     private static TransportMapping? ToMapping(TransportMappingDto d)
@@ -208,7 +244,12 @@ public sealed class AppSettingsService : IAppSettingsService
         try
         {
             if (File.Exists(path))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings();
+            {
+                var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings();
+                if (settings.MidiInputDevices.Count == 0 && !string.IsNullOrEmpty(settings.MidiInputDevice))
+                    settings.MidiInputDevices.Add(settings.MidiInputDevice);
+                return settings;
+            }
         }
         catch
         {

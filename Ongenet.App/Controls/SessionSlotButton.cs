@@ -20,7 +20,7 @@ public sealed class SessionSlotButton : Button
         }
 
         if (slot.IsEmpty)
-            slot.AssignFromSelection();
+            slot.OpenAssignPicker(this);
         else if (slot.IsGateMode)
             slot.PressGate();
         else

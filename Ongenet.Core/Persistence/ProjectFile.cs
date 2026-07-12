@@ -204,6 +204,19 @@ public static class ProjectFile
                 c.WriteGuid(section.MarkerId);
             }
 
+            c.WriteInt(p.SessionMidiMappings.Count);
+            foreach (var m in p.SessionMidiMappings)
+            {
+                c.WriteInt((int)m.Action);
+                c.WriteBool(m.IsNote);
+                c.WriteInt(m.Channel);
+                c.WriteInt(m.Number);
+                c.WriteString(m.SourceDeviceId ?? "");
+                c.WriteNullableGuid(m.TrackId);
+                c.WriteBool(m.SceneIndex is not null);
+                if (m.SceneIndex is { } si) c.WriteInt(si);
+            }
+
             c.WriteInt(p.KeyRootPitchClass);
             c.WriteInt((int)p.KeyScale);
         });
@@ -479,6 +492,9 @@ public static class ProjectFile
                 c.WriteDouble(ps.PitchCents);
                 c.WriteFloat(ps.Amplitude);
             }
+
+            c.WriteInt((int)clip.Origin);
+            c.WriteNullableGuid(clip.CapturedFromSessionClipId);
         });
     }
 
@@ -873,6 +889,9 @@ public static class ProjectFile
                     });
                 }
             }
+
+            if (c.ChunkHasMore) clip.Origin = (ClipOrigin)c.ReadInt();
+            if (c.ChunkHasMore) clip.CapturedFromSessionClipId = c.ReadNullableGuid();
         });
         return clip;
     }
@@ -1065,6 +1084,24 @@ public static class ProjectFile
                 {
                     Id = c.ReadGuid(),
                     MarkerId = c.ReadGuid()
+                });
+            }
+        }
+
+        if (c.ChunkHasMore)
+        {
+            var smCount = c.ReadInt();
+            for (var i = 0; i < smCount; i++)
+            {
+                project.SessionMidiMappings.Add(new SessionMidiMapping
+                {
+                    Action = (SessionMidiAction)c.ReadInt(),
+                    IsNote = c.ReadBool(),
+                    Channel = c.ReadInt(),
+                    Number = c.ReadInt(),
+                    SourceDeviceId = c.ReadString() is { Length: > 0 } sid ? sid : null,
+                    TrackId = c.ReadNullableGuid(),
+                    SceneIndex = c.ReadBool() ? c.ReadInt() : null
                 });
             }
         }
