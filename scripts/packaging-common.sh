@@ -16,7 +16,7 @@ read_version() {
 # linux-x64 -> linux-x64, osx-arm64 -> macos-arm64
 rid_to_release_slug() {
   case "$1" in
-    linux-x64|linux-arm64|win-x64) echo "$1" ;;
+    linux-x64|linux-arm64|win-x64|win-arm64) echo "$1" ;;
     osx-arm64) echo "macos-arm64" ;;
     osx-x64) echo "macos-x64" ;;
     *) echo "$1" ;;

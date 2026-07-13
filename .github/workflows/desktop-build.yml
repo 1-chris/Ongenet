@@ -44,6 +44,7 @@ jobs:
           - { rid: linux-x64,   os: ubuntu-latest }
           - { rid: linux-arm64, os: ubuntu-24.04-arm }
           - { rid: win-x64,     os: ubuntu-latest }
+          - { rid: win-arm64,   os: ubuntu-latest }
           - { rid: osx-arm64,   os: macos-14 }
           - { rid: osx-x64,     os: macos-14 }
 
@@ -104,9 +105,13 @@ jobs:
           retention-days: 14
 
   build-windows-installer:
-    name: Windows installer
+    name: Windows installer ${{ matrix.rid }}
     needs: test
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [ win-x64, win-arm64 ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -118,16 +123,20 @@ jobs:
         shell: pwsh
         run: |
           $version = ([regex]::Match((Get-Content Directory.Build.props -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
-          dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release -r win-x64 --self-contained true -p:DebugType=none -p:DebugSymbols=false
+          $rid = "${{ matrix.rid }}"
+          $arch = if ($rid -eq "win-arm64") { "arm64" } else { "x64" }
+          dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release -r $rid --self-contained true -p:DebugType=none -p:DebugSymbols=false
           if (-not (Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
-          & $iscc "/DMyAppVersion=$version" "packaging\windows\ongenet.iss"
+          $isccArgs = @("/DMyAppVersion=$version", "/DMyAppRid=$rid", "/DMyAppArch=$arch")
+          if ($rid -eq "win-arm64") { $isccArgs += "/DMyIsArm64=1" }
+          & $iscc @isccArgs "packaging\windows\ongenet.iss"
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: Ongenet-installers-win-x64
-          path: dist/Ongenet-*-win-x64-setup.exe
+          name: Ongenet-installers-${{ matrix.rid }}
+          path: dist/Ongenet-*-${{ matrix.rid }}-setup.exe
           if-no-files-found: error
           retention-days: 14
 
@@ -211,6 +220,7 @@ jobs:
             |----------|----------|---------|
             | Linux x64 | `.flatpak` or `.AppImage` | `flatpak update net.onge.Ongenet` or re-run `install-appimage.sh` |
             | Windows x64 | `*-win-x64-setup.exe` | Re-run the same setup.exe |
+            | Windows ARM64 | `*-win-arm64-setup.exe` | Re-run the same setup.exe |
             | macOS | `*.pkg` or `*.dmg` | Re-run the same pkg/dmg |
 
             ## Portable
@@ -222,7 +232,7 @@ jobs:
             artifacts/**/Ongenet-*-portable.zip
             artifacts/**/Ongenet-*.AppImage
             artifacts/**/Ongenet-*.flatpak
-            artifacts/**/Ongenet-*-win-x64-setup.exe
+            artifacts/**/Ongenet-*-win-*-setup.exe
             artifacts/**/Ongenet-*-macos-*.dmg
             artifacts/**/Ongenet-*-macos-*.pkg
             artifacts/**/Ongenet-*.apk

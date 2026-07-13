@@ -17,6 +17,7 @@ Core and a thin, swappable device/UI layer around it. Licensed under the [MIT Li
 | **Linux x64** | `.flatpak` or `.AppImage` | `*-linux-x64-portable.zip` |
 | **Linux arm64** | — | `*-linux-arm64-portable.zip` |
 | **Windows x64** | `*-win-x64-setup.exe` | `*-win-x64-portable.zip` |
+| **Windows ARM64** | `*-win-arm64-setup.exe` | `*-win-arm64-portable.zip` |
 | **macOS** (Apple Silicon / Intel) | `.pkg` or `.dmg` | `*-macos-*-portable.zip` |
 
 Portable builds are self-contained — extract and run, no install step. Installers upgrade in place; settings are stored separately. See [DEVELOPMENT.md §7.1](DEVELOPMENT.md#71-packaging-installers--portable-builds) and [packaging/README.md](packaging/README.md).

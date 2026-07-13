@@ -1,17 +1,28 @@
 ; Ongenet Windows installer (Inno Setup 6)
-; Build: scripts/build-windows-installer.sh (requires iscc on PATH)
-; Pass version: iscc /DMyAppVersion=0.40.0 ongenet.iss
+; Build: scripts/build-windows-installer.sh [win-x64|win-arm64] (requires iscc on PATH)
+; Pass version/RID: iscc /DMyAppVersion=0.40.0 /DMyAppRid=win-arm64 /DMyAppArch=arm64 /DMyIsArm64=1 ongenet.iss
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
+#endif
+#ifndef MyAppRid
+  #define MyAppRid "win-x64"
+#endif
+#ifndef MyAppArch
+  #define MyAppArch "x64"
 #endif
 
 #define MyAppName "Ongenet"
 #define MyAppPublisher "Ongenet"
 #define MyAppURL "https://onge.net/"
 #define MyAppExeName "Ongenet.exe"
-; Fixed GUID — never change (enables in-place upgrade)
-#define MyAppId "{{A7B3C4D5-E6F7-4890-ABCD-EF1234567890}"
+; Fixed GUIDs per arch — never change (enables in-place upgrade within that arch).
+; Pass /DMyIsArm64=1 from the build script for the arm64 installer.
+#ifdef MyIsArm64
+  #define MyAppId "{{B8C4D5E6-F7A8-4901-BCDE-F12345678901}"
+#else
+  #define MyAppId "{{A7B3C4D5-E6F7-4890-ABCD-EF1234567890}"
+#endif
 
 [Setup]
 AppId={#MyAppId}
@@ -26,14 +37,15 @@ DefaultGroupName=Ongenet
 DisableProgramGroupPage=yes
 LicenseFile=..\..\LICENSE
 OutputDir=..\..\dist
-OutputBaseFilename=Ongenet-{#MyAppVersion}-win-x64-setup
+OutputBaseFilename=Ongenet-{#MyAppVersion}-{#MyAppRid}-setup
 SetupIconFile=..\icons\ongenet.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 UsePreviousAppDir=yes
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed={#MyAppArch}
+ArchitecturesInstallIn64BitMode={#MyAppArch}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
@@ -43,7 +55,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\..\Ongenet.Desktop\bin\Release\net10.0\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\Ongenet.Desktop\bin\Release\net10.0\{#MyAppRid}\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

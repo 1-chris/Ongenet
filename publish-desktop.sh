@@ -9,7 +9,7 @@
 #   ./publish-desktop.sh                 # all platforms, zipped
 #   ./publish-desktop.sh --symbols       # keep .pdb debug symbols
 #   ./publish-desktop.sh --no-zip        # leave publish folders only
-#   ./publish-desktop.sh linux-x64 win-x64
+#   ./publish-desktop.sh linux-x64 win-x64 win-arm64
 
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -21,7 +21,7 @@ PROJ="$ROOT/Ongenet.Desktop/Ongenet.Desktop.csproj"
 OUTBASE="$ROOT/Ongenet.Desktop/bin/Release/net10.0"
 VERSION="$(read_version "$ROOT")"
 
-ALL_RIDS="linux-x64 linux-arm64 win-x64 osx-arm64 osx-x64"
+ALL_RIDS="linux-x64 linux-arm64 win-x64 win-arm64 osx-arm64 osx-x64"
 SYMBOLS=0
 DO_ZIP=1
 RIDS=""
@@ -30,7 +30,7 @@ for arg in "$@"; do
     case "$arg" in
         --symbols)   SYMBOLS=1 ;;
         --no-zip)    DO_ZIP=0 ;;
-        linux-x64|linux-arm64|win-x64|osx-arm64|osx-x64) RIDS="$RIDS $arg" ;;
+        linux-x64|linux-arm64|win-x64|win-arm64|osx-arm64|osx-x64) RIDS="$RIDS $arg" ;;
         *) echo "Unknown option: $arg"; exit 1 ;;
     esac
 done

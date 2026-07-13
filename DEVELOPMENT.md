@@ -440,7 +440,7 @@ executable is ~100 MB):
 ./publish-desktop.sh --no-zip        # leave the publish folders, don't zip
 ```
 
-It publishes `linux-x64`, `linux-arm64`, `win-x64`, `osx-arm64` and `osx-x64`. Because audio uses each
+It publishes `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-arm64` and `osx-x64`. Because audio uses each
 OS's native libraries via P/Invoke (PipeWire/PulseAudio/JACK/ALSA on Linux, CoreAudio on macOS, WASAPI on
 Windows), **nothing native is compiled or bundled** — every target is a plain `dotnet publish`, so the
 only toolchain requirement beyond the .NET SDK is `zip` (for packaging; the script falls back to `tar.gz`
@@ -451,7 +451,7 @@ otherwise).
 
 ### Cross-publishing
 
-`dotnet publish` cross-publishes between platforms for pure-.NET targets — e.g. `win-x64` and `osx-x64`
+`dotnet publish` cross-publishes between platforms for pure-.NET targets — e.g. `win-x64`, `win-arm64` and `osx-x64`
 are built on Linux/Apple-Silicon runners in CI. You can publish a single RID by hand without the script:
 
 ```bash
@@ -473,8 +473,8 @@ Every release ships **installers** (recommended) and **portable** ZIPs (extract 
 
 | Tier | Linux | Windows | macOS |
 |------|-------|---------|-------|
-| **Installer** | `.flatpak`, `.AppImage` (+ `install-appimage.sh`) | `*-win-x64-setup.exe` (Inno Setup) | `.pkg`, `.dmg` |
-| **Portable** | `*-linux-*-portable.zip` | `*-win-x64-portable.zip` | `*-macos-*-portable.zip` |
+| **Installer** | `.flatpak`, `.AppImage` (+ `install-appimage.sh`) | `*-win-*-setup.exe` (Inno Setup, x64 + ARM64) | `.pkg`, `.dmg` |
+| **Portable** | `*-linux-*-portable.zip` | `*-win-*-portable.zip` | `*-macos-*-portable.zip` |
 
 User settings (`settings.json`, presets) live outside install folders — see §4 — so in-place installer upgrades preserve them.
 
@@ -485,7 +485,8 @@ User settings (`settings.json`, presets) live outside install folders — see §
 ./scripts/build-appimage.sh linux-x64             # AppImage
 ./scripts/install-appimage.sh dist/Ongenet-*.AppImage   # install/upgrade (Linux)
 ./scripts/build-flatpak.sh linux-x64              # Flatpak bundle
-./scripts/build-windows-installer.sh              # Inno Setup (Windows, requires iscc)
+./scripts/build-windows-installer.sh              # Inno Setup win-x64 (Windows, requires iscc)
+./scripts/build-windows-installer.sh win-arm64    # Inno Setup win-arm64
 ./scripts/build-dmg.sh osx-arm64                  # DMG (macOS)
 ./scripts/build-macos-pkg.sh osx-arm64            # pkg installer (macOS)
 ```
@@ -519,7 +520,7 @@ Packaging tools (Inno Setup, AppImageKit, Flatpak) are free and do not change On
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `.github/workflows/desktop-build.yml` | push/PR to `main`, `v*` tags, manual | Runs Core tests, builds **portable** ZIPs for every desktop RID, **Linux** AppImage + Flatpak (x64), **Windows** Inno Setup installer, **macOS** dmg + pkg per arch, and the Android APK. On a `v*` tag, attaches all artifacts to one GitHub Release (installers + portable + APK). |
+| `.github/workflows/desktop-build.yml` | push/PR to `main`, `v*` tags, manual | Runs Core tests, builds **portable** ZIPs for every desktop RID (including `win-arm64`), **Linux** AppImage + Flatpak (x64), **Windows** Inno Setup installers (x64 + ARM64), **macOS** dmg + pkg per arch, and the Android APK. On a `v*` tag, attaches all artifacts to one GitHub Release (installers + portable + APK). |
 | `.github/workflows/deploy-web.yml` | push to `main`, manual | Installs `wasm-tools`, runs `./scripts/build-site.sh` (DocFX site + WASM publish), assembles `_site/` (homepage, guides, dev docs, API at `/`, app at `/app/`), and deploys to GitHub Pages. |
 
 ### Cutting a release

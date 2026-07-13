@@ -2,7 +2,7 @@
 # Build the Windows Inno Setup installer.
 #
 # Usage:
-#   ./scripts/build-windows-installer.sh
+#   ./scripts/build-windows-installer.sh [win-x64|win-arm64]
 #
 # Requires: iscc (Inno Setup 6) on PATH — typical location on CI:
 #   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
@@ -13,7 +13,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/packaging-common.sh"
 
 VERSION="$(read_version "$ROOT")"
-RID="win-x64"
+RID="${1:-win-x64}"
+case "$RID" in
+  win-x64) ARCH="x64" ;;
+  win-arm64) ARCH="arm64" ;;
+  *)
+    echo "Unsupported RID: $RID (expected win-x64 or win-arm64)"
+    exit 1
+    ;;
+esac
+
 PUBLISH="$(publish_dir "$ROOT" "$RID")"
 ISS="$ROOT/packaging/windows/ongenet.iss"
 
@@ -44,5 +53,9 @@ if [[ "$(uname -s 2>/dev/null || echo)" == MINGW* ]] || [[ "$(uname -s 2>/dev/nu
   export MSYS2_ARG_CONV_EXCL='*'
 fi
 
-"$ISCC" "//DMyAppVersion=$VERSION" "$ISS"
-echo "Created dist/Ongenet-${VERSION}-win-x64-setup.exe"
+ISCC_ARGS=( "//DMyAppVersion=$VERSION" "//DMyAppRid=$RID" "//DMyAppArch=$ARCH" )
+if [ "$RID" = "win-arm64" ]; then
+  ISCC_ARGS+=( "//DMyIsArm64=1" )
+fi
+"$ISCC" "${ISCC_ARGS[@]}" "$ISS"
+echo "Created dist/Ongenet-${VERSION}-${RID}-setup.exe"

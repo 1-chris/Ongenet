@@ -26,7 +26,8 @@ Native installers and portable ZIPs share the same `dotnet publish` output from 
 ./scripts/build-flatpak.sh linux-x64
 
 # Windows installer (requires Inno Setup `iscc` on PATH)
-./scripts/build-windows-installer.sh
+./scripts/build-windows-installer.sh            # win-x64
+./scripts/build-windows-installer.sh win-arm64  # win-arm64
 
 # macOS DMG + pkg (macOS only)
 ./scripts/build-dmg.sh osx-arm64
