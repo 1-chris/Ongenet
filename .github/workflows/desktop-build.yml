@@ -63,9 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Ongenet-portable-${{ matrix.rid }}
-          path: |
-            dist/Ongenet-*-portable.zip
-            dist/Ongenet-*-portable.tar.gz
+          path: dist/Ongenet-*-portable.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -222,7 +220,6 @@ jobs:
             See [DEVELOPMENT.md §7.1](https://github.com/1-chris/Ongenet/blob/main/DEVELOPMENT.md#71-packaging-installers--portable-builds) for build details.
           files: |
             artifacts/**/Ongenet-*-portable.zip
-            artifacts/**/Ongenet-*-portable.tar.gz
             artifacts/**/Ongenet-*.AppImage
             artifacts/**/Ongenet-*.flatpak
             artifacts/**/Ongenet-*-win-x64-setup.exe
