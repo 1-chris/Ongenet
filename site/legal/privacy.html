@@ -65,15 +65,16 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
 
 <main class="legal-page">
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated: 12 July 2026</p>
+  <p class="meta">Last updated: 13 July 2026</p>
 
   <p>This Privacy Policy describes how Ongenet (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) handles
      information in connection with the Ongenet desktop application, Android application, web demo,
      and website at <a href="https://onge.net/">onge.net</a>.</p>
 
   <p><strong>Summary:</strong> Ongenet does not collect, store, or receive personal data or usage data from you.
-     There are no user accounts, no telemetry, no analytics, no cookies, and no crash-reporting systems.
-     Your projects, settings, and media remain on your device under your control.</p>
+     There are no user accounts, no telemetry, no analytics, no cookies, and no remote crash-reporting systems.
+     The desktop application may write a local crash log on your device for your own debugging; that file is never
+     uploaded. Your projects, settings, and media remain on your device under your control.</p>
 
   <h2>1. Who we are</h2>
   <p>Ongenet is developed and published by Chris (GitHub: <a href="https://github.com/1-chris">1-chris</a>),
@@ -87,7 +88,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
     <li>require or offer user accounts or sign-in;</li>
     <li>collect telemetry, analytics, or usage statistics;</li>
     <li>use cookies or similar tracking technologies on our website;</li>
-    <li>operate crash dump or error-reporting services;</li>
+    <li>operate remote crash dump or error-reporting services (nothing is uploaded to us or to any third party);</li>
     <li>check for updates by transmitting data to our servers (there are no such servers);</li>
     <li>transmit your projects, audio, MIDI, settings, or other creative content to us or to any service we operate.</li>
   </ul>
@@ -100,6 +101,12 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
     <li><strong>Projects</strong> — <code>.ongen</code> project files and autosave copies at locations you choose;</li>
     <li><strong>Presets</strong> — saved instrument, effect, and chain presets in your local presets folder;</li>
     <li><strong>Scripts</strong> — user C# scripts in your Documents folder (<code>Documents/Ongenet/Scripts</code>);</li>
+    <li><strong>Crash logs</strong> — if the desktop application hits an unhandled managed exception, it may write a text dump under
+        <code>crashes/</code> inside the same configuration folder (for example
+        <code>%AppData%\Ongenet\crashes</code> on Windows). A dump typically includes a timestamp, app version,
+        OS description, and the exception type, message, and stack trace. Stack traces may incidentally include
+        local file paths from your machine. These files stay on your device, are not uploaded, and you may delete
+        the folder at any time;</li>
     <li><strong>Collaboration sync</strong> — if you enable it, project files are copied to a local folder you designate; no cloud sync is involved.</li>
   </ul>
   <p>This data is not transmitted to us. You are responsible for backing up and securing files on your device.</p>

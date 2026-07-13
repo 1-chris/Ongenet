@@ -58,6 +58,17 @@ public static class AppPaths
         return dir;
     }
 
+    /// <summary>
+    /// Local crash dump directory (<c>&lt;config&gt;/crashes</c>). Written only on the device —
+    /// never uploaded. Created on demand.
+    /// </summary>
+    public static string CrashesDirectory()
+    {
+        var dir = Path.Combine(ConfigDirectory(), "crashes");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
     public static string ConfigDirectory()
     {
         if (OperatingSystem.IsWindows())

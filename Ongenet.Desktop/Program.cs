@@ -14,10 +14,21 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // Plug the native desktop stack (OS-native audio + MIDI, CLAP + LV2 hosting) into the
-        // shared App, then run the classic multi-window desktop lifetime.
-        SharedApp.Platform = new DesktopPlatform();
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        // Local crash dialog + log for managed unhandled exceptions (no telemetry).
+        CrashReporter.Install();
+
+        try
+        {
+            // Plug the native desktop stack (OS-native audio + MIDI, CLAP + LV2 hosting) into the
+            // shared App, then run the classic multi-window desktop lifetime.
+            SharedApp.Platform = new DesktopPlatform();
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.ReportFatal(ex);
+            Environment.Exit(1);
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()

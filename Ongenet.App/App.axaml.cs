@@ -37,6 +37,12 @@ namespace Ongenet.App
         /// </summary>
         public static IPlatformServices? Platform { get; set; }
 
+        /// <summary>
+        /// Optional hook the desktop head sets (e.g. crash-reporter dispatcher attach). Invoked at the
+        /// start of <see cref="OnFrameworkInitializationCompleted"/> for classic-desktop lifetimes only.
+        /// </summary>
+        public static Action? OnClassicDesktopFrameworkInit { get; set; }
+
         /// <inheritdoc/>
         public override void Initialize()
         {
@@ -46,6 +52,9 @@ namespace Ongenet.App
         /// <inheritdoc/>
         public override void OnFrameworkInitializationCompleted()
         {
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime)
+                OnClassicDesktopFrameworkInit?.Invoke();
+
             var services = new ServiceCollection();
 
             // Logging surfaced to the in-app Log window.
