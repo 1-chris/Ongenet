@@ -86,8 +86,12 @@ public sealed class ProjectScriptExporter : IProjectScriptExporter
                 sb.AppendLine($"api.AddChordRegion(new ScriptChordRegionInfo({ScriptCodeGenerator.DoubleLiteral(r.StartBeat)}, {ScriptCodeGenerator.DoubleLiteral(r.LengthBeats)}, {ScriptCodeGenerator.StringLiteral(r.Symbol)}, ScriptChordQuality.{r.Quality}));");
         }
 
-        foreach (var vt in project.VideoTracks)
-            sb.AppendLine($"api.AddVideoTrack(new ScriptVideoTrackInfo({ScriptCodeGenerator.GuidLiteral(vt.Id)}, {ScriptCodeGenerator.StringLiteral(vt.FilePath)}, {ScriptCodeGenerator.DoubleLiteral(vt.OffsetSeconds)}, {ScriptCodeGenerator.DoubleLiteral(vt.Fps)}, {(vt.Muted ? "true" : "false")}, {ScriptCodeGenerator.DoubleLiteral(vt.InPointSeconds)}, {ScriptCodeGenerator.DoubleLiteral(vt.OutPointSeconds)}));");
+        foreach (var layer in project.VideoLayers)
+        {
+            sb.AppendLine($"api.AddVideoLayer(new ScriptVideoLayerInfo({ScriptCodeGenerator.GuidLiteral(layer.Id)}, {ScriptCodeGenerator.StringLiteral(layer.Name)}, {layer.ZOrder}, {ScriptCodeGenerator.DoubleLiteral(layer.Opacity)}, {(layer.DefaultVisible ? "true" : "false")}, {ScriptCodeGenerator.DoubleLiteral(layer.OffsetSeconds)}, {ScriptCodeGenerator.DoubleLiteral(layer.Fps)}, {(layer.Muted ? "true" : "false")}, {ScriptCodeGenerator.DoubleLiteral(layer.InPointSeconds)}, {ScriptCodeGenerator.DoubleLiteral(layer.OutPointSeconds)}, {(layer.SyncClipId.HasValue ? ScriptCodeGenerator.GuidLiteral(layer.SyncClipId.Value) : "null")}, {(layer.AudioSourceTrackId.HasValue ? ScriptCodeGenerator.GuidLiteral(layer.AudioSourceTrackId.Value) : "null")}));");
+            foreach (var item in layer.Items)
+                sb.AppendLine($"api.AddVideoLayerItem(new ScriptVideoLayerItemInfo({ScriptCodeGenerator.GuidLiteral(item.Id)}, {ScriptCodeGenerator.GuidLiteral(layer.Id)}, ScriptVideoElementKind.{item.Kind}, {ScriptCodeGenerator.StringLiteral(item.SourcePath)}, {ScriptCodeGenerator.DoubleLiteral(item.X)}, {ScriptCodeGenerator.DoubleLiteral(item.Y)}, {ScriptCodeGenerator.DoubleLiteral(item.Width)}, {ScriptCodeGenerator.DoubleLiteral(item.Height)}, {ScriptCodeGenerator.DoubleLiteral(item.Rotation)}, {ScriptCodeGenerator.DoubleLiteral(item.Opacity)}));");
+        }
 
         foreach (var route in project.MultiOutputRoutes)
             sb.AppendLine($"api.AddMultiOutputRoute(new ScriptMultiOutputRouteInfo({ScriptCodeGenerator.GuidLiteral(route.SourceTrackId)}, {route.SlotIndex}, {route.PluginOutputBus}, {ScriptCodeGenerator.GuidLiteral(route.DestinationTrackId)}, {ScriptCodeGenerator.DoubleLiteral(route.Level)}));");

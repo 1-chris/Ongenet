@@ -6,7 +6,7 @@
     UI reads it back at runtime (see Ongenet.Desktop/AppInfo.cs) to show it in the title bar.
   -->
   <PropertyGroup>
-    <Version>0.37.0</Version>
+    <Version>0.38.0</Version>
     <Product>Ongenet</Product>
     <Company>Ongenet</Company>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -28,6 +28,29 @@
     <_LinkLibDir>$(MSBuildThisFileDirectory)third_party/link/build</_LinkLibDir>
     <_LinkLibDir Condition="!Exists('$(_LinkLibDir)/libabl-link.dylib') and !Exists('$(_LinkLibDir)/libabl-link.so') and !Exists('$(_LinkLibDir)/abl-link.dll')">$(MSBuildThisFileDirectory)build/link</_LinkLibDir>
     <OngenetLinkNative Condition="Exists('$(_LinkLibDir)/libabl-link.dylib') or Exists('$(_LinkLibDir)/libabl-link.so') or Exists('$(_LinkLibDir)/abl-link.dll')">true</OngenetLinkNative>
+  </PropertyGroup>
+
+  <!--
+    Android builds need JDK 21. Prefer an explicit -p:JavaSdkDirectory=… or JAVA_HOME when set; otherwise
+    probe common install locations on Linux and macOS (see publish-android.sh for the same list).
+  -->
+  <PropertyGroup Condition="'$(JavaSdkDirectory)' == '' and '$(JAVA_HOME)' != '' and Exists('$(JAVA_HOME)/bin/javac')">
+    <JavaSdkDirectory>$(JAVA_HOME)</JavaSdkDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk/bin/javac')">
+    <JavaSdkDirectory>/usr/lib/jvm/java-21-openjdk</JavaSdkDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk-amd64/bin/javac')">
+    <JavaSdkDirectory>/usr/lib/jvm/java-21-openjdk-amd64</JavaSdkDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk-aarch64/bin/javac')">
+    <JavaSdkDirectory>/usr/lib/jvm/java-21-openjdk-aarch64</JavaSdkDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(JavaSdkDirectory)' == '' and Exists('/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin/javac')">
+    <JavaSdkDirectory>/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home</JavaSdkDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin/javac')">
+    <JavaSdkDirectory>/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home</JavaSdkDirectory>
   </PropertyGroup>
 
 </Project>

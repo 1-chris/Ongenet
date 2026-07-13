@@ -712,6 +712,9 @@ namespace Ongenet.App.Views.Windows
         private async void OnExportAudio_Click(object? sender, RoutedEventArgs e)
             => await ExportDialog.ShowAsync(this);
 
+        private async void OnExportVideo_Click(object? sender, RoutedEventArgs e)
+            => await ExportDialog.ShowForVideoAsync(this);
+
         private async void OnSyncCollaboration_Click(object? sender, RoutedEventArgs e)
         {
             var svc = AppSettings;

@@ -95,14 +95,20 @@ public static class ProjectCloner
         foreach (var dm in src.DrumMaps)
             dst.DrumMaps.Add(CloneDrumMap(dm));
 
-        foreach (var vt in src.VideoTracks)
-            dst.VideoTracks.Add(new VideoTrack
+        dst.VideoEnabled = src.VideoEnabled;
+        dst.VideoCanvasWidth = src.VideoCanvasWidth;
+        dst.VideoCanvasHeight = src.VideoCanvasHeight;
+        foreach (var layer in src.VideoLayers)
+            dst.VideoLayers.Add(CloneVideoLayer(layer));
+        foreach (var tr in src.VideoTriggers)
+            dst.VideoTriggers.Add(CloneVideoTrigger(tr));
+        foreach (var region in src.VideoVisibilityRegions)
+            dst.VideoVisibilityRegions.Add(new VideoVisibilityRegion
             {
-                Id = vt.Id,
-                FilePath = vt.FilePath,
-                OffsetSeconds = vt.OffsetSeconds,
-                Fps = vt.Fps,
-                Muted = vt.Muted
+                Id = region.Id,
+                LayerId = region.LayerId,
+                StartBeat = region.StartBeat,
+                EndBeat = region.EndBeat
             });
 
         dst.PlaybackMode = src.PlaybackMode;
@@ -354,6 +360,67 @@ public static class ProjectCloner
             }
         }
     }
+
+    private static VideoLayer CloneVideoLayer(VideoLayer layer)
+    {
+        var copy = new VideoLayer
+        {
+            Id = layer.Id,
+            Name = layer.Name,
+            ZOrder = layer.ZOrder,
+            Opacity = layer.Opacity,
+            DefaultVisible = layer.DefaultVisible,
+            OffsetSeconds = layer.OffsetSeconds,
+            InPointSeconds = layer.InPointSeconds,
+            OutPointSeconds = layer.OutPointSeconds,
+            Fps = layer.Fps,
+            Muted = layer.Muted,
+            SyncClipId = layer.SyncClipId,
+            AudioSourceTrackId = layer.AudioSourceTrackId,
+            WaveformStyle = layer.WaveformStyle,
+            WaveformFollowPlayhead = layer.WaveformFollowPlayhead,
+            WaveformColorArgb = layer.WaveformColorArgb,
+            WaveformX = layer.WaveformX,
+            WaveformY = layer.WaveformY,
+            WaveformWidth = layer.WaveformWidth,
+            WaveformHeight = layer.WaveformHeight,
+            VisualiserColorMode = layer.VisualiserColorMode,
+            VisualiserColorSecondaryArgb = layer.VisualiserColorSecondaryArgb,
+            SpectrumMinHz = layer.SpectrumMinHz,
+            SpectrumMaxHz = layer.SpectrumMaxHz,
+            SpectrumLineThickness = layer.SpectrumLineThickness
+        };
+        foreach (var item in layer.Items)
+        {
+            copy.Items.Add(new VideoLayerItem
+            {
+                Id = item.Id,
+                Kind = item.Kind,
+                SourcePath = item.SourcePath,
+                X = item.X,
+                Y = item.Y,
+                Width = item.Width,
+                Height = item.Height,
+                Rotation = item.Rotation,
+                Opacity = item.Opacity
+            });
+        }
+
+        return copy;
+    }
+
+    private static VideoTrigger CloneVideoTrigger(VideoTrigger tr) => new()
+    {
+        Id = tr.Id,
+        TargetLayerId = tr.TargetLayerId,
+        Source = tr.Source,
+        TrackId = tr.TrackId,
+        ClipId = tr.ClipId,
+        MidiNote = tr.MidiNote,
+        Moment = tr.Moment,
+        Action = tr.Action,
+        FadeDurationSeconds = tr.FadeDurationSeconds
+    };
 
     private static void CopyCustomState(object src, object dst)
     {

@@ -83,6 +83,17 @@ public sealed class GeneralSettingsViewModel : ViewModelBase
             OnPropertyChanged();
         }
     }
+
+    public bool VideoEnabled
+    {
+        get => _settings.Current.VideoEnabled;
+        set
+        {
+            if (_settings.Current.VideoEnabled == value) return;
+            _settings.SetVideoEnabled(value);
+            OnPropertyChanged();
+        }
+    }
 }
 
 public sealed record LocaleChoice(string Id, string DisplayName);

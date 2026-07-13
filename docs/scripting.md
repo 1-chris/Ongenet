@@ -131,7 +131,37 @@ The authoritative list is [`IScriptingApi.cs`](https://github.com/1-chris/Ongene
 | Automation | `GetAutomationLanes`, `AddAutomationLane`, `AddAutomationPoint`, `AddTrackModulator` |
 | Sends / multi-out | `GetSends`, `AddSend`, `GetMultiOutputRoutes`, `AddMultiOutputRoute` |
 | Patterns / session | `GetPatterns`, `AddPatternWithId`, `AddPatternChannel`, `SetPatternSteps`, `Get/AddPatternClip`, `Get/AddSessionClip` |
-| Markers / chord / maps / video | `Get/AddMarker`, `Get/AddSection`, `Get/AddChordRegion`, `Get/AddDrumMap`, `Get/AddExpressionMap`, `Get/AddVideoTrack`, `Get/AddControlRoomProfile` |
+| Markers / chord / maps / video tracks | `Get/AddMarker`, `Get/AddSection`, `Get/AddChordRegion`, `Get/AddDrumMap`, `Get/AddExpressionMap`, `Get/AddVideoTrack`, `Get/AddControlRoomProfile` |
+
+### Video composition
+
+| Method | Description |
+| --- | --- |
+| `GetVideoEnabled()` / `SetVideoEnabled(enabled)` | Per-project video on/off |
+| `GetVideoElements()` / `AddVideoElement(info)` | Overlay layers (kind, path, bounds, z-order, opacity) |
+| `GetVideoTriggers()` / `AddVideoTrigger(info)` | Clip/MIDI-driven show/hide/fade rules |
+
+`ScriptVideoElementInfo` fields: `Id`, `Name`, `Kind` (`Image`, `AnimatedGif`, `Video`, `Waveform`), `SourcePath`, `X`, `Y`, `Width`, `Height`, `Rotation`, `ZOrder`, `Opacity`, `DefaultVisible`.
+
+`ScriptVideoTriggerInfo` fields: `Id`, `TargetElementId`, `Source` (`ArrangementClip`, `SessionClip`, `MidiNote`), `TrackId`, `ClipId`, `MidiNote`, `Moment` (`ClipStart`, `ClipEnd`, `NoteOn`, `NoteOff`), `Action` (`Show`, `Hide`, `Toggle`, `FadeIn`, `FadeOut`), `FadeDurationSeconds`.
+
+Example:
+
+```csharp
+api.SetVideoEnabled(true);
+var logoId = Guid.NewGuid();
+api.AddVideoElement(new ScriptVideoElementInfo(
+    logoId, "Logo", ScriptVideoElementKind.Image, "/path/logo.png",
+    0.02, 0.02, 0.2, 0.2, 0, 1, 1.0, false));
+var clips = api.GetClips();
+if (clips.Count > 0)
+{
+    api.AddVideoTrigger(new ScriptVideoTriggerInfo(
+        Guid.NewGuid(), logoId, ScriptVideoTriggerSource.ArrangementClip,
+        null, clips[0].Id, null, ScriptVideoTriggerMoment.ClipStart,
+        ScriptVideoTriggerAction.FadeIn, 0.5));
+}
+```
 
 ### Export (desktop)
 

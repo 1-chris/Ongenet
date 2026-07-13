@@ -56,8 +56,23 @@ public sealed class Project
     public List<DrumMap> DrumMaps { get; } = new();
     public List<StepSequence> OrphanStepSequences { get; } = new();
 
-    /// <summary>Video tracks synced to the transport playhead.</summary>
-    public List<VideoTrack> VideoTracks { get; } = new();
+    /// <summary>Composited video layers (images, GIFs, synced video).</summary>
+    public List<VideoLayer> VideoLayers { get; } = new();
+
+    /// <summary>When false, video features are inactive for this project until enabled from the Video tab.</summary>
+    public bool VideoEnabled { get; set; }
+
+    /// <summary>Composition / export canvas width in pixels.</summary>
+    public int VideoCanvasWidth { get; set; } = 1920;
+
+    /// <summary>Composition / export canvas height in pixels.</summary>
+    public int VideoCanvasHeight { get; set; } = 1080;
+
+    /// <summary>Clip/MIDI-driven visibility triggers for video layers.</summary>
+    public List<VideoTrigger> VideoTriggers { get; } = new();
+
+    /// <summary>Beat ranges when video layers are visible (unsynced timeline blocks).</summary>
+    public List<VideoVisibilityRegion> VideoVisibilityRegions { get; } = new();
 
     /// <summary>Arrangement vs session vs hybrid playback (persisted per project).</summary>
     public PlaybackMode PlaybackMode { get; set; } = PlaybackMode.Arrangement;

@@ -297,15 +297,43 @@ public sealed record ScriptExpressionMapInfo(
     string Name,
     IReadOnlyList<ScriptExpressionMapEntryInfo> Entries);
 
-/// <summary>Video track metadata (path only).</summary>
-public sealed record ScriptVideoTrackInfo(
+public enum ScriptVideoElementKind { Image, AnimatedGif, Video, Waveform }
+
+/// <summary>Composited video layer snapshot for scripting.</summary>
+public sealed record ScriptVideoLayerInfo(
     Guid Id,
-    string FilePath,
+    string Name,
+    int ZOrder,
+    double Opacity,
+    bool DefaultVisible,
     double OffsetSeconds,
     double Fps,
     bool Muted,
     double InPointSeconds = 0,
-    double OutPointSeconds = 0);
+    double OutPointSeconds = 0,
+    Guid? SyncClipId = null,
+    Guid? AudioSourceTrackId = null);
+
+public sealed record ScriptVideoLayerItemInfo(
+    Guid Id,
+    Guid LayerId,
+    ScriptVideoElementKind Kind,
+    string SourcePath,
+    double X,
+    double Y,
+    double Width,
+    double Height,
+    double Rotation,
+    double Opacity);
+
+public enum ScriptVideoTriggerSource { ArrangementClip, SessionClip, MidiNote }
+public enum ScriptVideoTriggerMoment { ClipStart, ClipEnd, NoteOn, NoteOff }
+public enum ScriptVideoTriggerAction { Show, Hide, Toggle, FadeIn, FadeOut }
+
+public sealed record ScriptVideoTriggerInfo(
+    Guid Id, Guid TargetLayerId, ScriptVideoTriggerSource Source,
+    Guid? TrackId, Guid? ClipId, int? MidiNote,
+    ScriptVideoTriggerMoment Moment, ScriptVideoTriggerAction Action, double FadeDurationSeconds);
 
 /// <summary>Step sequencer data.</summary>
 public sealed record ScriptStepData(

@@ -1,0 +1,12 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+        x:Class="Ongenet.App.Views.Windows.VideoPreviewWindow"
+        x:DataType="vm:VideoTrackViewModel"
+        Title="{DynamicResource VideoTrack_Pop_out_preview}"
+        Width="960" Height="540"
+        WindowStartupLocation="CenterScreen">
+    <Grid Background="{StaticResource CatppuccinCrust}">
+        <Image x:Name="PreviewImage" Source="{Binding Frame}" Stretch="Uniform" Margin="8"/>
+    </Grid>
+</Window>

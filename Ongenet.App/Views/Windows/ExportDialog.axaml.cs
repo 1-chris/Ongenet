@@ -32,6 +32,16 @@ public partial class ExportDialog : Window
         await dialog.ShowDialog(owner);
     }
 
+    public static async Task ShowForVideoAsync(Window owner)
+    {
+        var vm = App.ServiceProvider?.GetRequiredService<ExportViewModel>();
+        if (vm is null) return;
+
+        vm.ApplyVideoExportPreset();
+        var dialog = new ExportDialog { DataContext = vm, _vm = vm };
+        await dialog.ShowDialog(owner);
+    }
+
     private void OnCancel(object? sender, RoutedEventArgs e) => Close();
 
     private async void OnExport(object? sender, RoutedEventArgs e)

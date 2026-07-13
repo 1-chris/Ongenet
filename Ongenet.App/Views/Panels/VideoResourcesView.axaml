@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels.Panels"
+             x:Class="Ongenet.App.Views.Panels.VideoResourcesView"
+             x:DataType="vm:VideoResourcesViewModel">
+    <Border Background="{StaticResource CatppuccinMantle}" Padding="8">
+        <Grid RowDefinitions="Auto,*">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,0,8">
+                <Button Content="{DynamicResource VideoResources_Add_layer}" Command="{Binding AddLayerCommand}" Padding="6,3" FontSize="11"/>
+                <Button Content="{DynamicResource VideoResources_Add_trigger}" Command="{Binding AddTriggerCommand}" Padding="6,3" FontSize="11"/>
+                <Button Content="−" Command="{Binding DeleteCommand}" Padding="6,3" FontSize="11"/>
+            </StackPanel>
+            <TreeView Grid.Row="1" ItemsSource="{Binding Roots}" SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}">
+                        <StackPanel Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="⚠" FontSize="10" Foreground="{StaticResource CatppuccinYellow}"
+                                           IsVisible="{Binding IsMissingFile}"/>
+                                <TextBlock Text="{Binding Label}" FontSize="11" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Hint}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay0}"
+                                       TextWrapping="Wrap" Margin="0,0,0,4" IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </Grid>
+    </Border>
+</UserControl>

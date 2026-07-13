@@ -45,7 +45,10 @@
     </UserControl.Styles>
 
     <Border Background="{StaticResource CatppuccinCrust}">
-        <Grid RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
+        <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="Auto,*">
+
+            <!-- timeline grid -->
+        <Grid Grid.Row="0" Grid.RowSpan="3" RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
 
             <!-- [0,0] corner above the headers -->
             <Border Grid.Row="0" Grid.Column="0"
@@ -674,6 +677,7 @@
                 <Rectangle Name="DragInsertLine" Height="3" IsVisible="False"
                            Fill="{StaticResource CatppuccinYellow}"/>
             </Canvas>
+        </Grid>
         </Grid>
     </Border>
 </UserControl>

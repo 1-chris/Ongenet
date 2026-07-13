@@ -136,8 +136,14 @@ public sealed class NullScriptingApi : IScriptingApi
     public void AddDrumMap(ScriptDrumMapInfo map) => throw Disabled();
     public IReadOnlyList<ScriptExpressionMapInfo> GetExpressionMaps() => Array.Empty<ScriptExpressionMapInfo>();
     public void AddExpressionMap(ScriptExpressionMapInfo map) => throw Disabled();
-    public IReadOnlyList<ScriptVideoTrackInfo> GetVideoTracks() => Array.Empty<ScriptVideoTrackInfo>();
-    public void AddVideoTrack(ScriptVideoTrackInfo track) => throw Disabled();
+    public IReadOnlyList<ScriptVideoLayerInfo> GetVideoLayers() => Array.Empty<ScriptVideoLayerInfo>();
+    public void AddVideoLayer(ScriptVideoLayerInfo layer) => throw Disabled();
+    public IReadOnlyList<ScriptVideoLayerItemInfo> GetVideoLayerItems() => Array.Empty<ScriptVideoLayerItemInfo>();
+    public void AddVideoLayerItem(ScriptVideoLayerItemInfo item) => throw Disabled();
+    public bool GetVideoEnabled() => false;
+    public void SetVideoEnabled(bool enabled) => throw Disabled();
+    public IReadOnlyList<ScriptVideoTriggerInfo> GetVideoTriggers() => Array.Empty<ScriptVideoTriggerInfo>();
+    public void AddVideoTrigger(ScriptVideoTriggerInfo trigger) => throw Disabled();
     public IReadOnlyList<ScriptControlRoomProfileInfo> GetControlRoomProfiles() => Array.Empty<ScriptControlRoomProfileInfo>();
     public void AddControlRoomProfile(ScriptControlRoomProfileInfo profile) => throw Disabled();
     public string ExportProjectAsScript(ExportScriptOptions? options = null) => throw Disabled();

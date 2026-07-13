@@ -27,8 +27,16 @@ public sealed class BrowserAppSettingsService : IAppSettingsService
         Current.WaveformBandColorsEnabled = enabled;
         WaveformDisplayPreferences.Apply(enabled);
     }
+
+    public void SetVideoEnabled(bool enabled)
+    {
+        Current.VideoEnabled = enabled;
+        VideoEnabledChanged?.Invoke();
+    }
+
     public void SaveLibrary() => LibraryChanged?.Invoke();
     public event Action? LibraryChanged;
+    public event Action? VideoEnabledChanged;
 }
 
 /// <summary>

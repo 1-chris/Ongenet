@@ -34,4 +34,10 @@ public interface IAppSettingsService
 
     /// <summary>Applies and persists the waveform band-colour display toggle.</summary>
     void SetWaveformBandColorsEnabled(bool enabled);
+
+    /// <summary>Applies and persists the video tab visibility toggle.</summary>
+    void SetVideoEnabled(bool enabled);
+
+    /// <summary>Raised when video tab visibility changes.</summary>
+    event System.Action? VideoEnabledChanged;
 }

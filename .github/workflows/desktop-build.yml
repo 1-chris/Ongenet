@@ -106,6 +106,7 @@ jobs:
   # (JDK 21 + the .NET android workload + SDK) that the desktop jobs don't.
   android:
     name: Build android
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

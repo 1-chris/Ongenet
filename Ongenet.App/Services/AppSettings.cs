@@ -92,6 +92,9 @@ public sealed class AppSettings
 
     /// <summary>When true, waveforms draw bass/mid/treble layers in theme colours.</summary>
     public bool WaveformBandColorsEnabled { get; set; } = true;
+
+    /// <summary>When true, the Video centre tab is shown in the main window.</summary>
+    public bool VideoEnabled { get; set; } = true;
 }
 
 public sealed class KeyboardShortcutDto

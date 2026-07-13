@@ -38,7 +38,7 @@ Ongenet uses **custom window chrome** (its own title bar, themed with Catppuccin
 │  (left)      │                                            │  h  (right) │
 │              │                                            │  t          │
 ├──────────────┴──────────────────────────────────────────┤  tabs       │
-│  Bottom panel:  [ Instrument | Piano Roll | Effects ]     │             │
+│  Bottom panel:  [ Instrument | Piano Roll | Effects | Video ]     │             │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -157,7 +157,47 @@ Audio clips show a waveform with fade handles; MIDI clips show a mini note previ
 
 ---
 
-## 5. Piano roll (bottom panel · "Piano Roll" tab)
+## 5. Video editing mode
+
+Selecting the centre **Video** tab switches the workspace into video editing mode (when **Settings →
+General → Enable video features** is on and the project has video enabled). Three regions work together:
+
+| Region | View | Role |
+| --- | --- | --- |
+| **Left** | [`VideoResourcesView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/VideoResourcesView.axaml) | Project bin: reference tracks, overlays, triggers, linked clips |
+| **Centre** | [`VideoTrackView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/VideoTrackView.axaml) | **Program monitor** — large preview, browse, mute, live preview, pop-out |
+| **Bottom** | [`VideoTimelineView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/VideoTimelineView.axaml) | Beat-synced lanes, reference blocks, trigger markers, inspector |
+
+Leaving the **Video** tab restores the usual left sidebar (Track Controls / Project Clips / Channel Rack)
+and your previous bottom tab.
+
+### Enable prompt
+
+Projects start with video off. The centre tab shows **Enable video for this project** until you click
+**Enable video**.
+
+### Program monitor (centre)
+
+Track picker, **Browse…**, **Muted**, **Live preview**, **Pop out**, and status. Overlay drag/resize
+works directly on the preview canvas; selection syncs with Resources and the bottom timeline.
+
+### Resources (left)
+
+Toolbar: **+ Track**, **+ Overlay**, **+ Trigger**, delete. Tree sections list all video objects.
+Double-click a **linked clip** to seek the arrangement to that clip's start.
+
+### Video timeline (bottom · **Video** tab)
+
+Reference lane (blue blocks), one overlay row per layer, diamond trigger markers on clip beats, shared
+ruler zoom/scroll with the arrangement timeline. Scrub the ruler to seek transport. Inspector below
+edits sync-to-clip, overlay kind, and trigger moment/action/target.
+
+See [video-and-composition guide](https://onge.net/articles/guides/video-and-composition.html) for export
+and ffmpeg setup.
+
+---
+
+## 6. Piano roll (bottom panel · "Piano Roll" tab)
 
 The MIDI note editor for the selected MIDI clip
 ([`Views/Panels/PianoRollView.axaml`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/PianoRollView.axaml)):
@@ -181,7 +221,7 @@ Mouse extras: **right-click** a note to delete it; **middle-drag** to zoom/pan. 
 
 ---
 
-## 6. The "mixer" — where mixing actually lives
+## 7. The "mixer" — where mixing actually lives
 
 There is a dedicated **Mixer** centre tab with channel strips, sends, meters, per-track **input monitoring**
 (Off/Auto/On on audio tracks), and an editable **Routing Matrix**
@@ -232,7 +272,7 @@ handoff** exports structured XML for post houses.
 
 ---
 
-## 7. Library / browser (right panel)
+## 8. Library / browser (right panel)
 
 A collapsible sidebar with vertical tabs. Click a tab to open it; the panel starts collapsed to just
 the tab strip. Tabs:
@@ -254,7 +294,7 @@ sample onto an audio lane. Configure which folders are scanned in **Settings →
 
 ---
 
-## 8. Inspectors (bottom panel)
+## 9. Inspectors (bottom panel)
 
 The bottom panel is a tabbed editor that changes with what you've selected
 ([`ViewModels/BottomPanelViewModel.cs`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/ViewModels/BottomPanelViewModel.cs)):
@@ -304,14 +344,14 @@ knob, slider or switch to **MIDI-learn** it or **create an automation track** fo
 
 ---
 
-## 9. Settings & secondary windows
+## 10. Settings & secondary windows
 
 Opened from the title bar (or the piano roll):
 
 | Window | Purpose |
 | --- | --- |
 | [Guide](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Windows/GuideWindow.axaml) | Built-in help topics (title bar **Guide** button) |
-| [Settings](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Windows/SettingsWindow.axaml) | Audio device, MIDI devices/mappings, Theme editor, Library folders |
+| [Settings](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Windows/SettingsWindow.axaml) | Audio device, MIDI devices/mappings, Theme editor, Library folders, **Enable video features** |
 | [History](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Windows/HistoryWindow.axaml) | Browse and jump around the undo stack |
 | [Logs](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Windows/LogWindow.axaml) | Debug log viewer |
 | [MIDI Generator](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Windows/MidiGeneratorWindow.axaml) | Generate chords/melodies into a clip |
@@ -320,7 +360,7 @@ Opened from the title bar (or the piano roll):
 
 ---
 
-## 10. Keyboard shortcuts (complete list)
+## 11. Keyboard shortcuts (complete list)
 
 Ongenet's shortcuts are defined in C# handlers (not XAML key bindings). Below is the full set.
 

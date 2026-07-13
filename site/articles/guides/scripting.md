@@ -22,7 +22,8 @@ Ongenet embeds a Roslyn C# scripting host with a curated `IScriptingApi`:
 - **Tracks** — all track kinds, mute/solo/arm, routing, sends
 - **Devices** — instruments, effects, presets, parameters
 - **Clips** — MIDI notes/CC, audio metadata, automation, patterns, session clips
-- **Timeline meta** — markers, chord track, drum maps, video paths
+- **Timeline meta** — markers, chord track, drum maps, video paths, overlays, triggers
+- **Video** — `GetVideoEnabled` / `SetVideoEnabled`, `GetVideoElements` / `AddVideoElement`, `GetVideoTriggers` / `AddVideoTrigger`
 - **MIDI bulk** — quantize, transpose, velocity scale, humanize, chance
 - **Live handlers** — transport state, beat grid, clip changes (Start live)
 
@@ -43,8 +44,17 @@ api.OnTransportStateChanged(state =>
     api.Log(state == ScriptTransportState.Playing ? "Playing" : "Stopped"));
 ```
 
+### Video example
+
+```csharp
+api.SetVideoEnabled(true);
+foreach (var el in api.GetVideoElements())
+    api.Log($"Overlay: {el.Name} ({el.Kind})");
+```
+
 ## Related
 
 - [Getting started](getting-started.md)
+- [Video & composition](video-and-composition.md)
 - [Dev: Scripting API](/dev/scripting.html)
 - [Keyboard shortcuts](keyboard-shortcuts.md)

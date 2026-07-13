@@ -7,7 +7,8 @@ namespace Ongenet.Core.Audio.Files;
 /// <summary>Muxes a rendered WAV master with a project video track via ffmpeg.</summary>
 public static class FfmpegVideoMuxer
 {
-    public static void Mux(string wavPath, string videoPath, double videoOffsetSeconds, string outputPath)
+    public static void Mux(string wavPath, string videoPath, double videoOffsetSeconds, string outputPath,
+        double inPointSeconds = 0, double outPointSeconds = 0)
     {
         var psi = new ProcessStartInfo
         {
@@ -19,8 +20,22 @@ public static class FfmpegVideoMuxer
         psi.ArgumentList.Add("-y");
         psi.ArgumentList.Add("-v");
         psi.ArgumentList.Add("error");
+
+        if (inPointSeconds > 1e-6)
+        {
+            psi.ArgumentList.Add("-ss");
+            psi.ArgumentList.Add(inPointSeconds.ToString("0.###"));
+        }
+
         psi.ArgumentList.Add("-i");
         psi.ArgumentList.Add(videoPath);
+
+        if (outPointSeconds > inPointSeconds + 1e-6)
+        {
+            psi.ArgumentList.Add("-to");
+            psi.ArgumentList.Add(outPointSeconds.ToString("0.###"));
+        }
+
         psi.ArgumentList.Add("-i");
         psi.ArgumentList.Add(wavPath);
         if (Math.Abs(videoOffsetSeconds) > 1e-6)

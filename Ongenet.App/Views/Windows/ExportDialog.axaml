@@ -5,6 +5,8 @@
         xmlns:vm="using:Ongenet.App.ViewModels"
         xmlns:services="using:Ongenet.Core.Services"
         xmlns:audio="using:Ongenet.Core.Models.Audio"
+        xmlns:media="using:Ongenet.Core.Models.Media"
+        xmlns:display="using:Ongenet.App.Display"
         mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="520"
         x:Class="Ongenet.App.Views.Windows.ExportDialog"
         x:DataType="vm:ExportViewModel"
@@ -55,6 +57,23 @@
             <CheckBox Content="{DynamicResource Export_Export_timeline_XML_post_handoff}"
                       IsChecked="{Binding ExportTimelineXml, Mode=TwoWay}"
                       ToolTip.Tip="{DynamicResource Export_Custom_Ongenet_timeline_XML_for_video_post_refer_Tip}"/>
+
+            <StackPanel Spacing="4" IsVisible="{Binding ShowVideoExport}">
+                <CheckBox Content="{DynamicResource Export_Mux_with_video}"
+                          IsChecked="{Binding MuxWithVideo, Mode=TwoWay}"
+                          IsEnabled="{Binding HasVideoLayers}"/>
+                <CheckBox Content="{DynamicResource Export_Composited_video}"
+                          IsChecked="{Binding ComposeVideo, Mode=TwoWay}"
+                          IsEnabled="{Binding HasVideoLayers}" Margin="16,0,0,0"/>
+                <ComboBox ItemsSource="{Binding VideoLayers}" SelectedItem="{Binding SelectedVideoLayer, Mode=TwoWay}"
+                          IsEnabled="{Binding MuxWithVideo}" PlaceholderText="{DynamicResource Export_Video_layer}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="media:VideoLayer">
+                            <TextBlock Text="{Binding Name}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
 
             <CheckBox Content="{DynamicResource Export_Export_AAF_OMF_handoff_XML}"
                       IsChecked="{Binding ExportAafOmf, Mode=TwoWay}"

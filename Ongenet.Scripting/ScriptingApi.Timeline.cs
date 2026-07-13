@@ -115,23 +115,84 @@ public sealed partial class ScriptingApi
         _project.Current.ExpressionMaps.Add(em);
     }
 
-    public IReadOnlyList<ScriptVideoTrackInfo> GetVideoTracks() =>
-        _project.Current.VideoTracks.Select(v => new ScriptVideoTrackInfo(
-            v.Id, v.FilePath, v.OffsetSeconds, v.Fps, v.Muted, v.InPointSeconds, v.OutPointSeconds)).ToArray();
+    public IReadOnlyList<ScriptVideoLayerInfo> GetVideoLayers() =>
+        _project.Current.VideoLayers.Select(l => new ScriptVideoLayerInfo(
+            l.Id, l.Name, l.ZOrder, l.Opacity, l.DefaultVisible,
+            l.OffsetSeconds, l.Fps, l.Muted, l.InPointSeconds, l.OutPointSeconds,
+            l.SyncClipId, l.AudioSourceTrackId)).ToArray();
 
-    public void AddVideoTrack(ScriptVideoTrackInfo track)
+    public void AddVideoLayer(ScriptVideoLayerInfo layer)
     {
-        if (_project.Current.VideoTracks.Any(v => v.Id == track.Id)) return;
-        _history.Capture("Add video track");
-        _project.Current.VideoTracks.Add(new VideoTrack
+        if (_project.Current.VideoLayers.Any(l => l.Id == layer.Id)) return;
+        _history.Capture("Add video layer");
+        _project.Current.VideoLayers.Add(new VideoLayer
         {
-            Id = track.Id,
-            FilePath = track.FilePath,
-            OffsetSeconds = track.OffsetSeconds,
-            Fps = track.Fps,
-            Muted = track.Muted,
-            InPointSeconds = track.InPointSeconds,
-            OutPointSeconds = track.OutPointSeconds
+            Id = layer.Id,
+            Name = layer.Name,
+            ZOrder = layer.ZOrder,
+            Opacity = layer.Opacity,
+            DefaultVisible = layer.DefaultVisible,
+            OffsetSeconds = layer.OffsetSeconds,
+            Fps = layer.Fps,
+            Muted = layer.Muted,
+            InPointSeconds = layer.InPointSeconds,
+            OutPointSeconds = layer.OutPointSeconds,
+            SyncClipId = layer.SyncClipId,
+            AudioSourceTrackId = layer.AudioSourceTrackId
+        });
+    }
+
+    public IReadOnlyList<ScriptVideoLayerItemInfo> GetVideoLayerItems() =>
+        _project.Current.VideoLayers.SelectMany(l => l.Items.Select(i => new ScriptVideoLayerItemInfo(
+            i.Id, l.Id, (ScriptVideoElementKind)i.Kind, i.SourcePath,
+            i.X, i.Y, i.Width, i.Height, i.Rotation, i.Opacity))).ToArray();
+
+    public void AddVideoLayerItem(ScriptVideoLayerItemInfo item)
+    {
+        var layer = _project.Current.VideoLayers.FirstOrDefault(l => l.Id == item.LayerId);
+        if (layer is null || layer.Items.Any(i => i.Id == item.Id)) return;
+        _history.Capture("Add video layer item");
+        layer.Items.Add(new VideoLayerItem
+        {
+            Id = item.Id,
+            Kind = (VideoElementKind)item.Kind,
+            SourcePath = item.SourcePath,
+            X = item.X,
+            Y = item.Y,
+            Width = item.Width,
+            Height = item.Height,
+            Rotation = item.Rotation,
+            Opacity = item.Opacity
+        });
+    }
+
+    public bool GetVideoEnabled() => _project.Current.VideoEnabled;
+
+    public void SetVideoEnabled(bool enabled)
+    {
+        _history.Capture("Set video enabled");
+        _project.Current.VideoEnabled = enabled;
+    }
+
+    public IReadOnlyList<ScriptVideoTriggerInfo> GetVideoTriggers() =>
+        _project.Current.VideoTriggers.Select(t => new ScriptVideoTriggerInfo(
+            t.Id, t.TargetLayerId, (ScriptVideoTriggerSource)t.Source, t.TrackId, t.ClipId, t.MidiNote,
+            (ScriptVideoTriggerMoment)t.Moment, (ScriptVideoTriggerAction)t.Action, t.FadeDurationSeconds)).ToArray();
+
+    public void AddVideoTrigger(ScriptVideoTriggerInfo trigger)
+    {
+        _history.Capture("Add video trigger");
+        _project.Current.VideoTriggers.Add(new VideoTrigger
+        {
+            Id = trigger.Id,
+            TargetLayerId = trigger.TargetLayerId,
+            Source = (VideoTriggerSource)trigger.Source,
+            TrackId = trigger.TrackId,
+            ClipId = trigger.ClipId,
+            MidiNote = trigger.MidiNote,
+            Moment = (VideoTriggerMoment)trigger.Moment,
+            Action = (VideoTriggerAction)trigger.Action,
+            FadeDurationSeconds = trigger.FadeDurationSeconds
         });
     }
 

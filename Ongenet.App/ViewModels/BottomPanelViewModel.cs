@@ -17,17 +17,39 @@ namespace Ongenet.App.ViewModels
         private const int ClipTab = 3;
         private const int MidiFxTab = 4;
         private const int EffectsTab = 5;
+        public const int VideoTab = 6;
 
         private readonly ISelectionService _selection;
+        private readonly IProjectService _project;
+        private readonly Services.IAppSettingsService _settings;
         private int _selectedTabIndex;
+        private bool _isVideoEditingMode;
 
-        public BottomPanelViewModel(ISelectionService selection,
+        public bool IsVideoEditingMode
+        {
+            get => _isVideoEditingMode;
+            set
+            {
+                if (!SetField(ref _isVideoEditingMode, value)) return;
+                NotifyTabVisibility();
+                if (value && ShowVideoTab)
+                    SelectedTabIndex = VideoTab;
+            }
+        }
+
+        public bool ShowEffectsTab => !IsVideoEditingMode;
+
+        public BottomPanelViewModel(ISelectionService selection, IProjectService project,
+            Services.IAppSettingsService settings,
             InstrumentInspectorViewModel instrument, SampleInspectorViewModel sample,
             PianoRollViewModel pianoRoll, Panels.ChannelRackViewModel channelRack,
             PatternEditorViewModel patternEditor, ClipInspectorViewModel clipInspector,
-            Panels.MidiFxViewModel midiFx, EffectsViewModel effects)
+            Panels.MidiFxViewModel midiFx, EffectsViewModel effects,
+            VideoTimeline.VideoTimelineViewModel videoTimeline)
         {
             _selection = selection;
+            _project = project;
+            _settings = settings;
             Instrument = instrument;
             Sample = sample;
             PianoRoll = pianoRoll;
@@ -36,7 +58,24 @@ namespace Ongenet.App.ViewModels
             ClipInspector = clipInspector;
             MidiFx = midiFx;
             Effects = effects;
+            VideoTimeline = videoTimeline;
             _selection.SelectionChanged += OnSelectionChanged;
+            _project.ProjectChanged += () =>
+            {
+                OnPropertyChanged(nameof(ShowVideoTab));
+                NotifyTabVisibility();
+            };
+            _settings.VideoEnabledChanged += () => OnPropertyChanged(nameof(ShowVideoTab));
+        }
+
+        private void NotifyTabVisibility()
+        {
+            OnPropertyChanged(nameof(ShowFirstTab));
+            OnPropertyChanged(nameof(ShowPatternTab));
+            OnPropertyChanged(nameof(ShowPianoRollTab));
+            OnPropertyChanged(nameof(ShowClipTab));
+            OnPropertyChanged(nameof(ShowMidiFxTab));
+            OnPropertyChanged(nameof(ShowEffectsTab));
         }
 
         public InstrumentInspectorViewModel Instrument { get; }
@@ -47,6 +86,9 @@ namespace Ongenet.App.ViewModels
         public ClipInspectorViewModel ClipInspector { get; }
         public Panels.MidiFxViewModel MidiFx { get; }
         public EffectsViewModel Effects { get; }
+        public VideoTimeline.VideoTimelineViewModel VideoTimeline { get; }
+
+        public bool ShowVideoTab => _settings.Current.VideoEnabled && _project.Current.VideoEnabled;
 
         /// <summary>True when an audio sample clip is selected — the first tab shows the Sample inspector.</summary>
         public bool IsSampleSelected => _selection.SelectedClip is { IsAudio: true };
@@ -63,22 +105,28 @@ namespace Ongenet.App.ViewModels
                                      || _selection.SelectedTrack is { Kind: TrackKind.Pattern };
 
         /// <summary>Whether the contextual first (Instrument/Sample) tab is shown.</summary>
-        public bool ShowFirstTab => (IsSampleSelected || !IsBusSelected) && !IsPatternMode;
+        public bool ShowFirstTab => !IsVideoEditingMode && (IsSampleSelected || !IsBusSelected) && !IsPatternMode;
 
         /// <summary>Whether the Pattern editor tab is shown.</summary>
-        public bool ShowPatternTab => IsPatternMode;
+        public bool ShowPatternTab => !IsVideoEditingMode && IsPatternMode;
 
         /// <summary>Whether the Piano Roll tab is shown.</summary>
-        public bool ShowPianoRollTab => !IsSampleSelected && !IsPatternMode
+        public bool ShowPianoRollTab => !IsVideoEditingMode && !IsSampleSelected && !IsPatternMode
                                         && (_selection.SelectedClip is { IsMidi: true }
                                             || _selection.SelectedTrack is { Kind: TrackKind.Instrument or TrackKind.Midi });
 
         /// <summary>Whether the MIDI FX tab is shown.</summary>
-        public bool ShowMidiFxTab => !IsSampleSelected && !IsPatternMode
+        public bool ShowMidiFxTab => !IsVideoEditingMode && !IsSampleSelected && !IsPatternMode
                                      && _selection.SelectedTrack is { Kind: TrackKind.Instrument };
 
         /// <summary>Whether the Clip inspector tab is shown.</summary>
-        public bool ShowClipTab => !IsPatternMode && _selection.SelectedClip is not null;
+        public bool ShowClipTab => !IsVideoEditingMode && !IsPatternMode && _selection.SelectedClip is not null;
+
+        public void ShowVideoTimelineTab()
+        {
+            if (ShowVideoTab)
+                SelectedTabIndex = VideoTab;
+        }
 
         public int SelectedTabIndex
         {
@@ -119,7 +167,13 @@ namespace Ongenet.App.ViewModels
             OnPropertyChanged(nameof(ShowPianoRollTab));
             OnPropertyChanged(nameof(ShowMidiFxTab));
             OnPropertyChanged(nameof(ShowClipTab));
+            OnPropertyChanged(nameof(ShowVideoTab));
+            NotifyTabVisibility();
 
+            if (IsVideoEditingMode)
+                return;
+            if (ShowVideoTab && SelectedTabIndex == VideoTab)
+                return;
             if (IsPatternMode)
             {
                 SelectedTabIndex = PatternTab;

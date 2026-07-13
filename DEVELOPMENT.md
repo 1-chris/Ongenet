@@ -37,7 +37,7 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 | `wasm-tools` workload | Building/running `Ongenet.Web` | One-time `dotnet workload install wasm-tools`. Not needed for the desktop app. |
 | `android` workload + Android SDK + **JDK 21** | Building `Ongenet.Android` | One-time `dotnet workload install android`, then provision the SDK once and install a full JDK 21 — see [§6](#6-the-android-head-tablets). **Not** needed for the desktop or web heads. Android Studio is **not** required (we sideload an APK). |
 | `zip` | Packaging releases | Used by `publish-desktop.sh`; it falls back to `tar.gz` if absent. |
-| `ffmpeg` (runtime) | Importing non-WAV audio, stem separation (demucs path), video mux | The desktop app shells out to `ffmpeg` to transcode imported audio. Optional — WAV works without it. |
+| `ffmpeg` (runtime) | Importing non-WAV audio, stem separation (demucs path), video preview/mux/composite | The desktop app shells out to `ffmpeg` to transcode imported audio and for video frame decode, mux, and composited export. Optional — WAV works without it; video sync still tracks time without ffmpeg. |
 | `demucs` (runtime) | High-quality 4-stem separation | Optional; without it, **Export → Separate stems** uses a built-in heuristic splitter. |
 | ARA SDK + `ENABLE_ARA` | Melodyne-class ARA2 plugins | Optional; default build uses monophonic pitch offset + stub host. |
 | Vulkan / MoltenVK | 3D Scope and Field visualizers | Optional; controls show placeholders when no GPU backend is available. |
@@ -89,6 +89,22 @@ commands below are the source of truth.
    (or add audio samples as sampler-backed rows).
 3. Double-click empty space on the pattern track lane to create a **pattern clip**.
 4. Edit steps in the bottom **Pattern** tab; reorder rows in Track Controls — step data follows each row.
+
+### Video composition (desktop)
+
+Reference sync, overlays, and export are implemented in Core + App:
+
+| Component | Role |
+| --- | --- |
+| [`ITempoMapService`](Ongenet.Core/Services/Interfaces/ITempoMapService.cs) / [`TempoMapService`](Ongenet.Core/Services/Implementation/TempoMapService.cs) | Beat ↔ wall-clock conversion for sync (honours tempo map) |
+| [`VideoTriggerEngine`](Ongenet.Core/Services/VideoTriggerEngine.cs) | Evaluates clip/MIDI triggers; owns [`VideoCompositionRuntime`](Ongenet.Core/Services/VideoTriggerEngine.cs) opacity/fade state |
+| [`FfmpegVideoCompositor`](Ongenet.Core/Audio/Files/FfmpegVideoCompositor.cs) | Offline composited MP4 (background + overlays via `filter_complex`) |
+| [`FfmpegVideoMuxer`](Ongenet.Core/Audio/Files/FfmpegVideoMuxer.cs) | Mux bounced WAV with reference video |
+| [`LiveVideoDecoder`](Ongenet.Core/Audio/Files/LiveVideoDecoder.cs) | Streaming RGB frames for live preview |
+
+[`VideoTrackViewModel`](Ongenet.App/ViewModels/Panels/VideoTrackViewModel.cs) wires transport ticks, session-clip events, and MIDI input into `VideoTriggerEngine`. **ffmpeg** must be on the PATH for preview frames and MP4 export; without it sync time still updates.
+
+User guide: [Video & composition](https://onge.net/articles/guides/video-and-composition.html).
 
 ### Comping (take lanes)
 
@@ -381,8 +397,10 @@ The helper script builds a sideloadable, debug-signed APK and copies it to `dist
 ./publish-android.sh --no-copy       # leave it in bin/, don't copy to dist/
 ```
 
-It auto-detects the SDK (`$HOME/Android/Sdk`, or `$ANDROID_SDK`/`$ANDROID_HOME`) and a JDK 21 (or
-`$JAVA21_HOME`). To build by hand without the script:
+It auto-detects the SDK (`$HOME/Android/Sdk`, or `$ANDROID_SDK`/`$ANDROID_HOME`) and a JDK 21 via
+`$JAVA21_HOME`, `$JAVA_HOME`, common Linux paths under `/usr/lib/jvm`, or Homebrew `openjdk@21` on macOS.
+`Directory.Build.props` applies the same JDK probe when you run `dotnet build` without `-p:JavaSdkDirectory`.
+To build by hand without the script:
 
 ```bash
 dotnet build Ongenet.Android/Ongenet.Android.csproj -c Debug \
@@ -404,7 +422,8 @@ sources" for that app). The APK is signed with the Android **debug** key, which 
 Play Store upload would instead use a real signing keystore and an `.aab` (`AndroidPackageFormat=aab`).
 
 > **JDK version errors (`XA0030`)?** The tooling rejects anything other than JDK 21. Point the build at a
-> full JDK 21 with `-p:JavaSdkDirectory=…` (must contain `bin/javac` and `bin/jar`).
+> full JDK 21 with `-p:JavaSdkDirectory=…` or set `JAVA_HOME` / `JAVA21_HOME` (must contain `bin/javac`
+> and `bin/jar`). On Windows, install Temurin 21 and set `JAVA_HOME` before building.
 
 ---
 

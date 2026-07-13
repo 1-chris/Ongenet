@@ -37,6 +37,10 @@
                       IsChecked="{Binding WaveformBandColorsEnabled}"
                       ToolTip.Tip="{DynamicResource Settings_WaveformBandColorsTip}"/>
 
+            <CheckBox Content="{DynamicResource Settings_VideoEnabled}"
+                      IsChecked="{Binding VideoEnabled}"
+                      ToolTip.Tip="{DynamicResource Settings_VideoEnabledTip}"/>
+
             <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource Settings_Language}"
                            VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext1}"/>

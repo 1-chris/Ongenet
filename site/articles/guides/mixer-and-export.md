@@ -26,9 +26,12 @@
 - **Timeline XML** handoff for post pipelines (not binary AAF)
 - **MIDI export** from the transport area
 - Honours automation, aux sends, PDC, sidechain, and effect tails
+- **Video mux** — when the project has video tracks and **ffmpeg** is installed, enable **Mux master audio with video track (MP4)** to deliver a single `.mp4` with the bounced master
+- **Composited export** — **Export composited video** (or title bar **Export ▾ → Export video…**) bakes all video layers into an MP4; see [Video & composition](video-and-composition.md) for a step-by-step visualiser tutorial.
 
 ## Related
 
 - [Timeline & clips](timeline-and-clips.md)
 - [Sidechain & dynamics](sidechain-and-dynamics.md)
+- [Video & composition](video-and-composition.md)
 - [Getting started](getting-started.md)

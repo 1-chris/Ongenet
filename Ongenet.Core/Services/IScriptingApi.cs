@@ -161,8 +161,14 @@ public interface IScriptingApi
     void AddDrumMap(ScriptDrumMapInfo map);
     IReadOnlyList<ScriptExpressionMapInfo> GetExpressionMaps();
     void AddExpressionMap(ScriptExpressionMapInfo map);
-    IReadOnlyList<ScriptVideoTrackInfo> GetVideoTracks();
-    void AddVideoTrack(ScriptVideoTrackInfo track);
+    IReadOnlyList<ScriptVideoLayerInfo> GetVideoLayers();
+    void AddVideoLayer(ScriptVideoLayerInfo layer);
+    IReadOnlyList<ScriptVideoLayerItemInfo> GetVideoLayerItems();
+    void AddVideoLayerItem(ScriptVideoLayerItemInfo item);
+    bool GetVideoEnabled();
+    void SetVideoEnabled(bool enabled);
+    IReadOnlyList<ScriptVideoTriggerInfo> GetVideoTriggers();
+    void AddVideoTrigger(ScriptVideoTriggerInfo trigger);
     IReadOnlyList<ScriptControlRoomProfileInfo> GetControlRoomProfiles();
     void AddControlRoomProfile(ScriptControlRoomProfileInfo profile);
 

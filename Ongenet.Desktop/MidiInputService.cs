@@ -6,6 +6,8 @@ using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 
+using Ongenet.App.ViewModels.Panels;
+
 namespace Ongenet.Desktop.Services;
 
 /// <summary>
@@ -26,6 +28,7 @@ public sealed class MidiInputService : IMidiInputService
     private readonly ISessionMidiMapService _session;
     private readonly IProjectService _project;
     private readonly MidiRetrospectiveCapture _retrospective;
+    private readonly VideoTrackViewModel? _video;
     private readonly IMidiInputBackend? _backend;
     private readonly MpeZoneRouter _mpeRouter;
     private readonly List<MpeRoutedAction> _mpeActions = new();
@@ -34,7 +37,8 @@ public sealed class MidiInputService : IMidiInputService
     private List<MidiDeviceInfo> _devices = new();
 
     public MidiInputService(IPreviewService preview, IMidiMappingService mappings, ITransportMapService transport,
-        ISessionMidiMapService session, IProjectService project, MidiRetrospectiveCapture retrospective)
+        ISessionMidiMapService session, IProjectService project, MidiRetrospectiveCapture retrospective,
+        VideoTrackViewModel? video = null)
     {
         _preview = preview;
         _mappings = mappings;
@@ -42,6 +46,7 @@ public sealed class MidiInputService : IMidiInputService
         _session = session;
         _project = project;
         _retrospective = retrospective;
+        _video = video;
         _mpeRouter = new MpeZoneRouter(project.Current.Mpe);
         _backend = MidiInputBackendFactory.Create();
         RefreshDevices();
@@ -110,9 +115,11 @@ public sealed class MidiInputService : IMidiInputService
                 {
                     if (InstrumentInputEnabled) _preview.NoteOn(m.Note, m.Velocity);
                 }
+                _video?.OnMidiNote(m.Note, true);
                 break;
             case MidiMessageKind.NoteOff:
                 if (!_session.HandleMessage(m) && InstrumentInputEnabled) _preview.NoteOff(m.Note);
+                _video?.OnMidiNote(m.Note, false);
                 break;
             case MidiMessageKind.ControlChange:
                 if (_transport.HandleMessage(m)) break;

@@ -30,7 +30,7 @@ public static class ProjectFile
 {
     /// <summary>Bumped whenever the on-disk layout changes. Newer files opened in an older app degrade gracefully.</summary>
     /// <remarks>v2: instrument rack. v3: track routing. v4: patterns, session, warp, takes, multi-out, MPE/groove/drum. v5: pattern tracks, pattern row metadata. v6: ARA pitch offset. v7: poly pitch segments.</remarks>
-    public const int FormatVersion = 7;
+    public const int FormatVersion = 13;
 
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("ONGENPRJ"); // 8 bytes
     private const string ManifestEntry = "ongen.manifest";
@@ -169,16 +169,8 @@ public static class ProjectFile
             c.WriteInt(p.DrumMaps.Count);
             foreach (var dm in p.DrumMaps) WriteDrumMap(c, dm);
 
-            // Video tracks
-            c.WriteInt(p.VideoTracks.Count);
-            foreach (var vt in p.VideoTracks)
-            {
-                c.WriteGuid(vt.Id);
-                c.WriteString(vt.FilePath);
-                c.WriteDouble(vt.OffsetSeconds);
-                c.WriteDouble(vt.Fps);
-                c.WriteBool(vt.Muted);
-            }
+            // Legacy video tracks slot (empty for v11+; layers stored below)
+            c.WriteInt(0);
 
             c.WriteInt((int)p.PlaybackMode);
             c.WriteDouble(p.LaunchQuantizeBeats);
@@ -220,6 +212,76 @@ public static class ProjectFile
 
             c.WriteInt(p.KeyRootPitchClass);
             c.WriteInt((int)p.KeyScale);
+
+            c.WriteBool(p.VideoEnabled);
+            c.WriteInt(p.VideoLayers.Count);
+            foreach (var layer in p.VideoLayers)
+            {
+                c.WriteGuid(layer.Id);
+                c.WriteString(layer.Name);
+                c.WriteInt(layer.ZOrder);
+                c.WriteDouble(layer.Opacity);
+                c.WriteBool(layer.DefaultVisible);
+                c.WriteDouble(layer.OffsetSeconds);
+                c.WriteDouble(layer.InPointSeconds);
+                c.WriteDouble(layer.OutPointSeconds);
+                c.WriteDouble(layer.Fps);
+                c.WriteBool(layer.Muted);
+                c.WriteNullableGuid(layer.SyncClipId);
+                c.WriteNullableGuid(layer.AudioSourceTrackId);
+                c.WriteInt((int)layer.WaveformStyle);
+                c.WriteBool(layer.WaveformFollowPlayhead);
+                c.WriteInt(unchecked((int)layer.WaveformColorArgb));
+                c.WriteDouble(layer.WaveformX);
+                c.WriteDouble(layer.WaveformY);
+                c.WriteDouble(layer.WaveformWidth);
+                c.WriteDouble(layer.WaveformHeight);
+                c.WriteInt((int)layer.VisualiserColorMode);
+                c.WriteInt(unchecked((int)layer.VisualiserColorSecondaryArgb));
+                c.WriteDouble(layer.SpectrumMinHz);
+                c.WriteDouble(layer.SpectrumMaxHz);
+                c.WriteDouble(layer.SpectrumLineThickness);
+                c.WriteInt(layer.Items.Count);
+                foreach (var item in layer.Items)
+                {
+                    c.WriteGuid(item.Id);
+                    c.WriteInt((int)item.Kind);
+                    c.WriteString(item.SourcePath);
+                    c.WriteDouble(item.X);
+                    c.WriteDouble(item.Y);
+                    c.WriteDouble(item.Width);
+                    c.WriteDouble(item.Height);
+                    c.WriteDouble(item.Rotation);
+                    c.WriteDouble(item.Opacity);
+                }
+            }
+
+            c.WriteInt(p.VideoTriggers.Count);
+            foreach (var tr in p.VideoTriggers)
+            {
+                c.WriteGuid(tr.Id);
+                c.WriteGuid(tr.TargetLayerId);
+                c.WriteInt((int)tr.Source);
+                c.WriteNullableGuid(tr.TrackId);
+                c.WriteNullableGuid(tr.ClipId);
+                c.WriteBool(tr.MidiNote is not null);
+                if (tr.MidiNote is { } note) c.WriteInt(note);
+                c.WriteInt((int)tr.Moment);
+                c.WriteInt((int)tr.Action);
+                c.WriteDouble(tr.FadeDurationSeconds);
+            }
+
+            c.WriteInt(p.VideoCanvasWidth);
+            c.WriteInt(p.VideoCanvasHeight);
+
+            c.WriteInt(p.VideoVisibilityRegions.Count);
+            foreach (var region in p.VideoVisibilityRegions)
+            {
+                c.WriteGuid(region.Id);
+                c.WriteGuid(region.LayerId);
+                c.WriteDouble(region.StartBeat);
+                c.WriteDouble(region.EndBeat);
+            }
         });
     }
 
@@ -1036,19 +1098,33 @@ public static class ProjectFile
             if (dm is not null) project.DrumMaps.Add(dm);
         }
 
+        var legacyVideoTrackCount = 0;
         if (c.ChunkHasMore)
         {
             var vtCount = c.ReadInt();
             for (var i = 0; i < vtCount; i++)
             {
-                project.VideoTracks.Add(new Models.Media.VideoTrack
+                var id = c.ReadGuid();
+                var filePath = c.ReadString();
+                var offsetSeconds = c.ReadDouble();
+                var fps = c.ReadDouble();
+                var muted = c.ReadBool();
+                var inPoint = 0.0;
+                var outPoint = 0.0;
+                Guid? syncClipId = null;
+                if (fileVersion >= 8)
                 {
-                    Id = c.ReadGuid(),
-                    FilePath = c.ReadString(),
-                    OffsetSeconds = c.ReadDouble(),
-                    Fps = c.ReadDouble(),
-                    Muted = c.ReadBool()
-                });
+                    inPoint = c.ReadDouble();
+                    outPoint = c.ReadDouble();
+                    syncClipId = c.ReadNullableGuid();
+                }
+
+                if (fileVersion < 11)
+                {
+                    project.VideoLayers.Add(VideoLayerMigration.FromLegacyTrack(
+                        id, filePath, offsetSeconds, fps, muted, inPoint, outPoint, syncClipId, i));
+                    legacyVideoTrackCount++;
+                }
             }
         }
 
@@ -1117,7 +1193,233 @@ public static class ProjectFile
         {
             project.KeyRootPitchClass = c.ReadInt();
             project.KeyScale = (ScaleType)c.ReadInt();
+            if (fileVersion >= 8)
+            {
+                project.VideoEnabled = c.ReadBool();
+                var elCount = c.ReadInt();
+                for (var i = 0; i < elCount; i++)
+                {
+                    if (fileVersion >= 12)
+                        ReadVideoLayer(c, project, fileVersion);
+                    else if (fileVersion >= 11)
+                        ReadVideoLayerV11(c, project);
+                    else if (fileVersion >= 10)
+                        ReadVideoLayerLegacyV10(c, project, legacyVideoTrackCount);
+                    else
+                        ReadVideoLayerLegacyV8(c, project, legacyVideoTrackCount);
+                }
+
+                var trCount = c.ReadInt();
+                for (var i = 0; i < trCount; i++)
+                {
+                    project.VideoTriggers.Add(new Models.Media.VideoTrigger
+                    {
+                        Id = c.ReadGuid(),
+                        TargetLayerId = c.ReadGuid(),
+                        Source = (Models.Media.VideoTriggerSource)c.ReadInt(),
+                        TrackId = c.ReadNullableGuid(),
+                        ClipId = c.ReadNullableGuid(),
+                        MidiNote = c.ReadBool() ? c.ReadInt() : null,
+                        Moment = (Models.Media.VideoTriggerMoment)c.ReadInt(),
+                        Action = (Models.Media.VideoTriggerAction)c.ReadInt(),
+                        FadeDurationSeconds = c.ReadDouble()
+                    });
+                }
+
+                if (fileVersion >= 9)
+                {
+                    project.VideoCanvasWidth = c.ReadInt();
+                    project.VideoCanvasHeight = c.ReadInt();
+                }
+
+                if (fileVersion >= 10)
+                {
+                    var regionCount = c.ReadInt();
+                    for (var i = 0; i < regionCount; i++)
+                    {
+                        project.VideoVisibilityRegions.Add(new Models.Media.VideoVisibilityRegion
+                        {
+                            Id = c.ReadGuid(),
+                            LayerId = c.ReadGuid(),
+                            StartBeat = c.ReadDouble(),
+                            EndBeat = c.ReadDouble()
+                        });
+                    }
+                }
+            }
         }
+    }
+
+    private static void ReadVideoLayerLegacyV8(OngenReader c, Project project, int zOffset)
+    {
+        var id = c.ReadGuid();
+        var name = c.ReadString();
+        var kind = (Models.Media.VideoElementKind)c.ReadInt();
+        var sourcePath = c.ReadString();
+        var x = c.ReadDouble();
+        var y = c.ReadDouble();
+        var width = c.ReadDouble();
+        var height = c.ReadDouble();
+        var rotation = c.ReadDouble();
+        var zOrder = c.ReadInt();
+        var opacity = c.ReadDouble();
+        var defaultVisible = c.ReadBool();
+        var audioSourceTrackId = c.ReadNullableGuid();
+        var waveformStyle = (Models.Media.VideoWaveformStyle)c.ReadInt();
+        var waveformFollow = c.ReadBool();
+
+        var layer = new Models.Media.VideoLayer
+        {
+            Id = id,
+            Name = name,
+            ZOrder = zOffset + zOrder,
+            Opacity = opacity,
+            DefaultVisible = defaultVisible,
+            AudioSourceTrackId = audioSourceTrackId,
+            WaveformStyle = waveformStyle,
+            WaveformFollowPlayhead = waveformFollow
+        };
+        if (kind != Models.Media.VideoElementKind.Waveform)
+        {
+            layer.Items.Add(new Models.Media.VideoLayerItem
+            {
+                Kind = kind,
+                SourcePath = sourcePath,
+                X = x,
+                Y = y,
+                Width = width,
+                Height = height,
+                Rotation = rotation,
+                Opacity = 1
+            });
+        }
+
+        project.VideoLayers.Add(layer);
+    }
+
+    private static void ReadVideoLayerLegacyV10(OngenReader c, Project project, int zOffset)
+    {
+        var layer = new Models.Media.VideoLayer
+        {
+            Id = c.ReadGuid(),
+            Name = c.ReadString(),
+            ZOrder = zOffset + c.ReadInt(),
+            Opacity = c.ReadDouble(),
+            DefaultVisible = c.ReadBool(),
+            AudioSourceTrackId = c.ReadNullableGuid(),
+            WaveformStyle = (Models.Media.VideoWaveformStyle)c.ReadInt(),
+            WaveformFollowPlayhead = c.ReadBool()
+        };
+        var itemCount = c.ReadInt();
+        for (var j = 0; j < itemCount; j++)
+        {
+            layer.Items.Add(new Models.Media.VideoLayerItem
+            {
+                Id = c.ReadGuid(),
+                Kind = (Models.Media.VideoElementKind)c.ReadInt(),
+                SourcePath = c.ReadString(),
+                X = c.ReadDouble(),
+                Y = c.ReadDouble(),
+                Width = c.ReadDouble(),
+                Height = c.ReadDouble(),
+                Rotation = c.ReadDouble(),
+                Opacity = c.ReadDouble()
+            });
+        }
+
+        project.VideoLayers.Add(layer);
+    }
+
+    private static void ReadVideoLayerV11(OngenReader c, Project project)
+    {
+        var layer = new Models.Media.VideoLayer
+        {
+            Id = c.ReadGuid(),
+            Name = c.ReadString(),
+            ZOrder = c.ReadInt(),
+            Opacity = c.ReadDouble(),
+            DefaultVisible = c.ReadBool(),
+            OffsetSeconds = c.ReadDouble(),
+            InPointSeconds = c.ReadDouble(),
+            OutPointSeconds = c.ReadDouble(),
+            Fps = c.ReadDouble(),
+            Muted = c.ReadBool(),
+            SyncClipId = c.ReadNullableGuid(),
+            AudioSourceTrackId = c.ReadNullableGuid(),
+            WaveformStyle = (Models.Media.VideoWaveformStyle)c.ReadInt(),
+            WaveformFollowPlayhead = c.ReadBool()
+        };
+        var itemCount = c.ReadInt();
+        for (var j = 0; j < itemCount; j++)
+        {
+            layer.Items.Add(new Models.Media.VideoLayerItem
+            {
+                Id = c.ReadGuid(),
+                Kind = (Models.Media.VideoElementKind)c.ReadInt(),
+                SourcePath = c.ReadString(),
+                X = c.ReadDouble(),
+                Y = c.ReadDouble(),
+                Width = c.ReadDouble(),
+                Height = c.ReadDouble(),
+                Rotation = c.ReadDouble(),
+                Opacity = c.ReadDouble()
+            });
+        }
+
+        project.VideoLayers.Add(layer);
+    }
+
+    private static void ReadVideoLayer(OngenReader c, Project project, int fileVersion)
+    {
+        var layer = new Models.Media.VideoLayer
+        {
+            Id = c.ReadGuid(),
+            Name = c.ReadString(),
+            ZOrder = c.ReadInt(),
+            Opacity = c.ReadDouble(),
+            DefaultVisible = c.ReadBool(),
+            OffsetSeconds = c.ReadDouble(),
+            InPointSeconds = c.ReadDouble(),
+            OutPointSeconds = c.ReadDouble(),
+            Fps = c.ReadDouble(),
+            Muted = c.ReadBool(),
+            SyncClipId = c.ReadNullableGuid(),
+            AudioSourceTrackId = c.ReadNullableGuid(),
+            WaveformStyle = (Models.Media.VideoWaveformStyle)c.ReadInt(),
+            WaveformFollowPlayhead = c.ReadBool(),
+            WaveformColorArgb = unchecked((uint)c.ReadInt()),
+            WaveformX = c.ReadDouble(),
+            WaveformY = c.ReadDouble(),
+            WaveformWidth = c.ReadDouble(),
+            WaveformHeight = c.ReadDouble()
+        };
+        if (fileVersion >= 13)
+        {
+            layer.VisualiserColorMode = (Models.Media.VideoVisualiserColorMode)c.ReadInt();
+            layer.VisualiserColorSecondaryArgb = unchecked((uint)c.ReadInt());
+            layer.SpectrumMinHz = c.ReadDouble();
+            layer.SpectrumMaxHz = c.ReadDouble();
+            layer.SpectrumLineThickness = c.ReadDouble();
+        }
+
+        var itemCount = c.ReadInt();
+        for (var j = 0; j < itemCount; j++)
+        {
+            layer.Items.Add(new Models.Media.VideoLayerItem
+            {
+                Id = c.ReadGuid(),
+                Kind = (Models.Media.VideoElementKind)c.ReadInt(),
+                SourcePath = c.ReadString(),
+                X = c.ReadDouble(),
+                Y = c.ReadDouble(),
+                Width = c.ReadDouble(),
+                Height = c.ReadDouble(),
+                Rotation = c.ReadDouble(),
+                Opacity = c.ReadDouble()
+            });
+        }
+
+        project.VideoLayers.Add(layer);
     }
 
     private static StepSequence ReadStepSequence(OngenReader c)

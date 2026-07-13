@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Ongenet.Core.Audio;
 using Ongenet.Core.DependencyInjection;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Implementation;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Platform;
@@ -101,6 +102,10 @@ namespace Ongenet.App
             // ~30fps UI heartbeat so automated controls visibly move during playback.
             services.AddSingleton<Services.IPlaybackClock, Services.PlaybackClock>();
 
+            services.AddSingleton<Services.ITimelineLayoutService, Services.TimelineLayoutService>();
+            services.AddSingleton<Services.ITransportSeekService, Services.TransportSeekService>();
+            services.AddSingleton<Services.IVideoSelectionService, Services.VideoSelectionService>();
+
             services.AddSingleton<Services.ControlSurfaceService>();
             services.AddSingleton<Services.OscControlService>();
             services.AddSingleton<Core.Services.TimecodeSyncService>();
@@ -160,6 +165,10 @@ namespace Ongenet.App
             services.AddTransient<LogicalMidiEditViewModel>();
             services.AddSingleton<ViewModels.Panels.SessionViewModel>();
             services.AddSingleton<ViewModels.Panels.NotationViewModel>();
+            services.AddSingleton<ITempoMapService, TempoMapService>();
+            services.AddSingleton<VideoTriggerEngine>();
+            services.AddSingleton<ViewModels.VideoTimeline.VideoTimelineViewModel>();
+            services.AddSingleton<ViewModels.Panels.VideoResourcesViewModel>();
             services.AddSingleton<ViewModels.Panels.VideoTrackViewModel>();
             services.AddSingleton<ViewModels.Panels.InstrumentRackViewModel>();
             services.AddSingleton<Services.IAudioEditorService, Services.AudioEditorService>();

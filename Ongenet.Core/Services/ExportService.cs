@@ -5,6 +5,7 @@ using System.Linq;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Audio;
+using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Core.Services;
 
@@ -21,6 +22,7 @@ public sealed class ExportOptions
     public ExportAudioFormat AudioFormat { get; set; } = ExportAudioFormat.Wav;
     public bool MuxWithVideo { get; set; }
     public Guid? VideoTrackId { get; set; }
+    public bool ComposeVideo { get; set; }
 }
 
 public enum ExportKind
@@ -84,7 +86,8 @@ public sealed class ExportService
     }
 
     public void Export(Project project, AudioFormat format, double bpm, string outputPath,
-        ExportOptions options, IProgress<double>? progress = null)
+        ExportOptions options, IProgress<double>? progress = null,
+        IVideoWaveformCacheService? waveformCache = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? ".");
         var regionStart = options.Kind == ExportKind.Region ? (double?)options.RegionStartBeat : null;
@@ -108,7 +111,8 @@ public sealed class ExportService
             }
         }
 
-        if (options.AudioFormat == ExportAudioFormat.Wav && !options.MuxWithVideo)
+        if (options.AudioFormat == ExportAudioFormat.Wav && !options.MuxWithVideo
+            && !(options.ComposeVideo && project.VideoLayers.Count > 0))
         {
             RenderWav(outputPath);
             return;
@@ -117,13 +121,27 @@ public sealed class ExportService
         FfmpegAudioEncoder.ExportViaWav(wavPath =>
         {
             RenderWav(wavPath);
+            if (options.ComposeVideo && project.VideoLayers.Count > 0)
+            {
+                var muxed = Path.ChangeExtension(outputPath, ".mp4");
+                var duration = ComputeVideoDurationSeconds(project, options, bpm);
+                FfmpegVideoCompositor.Export(project, wavPath, muxed, duration,
+                    waveformCache: waveformCache, bpm: bpm);
+                if (!muxed.Equals(outputPath, StringComparison.OrdinalIgnoreCase)
+                    && outputPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                    File.Move(muxed, outputPath, overwrite: true);
+                return;
+            }
+
             if (options.MuxWithVideo && options.VideoTrackId is { } vid)
             {
-                var vt = project.VideoTracks.FirstOrDefault(v => v.Id == vid);
-                if (vt is not null && File.Exists(vt.FilePath))
+                var layer = project.VideoLayers.FirstOrDefault(v => v.Id == vid);
+                var videoPath = layer?.Items.FirstOrDefault(i => i.Kind == Models.Media.VideoElementKind.Video)?.SourcePath;
+                if (layer is not null && !string.IsNullOrWhiteSpace(videoPath) && File.Exists(videoPath))
                 {
                     var muxed = Path.ChangeExtension(outputPath, ".mp4");
-                    FfmpegVideoMuxer.Mux(wavPath, vt.FilePath, vt.OffsetSeconds, muxed);
+                    FfmpegVideoMuxer.Mux(wavPath, videoPath, layer.OffsetSeconds, muxed,
+                        layer.InPointSeconds, layer.OutPointSeconds > layer.InPointSeconds ? layer.OutPointSeconds : 0);
                     if (!muxed.Equals(outputPath, StringComparison.OrdinalIgnoreCase)
                         && outputPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
                         File.Move(muxed, outputPath, overwrite: true);
@@ -131,6 +149,17 @@ public sealed class ExportService
                 }
             }
         }, outputPath);
+    }
+
+    private static double ComputeVideoDurationSeconds(Project project, ExportOptions options, double bpm)
+    {
+        if (options.Kind == ExportKind.Region && options.RegionEndBeat > options.RegionStartBeat)
+            return (options.RegionEndBeat - options.RegionStartBeat) * 60.0 / Math.Max(1, bpm);
+        var synced = project.VideoLayers.FirstOrDefault(l => l.HasVideoItem && l.OutPointSeconds > l.InPointSeconds);
+        if (synced is not null)
+            return synced.OutPointSeconds - synced.InPointSeconds;
+        var beats = project.BarCount * Math.Max(1, project.TimeSignature.Numerator);
+        return beats * 60.0 / Math.Max(1, bpm);
     }
 
     private static void ExportStems(Project project, AudioFormat format, double bpm, string folder,

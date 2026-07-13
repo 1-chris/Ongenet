@@ -22,6 +22,7 @@ public sealed class ExportViewModel : ViewModelBase
     private readonly StemSeparationService _stemSeparation;
     private readonly ISelectionService _selection;
     private readonly TimelineViewModel _timeline;
+    private readonly IVideoWaveformCacheService _waveformCache;
     private ExportKind _kind = ExportKind.Master;
     private SurroundFormat _surround = SurroundFormat.Stereo;
     private int _bitDepth = 16;
@@ -31,13 +32,16 @@ public sealed class ExportViewModel : ViewModelBase
     private double _progress;
     private string _status = string.Empty;
     private bool _exportTimelineXml;
+    private bool _muxWithVideo;
+    private bool _composeVideo;
+    private Ongenet.Core.Models.Media.VideoLayer? _selectedVideoLayer;
     private bool _exportAdmBwf;
     private bool _exportAafOmf;
     private ArrangementMarker? _selectedMarker;
 
     public ExportViewModel(IProjectService project, ITransportService transport, IAudioEngine engine,
         ExportService export, StemSeparationService stemSeparation, ISelectionService selection,
-        TimelineViewModel timeline)
+        TimelineViewModel timeline, IVideoWaveformCacheService waveformCache)
     {
         _project = project;
         _transport = transport;
@@ -46,6 +50,7 @@ public sealed class ExportViewModel : ViewModelBase
         _stemSeparation = stemSeparation;
         _selection = selection;
         _timeline = timeline;
+        _waveformCache = waveformCache;
 
         _regionStartBeat = transport.IsLoopActive ? transport.LoopStart : 0;
         _regionEndBeat = transport.IsLoopActive ? transport.LoopEnd
@@ -57,10 +62,24 @@ public sealed class ExportViewModel : ViewModelBase
         foreach (var marker in _project.Current.Markers.OrderBy(m => m.Beat))
             Markers.Add(marker);
 
+        foreach (var layer in _project.Current.VideoLayers.Where(l => l.HasVideoItem))
+            VideoLayers.Add(layer);
+
         ExportCommand = new RelayCommand(() => _ = ExportAsync(), () => CanExport);
         SeparateSelectedClipCommand = new RelayCommand(
             () => _ = SeparateSelectedClipAsync(),
             () => CanSeparateSelectedClip);
+    }
+
+    /// <summary>Presets the dialog for composited MP4 export from the title bar Export video menu.</summary>
+    public void ApplyVideoExportPreset()
+    {
+        Kind = ExportKind.Master;
+        MuxWithVideo = false;
+        ComposeVideo = true;
+        ExportTimelineXml = false;
+        ExportAdmBwf = false;
+        ExportAafOmf = false;
     }
 
     public string StemSeparationBackend => _stemSeparation.IsDemucsAvailable
@@ -119,8 +138,38 @@ public sealed class ExportViewModel : ViewModelBase
     public int[] BitDepths { get; } = { 16, 24, 32 };
 
     public ObservableCollection<ArrangementMarker> Markers { get; } = new();
+    public ObservableCollection<Ongenet.Core.Models.Media.VideoLayer> VideoLayers { get; } = new();
 
     public bool HasMarkers => Markers.Count > 0;
+    public bool HasVideoLayers => VideoLayers.Count > 0;
+    public bool ShowVideoExport => _project.Current.VideoLayers.Count > 0;
+
+    public bool MuxWithVideo
+    {
+        get => _muxWithVideo;
+        set
+        {
+            if (!SetField(ref _muxWithVideo, value)) return;
+            OnPropertyChanged(nameof(SuggestedFileExtension));
+            if (!value) ComposeVideo = false;
+        }
+    }
+
+    public bool ComposeVideo
+    {
+        get => _composeVideo;
+        set
+        {
+            if (!SetField(ref _composeVideo, value)) return;
+            OnPropertyChanged(nameof(SuggestedFileExtension));
+        }
+    }
+
+    public Ongenet.Core.Models.Media.VideoLayer? SelectedVideoLayer
+    {
+        get => _selectedVideoLayer;
+        set => SetField(ref _selectedVideoLayer, value);
+    }
 
     public bool ExportTimelineXml
     {
@@ -181,6 +230,7 @@ public sealed class ExportViewModel : ViewModelBase
     public string SuggestedFileExtension => ExportTimelineXml ? TimelineXmlExporter.DefaultExtension
         : ExportAdmBwf ? AdmBwfExporter.DefaultExtension
         : ExportAafOmf ? AafOmffExporter.AafExtension
+        : MuxWithVideo || ComposeVideo ? "mp4"
         : AudioFormat.GetExtension();
 
     private ExportAudioFormat _audioFormat = ExportAudioFormat.Wav;
@@ -325,14 +375,18 @@ public sealed class ExportViewModel : ViewModelBase
                 RegionEndBeat = RegionEndBeat,
                 TrackIds = Kind == ExportKind.Stems
                     ? StemTracks.Where(t => t.IsSelected).Select(t => t.TrackId).ToList()
-                    : null
+                    : null,
+                MuxWithVideo = MuxWithVideo,
+                VideoTrackId = SelectedVideoLayer?.Id ?? VideoLayers.FirstOrDefault()?.Id,
+                ComposeVideo = ComposeVideo
             };
 
             var progress = new Progress<double>(p => Progress = p);
             var format = _engine.Format;
             var bpm = _transport.Tempo.BeatsPerMinute;
 
-            await Task.Run(() => _export.Export(_project.Current, format, bpm, path, options, progress));
+            await Task.Run(() => _export.Export(_project.Current, format, bpm, path, options, progress,
+                _waveformCache));
             Status = "Done.";
             Progress = 1;
         }

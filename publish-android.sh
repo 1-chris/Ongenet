@@ -16,7 +16,7 @@
 #
 # The SDK and JDK locations are auto-detected but can be overridden with environment variables:
 #   ANDROID_SDK   (or ANDROID_HOME / ANDROID_SDK_ROOT)   default: $HOME/Android/Sdk
-#   JAVA21_HOME                                          default: first JDK 21 found under /usr/lib/jvm
+#   JAVA21_HOME   (or JAVA_HOME when it points at a full JDK 21)
 
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"   # solution root (this script lives here)
@@ -46,8 +46,18 @@ fi
 
 # --- Locate a JDK 21 (the .NET Android tooling requires exactly 21, with javac/jar present) ---------
 JDK="${JAVA21_HOME:-}"
+if [ -z "$JDK" ] && [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/javac" ] && [ -x "$JAVA_HOME/bin/jar" ]; then
+    JDK="$JAVA_HOME"
+fi
 if [ -z "$JDK" ]; then
-    for d in /usr/lib/jvm/java-21-openjdk /usr/lib/jvm/*21* /usr/lib/jvm/*jdk-21*; do
+    for d in \
+        /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+        /usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+        /usr/lib/jvm/java-21-openjdk \
+        /usr/lib/jvm/java-21-openjdk-amd64 \
+        /usr/lib/jvm/java-21-openjdk-aarch64 \
+        /usr/lib/jvm/*21* \
+        /usr/lib/jvm/*jdk-21*; do
         if [ -x "$d/bin/javac" ] && [ -x "$d/bin/jar" ]; then JDK="$d"; break; fi
     done
 fi

@@ -28,8 +28,16 @@ public sealed class AndroidAppSettingsService : IAppSettingsService
         Current.WaveformBandColorsEnabled = enabled;
         WaveformDisplayPreferences.Apply(enabled);
     }
+
+    public void SetVideoEnabled(bool enabled)
+    {
+        Current.VideoEnabled = enabled;
+        VideoEnabledChanged?.Invoke();
+    }
+
     public void SaveLibrary() => LibraryChanged?.Invoke();
     public event Action? LibraryChanged;
+    public event Action? VideoEnabledChanged;
 }
 
 /// <summary>
@@ -77,6 +85,6 @@ public sealed class AndroidMidiInputService : IMidiInputService
     public void SetEnabledDevices(IReadOnlyList<MidiDeviceInfo> devices) => EnabledDevicesChanged?.Invoke();
     public event Action? DevicesChanged;
     public event Action? EnabledDevicesChanged;
-    public event Action<MidiMessage>? MessageReceived;
+    public event Action<MidiMessage>? MessageReceived { add { } remove { } }
     public void Dispose() { }
 }

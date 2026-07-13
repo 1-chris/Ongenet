@@ -96,6 +96,9 @@
                         <Button.Flyout>
                             <MenuFlyout Placement="Bottom">
                                 <MenuItem Header="{DynamicResource Main_Export_audio}" Click="OnExportAudio_Click"/>
+                                <MenuItem Header="{DynamicResource Main_Export_video}"
+                                          IsVisible="{Binding ShowExportVideo}"
+                                          Click="OnExportVideo_Click"/>
                                 <MenuItem Header="{DynamicResource Main_Sync_to_collaboration_folder}" Click="OnSyncCollaboration_Click"/>
                                 <MenuItem Header="{DynamicResource Main_Pull_from_collaboration_folder}" Click="OnPullCollaboration_Click"/>
                             </MenuFlyout>
@@ -212,24 +215,34 @@
                                     ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
                         </Border>
                         <!-- Track-oriented project sidebar: controls, clip catalog, and pattern/channel rack. -->
-                        <TabControl Grid.Row="1" Name="LeftContent" MinWidth="180"
-                                    Background="{StaticResource CatppuccinMantle}">
-                            <TabItem Header="{DynamicResource Main_Track_Controls}">
-                                <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
-                            </TabItem>
-                            <TabItem Header="{DynamicResource Main_Project_Clips}">
-                                <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
-                            </TabItem>
-                            <TabItem Header="{DynamicResource Main_Channel_Rack}">
-                                <views:ChannelRackView DataContext="{Binding BottomPanel.ChannelRack}"/>
-                            </TabItem>
-                        </TabControl>
+                        <Panel Grid.Row="1" Name="LeftContent" MinWidth="180">
+                            <TabControl Background="{StaticResource CatppuccinMantle}"
+                                        IsVisible="{Binding !IsVideoEditingMode}">
+                                <TabItem Header="{DynamicResource Main_Track_Controls}">
+                                    <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
+                                </TabItem>
+                                <TabItem Header="{DynamicResource Main_Project_Clips}">
+                                    <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
+                                </TabItem>
+                                <TabItem Header="{DynamicResource Main_Channel_Rack}">
+                                    <views:ChannelRackView DataContext="{Binding BottomPanel.ChannelRack}"/>
+                                </TabItem>
+                            </TabControl>
+                            <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsVideoEditingMode}">
+                                <Border Grid.Row="0" Padding="8,4" Background="{StaticResource CatppuccinSurface0}">
+                                    <TextBlock Text="{DynamicResource VideoResources_Title}" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                </Border>
+                                <views:VideoResourcesView Grid.Row="1" DataContext="{Binding VideoResources}"/>
+                            </Grid>
+                        </Panel>
                     </Grid>
                     <GridSplitter Grid.Column="1" Grid.Row="0" Name="LeftSplitter" ResizeDirection="Columns"
                                   Background="{StaticResource CatppuccinCrust}"/>
 
                     <!-- Centre: arrangement / mixer / session tabs -->
-                    <TabControl Grid.Column="2" Grid.Row="0" Background="{StaticResource CatppuccinBase}">
+                    <TabControl Grid.Column="2" Grid.Row="0" Name="CenterTabs" Background="{StaticResource CatppuccinBase}"
+                                SelectedIndex="{Binding SelectedCenterTabIndex, Mode=TwoWay}">
                         <TabItem Header="{DynamicResource Main_Arrangement}">
                             <views:TimelineView DataContext="{Binding Timeline}"/>
                         </TabItem>
@@ -242,7 +255,7 @@
                         <TabItem Header="{DynamicResource Main_Notation}">
                             <views:NotationView DataContext="{Binding Notation}"/>
                         </TabItem>
-                        <TabItem Header="{DynamicResource Main_Video}">
+                        <TabItem Header="{DynamicResource Main_Video}" IsVisible="{Binding ShowVideoTab}">
                             <views:VideoTrackView DataContext="{Binding Video}"/>
                         </TabItem>
                         <TabItem Header="{DynamicResource Main_Scripting}">
@@ -365,8 +378,11 @@
                             <TabItem Header="{DynamicResource Main_MIDI_FX}" IsVisible="{Binding ShowMidiFxTab}">
                                 <views:MidiFxView DataContext="{Binding MidiFx}"/>
                             </TabItem>
-                            <TabItem Header="{DynamicResource Main_Effects}">
+                            <TabItem Header="{DynamicResource Main_Effects}" IsVisible="{Binding ShowEffectsTab}">
                                 <views:EffectsView Name="BottomEffectsContent" DataContext="{Binding Effects}"/>
+                            </TabItem>
+                            <TabItem Header="{DynamicResource Main_Video}" IsVisible="{Binding ShowVideoTab}">
+                                <views:VideoTimelineView DataContext="{Binding VideoTimeline}"/>
                             </TabItem>
                         </TabControl>
                         <Button Name="BottomToggle" Content="▾" Click="ToggleBottomPanel"

@@ -150,6 +150,15 @@ public sealed class AppSettingsService : IAppSettingsService
         Save();
     }
 
+    public event Action? VideoEnabledChanged;
+
+    public void SetVideoEnabled(bool enabled)
+    {
+        Current.VideoEnabled = enabled;
+        Save();
+        VideoEnabledChanged?.Invoke();
+    }
+
     private void ApplyTheme()
     {
         if (string.IsNullOrEmpty(Current.ThemeName)) return;

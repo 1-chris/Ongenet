@@ -5,6 +5,16 @@ using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.App.ViewModels
 {
+    public enum CenterTab
+    {
+        Arrangement = 0,
+        Mixer = 1,
+        Session = 2,
+        Notation = 3,
+        Video = 4,
+        Scripting = 5
+    }
+
     /// <summary>
     /// Root view model for the main window. Composes the panel view models that make up the
     /// DAW layout (transport, timeline, inspectors, file browser); each is injected and owns
@@ -15,6 +25,10 @@ namespace Ongenet.App.ViewModels
         private readonly ObservableCollection<LogEntry> _logEntries;
         private readonly IProjectFileService _projectFile;
         private readonly Services.IHistoryService _history;
+        private readonly Services.IAppSettingsService _settings;
+        private int _selectedCenterTabIndex;
+        private int _savedBottomTabIndex;
+        private bool _inVideoMode;
 
         public MainViewModel(
             TransportViewModel transport,
@@ -38,9 +52,11 @@ namespace Ongenet.App.ViewModels
             Panels.SessionViewModel session,
             Panels.NotationViewModel notation,
             Panels.VideoTrackViewModel video,
+            Panels.VideoResourcesViewModel videoResources,
             Panels.ScriptingPanelViewModel scripting,
             IProjectFileService projectFile,
             Services.IHistoryService history,
+            Services.IAppSettingsService settings,
             ObservableCollectionLoggerProvider? logProvider = null)
         {
             Transport = transport;
@@ -64,9 +80,17 @@ namespace Ongenet.App.ViewModels
             Session = session;
             Notation = notation;
             Video = video;
+            VideoResources = videoResources;
             Scripting = scripting;
             _projectFile = projectFile;
             _history = history;
+            _settings = settings;
+            _settings.VideoEnabledChanged += () =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    OnPropertyChanged(nameof(ShowVideoTab));
+                    OnPropertyChanged(nameof(ShowExportVideo));
+                });
             _history.Changed += () =>
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
@@ -81,6 +105,14 @@ namespace Ongenet.App.ViewModels
                     OnPropertyChanged(nameof(BusyStatus));
                 });
             _logEntries = logProvider?.LogEntries ?? new ObservableCollection<LogEntry>();
+            Video.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(Panels.VideoTrackViewModel.IsProjectVideoEnabled))
+                {
+                    UpdateVideoEditingMode();
+                    OnPropertyChanged(nameof(ShowExportVideo));
+                }
+            };
         }
 
         /// <summary>Window title: project name (with a "*" when there are unsaved changes) + app version.</summary>
@@ -146,6 +178,47 @@ namespace Ongenet.App.ViewModels
 
         /// <summary>Video track sync panel.</summary>
         public Panels.VideoTrackViewModel Video { get; }
+
+        /// <summary>Left sidebar resources bin when video editing mode is active.</summary>
+        public Panels.VideoResourcesViewModel VideoResources { get; }
+
+        /// <summary>Selected centre tab index (Arrangement, Mixer, …).</summary>
+        public int SelectedCenterTabIndex
+        {
+            get => _selectedCenterTabIndex;
+            set
+            {
+                if (!SetField(ref _selectedCenterTabIndex, value)) return;
+                OnPropertyChanged(nameof(IsVideoEditingMode));
+                UpdateVideoEditingMode();
+            }
+        }
+
+        /// <summary>True when the Video centre tab is selected and video is enabled.</summary>
+        public bool IsVideoEditingMode => ShowVideoTab && SelectedCenterTabIndex == (int)CenterTab.Video;
+
+        private void UpdateVideoEditingMode()
+        {
+            BottomPanel.IsVideoEditingMode = IsVideoEditingMode;
+            if (IsVideoEditingMode)
+            {
+                if (!_inVideoMode)
+                    _savedBottomTabIndex = BottomPanel.SelectedTabIndex;
+                BottomPanel.ShowVideoTimelineTab();
+                _inVideoMode = true;
+            }
+            else if (_inVideoMode)
+            {
+                BottomPanel.SelectedTabIndex = _savedBottomTabIndex;
+                _inVideoMode = false;
+            }
+        }
+
+        /// <summary>When false, the Video centre tab is hidden (app setting).</summary>
+        public bool ShowVideoTab => _settings.Current.VideoEnabled;
+
+        /// <summary>When true, the title bar shows Export video (app + project video enabled).</summary>
+        public bool ShowExportVideo => _settings.Current.VideoEnabled && Video.IsProjectVideoEnabled;
 
         /// <summary>In-app scripting IDE (script list, editor, output).</summary>
         public Panels.ScriptingPanelViewModel Scripting { get; }

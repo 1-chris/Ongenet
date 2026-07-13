@@ -14,8 +14,10 @@ using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.Core.Audio.Midi;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
+using Ongenet.Core.Models.Media;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Services;
 using Ongenet.App.ViewModels.Panels;
 using Ongenet.App.ViewModels.Timeline;
 
@@ -47,6 +49,8 @@ namespace Ongenet.App.ViewModels
         private readonly StemSeparationService _stemSeparation;
         private readonly MidiRetrospectiveCapture _retrospective;
         private readonly Services.IAudioEditorService _audioEditor;
+        private readonly ITimelineLayoutService _layout;
+        private readonly ITransportSeekService _seek;
         private bool _isRenderingClip;
 
         // Canonical per-track lanes (one per track). The rendered <see cref="Lanes"/> collection
@@ -63,7 +67,8 @@ namespace Ongenet.App.ViewModels
             OfflineRenderer renderer, IAudioEngine engine, IAraHost araHost,
             SessionViewModel session, ChannelRackViewModel channelRack, BottomPanelViewModel bottomPanel,
             StemSeparationService stemSeparation, MidiRetrospectiveCapture retrospective,
-            Services.IAudioEditorService audioEditor)
+            Services.IAudioEditorService audioEditor,
+            ITimelineLayoutService layout, ITransportSeekService seek)
         {
             _project = project;
             _selection = selection;
@@ -84,6 +89,8 @@ namespace Ongenet.App.ViewModels
             _stemSeparation = stemSeparation;
             _retrospective = retrospective;
             _audioEditor = audioEditor;
+            _layout = layout;
+            _seek = seek;
 
             SelectClipCommand = new RelayCommand<ClipViewModel>(OnClipClicked);
             AddInstrumentTrackCommand = new RelayCommand(AddInstrumentTrack);
@@ -183,12 +190,8 @@ namespace Ongenet.App.ViewModels
         public double? PunchOutBeat => _transport.PunchOutBeat;
         public bool HasPunchRegion => PunchInBeat is { } pi && PunchOutBeat is { } po && po > pi;
 
-        /// <summary>Sets the start marker to the given beat, snapped to the nearest bar.</summary>
-        public void SetStartBeat(double beat)
-        {
-            var bar = BeatsPerBar;
-            _transport.StartBeat = Math.Max(0, Math.Round(beat / bar) * bar);
-        }
+        /// <summary>Seeks transport to the given beat, snapped to the nearest bar.</summary>
+        public void SetStartBeat(double beat) => _seek.SeekToBeat(beat, snapToBar: true);
 
         /// <summary>Beats per bar from the project's time signature.</summary>
         public int BeatsPerBar => Math.Max(1, _project.Current.TimeSignature.Numerator);
@@ -1508,8 +1511,27 @@ namespace Ongenet.App.ViewModels
         /// <summary>Named arrangement markers for the ruler.</summary>
         public ObservableCollection<ArrangementMarkerViewModel> Markers { get; } = new();
 
+        public bool ShowVideoReferenceLane =>
+            _project.Current.VideoEnabled &&
+            _project.Current.VideoLayers.Any(l => l.HasVideoItem && l.Items.Any(i => !string.IsNullOrWhiteSpace(i.SourcePath)));
+
+        public string VideoReferenceLabel
+        {
+            get
+            {
+                var layer = _project.Current.VideoLayers.FirstOrDefault(l => l.HasVideoItem);
+                var path = layer?.Items.FirstOrDefault(i => i.Kind == VideoElementKind.Video)?.SourcePath;
+                return string.IsNullOrWhiteSpace(path) ? "" : Path.GetFileName(path);
+            }
+        }
+
+        public double VideoReferenceStartBeat => 0;
+
+        public double VideoReferenceEndBeat =>
+            _project.Current.BarCount * Math.Max(1, _project.Current.TimeSignature.Numerator);
+
         /// <summary>Time&lt;-&gt;pixel mapping shared by every lane, clip, and ruler tick.</summary>
-        public TimelineMetrics Metrics { get; } = new();
+        public TimelineMetrics Metrics => _layout.Metrics;
 
         /// <summary>Bound to the lane ListBox's SelectedItem; reports track selection.</summary>
         public LaneViewModel? SelectedLane
@@ -1786,6 +1808,8 @@ namespace Ongenet.App.ViewModels
             RebuildRows();
             RefreshPatternClipsOnLanes();
             RefreshMarkers();
+            OnPropertyChanged(nameof(ShowVideoReferenceLane));
+            OnPropertyChanged(nameof(VideoReferenceLabel));
             ResizeArrangement();
             foreach (var lane in _trackLanes) UpdateCrossfades(lane);
         }

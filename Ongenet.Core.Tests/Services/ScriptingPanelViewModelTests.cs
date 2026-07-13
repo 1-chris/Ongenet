@@ -108,7 +108,7 @@ public sealed class ScriptingPanelViewModelTests
     private sealed class TestScriptEditorSession : IScriptEditorSession
     {
         public event Action<string>? TextChanged;
-        public event Action? AnalysisUpdated;
+        public event Action? AnalysisUpdated { add { } remove { } }
 
         public string Text { get; set; } = string.Empty;
         public int CaretOffset { get; set; }

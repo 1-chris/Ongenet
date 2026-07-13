@@ -112,13 +112,15 @@ public sealed class AudioEngine : IAudioEngine
 
     // Per-block context + cross-track signal bus handed to effects that opt in via IContextualEffect.
     private readonly Effects.SidechainBus _sidechain = new();
+    private readonly IVideoAudioScopeService? _videoScope;
     private readonly Effects.EffectContext _effectCtx = new();
     private bool _disposed;
     private volatile bool _rebuildPending;
 
     public AudioEngine(IAudioOutput output, IProjectService project, ITransportService transport,
         IPlaybackModeService playback, IEventAggregator events, IAuditionPlayer audition,
-        IMidiOutputService? midiOut = null, IInputMonitorService? inputMonitor = null)
+        IMidiOutputService? midiOut = null, IInputMonitorService? inputMonitor = null,
+        IVideoAudioScopeService? videoScope = null)
     {
         _output = output;
         _project = project;
@@ -127,6 +129,7 @@ public sealed class AudioEngine : IAudioEngine
         _audition = audition;
         _midiOut = midiOut ?? new NullMidiOutputService();
         _inputMonitor = inputMonitor ?? new NullInputMonitorService();
+        _videoScope = videoScope;
         _renderJob = RenderTrackJob;
         _project.ProjectChanged += OnProjectChanged;
         _transport.StateChanged += OnTransportStateChanged;
@@ -578,6 +581,7 @@ public sealed class AudioEngine : IAudioEngine
         _effectCtx.Playing = playing;
         _effectCtx.Sidechain = _sidechain;
         _sidechain.BeginBlock();
+        _videoScope?.BeginBlock();
 
         // RENDER phase: fan out across worker threads (plus this audio thread). Each content track renders
         // into its own buffer with no shared scratch — safe without locks.
@@ -607,8 +611,8 @@ public sealed class AudioEngine : IAudioEngine
             if (silenced)
             {
                 track.MeterLevel *= MeterRelease;
-                if (st.Rendered && (sidechainSource || _sidechain.IsRequested(track.Id)))
-                    _sidechain.Publish(track.Id, st.Buffer.AsSpan(0, buffer.Length), channels);
+                if (st.Rendered && (sidechainSource || NeedsTrackTap(track.Id)))
+                    PublishTrackOutput(track.Id, st.Buffer.AsSpan(0, buffer.Length), channels);
                 continue;
             }
 
@@ -618,8 +622,8 @@ public sealed class AudioEngine : IAudioEngine
                 continue;
             }
 
-            if (sidechainSource || _sidechain.IsRequested(track.Id))
-                _sidechain.Publish(track.Id, st.Buffer.AsSpan(0, buffer.Length), channels);
+            if (sidechainSource || NeedsTrackTap(track.Id))
+                PublishTrackOutput(track.Id, st.Buffer.AsSpan(0, buffer.Length), channels);
 
             ProcessSends(st, track, routing, channels, frames, soloActive, preFader: true);
 
@@ -678,7 +682,7 @@ public sealed class AudioEngine : IAudioEngine
             }
 
             // A group/master bus can be a sidechain source too (e.g. a "Drums" group triggering a duck).
-            if (_sidechain.IsRequested(bt.Id)) _sidechain.Publish(bt.Id, busSpan, channels);
+            if (NeedsTrackTap(bt.Id)) PublishTrackOutput(bt.Id, busSpan, channels);
 
             if (bus.PdcDelay > 0)
                 bus.PdcLine.Process(busSpan, frames);
@@ -1632,5 +1636,16 @@ public sealed class AudioEngine : IAudioEngine
 
             return false;
         }
+    }
+
+    private bool NeedsTrackTap(Guid trackId) =>
+        _sidechain.IsRequested(trackId) || _videoScope?.IsRequested(trackId) == true;
+
+    private void PublishTrackOutput(Guid trackId, ReadOnlySpan<float> interleaved, int channels)
+    {
+        if (_sidechain.IsRequested(trackId))
+            _sidechain.Publish(trackId, interleaved, channels);
+        if (_videoScope?.IsRequested(trackId) == true)
+            _videoScope.Tap(trackId, interleaved, channels, _blkSampleRate);
     }
 }

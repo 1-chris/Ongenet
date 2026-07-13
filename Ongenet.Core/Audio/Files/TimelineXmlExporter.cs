@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Ongenet.Core.Models.Audio;
+using Ongenet.Core.Models.Media;
 
 namespace Ongenet.Core.Audio.Files;
 
@@ -44,6 +45,19 @@ public static class TimelineXmlExporter
         }
 
         sb.AppendLine("  </Timeline>");
+
+        if (project.VideoLayers.Count > 0)
+        {
+            sb.AppendLine("  <VideoLayers>");
+            foreach (var layer in project.VideoLayers.OrderBy(l => l.ZOrder))
+            {
+                var videoPath = layer.Items.FirstOrDefault(i => i.Kind == Models.Media.VideoElementKind.Video)?.SourcePath ?? "";
+                sb.AppendLine(
+                    $"    <VideoLayer id=\"{layer.Id}\" name=\"{Escape(layer.Name)}\" zOrder=\"{layer.ZOrder}\" path=\"{Escape(videoPath)}\" offsetSeconds=\"{layer.OffsetSeconds:F4}\" fps=\"{layer.Fps:F2}\" muted=\"{(layer.Muted ? "true" : "false")}\" inPointSeconds=\"{layer.InPointSeconds:F4}\" outPointSeconds=\"{layer.OutPointSeconds:F4}\"{(layer.SyncClipId is { } sc ? $" syncClipId=\"{sc}\"" : "")}/>");
+            }
+            sb.AppendLine("  </VideoLayers>");
+        }
+
         sb.AppendLine("</OngenetTimeline>");
         File.WriteAllText(outputPath, sb.ToString());
     }

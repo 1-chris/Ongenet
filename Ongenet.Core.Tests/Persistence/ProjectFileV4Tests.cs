@@ -72,13 +72,21 @@ public sealed class ProjectFileV4Tests
             Entries = { new DrumMapEntry { Note = 36, Label = "Kick", VelocityScale = 1.2f } }
         });
 
-        project.VideoTracks.Add(new VideoTrack
+        var videoLayer = new VideoLayer
         {
-            FilePath = "/tmp/test.mp4",
             OffsetSeconds = 1.5,
             Fps = 30,
-            Muted = true
+            Muted = true,
+            InPointSeconds = 2,
+            OutPointSeconds = 120
+        };
+        videoLayer.Items.Add(new VideoLayerItem
+        {
+            Kind = VideoElementKind.Video,
+            SourcePath = "/tmp/test.mp4",
+            X = 0, Y = 0, Width = 1, Height = 1
         });
+        project.VideoLayers.Add(videoLayer);
         track.SurroundWidth = 0.75;
 
         using var ms = new MemoryStream();
@@ -103,10 +111,12 @@ public sealed class ProjectFileV4Tests
         Assert.Single(loaded.Tracks[0].TakeLanes);
         Assert.Equal(WarpMode.Complex, loaded.Tracks[0].Clips[0].WarpMode);
         Assert.Equal(2, loaded.Tracks[0].Clips[0].WarpMarkers.Count);
-        Assert.Single(loaded.VideoTracks);
-        Assert.Equal("/tmp/test.mp4", loaded.VideoTracks[0].FilePath);
-        Assert.Equal(1.5, loaded.VideoTracks[0].OffsetSeconds);
-        Assert.True(loaded.VideoTracks[0].Muted);
+        Assert.Single(loaded.VideoLayers);
+        Assert.Equal("/tmp/test.mp4", loaded.VideoLayers[0].Items[0].SourcePath);
+        Assert.Equal(1.5, loaded.VideoLayers[0].OffsetSeconds);
+        Assert.True(loaded.VideoLayers[0].Muted);
+        Assert.Equal(2, loaded.VideoLayers[0].InPointSeconds);
+        Assert.Equal(120, loaded.VideoLayers[0].OutPointSeconds);
         Assert.Equal(0.75, loaded.Tracks[0].SurroundWidth);
     }
 }
