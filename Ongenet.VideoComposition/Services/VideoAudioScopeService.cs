@@ -5,7 +5,7 @@ using System.Threading;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Services.Interfaces;
 
-namespace Ongenet.Core.Services;
+namespace Ongenet.VideoComposition.Services;
 
 /// <summary>Ring-buffer audio taps for live video visualisers (mirrors sidechain request semantics).</summary>
 public sealed class VideoAudioScopeService : IVideoAudioScopeService

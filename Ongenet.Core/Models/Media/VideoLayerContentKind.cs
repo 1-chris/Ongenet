@@ -4,5 +4,6 @@ public enum VideoLayerContentKind
 {
     Empty,
     Media,
-    Waveform
+    Waveform,
+    Engine3D
 }

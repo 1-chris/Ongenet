@@ -119,7 +119,17 @@ public sealed partial class ScriptingApi
         _project.Current.VideoLayers.Select(l => new ScriptVideoLayerInfo(
             l.Id, l.Name, l.ZOrder, l.Opacity, l.DefaultVisible,
             l.OffsetSeconds, l.Fps, l.Muted, l.InPointSeconds, l.OutPointSeconds,
-            l.SyncClipId, l.AudioSourceTrackId)).ToArray();
+            l.SyncClipId, l.AudioSourceTrackId,
+            (ScriptVideoWaveformStyle)l.WaveformStyle, l.WaveformFollowPlayhead,
+            l.WaveformColorArgb, l.WaveformX, l.WaveformY, l.WaveformWidth, l.WaveformHeight,
+            l.Scope3DCameraYaw, l.Scope3DCameraPitch, l.Scope3DCameraDistance,
+            l.Scope3DLineThickness, l.Scope3DTrailCount, l.Scope3DTransparentBackground,
+            l.Engine3DEffectKind is { } fx ? (ScriptVideoEngine3DEffectKind)fx : null,
+            l.Engine3DAudioSourceTrackId, l.Engine3DImagePath,
+            l.Engine3DX, l.Engine3DY, l.Engine3DWidth, l.Engine3DHeight,
+            l.Engine3DCameraYaw, l.Engine3DCameraPitch, l.Engine3DCameraDistance,
+            l.Engine3DParticleCount, l.Engine3DParticleSize, l.Engine3DParticleColorArgb,
+            (ScriptVideoEngine3DParticleShape)l.Engine3DParticleShape, l.Engine3DTransparentBackground)).ToArray();
 
     public void AddVideoLayer(ScriptVideoLayerInfo layer)
     {
@@ -138,14 +148,45 @@ public sealed partial class ScriptingApi
             InPointSeconds = layer.InPointSeconds,
             OutPointSeconds = layer.OutPointSeconds,
             SyncClipId = layer.SyncClipId,
-            AudioSourceTrackId = layer.AudioSourceTrackId
+            AudioSourceTrackId = layer.AudioSourceTrackId,
+            WaveformStyle = (VideoWaveformStyle)layer.WaveformStyle,
+            WaveformFollowPlayhead = layer.WaveformFollowPlayhead,
+            WaveformColorArgb = layer.WaveformColorArgb,
+            WaveformX = layer.WaveformX,
+            WaveformY = layer.WaveformY,
+            WaveformWidth = layer.WaveformWidth,
+            WaveformHeight = layer.WaveformHeight,
+            Scope3DCameraYaw = layer.Scope3DCameraYaw,
+            Scope3DCameraPitch = layer.Scope3DCameraPitch,
+            Scope3DCameraDistance = layer.Scope3DCameraDistance,
+            Scope3DLineThickness = layer.Scope3DLineThickness,
+            Scope3DTrailCount = layer.Scope3DTrailCount,
+            Scope3DTransparentBackground = layer.Scope3DTransparentBackground,
+            Engine3DEffectKind = layer.Engine3DEffectKind is { } fx
+                ? (VideoEngine3DEffectKind)fx
+                : null,
+            Engine3DAudioSourceTrackId = layer.Engine3DAudioSourceTrackId,
+            Engine3DImagePath = layer.Engine3DImagePath,
+            Engine3DX = layer.Engine3DX,
+            Engine3DY = layer.Engine3DY,
+            Engine3DWidth = layer.Engine3DWidth,
+            Engine3DHeight = layer.Engine3DHeight,
+            Engine3DCameraYaw = layer.Engine3DCameraYaw,
+            Engine3DCameraPitch = layer.Engine3DCameraPitch,
+            Engine3DCameraDistance = layer.Engine3DCameraDistance,
+            Engine3DParticleCount = layer.Engine3DParticleCount,
+            Engine3DParticleSize = layer.Engine3DParticleSize,
+            Engine3DParticleColorArgb = layer.Engine3DParticleColorArgb,
+            Engine3DParticleShape = (VideoEngine3DParticleShape)layer.Engine3DParticleShape,
+            Engine3DTransparentBackground = layer.Engine3DTransparentBackground
         });
     }
 
     public IReadOnlyList<ScriptVideoLayerItemInfo> GetVideoLayerItems() =>
         _project.Current.VideoLayers.SelectMany(l => l.Items.Select(i => new ScriptVideoLayerItemInfo(
             i.Id, l.Id, (ScriptVideoElementKind)i.Kind, i.SourcePath,
-            i.X, i.Y, i.Width, i.Height, i.Rotation, i.Opacity))).ToArray();
+            i.X, i.Y, i.Width, i.Height, i.Rotation, i.Opacity,
+            i.TextContent, i.FontSizePx, i.TextColorArgb))).ToArray();
 
     public void AddVideoLayerItem(ScriptVideoLayerItemInfo item)
     {
@@ -162,7 +203,10 @@ public sealed partial class ScriptingApi
             Width = item.Width,
             Height = item.Height,
             Rotation = item.Rotation,
-            Opacity = item.Opacity
+            Opacity = item.Opacity,
+            TextContent = item.TextContent,
+            FontSizePx = item.FontSizePx,
+            TextColorArgb = item.TextColorArgb
         });
     }
 
@@ -194,6 +238,43 @@ public sealed partial class ScriptingApi
             Action = (VideoTriggerAction)trigger.Action,
             FadeDurationSeconds = trigger.FadeDurationSeconds
         });
+    }
+
+    public IReadOnlyList<ScriptVideoVisibilityRegionInfo> GetVideoVisibilityRegions() =>
+        _project.Current.VideoVisibilityRegions.Select(r => new ScriptVideoVisibilityRegionInfo(
+            r.Id, r.LayerId, r.StartBeat, r.EndBeat)).ToArray();
+
+    public void AddVideoVisibilityRegion(ScriptVideoVisibilityRegionInfo region)
+    {
+        if (_project.Current.VideoVisibilityRegions.Any(r => r.Id == region.Id)) return;
+        _history.Capture("Add video visibility region");
+        _project.Current.VideoVisibilityRegions.Add(new VideoVisibilityRegion
+        {
+            Id = region.Id,
+            LayerId = region.LayerId,
+            StartBeat = region.StartBeat,
+            EndBeat = region.EndBeat
+        });
+    }
+
+    public ScriptVideoCanvasInfo GetVideoCanvasSize() =>
+        new(_project.Current.VideoCanvasWidth, _project.Current.VideoCanvasHeight, _project.Current.VideoExportFps);
+
+    public void SetVideoCanvasSize(ScriptVideoCanvasInfo size)
+    {
+        _history.Capture("Set video canvas size");
+        _project.Current.VideoCanvasWidth = Math.Clamp(size.Width, 320, 4096);
+        _project.Current.VideoCanvasHeight = Math.Clamp(size.Height, 320, 4096);
+        if (size.ExportFps > 0)
+            _project.Current.VideoExportFps = Math.Clamp(size.ExportFps, 1, 120);
+    }
+
+    public double GetVideoExportFps() => _project.Current.VideoExportFps;
+
+    public void SetVideoExportFps(double fps)
+    {
+        _history.Capture("Set video export FPS");
+        _project.Current.VideoExportFps = Math.Clamp(fps, 1, 120);
     }
 
     public IReadOnlyList<ScriptControlRoomProfileInfo> GetControlRoomProfiles() =>

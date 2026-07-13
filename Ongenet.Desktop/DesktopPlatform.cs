@@ -79,6 +79,10 @@ public sealed class DesktopPlatform : IPlatformServices
         services.AddSingleton<Core.Services.IScriptingApi>(sp => sp.GetRequiredService<ScriptingApi>());
         services.AddSingleton<Core.Services.IScriptingHost, RoslynScriptingHost>();
         services.AddSingleton<IScriptEditorFactory, ScriptEditorFactory>();
+        services.AddSingleton<IVideoCompositionEditorFactory, VideoCompositionEditorFactory>();
+        Ongenet.VideoComposition.DependencyInjection.VideoCompositionServiceCollectionExtensions.AddVideoComposition(services);
+        services.AddSingleton<IVideoEngine3DRenderService, Ongenet.App.Services.VideoEngine3DRenderService>();
+        services.AddSingleton<IVideoEngine3DLayerRenderer, Ongenet.App.Services.VideoEngine3DLayerRenderer>();
 
         // Plugin crash isolation bridge (scaffold — out-of-process host when enabled).
         services.AddSingleton<Core.Services.IPluginProcessHost, OutOfProcessPluginHost>();

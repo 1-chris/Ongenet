@@ -144,6 +144,12 @@ public sealed class NullScriptingApi : IScriptingApi
     public void SetVideoEnabled(bool enabled) => throw Disabled();
     public IReadOnlyList<ScriptVideoTriggerInfo> GetVideoTriggers() => Array.Empty<ScriptVideoTriggerInfo>();
     public void AddVideoTrigger(ScriptVideoTriggerInfo trigger) => throw Disabled();
+    public IReadOnlyList<ScriptVideoVisibilityRegionInfo> GetVideoVisibilityRegions() => Array.Empty<ScriptVideoVisibilityRegionInfo>();
+    public void AddVideoVisibilityRegion(ScriptVideoVisibilityRegionInfo region) => throw Disabled();
+    public ScriptVideoCanvasInfo GetVideoCanvasSize() => new(1920, 1080, 30);
+    public void SetVideoCanvasSize(ScriptVideoCanvasInfo size) => throw Disabled();
+    public double GetVideoExportFps() => 30;
+    public void SetVideoExportFps(double fps) => throw Disabled();
     public IReadOnlyList<ScriptControlRoomProfileInfo> GetControlRoomProfiles() => Array.Empty<ScriptControlRoomProfileInfo>();
     public void AddControlRoomProfile(ScriptControlRoomProfileInfo profile) => throw Disabled();
     public string ExportProjectAsScript(ExportScriptOptions? options = null) => throw Disabled();

@@ -44,5 +44,7 @@
              referenced solely by the desktop head and injected via DI, so this stays clean for Web/Android. -->
         <ProjectReference Include="..\Ongenet.Engine3D.Abstractions\Ongenet.Engine3D.Abstractions.csproj" />
         <ProjectReference Include="..\Ongenet.Scripting\Ongenet.Scripting.csproj" />
+        <!-- Video composition preview controls (FFmpeg implementation is desktop-only via DI). -->
+        <ProjectReference Include="..\Ongenet.VideoComposition.Editor\Ongenet.VideoComposition.Editor.csproj" />
     </ItemGroup>
 </Project>

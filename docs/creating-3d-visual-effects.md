@@ -363,3 +363,22 @@ That's it — add the **3D Scope** to a track, and the waveform renders in the c
 For the engine internals (RHI, the Vulkan backend, MoltenVK on macOS, presenters), see
 [DEVELOPMENT.md §9](https://github.com/1-chris/Ongenet/blob/main/DEVELOPMENT.md). For the audio side, see
 [creating-effects.md](creating-effects.md); for colours, [theming.md](theming.md).
+
+---
+
+## 8. Video composition (live GPU layers)
+
+The same `IEngine3DVisualization` types can render **inside video layers** on desktop:
+
+| Layer mode | How to use it |
+| --- | --- |
+| **Audio visualiser → 3D Scope** | Pick **3D Scope** as the visualiser type. Audio comes from `IVideoAudioScopeService` (track-level, like 2D visualisers). Inspector exposes camera orbit, ribbon thickness, trail count, and transparent background. |
+| **3D FX** | Set layer **Content** to **3D FX**. Choose **Textured cube** (image baked onto faces via `TexturedMeshBuilder`) or **Audio particles** (instanced billboards driven by track energy). Bounds and camera match the waveform layer UX. |
+
+Rendering path:
+
+- **Preview** — `IVideoEngine3DLayerRenderer` renders each frame to premultiplied BGRA, presented through `VideoCompositionCanvas`.
+- **Export** — the same renderer runs per frame during ffmpeg compositing (`VideoCompositionFrameRenderer`).
+- **Static snapshot items** — `VideoElementKind.Engine3D` still bakes a one-off PNG via **Capture 3D snapshot** (demo or cube preview, transparent background optional).
+
+Set `Scene.TransparentBackground = true` (or `ClearColor.W = 0`) so the compositor can alpha-blend 3D output over other layers without an opaque fill inside the layer rect.

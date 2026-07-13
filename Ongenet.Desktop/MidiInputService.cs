@@ -124,6 +124,7 @@ public sealed class MidiInputService : IMidiInputService
             case MidiMessageKind.ControlChange:
                 if (_transport.HandleMessage(m)) break;
                 if (_session.HandleMessage(m)) break;
+                _video?.OnMidiCc(m.Channel, m.Controller, m.Value);
                 if (!_mappings.HandleControlChange(m) && InstrumentInputEnabled)
                     _preview.ControlChange(m.Controller, m.Value);
                 break;

@@ -68,6 +68,12 @@ public sealed class Project
     /// <summary>Composition / export canvas height in pixels.</summary>
     public int VideoCanvasHeight { get; set; } = 1080;
 
+    /// <summary>Frame rate for composited video export (project-level).</summary>
+    public double VideoExportFps { get; set; } = 30;
+
+    /// <summary>Beat-synced keyframes for video layer items.</summary>
+    public List<VideoLayerKeyframe> VideoLayerKeyframes { get; } = new();
+
     /// <summary>Clip/MIDI-driven visibility triggers for video layers.</summary>
     public List<VideoTrigger> VideoTriggers { get; } = new();
 

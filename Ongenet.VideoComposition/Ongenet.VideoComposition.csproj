@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Ongenet.VideoComposition</RootNamespace>
+    <Description>Video composition rendering, FFmpeg decode/encode, and audio visualiser export for Ongenet</Description>
+  </PropertyGroup>
+
+    <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
+  </ItemGroup>
+
+</Project>

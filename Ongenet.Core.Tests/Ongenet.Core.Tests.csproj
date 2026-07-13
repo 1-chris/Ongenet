@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Ongenet.App\Ongenet.App.csproj" />
     <ProjectReference Include="..\Ongenet.Core\Ongenet.Core.csproj" />
     <ProjectReference Include="..\Ongenet.Scripting\Ongenet.Scripting.csproj" />
+    <ProjectReference Include="..\Ongenet.VideoComposition\Ongenet.VideoComposition.csproj" />
     <ProjectReference Include="..\Ongenet.Lv2\Ongenet.Lv2.csproj" />
     <ProjectReference Include="..\Ongenet.Au\Ongenet.Au.csproj" />
   </ItemGroup>

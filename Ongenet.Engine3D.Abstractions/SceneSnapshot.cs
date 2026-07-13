@@ -62,7 +62,7 @@ public sealed class SceneSnapshot
         var camSnap = new CameraSnapshot(cam.ViewMatrix(), cam.Position, cam.Projection,
             cam.FieldOfView, cam.OrthographicHalfHeight, cam.NearPlane, cam.FarPlane);
 
-        return new SceneSnapshot(scene.ClearColor, camSnap, items, ambient, lightDir, lightColor);
+        return new SceneSnapshot(scene.EffectiveClearColor, camSnap, items, ambient, lightDir, lightColor);
     }
 
     private static void Flatten(SceneNode node, Matrix4x4 parentWorld, List<DrawItem> items)

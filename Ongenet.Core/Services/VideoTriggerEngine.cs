@@ -14,6 +14,35 @@ public sealed class VideoCompositionRuntime
     private readonly Dictionary<Guid, double> _fadeSpeed = new();
     private readonly Dictionary<Guid, bool> _regionGated = new();
 
+    private static double RegionOpacityAtBeat(VideoVisibilityRegion region, double beat, double layerOpacity)
+    {
+        if (beat < region.StartBeat || beat >= region.EndBeat) return 0;
+        var opacity = layerOpacity;
+        if (region.FadeInBeats > 1e-6 && beat < region.StartBeat + region.FadeInBeats)
+        {
+            var t = (beat - region.StartBeat) / region.FadeInBeats;
+            opacity *= Math.Clamp(t, 0, 1);
+        }
+
+        if (region.FadeOutBeats > 1e-6 && beat >= region.EndBeat - region.FadeOutBeats)
+        {
+            var t = (region.EndBeat - beat) / region.FadeOutBeats;
+            opacity *= Math.Clamp(t, 0, 1);
+        }
+
+        return opacity;
+    }
+
+    private static double ComputeRegionOpacity(Project project, VideoLayer layer, double beat)
+    {
+        var regions = project.VideoVisibilityRegions.Where(r => r.LayerId == layer.Id).ToList();
+        if (regions.Count == 0) return layer.DefaultVisible ? layer.Opacity : 0;
+        var max = 0.0;
+        foreach (var region in regions)
+            max = Math.Max(max, RegionOpacityAtBeat(region, beat, layer.Opacity));
+        return max;
+    }
+
     public void Reset(Project project, double beat)
     {
         _opacity.Clear();
@@ -25,7 +54,9 @@ public sealed class VideoCompositionRuntime
             var regions = project.VideoVisibilityRegions.Where(r => r.LayerId == layer.Id).ToList();
             var inRegion = regions.Count == 0 || regions.Any(r => beat >= r.StartBeat && beat < r.EndBeat);
             _regionGated[layer.Id] = inRegion;
-            _opacity[layer.Id] = inRegion && layer.DefaultVisible ? layer.Opacity : 0;
+            _opacity[layer.Id] = inRegion
+                ? ComputeRegionOpacity(project, layer, beat)
+                : 0;
         }
     }
 
@@ -41,6 +72,7 @@ public sealed class VideoCompositionRuntime
                     _opacity[layer.Id] = layer.DefaultVisible ? layer.Opacity : 0;
                 continue;
             }
+
             var inRegion = regions.Any(r => beat >= r.StartBeat && beat < r.EndBeat);
             _regionGated[layer.Id] = inRegion;
             if (!inRegion)
@@ -49,8 +81,8 @@ public sealed class VideoCompositionRuntime
                 _fadeSpeed.Remove(layer.Id);
                 _opacity[layer.Id] = 0;
             }
-            else if (!_fadeTarget.ContainsKey(layer.Id) && GetOpacity(layer.Id) <= 0.01 && layer.DefaultVisible)
-                _opacity[layer.Id] = layer.Opacity;
+            else if (!_fadeTarget.ContainsKey(layer.Id))
+                _opacity[layer.Id] = ComputeRegionOpacity(project, layer, beat);
         }
     }
 
@@ -157,6 +189,19 @@ public sealed class VideoTriggerEngine
         var moment = on ? VideoTriggerMoment.NoteOn : VideoTriggerMoment.NoteOff;
         foreach (var trigger in project.VideoTriggers.Where(t =>
                      t.Source == VideoTriggerSource.MidiNote && t.MidiNote == note && t.Moment == moment))
+        {
+            var layer = project.VideoLayers.FirstOrDefault(e => e.Id == trigger.TargetLayerId);
+            if (layer is not null) Runtime.ApplyTrigger(trigger, layer, 0);
+        }
+    }
+
+    public void OnMidiCc(Project project, int channel, int cc, int value)
+    {
+        foreach (var trigger in project.VideoTriggers.Where(t =>
+                     t.Source == VideoTriggerSource.MidiCc
+                     && t.MidiCcChannel == channel
+                     && t.MidiCcNumber == cc
+                     && value >= t.MidiCcThreshold))
         {
             var layer = project.VideoLayers.FirstOrDefault(e => e.Id == trigger.TargetLayerId);
             if (layer is not null) Runtime.ApplyTrigger(trigger, layer, 0);

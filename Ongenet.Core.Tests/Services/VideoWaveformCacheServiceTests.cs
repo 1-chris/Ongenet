@@ -1,7 +1,7 @@
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Audio;
-using Ongenet.Core.Services;
+using Ongenet.VideoComposition.Services;
 using Xunit;
 
 namespace Ongenet.Core.Tests.Services;

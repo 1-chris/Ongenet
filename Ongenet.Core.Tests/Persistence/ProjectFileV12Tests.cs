@@ -44,7 +44,7 @@ public sealed class ProjectFileV12Tests
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
 
-        Assert.Equal(13, ProjectFile.FormatVersion);
+        Assert.Equal(20, ProjectFile.FormatVersion);
         Assert.Single(loaded.VideoLayers);
         var wf = loaded.VideoLayers[0];
         Assert.True(wf.IsWaveformLayer);

@@ -67,8 +67,6 @@ public static class ServiceCollectionExtensions
 
         // Offline render (export to WAV).
         services.AddSingleton<OfflineRenderer>();
-        services.AddSingleton<IVideoWaveformCacheService, VideoWaveformCacheService>();
-        services.AddSingleton<IVideoAudioScopeService, VideoAudioScopeService>();
         return services;
     }
 }

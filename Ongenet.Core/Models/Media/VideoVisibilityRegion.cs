@@ -9,4 +9,6 @@ public sealed class VideoVisibilityRegion
     public Guid LayerId { get; set; }
     public double StartBeat { get; set; }
     public double EndBeat { get; set; }
+    public double FadeInBeats { get; set; }
+    public double FadeOutBeats { get; set; }
 }

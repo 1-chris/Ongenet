@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Ongenet.App.Controls"
+        x:Class="Ongenet.App.Views.Windows.Engine3DSnapshotWindow"
+        Width="480" Height="440" MinWidth="360" MinHeight="360"
+        Title="{DynamicResource VideoTrack_3d_snapshot_title}"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="12" RowSpacing="8">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <TextBlock Text="{DynamicResource VideoTrack_3d_snapshot_viz}" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext0}" FontSize="11"/>
+            <ComboBox Grid.Column="1" Name="VizCombo" HorizontalAlignment="Stretch"/>
+            <CheckBox Grid.Column="2" Name="TransparentCheck" Content="{DynamicResource VideoTrack_Scope3d_transparent}"
+                      IsChecked="True" VerticalAlignment="Center"/>
+        </Grid>
+        <Border Grid.Row="1" ClipToBounds="True" CornerRadius="6"
+                BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+            <controls:Engine3DView Name="PreviewView" MinHeight="240"/>
+        </Border>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10"
+                    HorizontalAlignment="Right" Margin="0,4,0,0">
+            <Button Name="CancelButton" Content="{DynamicResource Dialog_Cancel}" Padding="12,6"/>
+            <Button Name="CaptureButton" Content="{DynamicResource VideoTrack_Capture_3d_snapshot}" Padding="12,6"/>
+        </StackPanel>
+    </Grid>
+</Window>

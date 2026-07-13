@@ -27,10 +27,29 @@
             <Setter Property="BorderThickness" Value="2"/>
             <Setter Property="Opacity" Value="1"/>
         </Style>
+        <Style Selector="Border.video-layer-header">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMantle}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3,0,0,0"/>
+        </Style>
+        <Style Selector="Border.video-layer-header.selected">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinSapphire}"/>
+        </Style>
+        <Style Selector="Border.video-layer-header.selected TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Border.video-overlay-lane">
+            <Setter Property="Background" Value="{StaticResource CatppuccinCrust}"/>
+        </Style>
+        <Style Selector="Border.video-overlay-lane.selected">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+        </Style>
     </UserControl.Styles>
 
     <Border Background="{StaticResource CatppuccinCrust}">
-        <Grid RowDefinitions="Auto,*,Auto">
+        <Grid RowDefinitions="Auto,*">
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="8,4">
                 <TextBlock Text="{DynamicResource VideoTimeline_Title}" FontSize="11" FontWeight="SemiBold"
                            Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Center"/>
@@ -38,9 +57,12 @@
                         Padding="6,2" FontSize="10"/>
                 <Button Content="{DynamicResource VideoTimeline_Add_region}" Command="{Binding AddVisibilityRegionCommand}"
                         Padding="6,2" FontSize="10"/>
+                <Button Content="{DynamicResource VideoTimeline_Import_markers}" Command="{Binding ImportMarkersAsTriggersCommand}"
+                        Padding="6,2" FontSize="10"/>
             </StackPanel>
 
-            <Grid Grid.Row="1" RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
+            <Grid Grid.Row="1" Name="ContentGrid" ColumnDefinitions="*,4,340">
+                <Grid Grid.Column="0" RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
                 <Border Grid.Row="0" Grid.Column="0" Width="{StaticResource HeaderWidth}" Height="{StaticResource RulerHeight}"
                         Background="{StaticResource CatppuccinMantle}"/>
                 <ScrollViewer Grid.Row="0" Grid.Column="1" Name="RulerScroll"
@@ -68,25 +90,26 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled" Background="{StaticResource CatppuccinMantle}">
-                    <StackPanel Name="HeaderStack" Width="{StaticResource HeaderWidth}">
-                        <ItemsControl ItemsSource="{Binding OverlayLanes}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:VideoOverlayLaneViewModel">
-                                    <Border Height="{Binding LaneHeight}" Padding="6,0"
-                                            Background="{StaticResource CatppuccinMantle}"
-                                            PointerPressed="OverlayHeader_PointerPressed"
-                                            PointerMoved="OverlayHeader_PointerMoved"
-                                            PointerReleased="OverlayHeader_PointerReleased">
-                                        <TextBlock Text="{Binding Header}" FontSize="10" VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
+                <ScrollViewer Grid.Row="1" Grid.Column="0" Name="HeaderScroll"
+                              VerticalScrollBarVisibility="Hidden"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Background="{StaticResource CatppuccinMantle}">
+                    <ItemsControl ItemsSource="{Binding OverlayLanes}" Width="{StaticResource HeaderWidth}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:VideoOverlayLaneViewModel">
+                                <Border Height="{Binding LaneHeight}" Padding="6,0"
+                                        Classes="video-layer-header"
+                                        Classes.selected="{Binding IsSelected}"
+                                        PointerPressed="OverlayHeader_PointerPressed"
+                                        PointerMoved="OverlayHeader_PointerMoved"
+                                        PointerReleased="OverlayHeader_PointerReleased">
+                                    <TextBlock Text="{Binding Header}" FontSize="10" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </ScrollViewer>
 
                 <ScrollViewer Grid.Row="1" Grid.Column="1" Name="LanesScroll"
@@ -97,7 +120,9 @@
                             <ItemsControl ItemsSource="{Binding OverlayLanes}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:VideoOverlayLaneViewModel">
-                                        <Border Height="{Binding LaneHeight}" Background="{StaticResource CatppuccinCrust}"
+                                        <Border Height="{Binding LaneHeight}"
+                                                Classes="video-overlay-lane"
+                                                Classes.selected="{Binding IsSelected}"
                                                 PointerPressed="OverlayLane_PointerPressed"
                                                 DoubleTapped="OverlayLane_DoubleTapped">
                                             <Canvas Height="{Binding LaneHeight}">
@@ -177,11 +202,19 @@
                         </Canvas>
                     </Grid>
                 </ScrollViewer>
-            </Grid>
+                </Grid>
 
-            <Border Grid.Row="2" Padding="8" Background="{StaticResource CatppuccinMantle}"
-                    BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,1,0,0">
-                <StackPanel Spacing="8">
+                <GridSplitter Grid.Column="1" Name="InspectorSplitter" ResizeDirection="Columns"
+                              Background="{StaticResource CatppuccinSurface1}"
+                              IsVisible="{Binding ShowInspectorPanel}"/>
+
+                <Border Grid.Column="2" Background="{StaticResource CatppuccinMantle}"
+                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1,0,0,0"
+                        ClipToBounds="True" MinWidth="260" MaxWidth="520"
+                        IsVisible="{Binding ShowInspectorPanel}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Padding="8,8,4,8">
+                        <StackPanel Spacing="8" MinWidth="240">
                     <TextBlock Text="{DynamicResource VideoTimeline_Inspector_empty}" FontSize="11"
                                Foreground="{StaticResource CatppuccinOverlay1}" TextWrapping="Wrap"
                                IsVisible="{Binding ShowInspectorPlaceholder}"/>
@@ -204,7 +237,7 @@
                             </ComboBox>
                             <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Grid.RowSpan="3"
                                         IsVisible="{Binding ShowLayerMediaInspector}">
-                                <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+                                <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTimeline_Items}" FontSize="11"
                                                VerticalAlignment="Top" Margin="0,4,0,0" Foreground="{StaticResource CatppuccinSubtext0}"/>
                                     <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
@@ -231,12 +264,125 @@
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
                                     <Button Grid.Row="2" Grid.Column="1" Content="{DynamicResource VideoTrack_Browse}"
-                                            Command="{Binding BrowseLayerItemCommand}" HorizontalAlignment="Left" Padding="8,4"/>
+                                            Command="{Binding BrowseLayerItemCommand}" HorizontalAlignment="Left" Padding="8,4"
+                                            IsVisible="{Binding ShowLayerItemMediaPath}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource VideoTrack_Text_content}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemTextInspector}"/>
+                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding LayerItemTextContent, Mode=TwoWay}"
+                                             IsVisible="{Binding ShowLayerItemTextInspector}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource VideoTrack_Text_size}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemTextInspector}"/>
+                                    <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding LayerItemFontSizePx, Mode=TwoWay}"
+                                                   Minimum="8" Maximum="256" Increment="2" FormatString="0"
+                                                   IsVisible="{Binding ShowLayerItemTextInspector}"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{DynamicResource VideoTrack_Text_color}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemTextInspector}"/>
+                                    <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding WaveformColorPresets}"
+                                              SelectedItem="{Binding SelectedLayerItemTextColor, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowLayerItemTextInspector}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:WaveformColorPreset">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="{DynamicResource VideoTrack_Subtitle_srt}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemSubtitleInspector}"/>
+                                    <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                                                IsVisible="{Binding ShowLayerItemSubtitleInspector}">
+                                        <TextBox Text="{Binding LayerItemSubtitleSrtPath, Mode=TwoWay}" MinWidth="120"/>
+                                        <Button Content="{DynamicResource VideoTrack_Browse}" Command="{Binding BrowseSubtitleSrtCommand}" Padding="6,3"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="{DynamicResource VideoTrack_Rotation}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemInspector}"/>
+                                    <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding LayerItemRotation, Mode=TwoWay}"
+                                                   Minimum="-360" Maximum="360" Increment="1" FormatString="0"
+                                                   IsVisible="{Binding ShowLayerItemInspector}"/>
+                                    <TextBlock Grid.Row="8" Grid.Column="0" Text="{DynamicResource VideoTrack_Opacity}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemInspector}"/>
+                                    <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding LayerItemOpacity, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="1" Increment="0.05" FormatString="F2"
+                                                   IsVisible="{Binding ShowLayerItemInspector}"/>
+                                    <TextBlock Grid.Row="9" Grid.Column="0" Text="{DynamicResource VideoTrack_Chroma_key}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <CheckBox Grid.Row="9" Grid.Column="1" Content="{DynamicResource VideoTrack_Chroma_key_enable}"
+                                              IsChecked="{Binding LayerItemChromaKeyEnabled, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <TextBlock Grid.Row="10" Grid.Column="0" Text="{DynamicResource VideoTrack_Chroma_tolerance}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <NumericUpDown Grid.Row="10" Grid.Column="1" Value="{Binding LayerItemChromaKeyTolerance, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="1" Increment="0.05" FormatString="F2"
+                                                   IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <Button Grid.Row="11" Grid.Column="1" Content="{DynamicResource VideoTrack_Add_keyframe}"
+                                            Command="{Binding AddKeyframeAtPlayheadCommand}" HorizontalAlignment="Left" Padding="8,4"
+                                            IsVisible="{Binding ShowLayerItemInspector}"/>
+                                    <TextBlock Grid.Row="12" Grid.Column="0" Text="{DynamicResource VideoTrack_Blend_mode}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox Grid.Row="12" Grid.Column="1" ItemsSource="{Binding BlendModeOptions}"
+                                              SelectedItem="{Binding SelectedLayerBlendMode, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate><TextBlock Text="{Binding Label}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="13" Grid.Column="0" Text="{DynamicResource VideoTrack_Brightness}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <NumericUpDown Grid.Row="13" Grid.Column="1" Value="{Binding LayerItemBrightness, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="2" Increment="0.05" FormatString="F2"
+                                                   IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <TextBlock Grid.Row="14" Grid.Column="0" Text="{DynamicResource VideoTrack_Contrast}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <NumericUpDown Grid.Row="14" Grid.Column="1" Value="{Binding LayerItemContrast, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="2" Increment="0.05" FormatString="F2"
+                                                   IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <TextBlock Grid.Row="15" Grid.Column="0" Text="{DynamicResource VideoTrack_Saturation}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <NumericUpDown Grid.Row="15" Grid.Column="1" Value="{Binding LayerItemSaturation, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="2" Increment="0.05" FormatString="F2"
+                                                   IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <TextBlock Grid.Row="16" Grid.Column="0" Text="{DynamicResource VideoTrack_Lut_cube}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <StackPanel Grid.Row="16" Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                                                IsVisible="{Binding ShowLayerItemEffectsInspector}">
+                                        <TextBox Text="{Binding LayerItemLutCubePath, Mode=TwoWay}" MinWidth="120"/>
+                                        <Button Content="{DynamicResource VideoTrack_Browse}" Command="{Binding BrowseLutCubeCommand}" Padding="6,3"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="17" Grid.Column="0" Text="{DynamicResource VideoTrack_Mask_image}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemEffectsInspector}"/>
+                                    <StackPanel Grid.Row="17" Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                                                IsVisible="{Binding ShowLayerItemEffectsInspector}">
+                                        <TextBox Text="{Binding LayerItemMaskImagePath, Mode=TwoWay}" MinWidth="120"/>
+                                        <Button Content="{DynamicResource VideoTrack_Browse}" Command="{Binding BrowseMaskImageCommand}" Padding="6,3"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="18" Grid.Column="0" Text="{DynamicResource VideoTrack_Generate_proxy}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowLayerItemProxyInspector}"/>
+                                    <StackPanel Grid.Row="18" Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                                                IsVisible="{Binding ShowLayerItemProxyInspector}">
+                                        <Button Content="{DynamicResource VideoTrack_Generate_proxy}" Command="{Binding GenerateProxyCommand}" Padding="8,4"/>
+                                        <TextBlock Text="{Binding ProxyCacheStatus}" FontSize="10" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    </StackPanel>
+                                    <Button Grid.Row="19" Grid.Column="1" Content="{DynamicResource VideoTrack_Capture_3d_snapshot}"
+                                            Command="{Binding CaptureEngine3DSnapshotCommand}" HorizontalAlignment="Left" Padding="8,4"
+                                            IsVisible="{Binding ShowEngine3DCapture}"/>
                                 </Grid>
                             </StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Grid.RowSpan="3"
                                         IsVisible="{Binding ShowLayerWaveformInspector}" Spacing="6">
-                                <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                                <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTrack_Visualiser_source}" FontSize="11"
                                                VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
                                     <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding AudioSourceTrackOptions}"
@@ -256,17 +402,21 @@
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource VideoTrack_Visualiser_color_mode}" FontSize="11"
-                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowVisualiser2DColorSettings}"/>
                                     <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding VisualiserColorModeOptions}"
-                                              SelectedItem="{Binding SelectedVisualiserColorMode, Mode=TwoWay}">
+                                              SelectedItem="{Binding SelectedVisualiserColorMode, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowVisualiser2DColorSettings}">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate><TextBlock Text="{Binding Label}"/></DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource VideoTrack_Visualiser_color}" FontSize="11"
-                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowVisualiser2DColorSettings}"/>
                                     <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding WaveformColorPresets}"
-                                              SelectedItem="{Binding SelectedWaveformColor, Mode=TwoWay}">
+                                              SelectedItem="{Binding SelectedWaveformColor, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowVisualiser2DColorSettings}">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate x:DataType="vm:WaveformColorPreset">
                                                 <TextBlock Text="{Binding Label}"/>
@@ -290,7 +440,10 @@
                                                IsVisible="{Binding ShowVisualiserLineThickness}"/>
                                     <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding SpectrumLineThickness, Mode=TwoWay}"
                                                      Minimum="0.5" Maximum="12" Increment="0.5" FormatString="F1"
-                                                     IsVisible="{Binding ShowVisualiserLineThickness}"/>
+                                                     IsVisible="{Binding ShowVisualiserSpectrumLineThickness}"/>
+                                    <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding Scope3DLineThickness, Mode=TwoWay}"
+                                                     Minimum="0.005" Maximum="0.08" Increment="0.002" FormatString="F3"
+                                                     IsVisible="{Binding ShowScope3DInspector}"/>
                                     <TextBlock Grid.Row="6" Grid.Column="0" Text="{DynamicResource VideoTrack_Visualiser_spectrum_min}" FontSize="11"
                                                VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
                                                IsVisible="{Binding ShowVisualiserSpectrumSettings}"/>
@@ -315,45 +468,165 @@
                                         <NumericUpDown Grid.Column="3" Value="{Binding WaveformHeight, Mode=TwoWay}" Minimum="0.03" Maximum="1" Increment="0.01" FormatString="F2"
                                                        ToolTip.Tip="H"/>
                                     </Grid>
+                                    <CheckBox Grid.Row="9" Grid.Column="1" Content="{DynamicResource VideoTrack_Waveform_follow_playhead}"
+                                              IsChecked="{Binding WaveformFollowPlayhead, Mode=TwoWay}"/>
+                                    <TextBlock Grid.Row="10" Grid.Column="0" Text="{DynamicResource VideoTrack_Scope3d_camera_yaw}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <NumericUpDown Grid.Row="10" Grid.Column="1" Value="{Binding Scope3DCameraYaw, Mode=TwoWay}"
+                                                     Minimum="-3.14" Maximum="3.14" Increment="0.05" FormatString="F2"
+                                                     IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <TextBlock Grid.Row="11" Grid.Column="0" Text="{DynamicResource VideoTrack_Scope3d_camera_pitch}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <NumericUpDown Grid.Row="11" Grid.Column="1" Value="{Binding Scope3DCameraPitch, Mode=TwoWay}"
+                                                     Minimum="-1.2" Maximum="1.2" Increment="0.05" FormatString="F2"
+                                                     IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <TextBlock Grid.Row="12" Grid.Column="0" Text="{DynamicResource VideoTrack_Scope3d_camera_distance}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <NumericUpDown Grid.Row="12" Grid.Column="1" Value="{Binding Scope3DCameraDistance, Mode=TwoWay}"
+                                                     Minimum="1.5" Maximum="12" Increment="0.1" FormatString="F1"
+                                                     IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <TextBlock Grid.Row="13" Grid.Column="0" Text="{DynamicResource VideoTrack_Scope3d_trail_count}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <NumericUpDown Grid.Row="13" Grid.Column="1" Value="{Binding Scope3DTrailCount, Mode=TwoWay}"
+                                                     Minimum="4" Maximum="40" Increment="1" FormatString="0"
+                                                     IsVisible="{Binding ShowScope3DInspector}"/>
+                                    <CheckBox Grid.Row="14" Grid.Column="1" Content="{DynamicResource VideoTrack_Scope3d_transparent}"
+                                              IsChecked="{Binding Scope3DTransparentBackground, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowScope3DInspector}"/>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Grid.RowSpan="3"
+                                        IsVisible="{Binding ShowLayerEngine3DInspector}" Spacing="6">
+                                <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTrack_Engine3d_effect}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Engine3DEffectKindOptions}"
+                                              SelectedItem="{Binding SelectedEngine3DEffectKind, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate><TextBlock Text="{Binding Label}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource VideoTrack_Visualiser_source}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowEngine3DParticlesInspector}"/>
+                                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AudioSourceTrackOptions}"
+                                              SelectedItem="{Binding SelectedEngine3DAudioSourceTrack, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowEngine3DParticlesInspector}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:VideoAudioSourceOption">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource VideoTrack_Engine3d_texture}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowEngine3DTexturedCubeInspector}"/>
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                                                IsVisible="{Binding ShowEngine3DTexturedCubeInspector}">
+                                        <TextBox Text="{Binding Engine3DImagePath, Mode=TwoWay}" MinWidth="120"/>
+                                        <Button Content="{DynamicResource VideoTrack_Browse}" Command="{Binding BrowseEngine3DImageCommand}" Padding="6,3"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource VideoTrack_Engine3d_particle_count}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowEngine3DParticlesInspector}"/>
+                                    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Engine3DParticleCount, Mode=TwoWay}"
+                                                     Minimum="16" Maximum="384" Increment="16" FormatString="0"
+                                                     IsVisible="{Binding ShowEngine3DParticlesInspector}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource VideoTrack_Engine3d_particle_size}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowEngine3DParticlesInspector}"/>
+                                    <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding Engine3DParticleSize, Mode=TwoWay}"
+                                                     Minimum="0.01" Maximum="0.35" Increment="0.01" FormatString="F2"
+                                                     IsVisible="{Binding ShowEngine3DParticlesInspector}"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{DynamicResource VideoTrack_Engine3d_particle_color}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowEngine3DParticlesInspector}"/>
+                                    <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding WaveformColorPresets}"
+                                              SelectedItem="{Binding SelectedEngine3DParticleColor, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowEngine3DParticlesInspector}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:WaveformColorPreset">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="{DynamicResource VideoTrack_Engine3d_particle_shape}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                               IsVisible="{Binding ShowEngine3DParticlesInspector}"/>
+                                    <ComboBox Grid.Row="6" Grid.Column="1" ItemsSource="{Binding Engine3DParticleShapeOptions}"
+                                              SelectedItem="{Binding SelectedEngine3DParticleShape, Mode=TwoWay}"
+                                              IsVisible="{Binding ShowEngine3DParticlesInspector}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate><TextBlock Text="{Binding Label}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="{DynamicResource VideoTrack_Scope3d_camera_yaw}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding Engine3DCameraYaw, Mode=TwoWay}"
+                                                     Minimum="-3.14" Maximum="3.14" Increment="0.05" FormatString="F2"/>
+                                    <TextBlock Grid.Row="8" Grid.Column="0" Text="{DynamicResource VideoTrack_Scope3d_camera_pitch}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding Engine3DCameraPitch, Mode=TwoWay}"
+                                                     Minimum="-1.2" Maximum="1.2" Increment="0.05" FormatString="F2"/>
+                                    <TextBlock Grid.Row="9" Grid.Column="0" Text="{DynamicResource VideoTrack_Scope3d_camera_distance}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding Engine3DCameraDistance, Mode=TwoWay}"
+                                                     Minimum="1.5" Maximum="12" Increment="0.1" FormatString="F1"/>
+                                    <TextBlock Grid.Row="10" Grid.Column="0" Text="{DynamicResource VideoTrack_Visualiser_bounds}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <Grid Grid.Row="10" Grid.Column="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
+                                        <NumericUpDown Value="{Binding Engine3DX, Mode=TwoWay}" Minimum="0" Maximum="1" Increment="0.01" FormatString="F2"
+                                                       ToolTip.Tip="X"/>
+                                        <NumericUpDown Grid.Column="1" Value="{Binding Engine3DY, Mode=TwoWay}" Minimum="0" Maximum="1" Increment="0.01" FormatString="F2"
+                                                       ToolTip.Tip="Y"/>
+                                        <NumericUpDown Grid.Column="2" Value="{Binding Engine3DWidth, Mode=TwoWay}" Minimum="0.05" Maximum="1" Increment="0.01" FormatString="F2"
+                                                       ToolTip.Tip="W"/>
+                                        <NumericUpDown Grid.Column="3" Value="{Binding Engine3DHeight, Mode=TwoWay}" Minimum="0.03" Maximum="1" Increment="0.01" FormatString="F2"
+                                                       ToolTip.Tip="H"/>
+                                    </Grid>
+                                    <CheckBox Grid.Row="11" Grid.Column="1" Content="{DynamicResource VideoTrack_Scope3d_transparent}"
+                                              IsChecked="{Binding Engine3DTransparentBackground, Mode=TwoWay}"/>
                                 </Grid>
                             </StackPanel>
                         </Grid>
-                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6"
+                        <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6"
                               IsVisible="{Binding ShowLayerSyncInspector}">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTrack_Offset_s}"
-                                       Width="{StaticResource VideoInspectorLabelWidth}" FontSize="11" VerticalAlignment="Center"
-                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <NumericUpDown Grid.Row="1" Grid.Column="0" Value="{Binding LayerOffsetSeconds, Mode=TwoWay}"
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTrack_Offset_s}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding LayerOffsetSeconds, Mode=TwoWay}"
                                            Minimum="-3600" Maximum="3600" Increment="0.1" FormatString="F2"
-                                           MinWidth="{StaticResource VideoInspectorFieldWidth}"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{DynamicResource VideoTrack_In_s}"
-                                       Width="{StaticResource VideoInspectorLabelWidth}" FontSize="11" VerticalAlignment="Center"
-                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                           HorizontalAlignment="Left"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource VideoTrack_In_s}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
                             <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding LayerInPointSeconds, Mode=TwoWay}"
                                            Minimum="0" Maximum="86400" Increment="0.1" FormatString="F2"
-                                           MinWidth="{StaticResource VideoInspectorFieldWidth}"/>
-                            <TextBlock Grid.Row="0" Grid.Column="2" Text="{DynamicResource VideoTrack_Out_s}"
-                                       Width="{StaticResource VideoInspectorLabelWidth}" FontSize="11" VerticalAlignment="Center"
-                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <NumericUpDown Grid.Row="1" Grid.Column="2" Value="{Binding LayerOutPointSeconds, Mode=TwoWay}"
+                                           HorizontalAlignment="Left"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource VideoTrack_Out_s}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding LayerOutPointSeconds, Mode=TwoWay}"
                                            Minimum="0" Maximum="86400" Increment="0.1" FormatString="F2"
-                                           MinWidth="{StaticResource VideoInspectorFieldWidth}"/>
-                            <TextBlock Grid.Row="0" Grid.Column="3" Text="{DynamicResource VideoTrack_FPS}"
-                                       Width="{StaticResource VideoInspectorLabelWidth}" FontSize="11" VerticalAlignment="Center"
-                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding LayerFps, Mode=TwoWay}"
+                                           HorizontalAlignment="Left"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource VideoTrack_FPS}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding LayerFps, Mode=TwoWay}"
                                            Minimum="1" Maximum="120" Increment="1" FormatString="0"
-                                           MinWidth="{StaticResource VideoInspectorFieldWidth}"/>
-                            <ComboBox Grid.Row="1" Grid.Column="4" ItemsSource="{Binding ArrangementClips}"
+                                           HorizontalAlignment="Left"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource VideoTrack_Sync_to_clip}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding ArrangementClips}"
                                       SelectedItem="{Binding SelectedSyncClip, Mode=TwoWay}"
-                                      MinWidth="180" PlaceholderText="{DynamicResource VideoTrack_Sync_to_clip}">
+                                      PlaceholderText="{DynamicResource VideoTrack_Sync_to_clip}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="panels:ClipSyncOption">
                                         <TextBlock Text="{Binding Label}"/>
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
-                            <Button Grid.Row="1" Grid.Column="5" Content="{DynamicResource VideoTrack_Sync}"
+                            <Button Grid.Row="5" Grid.Column="1" Content="{DynamicResource VideoTrack_Sync}"
                                     Command="{Binding SyncToClipCommand}" Padding="8,4" HorizontalAlignment="Left"/>
                         </Grid>
                     </StackPanel>
@@ -361,7 +634,7 @@
                     <StackPanel Spacing="6" IsVisible="{Binding SelectedVisibilityRegion, Converter={x:Static ObjectConverters.IsNotNull}}">
                         <TextBlock Text="{DynamicResource VideoTimeline_Inspector_visibility}" FontSize="11" FontWeight="SemiBold"
                                    Foreground="{StaticResource CatppuccinSubtext0}"/>
-                        <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                        <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTimeline_Region_start}" FontSize="11"
                                        VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
                             <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding RegionStartBeat, Mode=TwoWay}" Minimum="0"
@@ -372,35 +645,65 @@
                                            Increment="0.25" FormatString="F2" MinWidth="{StaticResource VideoInspectorFieldWidth}" HorizontalAlignment="Left"/>
                             <Button Grid.Row="2" Grid.Column="1" Content="{DynamicResource VideoTimeline_Remove_region}"
                                     Command="{Binding RemoveVisibilityRegionCommand}" HorizontalAlignment="Left" Padding="8,4"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource VideoTimeline_Region_fade_in}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding RegionFadeInBeats, Mode=TwoWay}" Minimum="0"
+                                           Increment="0.25" FormatString="F2" MinWidth="{StaticResource VideoInspectorFieldWidth}" HorizontalAlignment="Left"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource VideoTimeline_Region_fade_out}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding RegionFadeOutBeats, Mode=TwoWay}" Minimum="0"
+                                           Increment="0.25" FormatString="F2" MinWidth="{StaticResource VideoInspectorFieldWidth}" HorizontalAlignment="Left"/>
                         </Grid>
                     </StackPanel>
 
                     <StackPanel Spacing="6" IsVisible="{Binding SelectedTrigger, Converter={x:Static ObjectConverters.IsNotNull}}">
                         <TextBlock Text="{DynamicResource VideoTimeline_Inspector_trigger}" FontSize="11" FontWeight="SemiBold"
                                    Foreground="{StaticResource CatppuccinSubtext0}"/>
-                        <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_clip}" FontSize="11"
+                        <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_source}" FontSize="11"
                                        VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding ArrangementClips}"
+                            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding TriggerSourceOptions}"
+                                      SelectedItem="{Binding SelectedTriggerSource, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate><TextBlock Text="{Binding Label}"/></DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_clip}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       IsVisible="{Binding ShowTriggerClipInspector}"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ArrangementClips}"
                                       SelectedItem="{Binding SelectedTriggerClip, Mode=TwoWay}"
-                                      PlaceholderText="{DynamicResource VideoTrack_Trigger_clip}">
+                                      PlaceholderText="{DynamicResource VideoTrack_Trigger_clip}"
+                                      IsVisible="{Binding ShowTriggerClipInspector}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="panels:ClipSyncOption">
                                         <TextBlock Text="{Binding Label}"/>
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_moment}" FontSize="11"
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_midi_cc}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       IsVisible="{Binding ShowTriggerMidiCcInspector}"/>
+                            <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,*,*" ColumnSpacing="6"
+                                  IsVisible="{Binding ShowTriggerMidiCcInspector}">
+                                <NumericUpDown Value="{Binding TriggerMidiCcChannel, Mode=TwoWay}" Minimum="0" Maximum="15"
+                                               FormatString="0" ToolTip.Tip="Channel"/>
+                                <NumericUpDown Grid.Column="1" Value="{Binding TriggerMidiCcNumber, Mode=TwoWay}" Minimum="0" Maximum="127"
+                                               FormatString="0" ToolTip.Tip="CC"/>
+                                <NumericUpDown Grid.Column="2" Value="{Binding TriggerMidiCcThreshold, Mode=TwoWay}" Minimum="0" Maximum="127"
+                                               FormatString="0" ToolTip.Tip="Threshold"/>
+                            </Grid>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_moment}" FontSize="11"
                                        VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding TriggerMomentOptions}"
+                            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding TriggerMomentOptions}"
                                       SelectedItem="{Binding SelectedTriggerMoment, Mode=TwoWay}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_action}" FontSize="11"
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_action}" FontSize="11"
                                        VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding TriggerActionOptions}"
+                            <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding TriggerActionOptions}"
                                       SelectedItem="{Binding SelectedTriggerAction, Mode=TwoWay}"/>
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_target}" FontSize="11"
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="{DynamicResource VideoTrack_Trigger_target}" FontSize="11"
                                        VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding TargetLayerOptions}"
+                            <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding TargetLayerOptions}"
                                       SelectedItem="{Binding SelectedTriggerTarget, Mode=TwoWay}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="media:VideoLayer">
@@ -408,15 +711,17 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource VideoTrack_Fade_duration_s}" FontSize="11"
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="{DynamicResource VideoTrack_Fade_duration_s}" FontSize="11"
                                        VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding SelectedTrigger.FadeDurationSeconds, Mode=TwoWay}"
+                            <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding SelectedTrigger.FadeDurationSeconds, Mode=TwoWay}"
                                            Minimum="0" Maximum="30" Increment="0.1" FormatString="F2"
                                            MinWidth="{StaticResource VideoInspectorFieldWidth}" HorizontalAlignment="Left"/>
                         </Grid>
                     </StackPanel>
-                </StackPanel>
-            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

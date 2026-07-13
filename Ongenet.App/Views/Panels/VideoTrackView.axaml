@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Ongenet.App.ViewModels.Panels"
              xmlns:media="using:Ongenet.Core.Models.Media"
-             xmlns:controls="using:Ongenet.App.Controls"
+             xmlns:controls="using:Ongenet.VideoComposition.Editor.Controls"
              xmlns:display="using:Ongenet.App.Display"
              x:Class="Ongenet.App.Views.Panels.VideoTrackView"
              x:DataType="vm:VideoTrackViewModel">
@@ -29,6 +29,10 @@
                     <TextBlock Text="{DynamicResource VideoTrack_Program_monitor}" FontSize="13" FontWeight="SemiBold"
                                Foreground="{StaticResource CatppuccinText}" VerticalAlignment="Center"/>
                     <Button Content="{DynamicResource VideoResources_Add_layer}" Command="{Binding AddLayerCommand}" Padding="10,4" FontSize="11"/>
+                    <Button Content="{DynamicResource VideoTrack_Add_title}" Command="{Binding AddTitleCommand}" Padding="10,4" FontSize="11"/>
+                    <CheckBox Content="{DynamicResource VideoTrack_Safe_area}" IsChecked="{Binding ShowSafeAreaOverlay, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <CheckBox Content="{DynamicResource VideoTrack_Composited_preview}" IsChecked="{Binding UseCompositedPreview, Mode=TwoWay}" VerticalAlignment="Center"
+                              IsEnabled="{Binding IsFfmpegAvailable}"/>
                     <CheckBox Content="{DynamicResource VideoTrack_Muted}" IsChecked="{Binding IsMuted, Mode=TwoWay}" VerticalAlignment="Center"
                               IsVisible="{Binding HasSyncVideo}"/>
                     <CheckBox Content="{DynamicResource VideoTrack_Live_preview}" IsChecked="{Binding UseLivePreview, Mode=TwoWay}"
@@ -59,6 +63,10 @@
                         <NumericUpDown Value="{Binding CustomCanvasHeight, Mode=TwoWay}" Minimum="320" Maximum="4096"
                                        Increment="1" FormatString="0" MinWidth="{StaticResource VideoInspectorFieldWidth}"/>
                     </StackPanel>
+                    <TextBlock Text="{DynamicResource VideoTrack_Export_fps}" FontSize="11" VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <NumericUpDown Value="{Binding VideoExportFps, Mode=TwoWay}" Minimum="1" Maximum="120"
+                                   Increment="1" FormatString="0" MinWidth="72"/>
                 </StackPanel>
             </StackPanel>
 

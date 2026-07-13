@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Ongenet.App.Services;
@@ -14,11 +17,14 @@ using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Media;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.VideoComposition.Editor.Preview;
+using Ongenet.VideoComposition.Ffmpeg;
+using Ongenet.VideoComposition.Rendering;
 
 namespace Ongenet.App.ViewModels.Panels;
 
 /// <summary>Program monitor — preview, live sync, pop-out. Editing lives in bottom timeline + resources.</summary>
-public sealed class VideoTrackViewModel : ViewModelBase
+public sealed class VideoTrackViewModel : ViewModelBase, IVideoPreviewModel
 {
     private readonly IProjectService _project;
     private readonly ITransportService _transport;
@@ -30,21 +36,31 @@ public sealed class VideoTrackViewModel : ViewModelBase
     private readonly VideoTimelineViewModel _timeline;
     private readonly IVideoWaveformCacheService _waveformCache;
     private readonly IVideoAudioScopeService _audioScope;
-    private readonly LiveVideoDecoder _liveDecoder = new();
+    private readonly IVideoEngine3DLayerRenderer? _engine3D;
+    private readonly IVideoFrameExtractor _frameExtractor;
+    private readonly Func<ILiveVideoDecoder> _createDecoder;
+    private readonly ILiveVideoDecoder _syncDecoder;
+    private readonly Dictionary<Guid, ILiveVideoDecoder> _overlayDecoders = new();
+    private readonly Dictionary<Guid, (Bitmap Frame, double Time)> _overlayFrames = new();
+    private HashSet<Guid> _previousSessionClips = new();
     private Bitmap? _frame;
     private string _status = string.Empty;
     private double _lastFrameTime = double.NaN;
     private double _lastTickBeat;
     private bool _useLivePreview = true;
+    private bool _showSafeAreaOverlay = true;
+    private bool _useCompositedPreview;
     private VideoPreviewWindowHost? _popOut;
     private int _previewTick;
+    private double _previewDtSeconds = 1.0 / 30.0;
     private int _waveformRevision;
 
     public VideoTrackViewModel(IProjectService project, ITransportService transport, IPlaybackClock clock,
         IHistoryService history, ITempoMapService tempoMap, VideoTriggerEngine triggers,
         IPlaybackModeService playback, IVideoSelectionService videoSelection,
         VideoTimelineViewModel timeline, IVideoWaveformCacheService waveformCache,
-        IVideoAudioScopeService audioScope)
+        IVideoAudioScopeService audioScope, IVideoFrameExtractor frameExtractor,
+        Func<ILiveVideoDecoder> createDecoder, IVideoEngine3DLayerRenderer? engine3D = null)
     {
         _project = project;
         _transport = transport;
@@ -56,6 +72,10 @@ public sealed class VideoTrackViewModel : ViewModelBase
         _timeline = timeline;
         _waveformCache = waveformCache;
         _audioScope = audioScope;
+        _engine3D = engine3D;
+        _frameExtractor = frameExtractor;
+        _createDecoder = createDecoder;
+        _syncDecoder = createDecoder();
 
         BrowseCommand = new RelayCommand(() => _ = BrowseAsync(), () => IsProjectVideoEnabled);
         EnableProjectVideoCommand = new RelayCommand(EnableProjectVideo);
@@ -63,6 +83,7 @@ public sealed class VideoTrackViewModel : ViewModelBase
         AddLayerCommand = new RelayCommand(
             () => _timeline.AddLayerCommand.Execute(null),
             () => _timeline.AddLayerCommand.CanExecute(null));
+        AddTitleCommand = new RelayCommand(AddTitle, () => IsProjectVideoEnabled);
 
         _project.ProjectChanged += Rebuild;
         _timeline.LanesChanged += OnTimelineLanesChanged;
@@ -76,15 +97,52 @@ public sealed class VideoTrackViewModel : ViewModelBase
 
     public ObservableCollection<VideoLayer> Layers { get; } = new();
 
+    IReadOnlyList<VideoLayer> IVideoPreviewModel.Layers => Layers;
+
     public bool HasVideoLayers => Layers.Any(l => l.HasVideoItem);
 
-    public bool IsFfmpegAvailable => FfmpegVideoFrameExtractor.IsAvailable;
+    public bool IsFfmpegAvailable => _frameExtractor.IsAvailable;
     public bool IsLivePreviewAvailable => LiveVideoDecoder.IsAvailable;
     public bool IsProjectVideoEnabled => _project.Current.VideoEnabled;
 
     public int CanvasWidth => _project.Current.VideoCanvasWidth;
     public int CanvasHeight => _project.Current.VideoCanvasHeight;
-    public string CanvasSizeLabel => $"{CanvasWidth} × {CanvasHeight}";
+    public double ExportFps => _project.Current.VideoExportFps;
+    public string CanvasSizeLabel => $"{CanvasWidth} × {CanvasHeight} @ {ExportFps:0} fps";
+
+    public double VideoExportFps
+    {
+        get => ExportFps;
+        set
+        {
+            var clamped = Math.Clamp(value, 1, 120);
+            if (Math.Abs(ExportFps - clamped) < 1e-6) return;
+            _history.Capture("Set video export FPS");
+            _project.Current.VideoExportFps = clamped;
+            OnPropertyChanged(nameof(ExportFps));
+            OnPropertyChanged(nameof(VideoExportFps));
+            OnPropertyChanged(nameof(CanvasSizeLabel));
+        }
+    }
+
+    public bool ShowSafeAreaOverlay
+    {
+        get => _showSafeAreaOverlay;
+        set => SetField(ref _showSafeAreaOverlay, value);
+    }
+
+    public bool UseCompositedPreview
+    {
+        get => _useCompositedPreview;
+        set
+        {
+            if (!SetField(ref _useCompositedPreview, value)) return;
+            _lastFrameTime = double.NaN;
+            RefreshFrame(force: true);
+        }
+    }
+
+    public RelayCommand AddTitleCommand { get; }
 
     public bool HasSyncVideo => SyncLayer is not null
         && SyncLayer.Items.FirstOrDefault(i => i.Kind == VideoElementKind.Video) is { SourcePath: { } path }
@@ -95,10 +153,13 @@ public sealed class VideoTrackViewModel : ViewModelBase
 
     public ObservableCollection<VideoResolutionPreset> ResolutionPresets { get; } = new()
     {
-        new("1920 × 1080", 1920, 1080),
-        new("1280 × 720", 1280, 720),
-        new("1080 × 1080", 1080, 1080),
-        new("1080 × 1920", 1080, 1920),
+        new("YouTube 1080p30", 1920, 1080, ExportFps: 30),
+        new("Shorts 9:16", 1080, 1920, ExportFps: 30),
+        new("Square 1:1", 1080, 1080, ExportFps: 30),
+        new("1920 × 1080 (YouTube)", 1920, 1080),
+        new("1280 × 720 (HD)", 1280, 720),
+        new("1080 × 1080 (Square)", 1080, 1080),
+        new("1080 × 1920 (Vertical)", 1080, 1920),
         new("Custom", 0, 0, true)
     };
 
@@ -109,11 +170,26 @@ public sealed class VideoTrackViewModel : ViewModelBase
         get => _selectedResolutionPreset ?? MatchCurrentPreset();
         set
         {
-            if (value is null || value.IsCustom) { SetField(ref _selectedResolutionPreset, value); return; }
+            if (value is null) return;
             if (!SetField(ref _selectedResolutionPreset, value)) return;
+            if (value.IsCustom)
+            {
+                OnPropertyChanged(nameof(IsCustomResolution));
+                OnPropertyChanged(nameof(CustomCanvasWidth));
+                OnPropertyChanged(nameof(CustomCanvasHeight));
+                return;
+            }
+
             _history.Capture("Set video canvas resolution");
             _project.Current.VideoCanvasWidth = value.Width;
             _project.Current.VideoCanvasHeight = value.Height;
+            if (value.ExportFps > 0)
+            {
+                _history.Capture("Set video export FPS");
+                _project.Current.VideoExportFps = value.ExportFps;
+                OnPropertyChanged(nameof(ExportFps));
+            }
+
             NotifyCanvasChanged();
         }
     }
@@ -155,12 +231,11 @@ public sealed class VideoTrackViewModel : ViewModelBase
         {
             if (!SetField(ref _useLivePreview, value)) return;
             _lastFrameTime = double.NaN;
-            if (!value) _liveDecoder.Close();
+            if (!value) _syncDecoder.Close();
             RefreshFrame(force: true);
         }
     }
 
-    /// <summary>Layer used for transport-synced video decode.</summary>
     public VideoLayer? SyncLayer => _videoSelection.SelectedLayer is { HasVideoItem: true, Muted: false } selected
         ? selected
         : Layers.FirstOrDefault(l => l.HasVideoItem && !l.Muted);
@@ -199,6 +274,8 @@ public sealed class VideoTrackViewModel : ViewModelBase
         }
     }
 
+    IImage? IVideoPreviewModel.Frame => Frame;
+
     public Bitmap? Frame
     {
         get => _frame;
@@ -215,9 +292,8 @@ public sealed class VideoTrackViewModel : ViewModelBase
         private set => SetField(ref _status, value);
     }
 
-    public double SyncTimeSeconds => ComputeSyncTimeSeconds();
+    public double SyncTimeSeconds => ComputeSyncTimeSeconds(SyncLayer);
 
-    /// <summary>Increments during playback so the composition canvas repaints overlay visibility.</summary>
     public int PreviewTick => _previewTick;
 
     public double PlayheadBeats => _transport.PlayheadBeats;
@@ -228,14 +304,55 @@ public sealed class VideoTrackViewModel : ViewModelBase
 
     public IVideoAudioScopeService AudioScope => _audioScope;
 
+    public IVideoEngine3DLayerRenderer? Engine3DRenderer => _engine3D;
+
+    public double PreviewDtSeconds => _previewDtSeconds;
+
     public AudioWaveform? GetWaveformForLayer(VideoLayer layer)
     {
         if (!layer.IsWaveformLayer || layer.AudioSourceTrackId is not { } id) return null;
         return _waveformCache.TryGet(id);
     }
 
+    public IImage? GetOverlayFrame(VideoLayer layer, VideoLayerItem item)
+    {
+        if (item.Kind is not (VideoElementKind.Video or VideoElementKind.AnimatedGif)) return null;
+        if (string.IsNullOrWhiteSpace(item.SourcePath) || !File.Exists(item.SourcePath)) return null;
+        if (ReferenceEquals(layer, SyncLayer) && item.Kind == VideoElementKind.Video) return null;
+
+        var t = ComputeSyncTimeSeconds(layer);
+        if (_overlayFrames.TryGetValue(item.Id, out var cached)
+            && Math.Abs(cached.Time - t) < 1.0 / Math.Max(layer.Fps, 1))
+            return cached.Frame;
+
+        var width = Math.Max(64, (int)(item.Width * CanvasWidth));
+        var height = Math.Max(64, (int)(item.Height * CanvasHeight));
+        Bitmap? bmp = null;
+
+        if (UseLivePreview && IsLivePreviewAvailable && _transport.State == TransportState.Playing
+            && item.Kind == VideoElementKind.Video)
+        {
+            if (!_overlayDecoders.TryGetValue(item.Id, out var decoder))
+            {
+                decoder = _createDecoder();
+                _overlayDecoders[item.Id] = decoder;
+            }
+
+            decoder.Seek(item.SourcePath, Math.Max(0, t));
+            var rgb = decoder.ReadFrame();
+            if (rgb is not null && decoder.Width > 0 && decoder.Height > 0)
+                bmp = BitmapFromRgb(rgb, decoder.Width, decoder.Height);
+        }
+
+        bmp ??= DecodeStillFrame(item.SourcePath, t);
+        if (bmp is null) return null;
+
+        _overlayFrames[item.Id] = (bmp, t);
+        return bmp;
+    }
+
     public bool IsWaveformLayerSelected(VideoLayer layer) =>
-        ReferenceEquals(_videoSelection.SelectedLayer, layer) && layer.IsWaveformLayer;
+        ReferenceEquals(_videoSelection.SelectedLayer, layer) && (layer.IsWaveformLayer || layer.IsEngine3DLayer);
 
     public void SelectWaveformLayer(VideoLayer layer)
     {
@@ -247,11 +364,22 @@ public sealed class VideoTrackViewModel : ViewModelBase
 
     public void SetWaveformBounds(VideoLayer layer, double x, double y, double width, double height)
     {
-        _history.Capture("Move waveform bounds");
-        layer.WaveformX = Math.Clamp(x, 0, 1);
-        layer.WaveformY = Math.Clamp(y, 0, 1);
-        layer.WaveformWidth = Math.Clamp(width, 0.05, 1);
-        layer.WaveformHeight = Math.Clamp(height, 0.03, 1);
+        _history.Capture(layer.IsEngine3DLayer ? "Move 3D FX bounds" : "Move waveform bounds");
+        if (layer.IsEngine3DLayer)
+        {
+            layer.Engine3DX = Math.Clamp(x, 0, 1);
+            layer.Engine3DY = Math.Clamp(y, 0, 1);
+            layer.Engine3DWidth = Math.Clamp(width, 0.05, 1);
+            layer.Engine3DHeight = Math.Clamp(height, 0.03, 1);
+        }
+        else
+        {
+            layer.WaveformX = Math.Clamp(x, 0, 1);
+            layer.WaveformY = Math.Clamp(y, 0, 1);
+            layer.WaveformWidth = Math.Clamp(width, 0.05, 1);
+            layer.WaveformHeight = Math.Clamp(height, 0.03, 1);
+        }
+
         OnPropertyChanged(nameof(Layers));
     }
 
@@ -297,6 +425,41 @@ public sealed class VideoTrackViewModel : ViewModelBase
     {
         if (!IsProjectVideoEnabled) return;
         _triggers.OnMidiNote(_project.Current, note, on);
+    }
+
+    public void OnMidiCc(int channel, int cc, int value)
+    {
+        if (!IsProjectVideoEnabled) return;
+        _triggers.OnMidiCc(_project.Current, channel, cc, value);
+    }
+
+    private void AddTitle()
+    {
+        _history.Capture("Add title layer");
+        var layer = new VideoLayer
+        {
+            Name = "Title",
+            ZOrder = _project.Current.VideoLayers.Count
+        };
+        layer.Items.Add(new VideoLayerItem
+        {
+            Kind = VideoElementKind.Text,
+            TextContent = L("VideoTrack_Default_title"),
+            FontSizePx = 64,
+            TextColorArgb = 0xFFFFFFFF,
+            X = 0.1,
+            Y = 0.08,
+            Width = 0.8,
+            Height = 0.15
+        });
+        _project.Current.VideoLayers.Add(layer);
+        Layers.Add(layer);
+        _videoSelection.SelectedLayer = layer;
+        _videoSelection.SelectedLayerItem = layer.Items[0];
+        OnPropertyChanged(nameof(Layers));
+        OnPropertyChanged(nameof(SelectedLayer));
+        _lastFrameTime = double.NaN;
+        RefreshFrame(force: true);
     }
 
     private void OnVideoSelectionChanged()
@@ -350,10 +513,13 @@ public sealed class VideoTrackViewModel : ViewModelBase
 
     private void SyncVisualiserRequests()
     {
-        foreach (var layer in Layers.Where(l => l.IsWaveformLayer && l.AudioSourceTrackId is not null))
+        foreach (var layer in Layers)
         {
-            if (GetLayerOpacity(layer.Id) > 0.01)
-                _audioScope.Request(layer.AudioSourceTrackId!.Value);
+            if (GetLayerOpacity(layer.Id) <= 0.01) continue;
+            if (layer.IsWaveformLayer && layer.AudioSourceTrackId is { } wfId)
+                _audioScope.Request(wfId);
+            if (layer.IsEngine3DLayer && layer.Engine3DAudioSourceTrackId is { } fxId)
+                _audioScope.Request(fxId);
         }
     }
 
@@ -373,6 +539,7 @@ public sealed class VideoTrackViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowGettingStarted));
         PopOutCommand.RaiseCanExecuteChanged();
         _lastFrameTime = double.NaN;
+        _overlayFrames.Clear();
         EnsureWaveformCaches();
         SyncVisualiserRequests();
         RefreshFrame(force: true);
@@ -433,8 +600,14 @@ public sealed class VideoTrackViewModel : ViewModelBase
     private void OnSessionClipsChanged()
     {
         if (!IsProjectVideoEnabled) return;
-        foreach (var id in _playback.ActiveSessionClipIds)
+        var current = _playback.ActiveSessionClipIds;
+        foreach (var id in current)
             _triggers.OnSessionClipEvent(_project.Current, id, VideoTriggerMoment.ClipStart);
+
+        foreach (var ended in _previousSessionClips.Except(current))
+            _triggers.OnSessionClipEvent(_project.Current, ended, VideoTriggerMoment.ClipEnd);
+
+        _previousSessionClips = current.ToHashSet();
     }
 
     private void OnTransportScrub()
@@ -442,6 +615,7 @@ public sealed class VideoTrackViewModel : ViewModelBase
         _triggers.Seek(_project.Current, _transport.PlayheadBeats);
         SyncVisualiserRequests();
         _lastFrameTime = double.NaN;
+        _overlayFrames.Clear();
         RefreshFrame(force: true);
     }
 
@@ -453,6 +627,7 @@ public sealed class VideoTrackViewModel : ViewModelBase
         var now = DateTime.UtcNow;
         var delta = (now - _lastTickUtc).TotalSeconds;
         _lastTickUtc = now;
+        _previewDtSeconds = Math.Clamp(delta, 1.0 / 120.0, 0.1);
         var beat = _transport.PlayheadBeats;
         _triggers.Tick(_project.Current, _lastTickBeat, beat, delta);
         _lastTickBeat = beat;
@@ -468,15 +643,13 @@ public sealed class VideoTrackViewModel : ViewModelBase
         _popOut?.UpdateFrame();
     }
 
-    private double ComputeSyncTimeSeconds()
+    private double ComputeSyncTimeSeconds(VideoLayer? layer)
     {
-        if (SyncLayer is null) return 0;
-        var seconds = _tempoMap.BeatsToSeconds(_project.Current, _transport.PlayheadBeats);
-        var raw = SyncLayer.OffsetSeconds + seconds;
-        var inPt = SyncLayer.InPointSeconds;
-        var outPt = SyncLayer.OutPointSeconds;
-        if (outPt > inPt && raw > outPt) raw = outPt;
-        return Math.Max(inPt, raw);
+        if (layer is null) return 0;
+        var transportSeconds = _tempoMap.BeatsToSeconds(_project.Current, _transport.PlayheadBeats);
+        return VideoCompositionTimeMapper.ComputeLayerTimeSeconds(
+            layer, transportSeconds, _project.Current,
+            _tempoMap.BeatsToSeconds, _transport.PlayheadBeats);
     }
 
     private void RefreshFrame(bool force)
@@ -485,6 +658,12 @@ public sealed class VideoTrackViewModel : ViewModelBase
         {
             Frame = null;
             Status = string.Empty;
+            return;
+        }
+
+        if (UseCompositedPreview && IsFfmpegAvailable)
+        {
+            RenderCompositedPreview(force);
             return;
         }
 
@@ -501,7 +680,7 @@ public sealed class VideoTrackViewModel : ViewModelBase
             return;
         }
 
-        var t = SyncTimeSeconds;
+        var t = ComputeSyncTimeSeconds(syncLayer);
 
         if (!IsFfmpegAvailable)
         {
@@ -518,31 +697,71 @@ public sealed class VideoTrackViewModel : ViewModelBase
 
         if (UseLivePreview && IsLivePreviewAvailable && _transport.State == TransportState.Playing)
         {
-            _liveDecoder.Seek(videoPath, Math.Max(0, t));
-            var rgb = _liveDecoder.ReadFrame();
-            if (rgb is not null && _liveDecoder.Width > 0 && _liveDecoder.Height > 0)
+            _syncDecoder.Seek(videoPath, Math.Max(0, t));
+            var rgb = _syncDecoder.ReadFrame();
+            if (rgb is not null && _syncDecoder.Width > 0 && _syncDecoder.Height > 0)
             {
-                Frame = BitmapFromRgb(rgb, _liveDecoder.Width, _liveDecoder.Height);
+                Frame = BitmapFromRgb(rgb, _syncDecoder.Width, _syncDecoder.Height);
                 Status = string.Format(L("VideoTrack_Live_sync"), t);
                 OnPropertyChanged(nameof(SyncTimeSeconds));
                 return;
             }
         }
 
-        var png = FfmpegVideoFrameExtractor.ExtractFramePng(videoPath, Math.Max(0, t));
-        if (png is null)
+        var bmp = DecodeStillFrame(videoPath, t);
+        if (bmp is null)
         {
             Status = L("VideoTrack_Frame_extract_failed");
             return;
         }
 
-        using var ms = new MemoryStream(png);
-        Frame = new Bitmap(ms);
+        Frame = bmp;
         Status = _transport.State == TransportState.Playing
             ? string.Format(L("VideoTrack_Synced_at"), t)
             : string.Format(L("VideoTrack_Scrub_preview_at"), t);
         OnPropertyChanged(nameof(SyncTimeSeconds));
         OnPropertyChanged(nameof(HasSyncVideo));
+    }
+
+    private void RenderCompositedPreview(bool force)
+    {
+        var beat = _transport.PlayheadBeats;
+        if (!force && Math.Abs(beat - _lastTickBeat) < 1e-6 && Frame is not null) return;
+
+        var previewW = Math.Max(320, Math.Min(960, CanvasWidth));
+        var previewH = Math.Max(180, previewW * CanvasHeight / Math.Max(1, CanvasWidth));
+        try
+        {
+            using var surface = SkiaSharp.SKSurface.Create(new SkiaSharp.SKImageInfo(previewW, previewH));
+            if (surface is null) return;
+            var transportSeconds = _tempoMap.BeatsToSeconds(_project.Current, beat);
+            using var assets = new VideoCompositionExportAssets(_frameExtractor)
+            {
+                Engine3DRenderer = _engine3D,
+                Engine3DFrameDt = _previewDtSeconds
+            };
+            VideoCompositionFrameRenderer.Render(surface.Canvas, _project.Current, transportSeconds, beat,
+                _triggers.Runtime, new OfflineVideoAudioScope(new Dictionary<Guid, Ongenet.Core.Audio.Files.AudioSampleBuffer>()), assets, previewW, previewH,
+                _tempoMap.BeatsToSeconds);
+            using var image = surface.Snapshot();
+            using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 90);
+            if (data is null) return;
+            using var ms = new MemoryStream(data.ToArray());
+            Frame = new Bitmap(ms);
+            Status = L("VideoTrack_Composited_preview");
+        }
+        catch
+        {
+            Status = L("VideoTrack_Composited_preview_failed");
+        }
+    }
+
+    private Bitmap? DecodeStillFrame(string path, double timeSeconds)
+    {
+        var png = _frameExtractor.ExtractFramePng(path, Math.Max(0, timeSeconds));
+        if (png is null) return null;
+        using var ms = new MemoryStream(png);
+        return new Bitmap(ms);
     }
 
     private VideoResolutionPreset? MatchCurrentPreset()
@@ -558,6 +777,8 @@ public sealed class VideoTrackViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanvasWidth));
         OnPropertyChanged(nameof(CanvasHeight));
         OnPropertyChanged(nameof(CanvasSizeLabel));
+        OnPropertyChanged(nameof(ExportFps));
+        OnPropertyChanged(nameof(VideoExportFps));
         OnPropertyChanged(nameof(CustomCanvasWidth));
         OnPropertyChanged(nameof(CustomCanvasHeight));
         OnPropertyChanged(nameof(SelectedResolutionPreset));
@@ -582,7 +803,7 @@ public sealed class VideoTrackViewModel : ViewModelBase
     }
 }
 
-public sealed record VideoResolutionPreset(string Label, int Width, int Height, bool IsCustom = false);
+public sealed record VideoResolutionPreset(string Label, int Width, int Height, bool IsCustom = false, double ExportFps = 0);
 
 public sealed record ClipSyncOption(string TrackName, string ClipName, Guid ClipId, double StartBeat, double EndBeat)
 {

@@ -62,6 +62,9 @@ public partial class VideoTimelineView : UserControl
             _vm.Metrics.PropertyChanged -= OnMetricsPropertyChanged;
             _vm.LanesChanged -= OnLanesChanged;
             _vm.PickImagePathAsync = null;
+            _vm.PickSubtitleSrtPathAsync = null;
+            _vm.PickLutCubePathAsync = null;
+            _vm.PickMaskImagePathAsync = null;
         }
 
         _vm = DataContext as VideoTimelineViewModel;
@@ -71,9 +74,14 @@ public partial class VideoTimelineView : UserControl
             _vm.Metrics.PropertyChanged += OnMetricsPropertyChanged;
             _vm.LanesChanged += OnLanesChanged;
             _vm.PickImagePathAsync = PickLayerPathAsync;
+            _vm.PickSubtitleSrtPathAsync = PickSubtitleSrtPathAsync;
+            _vm.PickLutCubePathAsync = PickLutCubePathAsync;
+            _vm.PickMaskImagePathAsync = PickMaskImagePathAsync;
             SyncScrollFromMetrics();
+            SyncHeaderScroll();
             UpdatePlayhead();
             SyncTickerSpeed();
+            UpdateInspectorColumns();
         }
     }
 
@@ -87,7 +95,17 @@ public partial class VideoTimelineView : UserControl
         (_clock ??= App.ServiceProvider?.GetService<IPlaybackClock>())?.Pump();
     }
 
-    private void OnLanesChanged() => UpdatePlayhead();
+    private void OnLanesChanged()
+    {
+        SyncHeaderScroll();
+        UpdatePlayhead();
+    }
+
+    private void SyncHeaderScroll()
+    {
+        if (_syncingScroll) return;
+        HeaderScroll.Offset = new Vector(0, LanesScroll.Offset.Y);
+    }
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -96,6 +114,27 @@ public partial class VideoTimelineView : UserControl
             if (e.PropertyName == nameof(VideoTimelineViewModel.IsPlaying))
                 SyncTickerSpeed();
             UpdatePlayhead();
+        }
+
+        if (e.PropertyName is nameof(VideoTimelineViewModel.ShowInspectorPanel))
+            UpdateInspectorColumns();
+    }
+
+    private void UpdateInspectorColumns()
+    {
+        if (_vm is null) return;
+        var cols = ContentGrid.ColumnDefinitions;
+        if (cols.Count < 3) return;
+
+        if (_vm.ShowInspectorPanel)
+        {
+            cols[1].Width = cols[1].Width.Value > 0 ? cols[1].Width : new GridLength(4);
+            cols[2].Width = cols[2].Width.Value > 0 ? cols[2].Width : new GridLength(340);
+        }
+        else
+        {
+            cols[1].Width = new GridLength(0);
+            cols[2].Width = new GridLength(0);
         }
     }
 
@@ -121,7 +160,7 @@ public partial class VideoTimelineView : UserControl
         _syncingScroll = true;
         var offset = LanesScroll.Offset;
         RulerScroll.Offset = new Vector(offset.X, 0);
-        HeaderStack.Margin = new Thickness(0, -offset.Y, 0, 0);
+        HeaderScroll.Offset = new Vector(0, offset.Y);
         _vm.Metrics.HorizontalOffset = offset.X;
         _syncingScroll = false;
         UpdatePlayhead();
@@ -462,6 +501,57 @@ public partial class VideoTimelineView : UserControl
             FileTypeFilter =
             [
                 new FilePickerFileType("Media") { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.bmp", "*.mp4", "*.mov", "*.mkv", "*.avi", "*.webm"] },
+                FilePickerFileTypes.All
+            ]
+        });
+        return files.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    private async Task<string?> PickSubtitleSrtPathAsync()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null) return null;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = Loc.Get("VideoTrack_Subtitle_srt", "Subtitle SRT"),
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Subtitles") { Patterns = ["*.srt", "*.vtt"] },
+                FilePickerFileTypes.All
+            ]
+        });
+        return files.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    private async Task<string?> PickLutCubePathAsync()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null) return null;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = Loc.Get("VideoTrack_Lut_cube", "LUT (.cube)"),
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("LUT") { Patterns = ["*.cube"] },
+                FilePickerFileTypes.All
+            ]
+        });
+        return files.FirstOrDefault()?.TryGetLocalPath();
+    }
+
+    private async Task<string?> PickMaskImagePathAsync()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null) return null;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = Loc.Get("VideoTrack_Mask_image", "Mask image"),
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Images") { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.bmp"] },
                 FilePickerFileTypes.All
             ]
         });

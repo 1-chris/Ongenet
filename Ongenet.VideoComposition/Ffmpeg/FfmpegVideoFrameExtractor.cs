@@ -1,20 +1,18 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using Ongenet.Core.Audio.Files;
+using Ongenet.Core.Services.Interfaces;
 
-namespace Ongenet.Core.Audio.Files;
+namespace Ongenet.VideoComposition.Ffmpeg;
 
-/// <summary>
-/// Extracts a single video frame at a given timestamp via ffmpeg (optional system dependency).
-/// Uses the same locate/probe pattern as <see cref="FfmpegEncoder"/>.
-/// </summary>
-public static class FfmpegVideoFrameExtractor
+/// <summary>Extracts a single video frame at a given timestamp via ffmpeg.</summary>
+public sealed class FfmpegVideoFrameExtractor : IVideoFrameExtractor
 {
-    /// <summary>True when ffmpeg is available on this system.</summary>
-    public static bool IsAvailable => FfmpegEncoder.IsAvailable;
+    public bool IsAvailable => FfmpegEncoder.IsAvailable;
 
-    /// <summary>Extracts one frame at <paramref name="timeSeconds"/> as PNG bytes, or null on failure.</summary>
-    public static byte[]? ExtractFramePng(string videoPath, double timeSeconds)
+    public byte[]? ExtractFramePng(string videoPath, double timeSeconds)
     {
         var ffmpeg = FfmpegEncoder.Locate();
         if (ffmpeg is null || string.IsNullOrWhiteSpace(videoPath) || !File.Exists(videoPath))
@@ -35,7 +33,7 @@ public static class FfmpegVideoFrameExtractor
             psi.ArgumentList.Add("-loglevel");
             psi.ArgumentList.Add("error");
             psi.ArgumentList.Add("-ss");
-            psi.ArgumentList.Add(timeSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+            psi.ArgumentList.Add(timeSeconds.ToString("F3", CultureInfo.InvariantCulture));
             psi.ArgumentList.Add("-i");
             psi.ArgumentList.Add(videoPath);
             psi.ArgumentList.Add("-frames:v");

@@ -30,7 +30,7 @@ public static class ProjectFile
 {
     /// <summary>Bumped whenever the on-disk layout changes. Newer files opened in an older app degrade gracefully.</summary>
     /// <remarks>v2: instrument rack. v3: track routing. v4: patterns, session, warp, takes, multi-out, MPE/groove/drum. v5: pattern tracks, pattern row metadata. v6: ARA pitch offset. v7: poly pitch segments.</remarks>
-    public const int FormatVersion = 13;
+    public const int FormatVersion = 20;
 
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("ONGENPRJ"); // 8 bytes
     private const string ManifestEntry = "ongen.manifest";
@@ -241,6 +241,30 @@ public static class ProjectFile
                 c.WriteDouble(layer.SpectrumMinHz);
                 c.WriteDouble(layer.SpectrumMaxHz);
                 c.WriteDouble(layer.SpectrumLineThickness);
+                c.WriteInt((int)layer.BlendMode);
+                c.WriteDouble(layer.Scope3DCameraYaw);
+                c.WriteDouble(layer.Scope3DCameraPitch);
+                c.WriteDouble(layer.Scope3DCameraDistance);
+                c.WriteDouble(layer.Scope3DLineThickness);
+                c.WriteInt(layer.Scope3DTrailCount);
+                c.WriteBool(layer.Scope3DTransparentBackground);
+                c.WriteBool(layer.Engine3DEffectKind is not null);
+                if (layer.Engine3DEffectKind is { } fxKind)
+                    c.WriteInt((int)fxKind);
+                c.WriteNullableGuid(layer.Engine3DAudioSourceTrackId);
+                c.WriteString(layer.Engine3DImagePath ?? "");
+                c.WriteDouble(layer.Engine3DX);
+                c.WriteDouble(layer.Engine3DY);
+                c.WriteDouble(layer.Engine3DWidth);
+                c.WriteDouble(layer.Engine3DHeight);
+                c.WriteDouble(layer.Engine3DCameraYaw);
+                c.WriteDouble(layer.Engine3DCameraPitch);
+                c.WriteDouble(layer.Engine3DCameraDistance);
+                c.WriteInt(layer.Engine3DParticleCount);
+                c.WriteDouble(layer.Engine3DParticleSize);
+                c.WriteBool(layer.Engine3DTransparentBackground);
+                c.WriteInt(unchecked((int)layer.Engine3DParticleColorArgb));
+                c.WriteInt((int)layer.Engine3DParticleShape);
                 c.WriteInt(layer.Items.Count);
                 foreach (var item in layer.Items)
                 {
@@ -253,6 +277,20 @@ public static class ProjectFile
                     c.WriteDouble(item.Height);
                     c.WriteDouble(item.Rotation);
                     c.WriteDouble(item.Opacity);
+                    c.WriteString(item.TextContent);
+                    c.WriteDouble(item.FontSizePx);
+                    c.WriteInt(unchecked((int)item.TextColorArgb));
+                    c.WriteNullableGuid(item.SubtitleClipId);
+                    c.WriteString(item.SubtitleSrtPath ?? "");
+                    c.WriteString(item.MaskImagePath ?? "");
+                    c.WriteBool(item.ChromaKeyEnabled);
+                    c.WriteInt(unchecked((int)item.ChromaKeyColorArgb));
+                    c.WriteDouble(item.ChromaKeyTolerance);
+                    c.WriteDouble(item.ChromaKeyFeather);
+                    c.WriteDouble(item.Brightness);
+                    c.WriteDouble(item.Contrast);
+                    c.WriteDouble(item.Saturation);
+                    c.WriteString(item.LutCubePath ?? "");
                 }
             }
 
@@ -266,6 +304,11 @@ public static class ProjectFile
                 c.WriteNullableGuid(tr.ClipId);
                 c.WriteBool(tr.MidiNote is not null);
                 if (tr.MidiNote is { } note) c.WriteInt(note);
+                c.WriteBool(tr.MidiCcChannel is not null);
+                if (tr.MidiCcChannel is { } ccCh) c.WriteInt(ccCh);
+                c.WriteBool(tr.MidiCcNumber is not null);
+                if (tr.MidiCcNumber is { } ccNum) c.WriteInt(ccNum);
+                c.WriteDouble(tr.MidiCcThreshold);
                 c.WriteInt((int)tr.Moment);
                 c.WriteInt((int)tr.Action);
                 c.WriteDouble(tr.FadeDurationSeconds);
@@ -273,6 +316,7 @@ public static class ProjectFile
 
             c.WriteInt(p.VideoCanvasWidth);
             c.WriteInt(p.VideoCanvasHeight);
+            c.WriteDouble(p.VideoExportFps);
 
             c.WriteInt(p.VideoVisibilityRegions.Count);
             foreach (var region in p.VideoVisibilityRegions)
@@ -281,6 +325,21 @@ public static class ProjectFile
                 c.WriteGuid(region.LayerId);
                 c.WriteDouble(region.StartBeat);
                 c.WriteDouble(region.EndBeat);
+                c.WriteDouble(region.FadeInBeats);
+                c.WriteDouble(region.FadeOutBeats);
+            }
+
+            c.WriteInt(p.VideoLayerKeyframes.Count);
+            foreach (var kf in p.VideoLayerKeyframes)
+            {
+                c.WriteGuid(kf.Id);
+                c.WriteGuid(kf.ItemId);
+                c.WriteDouble(kf.Beat);
+                c.WriteDouble(kf.X);
+                c.WriteDouble(kf.Y);
+                c.WriteDouble(kf.Width);
+                c.WriteDouble(kf.Height);
+                c.WriteDouble(kf.Opacity);
             }
         });
     }
@@ -1212,18 +1271,26 @@ public static class ProjectFile
                 var trCount = c.ReadInt();
                 for (var i = 0; i < trCount; i++)
                 {
-                    project.VideoTriggers.Add(new Models.Media.VideoTrigger
+                    var trigger = new Models.Media.VideoTrigger
                     {
                         Id = c.ReadGuid(),
                         TargetLayerId = c.ReadGuid(),
                         Source = (Models.Media.VideoTriggerSource)c.ReadInt(),
                         TrackId = c.ReadNullableGuid(),
                         ClipId = c.ReadNullableGuid(),
-                        MidiNote = c.ReadBool() ? c.ReadInt() : null,
-                        Moment = (Models.Media.VideoTriggerMoment)c.ReadInt(),
-                        Action = (Models.Media.VideoTriggerAction)c.ReadInt(),
-                        FadeDurationSeconds = c.ReadDouble()
-                    });
+                        MidiNote = c.ReadBool() ? c.ReadInt() : null
+                    };
+                    if (fileVersion >= 17)
+                    {
+                        trigger.MidiCcChannel = c.ReadBool() ? c.ReadInt() : null;
+                        trigger.MidiCcNumber = c.ReadBool() ? c.ReadInt() : null;
+                        trigger.MidiCcThreshold = c.ReadDouble();
+                    }
+
+                    trigger.Moment = (Models.Media.VideoTriggerMoment)c.ReadInt();
+                    trigger.Action = (Models.Media.VideoTriggerAction)c.ReadInt();
+                    trigger.FadeDurationSeconds = c.ReadDouble();
+                    project.VideoTriggers.Add(trigger);
                 }
 
                 if (fileVersion >= 9)
@@ -1232,17 +1299,46 @@ public static class ProjectFile
                     project.VideoCanvasHeight = c.ReadInt();
                 }
 
+                if (fileVersion >= 15)
+                    project.VideoExportFps = c.ReadDouble();
+
                 if (fileVersion >= 10)
                 {
                     var regionCount = c.ReadInt();
                     for (var i = 0; i < regionCount; i++)
                     {
-                        project.VideoVisibilityRegions.Add(new Models.Media.VideoVisibilityRegion
+                        var region = new Models.Media.VideoVisibilityRegion
                         {
                             Id = c.ReadGuid(),
                             LayerId = c.ReadGuid(),
                             StartBeat = c.ReadDouble(),
                             EndBeat = c.ReadDouble()
+                        };
+                        if (fileVersion >= 16)
+                        {
+                            region.FadeInBeats = c.ReadDouble();
+                            region.FadeOutBeats = c.ReadDouble();
+                        }
+
+                        project.VideoVisibilityRegions.Add(region);
+                    }
+                }
+
+                if (fileVersion >= 18)
+                {
+                    var kfCount = c.ReadInt();
+                    for (var i = 0; i < kfCount; i++)
+                    {
+                        project.VideoLayerKeyframes.Add(new Models.Media.VideoLayerKeyframe
+                        {
+                            Id = c.ReadGuid(),
+                            ItemId = c.ReadGuid(),
+                            Beat = c.ReadDouble(),
+                            X = c.ReadDouble(),
+                            Y = c.ReadDouble(),
+                            Width = c.ReadDouble(),
+                            Height = c.ReadDouble(),
+                            Opacity = c.ReadDouble()
                         });
                     }
                 }
@@ -1402,10 +1498,43 @@ public static class ProjectFile
             layer.SpectrumLineThickness = c.ReadDouble();
         }
 
+        if (fileVersion >= 16)
+            layer.BlendMode = (Models.Media.VideoBlendMode)c.ReadInt();
+
+        if (fileVersion >= 19)
+        {
+            layer.Scope3DCameraYaw = c.ReadDouble();
+            layer.Scope3DCameraPitch = c.ReadDouble();
+            layer.Scope3DCameraDistance = c.ReadDouble();
+            layer.Scope3DLineThickness = c.ReadDouble();
+            layer.Scope3DTrailCount = c.ReadInt();
+            layer.Scope3DTransparentBackground = c.ReadBool();
+            if (c.ReadBool())
+                layer.Engine3DEffectKind = (Models.Media.VideoEngine3DEffectKind)c.ReadInt();
+            layer.Engine3DAudioSourceTrackId = c.ReadNullableGuid();
+            layer.Engine3DImagePath = c.ReadString() is { Length: > 0 } img ? img : null;
+            layer.Engine3DX = c.ReadDouble();
+            layer.Engine3DY = c.ReadDouble();
+            layer.Engine3DWidth = c.ReadDouble();
+            layer.Engine3DHeight = c.ReadDouble();
+            layer.Engine3DCameraYaw = c.ReadDouble();
+            layer.Engine3DCameraPitch = c.ReadDouble();
+            layer.Engine3DCameraDistance = c.ReadDouble();
+            layer.Engine3DParticleCount = c.ReadInt();
+            layer.Engine3DParticleSize = c.ReadDouble();
+            layer.Engine3DTransparentBackground = c.ReadBool();
+        }
+
+        if (fileVersion >= 20)
+        {
+            layer.Engine3DParticleColorArgb = unchecked((uint)c.ReadInt());
+            layer.Engine3DParticleShape = (Models.Media.VideoEngine3DParticleShape)c.ReadInt();
+        }
+
         var itemCount = c.ReadInt();
         for (var j = 0; j < itemCount; j++)
         {
-            layer.Items.Add(new Models.Media.VideoLayerItem
+            var item = new Models.Media.VideoLayerItem
             {
                 Id = c.ReadGuid(),
                 Kind = (Models.Media.VideoElementKind)c.ReadInt(),
@@ -1416,7 +1545,30 @@ public static class ProjectFile
                 Height = c.ReadDouble(),
                 Rotation = c.ReadDouble(),
                 Opacity = c.ReadDouble()
-            });
+            };
+            if (fileVersion >= 14)
+            {
+                item.TextContent = c.ReadString();
+                item.FontSizePx = c.ReadDouble();
+                item.TextColorArgb = unchecked((uint)c.ReadInt());
+            }
+
+            if (fileVersion >= 17)
+            {
+                item.SubtitleClipId = c.ReadNullableGuid();
+                item.SubtitleSrtPath = c.ReadString() is { Length: > 0 } srt ? srt : null;
+                item.MaskImagePath = c.ReadString() is { Length: > 0 } mask ? mask : null;
+                item.ChromaKeyEnabled = c.ReadBool();
+                item.ChromaKeyColorArgb = unchecked((uint)c.ReadInt());
+                item.ChromaKeyTolerance = c.ReadDouble();
+                item.ChromaKeyFeather = c.ReadDouble();
+                item.Brightness = c.ReadDouble();
+                item.Contrast = c.ReadDouble();
+                item.Saturation = c.ReadDouble();
+                item.LutCubePath = c.ReadString() is { Length: > 0 } lut ? lut : null;
+            }
+
+            layer.Items.Add(item);
         }
 
         project.VideoLayers.Add(layer);

@@ -21,6 +21,14 @@ public sealed class Scene
         Light.Directional(Vector3.Normalize(new Vector3(-0.4f, -1f, -0.35f)))
     };
 
+    /// <summary>When true, <see cref="ClearColor"/> alpha is forced to 0 for transparent video overlays.</summary>
+    public bool TransparentBackground { get; set; }
+
     /// <summary>Background clear colour (linear RGBA, premultiplied semantics handled by the backend).</summary>
     public Vector4 ClearColor { get; set; } = new(0.07f, 0.07f, 0.09f, 1f);
+
+    /// <summary>Effective clear colour accounting for <see cref="TransparentBackground"/>.</summary>
+    public Vector4 EffectiveClearColor => TransparentBackground
+        ? new Vector4(0, 0, 0, 0)
+        : ClearColor;
 }

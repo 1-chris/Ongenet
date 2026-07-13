@@ -1,18 +1,25 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using Ongenet.Core.Audio.Files;
+using Ongenet.Core.Services.Interfaces;
 
-namespace Ongenet.Core.Audio.Files;
+namespace Ongenet.VideoComposition.Ffmpeg;
 
 /// <summary>Muxes a rendered WAV master with a project video track via ffmpeg.</summary>
-public static class FfmpegVideoMuxer
+public sealed class FfmpegVideoMuxer : IVideoMuxer
 {
-    public static void Mux(string wavPath, string videoPath, double videoOffsetSeconds, string outputPath,
+    public bool IsAvailable => FfmpegEncoder.IsAvailable;
+
+    public void Mux(string wavPath, string videoPath, double videoOffsetSeconds, string outputPath,
         double inPointSeconds = 0, double outPointSeconds = 0)
     {
+        var ffmpeg = FfmpegEncoder.Locate()
+            ?? throw new InvalidOperationException("ffmpeg was not found on this system.");
+
         var psi = new ProcessStartInfo
         {
-            FileName = "ffmpeg",
+            FileName = ffmpeg,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardError = true
@@ -55,24 +62,5 @@ public static class FfmpegVideoMuxer
         process.WaitForExit();
         if (process.ExitCode != 0)
             throw new InvalidOperationException($"ffmpeg mux failed: {err.Trim()}");
-    }
-
-    public static bool IsAvailable()
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("ffmpeg", "-version")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true
-            };
-            using var p = Process.Start(psi);
-            return p is not null;
-        }
-        catch
-        {
-            return false;
-        }
     }
 }

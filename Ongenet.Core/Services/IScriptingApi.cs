@@ -169,6 +169,12 @@ public interface IScriptingApi
     void SetVideoEnabled(bool enabled);
     IReadOnlyList<ScriptVideoTriggerInfo> GetVideoTriggers();
     void AddVideoTrigger(ScriptVideoTriggerInfo trigger);
+    IReadOnlyList<ScriptVideoVisibilityRegionInfo> GetVideoVisibilityRegions();
+    void AddVideoVisibilityRegion(ScriptVideoVisibilityRegionInfo region);
+    ScriptVideoCanvasInfo GetVideoCanvasSize();
+    void SetVideoCanvasSize(ScriptVideoCanvasInfo size);
+    double GetVideoExportFps();
+    void SetVideoExportFps(double fps);
     IReadOnlyList<ScriptControlRoomProfileInfo> GetControlRoomProfiles();
     void AddControlRoomProfile(ScriptControlRoomProfileInfo profile);
 

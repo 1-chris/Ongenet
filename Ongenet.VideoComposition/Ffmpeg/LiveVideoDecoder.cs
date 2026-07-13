@@ -1,13 +1,13 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
+using Ongenet.Core.Audio.Files;
+using Ongenet.Core.Services.Interfaces;
 
-namespace Ongenet.Core.Audio.Files;
+namespace Ongenet.VideoComposition.Ffmpeg;
 
 /// <summary>Persistent ffmpeg decoder streaming raw RGB frames for live preview.</summary>
-public sealed class LiveVideoDecoder : IDisposable
+public sealed class LiveVideoDecoder : ILiveVideoDecoder
 {
     private Process? _process;
     private Stream? _stdout;
@@ -20,7 +20,7 @@ public sealed class LiveVideoDecoder : IDisposable
     public int Width => _width;
     public int Height => _height;
 
-    public static bool IsAvailable => FfmpegVideoFrameExtractor.IsAvailable;
+    public static bool IsAvailable => FfmpegEncoder.IsAvailable;
 
     public bool Open(string videoPath, double startSeconds, int width = 1280, int height = 720)
     {
@@ -42,6 +42,8 @@ public sealed class LiveVideoDecoder : IDisposable
         psi.ArgumentList.Add("-hide_banner");
         psi.ArgumentList.Add("-loglevel");
         psi.ArgumentList.Add("error");
+        psi.ArgumentList.Add("-hwaccel");
+        psi.ArgumentList.Add("auto");
         if (startSeconds > 1e-6)
         {
             psi.ArgumentList.Add("-ss");

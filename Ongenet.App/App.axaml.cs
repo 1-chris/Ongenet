@@ -177,6 +177,21 @@ namespace Ongenet.App
             services.AddSingleton<ExpressionMapViewModel>();
             services.AddSingleton<ControlRoomSettingsViewModel>();
             services.AddSingleton<Platform.IScriptEditorFactory, Platform.NullScriptEditorFactory>();
+            services.AddSingleton<Platform.IVideoCompositionEditorFactory, Platform.NullVideoCompositionEditorFactory>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoFrameExtractor, Core.Services.NullVideoFrameExtractor>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoCompositor, Core.Services.NullVideoCompositor>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoMuxer, Core.Services.NullVideoMuxer>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoWaveformCacheService, Core.Services.NullVideoWaveformCacheService>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoAudioScopeService, Core.Services.NullVideoAudioScopeService>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoProxyCacheService, Core.Services.NullVideoProxyCacheService>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoRenderQueueService, Core.Services.NullVideoRenderQueueService>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoEngine3DRenderService, Core.Services.NullVideoEngine3DRenderService>();
+            services.AddSingleton<Core.Services.Interfaces.IVideoEngine3DLayerRenderer, Core.Services.NullVideoEngine3DLayerRenderer>();
+            services.AddTransient<Core.Services.Interfaces.ILiveVideoDecoder, Core.Services.NullLiveVideoDecoder>();
+            // Factory delegate so VideoTrackViewModel can create one decoder per overlay video.
+            // Resolves through the container, so the desktop head's real decoder wins when registered.
+            services.AddSingleton<Func<Core.Services.Interfaces.ILiveVideoDecoder>>(sp =>
+                () => sp.GetRequiredService<Core.Services.Interfaces.ILiveVideoDecoder>());
             services.AddSingleton<ViewModels.Panels.ScriptingPanelViewModel>();
             services.AddSingleton<Core.Services.IScriptingHost, Core.Services.NullScriptingHost>();
             services.AddSingleton<Core.Services.IScriptingApi, Core.Services.NullScriptingApi>();

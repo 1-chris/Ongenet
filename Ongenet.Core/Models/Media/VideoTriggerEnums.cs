@@ -4,7 +4,8 @@ public enum VideoTriggerSource
 {
     ArrangementClip,
     SessionClip,
-    MidiNote
+    MidiNote,
+    MidiCc
 }
 
 public enum VideoTriggerMoment

@@ -16,7 +16,7 @@ Core and a thin, swappable device/UI layer around it. Licensed under the [MIT Li
 | Project                         | Native deps             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Ongenet.Core`                  | none                    | The heart of the app, fully platform-agnostic. Audio models (project / tracks / clips / MIDI notes), the lock-free audio **engine** (sequencer, per-track mixing, metering, automation), the **instrument** framework (Oscillator, 3x Osc, FM, Basic Sampler, Granular, Padda, Kicka, SFZ Sampler) and **effects** chain (filter, EQ, dynamics, modulation, delay/reverb…), the shared DSP toolkit (`Audio/Dsp`), the parameter framework, WAV decode/encode, a cross-platform **MIDI** model (running-status parser, learn/transport mappings), and the app services (project, transport, selection, recording, edit-mode, MIDI input/mapping) plus DI registration, an in-process event aggregator, and logging. Depends only on the BCL. |
-| `Ongenet.App`                   | Avalonia                | The **shared UI library** used by every head (desktop / web / Android): the `App` composition root + DI, all views & view-models, custom controls, the Catppuccin **theming** system, arrange/timeline, piano roll, inspectors, mixer/meters, editable automation lanes, the unified **Settings** window, a debug Log window, and the embeddable **3D controls**. Each head injects its platform pieces (audio backend, MIDI, plugins, GPU engine, shell) through `IPlatformServices`.                                                                                                                                                                                                                                                      |
+| `Ongenet.App`                   | Avalonia                | The **shared UI library** used by every head (desktop / web / Android): the `App` composition root + DI, all views & view-models, custom controls, the Catppuccin **theming** system, arrange/timeline, piano roll, inspectors, mixer/meters, editable automation lanes, **video composition** (layer stack, beat-synced timeline, program monitor, export), the unified **Settings** window, a debug Log window, and the embeddable **3D controls**. Each head injects its platform pieces (audio backend, MIDI, plugins, GPU engine, shell) through `IPlatformServices`.                                                                                                                                                                                                                                                      |
 | `Ongenet.Engine3D.Abstractions` | none                    | Portable, dependency-free **3D scene model** (meshes, materials, orbit camera, lights, the immutable per-frame `SceneSnapshot`) plus the engine contracts (`I3DEngineFactory` / `I3DRenderSession`). Referenced by both the UI and the native engine, so the UI never touches GPU code and the engine never touches Avalonia. BCL only.                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `Ongenet.Engine3D`              | Vulkan / MoltenVK       | The **native GPU 3D engine** behind Ongenet's embeddable 3D controls. A Render Hardware Interface (RHI) over **Silk.NET**, with a **Vulkan** backend that renders scenes offscreen — native on Windows/Linux and on macOS via **MoltenVK** (bundled; no Vulkan SDK needed). Desktop-only; injected into the shared UI via DI, so the web/Android heads never pull native GPU code.                                                                                                                                                                                                                                                                                                                                                          |
 | `Ongenet.Audio`                 | OS audio + MIDI         | The audio **and MIDI** device backend. P/Invoke layers over each platform's native **audio** API — ALSA (with PipeWire/JACK/PulseAudio routing) on Linux, **CoreAudio** on macOS, **WASAPI** on Windows — and each platform's native **MIDI** API — the **ALSA sequencer** on Linux (works with PipeWire/JACK), **WinMM** on Windows and **CoreMIDI** on macOS, behind single `IAudioBackend` / `IMidiInputBackend` seams. This is the only project that touches native audio/MIDI libraries; Core depends solely on the device seams, so the backend is swappable.                                                                                                                                                                         |
@@ -46,8 +46,8 @@ pattern-based composition:
 | **Channel Rack**     | Pattern-channel overview for the step sequencer — mute channels, pick the active pattern and jump into note editing.                                                                                                                                                   |
 | **Step Sequencer**   | Per-pattern step grid for drum and melodic programming; pattern clips on the timeline expand into MIDI at playback time.                                                                                                                                               |
 | **Notation**         | Staff view from MIDI clips — MusicXML import/export, transpose, articulations/dynamics, chord symbols, and **PDF export**.                                                                                                                                              |
-| **Video**            | Centre **Video** tab — reference sync to arrangement clips, overlay composition, clip/MIDI triggers, live ffmpeg preview, pop-out window, mux/composited MP4 export. Hidden until **Settings → General → Enable video features**; each project enables video separately. |
-| **Export dialog**    | Offline bounce to WAV, FLAC, MP3, or OGG — master mix, per-track stems, beat region (including by arrangement marker), or 5.1/7.1 surround — faster than real time with automation, sends, PDC and effect tails honoured. Optional **ffmpeg** mux or composited MP4 when video tracks exist. |
+| **Video**            | Centre **Video** tab (desktop) — stacked **layers** (background media or live **audio visualisers**: volume bars, waveform, spectrum), program monitor with drag-resize bounds, beat-synced **video timeline** (layer reorder, visibility regions, clip/MIDI triggers), reference sync to arrangement clips, live Skia preview (ffmpeg decodes video files), pop-out preview window, and **Export ▾ → Export video…** for composited MP4 (frame bake matches preview + master mix). Hidden until **Settings → General → Enable video features**; each project enables video separately. Requires **ffmpeg** on PATH. |
+| **Export dialog**    | Offline bounce to WAV, FLAC, MP3, or OGG — master mix, per-track stems, beat region (including by arrangement marker), or 5.1/7.1 surround — faster than real time with automation, sends, PDC and effect tails honoured. **Export video…** (when video is enabled) writes composited MP4 or muxes bounced audio with a reference video file. |
 | **Tempo Map**        | View → Tempo Map — edit master-track tempo automation points at the playhead.                                                                                                                                                                                           |
 | **Section Playlist** | View → Section Playlist — ordered arrangement-marker sections for song-structure playback.                                                                                                                                                                                |
 | **Ableton Link**     | Optional tempo/phase sync with other Link-enabled apps; continuous beat-follow while playing when the native library is present (isolated in `Ongenet.Link`; degrades to a no-op stub otherwise).                                                                      |
@@ -66,8 +66,9 @@ pattern-based composition:
 
 Ongenet is a **broad, open-source desktop DAW**: arrangement + session + FL-style patterns, deep
 mixing/routing, scratch-built CLAP/LV2/VST/AU hosting, Field modular patching, standalone audio
-editing, polyphonic pitch editing, C# scripting, and optional plugin crash isolation. Strong for
-beat-making, songwriting, vocal tuning, and hybrid live/arrange work.
+editing, polyphonic pitch editing, **layer-based video composition**, C# scripting, and optional
+plugin crash isolation. Strong for beat-making, songwriting, vocal tuning, simple music-video
+workflows, and hybrid live/arrange work.
 
 ### Comparison & scope (Ongenet terminology)
 
@@ -94,7 +95,7 @@ self-hosted versioned folder sync.
 | Scripting / automation                      | **Strong** — Roslyn C# scripts, full project metadata API, portable project/preset export, in-app IDE, live handlers |
 | Field modular engine                        | **Strong** — Bitwig Grid-class patching as instrument and effect                                                   |
 | Comping / take lanes                        | **Good** — multi-lane loop recording, toggle comp regions, crossfade flatten, warp-aware bake                        |
-| Export delivery                             | **Strong** — WAV/FLAC/MP3/OGG, stems, surround (5.1/7.1), ADM BWF, AAF/OMF XML handoff, timeline XML |
+| Export delivery                             | **Strong** — WAV/FLAC/MP3/OGG, stems, surround (5.1/7.1), ADM BWF, AAF/OMF XML handoff, timeline XML, composited MP4 (desktop + ffmpeg) |
 | Instrument / drum rack                      | **Good** — macros + drum pad grid in track inspector |
 | Chord track / expression maps               | **Good** — global harmony regions + VST expression map editor |
 | Hybrid tracks                               | **Good** — audio + MIDI clips on one lane |
@@ -103,7 +104,7 @@ self-hosted versioned folder sync.
 | Control Room                                | **Good** — monitor/cue profiles in Settings |
 | ARA / third-party pitch plugins             | **Partial** — optional ARA2 SDK seam (`ENABLE_ARA`); native pitch editor is the primary path |
 | Notation / scoring                          | **Good** — staff view, tuplets/articulations/dynamics, chord symbols, MusicXML I/O, transpose, basic PDF export      |
-| Post / video                                | **Good** — reference sync, overlays, clip/MIDI triggers, live preview, pop-out window, ffmpeg mux/composited MP4 export |
+| Post / video                                | **Strong** — layer stack (media + live audio visualisers), beat-synced timeline, visibility regions, clip/MIDI triggers, reference sync, pop-out preview, composited MP4 export (Skia frame bake matches live preview + master mix); optional mux with reference video |
 | Surround monitoring                         | **Conditional** — immersive pan + offline 5.1/7.1 export; live monitoring requires 6/8-channel output device       |
 | Hardware control surfaces                   | **Good** — MCU/HUI/Launchpad/Push2/APC40 profiles; learn UI for mixer CC mapping                                     |
 | Collaboration                               | **Good** — folder sync + versioned push; self-hosted collab                                                   |
@@ -113,6 +114,26 @@ self-hosted versioned folder sync.
 | Windows pro audio                           | **Good** — WASAPI exclusive low-latency; ASIO driver registry enumeration on Windows                          |
 | Autosave / crash recovery                   | **Good** — periodic autosave backups + recovery prompt on launch (Settings → on by default)                        |
 | Content library                             | **Good** — nine demo songs/templates + Field/FX presets via the Library sidebar                                      |
+
+
+### Video composition (desktop)
+
+Layer-based music-video workflow in the **Video** tab. Turn on **Settings → General → Enable video features**, then **Enable video** per project.
+
+
+| Capability | Status |
+| --- | --- |
+| Layer stack (media images/video + audio visualisers) | **Strong** — drag-reorder layers; per-layer bounds, opacity, sync offset/in-out, clip sync |
+| Audio visualisers | **Strong** — volume bars, waveform, spectrum; source from any track or group; solid/gradient colours |
+| Program monitor | **Strong** — live Skia composition; drag-resize layer bounds; pop-out preview window |
+| Beat-synced video timeline | **Good** — overlay lanes, visibility regions (when layers show), trigger markers, layer inspector |
+| Clip / MIDI triggers | **Good** — fade in/out (and related actions) on arrangement-clip or MIDI events |
+| Reference sync | **Good** — sync layer playback to arrangement clips via tempo map |
+| Composited MP4 export | **Strong** — **Export ▾ → Export video…** bakes frames with the same renderer as live preview; master mix muxed via ffmpeg |
+| Mux with reference video | **Good** — bounce master WAV and mux with an existing video file (export dialog) |
+| Scripting API | **Good** — `GetVideoLayers`, `AddVideoLayer`, triggers, `SetVideoEnabled` via `IScriptingApi` |
+| ffmpeg dependency | **Required** on desktop for video-file decode, preview frames, and MP4 encode/mux |
+| Web / Android | **Not yet** — settings stubs only; no preview, timeline, or export |
 
 
 The right-hand library sidebar has two distinct content sources for getting started:
@@ -275,6 +296,7 @@ Deep-dive feature guides:
 
 | Guide | Topic |
 | --- | --- |
+| [site/articles/guides/video-and-composition.md](site/articles/guides/video-and-composition.md) | Layer-based video, visualisers, timeline, MP4 export |
 | [docs/scripting.md](docs/scripting.md) | C# scripting host (`IScriptingApi`, Roslyn, factory scripts) |
 | [docs/audio-editor.md](docs/audio-editor.md) | Standalone multitrack Audio Editor |
 | [docs/polyphonic-pitch.md](docs/polyphonic-pitch.md) | Built-in VariAudio-class pitch editor |

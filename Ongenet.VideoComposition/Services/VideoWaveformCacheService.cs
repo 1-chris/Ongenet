@@ -7,9 +7,10 @@ using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Media;
+using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 
-namespace Ongenet.Core.Services;
+namespace Ongenet.VideoComposition.Services;
 
 /// <summary>Offline-renders track/bus audio into waveform peaks for video layer preview and export.</summary>
 public sealed class VideoWaveformCacheService : IVideoWaveformCacheService

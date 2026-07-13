@@ -5,12 +5,16 @@ public enum VideoElementKind
     Image,
     AnimatedGif,
     Video,
-    Waveform
+    Waveform,
+    Text,
+    Subtitle,
+    Engine3D
 }
 
 public enum VideoWaveformStyle
 {
     Bars,
     Mirrored,
-    Spectrum
+    Spectrum,
+    Scope3D
 }

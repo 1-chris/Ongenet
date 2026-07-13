@@ -22,6 +22,18 @@
                        IsVisible="{Binding ShowAudioExportOptions}"/>
             <TextBlock Text="{DynamicResource Export_Video_heading}" FontWeight="SemiBold" FontSize="16"
                        IsVisible="{Binding IsVideoExportMode}"/>
+            <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsVideoExportMode}">
+                <TextBlock Text="{DynamicResource Export_Video_canvas}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Text="{Binding VideoCanvasSizeLabel}" Foreground="{StaticResource CatppuccinText}"/>
+                <TextBlock Text="{DynamicResource Export_Video_fps}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Text="{Binding VideoExportFpsLabel}" Foreground="{StaticResource CatppuccinText}"/>
+            </StackPanel>
+            <TextBlock Text="{Binding RenderQueueStatus}" FontSize="11"
+                       Foreground="{StaticResource CatppuccinOverlay1}"
+                       IsVisible="{Binding IsVideoExportMode}"/>
+            <CheckBox Content="{DynamicResource Export_Background_video}"
+                      IsChecked="{Binding ExportInBackground, Mode=TwoWay}"
+                      IsVisible="{Binding ShowBackgroundExportOption}"/>
 
             <StackPanel Spacing="4">
                 <TextBlock Text="{DynamicResource Export_Kind}" Foreground="{StaticResource CatppuccinSubtext0}"/>

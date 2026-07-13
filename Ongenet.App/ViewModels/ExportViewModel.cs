@@ -23,6 +23,7 @@ public sealed class ExportViewModel : ViewModelBase
     private readonly ISelectionService _selection;
     private readonly TimelineViewModel _timeline;
     private readonly IVideoWaveformCacheService _waveformCache;
+    private readonly IVideoRenderQueueService _renderQueue;
     private ExportKind _kind = ExportKind.Master;
     private SurroundFormat _surround = SurroundFormat.Stereo;
     private int _bitDepth = 16;
@@ -38,11 +39,13 @@ public sealed class ExportViewModel : ViewModelBase
     private bool _exportAdmBwf;
     private bool _exportAafOmf;
     private bool _isVideoExportMode;
+    private bool _exportInBackground;
     private ArrangementMarker? _selectedMarker;
 
     public ExportViewModel(IProjectService project, ITransportService transport, IAudioEngine engine,
         ExportService export, StemSeparationService stemSeparation, ISelectionService selection,
-        TimelineViewModel timeline, IVideoWaveformCacheService waveformCache)
+        TimelineViewModel timeline, IVideoWaveformCacheService waveformCache,
+        IVideoRenderQueueService renderQueue)
     {
         _project = project;
         _transport = transport;
@@ -52,6 +55,8 @@ public sealed class ExportViewModel : ViewModelBase
         _selection = selection;
         _timeline = timeline;
         _waveformCache = waveformCache;
+        _renderQueue = renderQueue;
+        _renderQueue.JobsChanged += () => OnPropertyChanged(nameof(RenderQueueStatus));
 
         _regionStartBeat = transport.IsLoopActive ? transport.LoopStart : 0;
         _regionEndBeat = transport.IsLoopActive ? transport.LoopEnd
@@ -163,6 +168,25 @@ public sealed class ExportViewModel : ViewModelBase
     public bool HasMuxVideoLayers => VideoLayers.Count > 0;
     public bool CanComposeVideo => _project.Current.VideoLayers.Count > 0;
     public bool ShowVideoExport => _project.Current.VideoLayers.Count > 0;
+    public string VideoExportFpsLabel => $"{_project.Current.VideoExportFps:0} fps";
+    public string VideoCanvasSizeLabel =>
+        $"{_project.Current.VideoCanvasWidth} × {_project.Current.VideoCanvasHeight}";
+    public string RenderQueueStatus
+    {
+        get
+        {
+            var job = _renderQueue.Jobs.LastOrDefault();
+            return job is null ? string.Empty : $"{job.Status} ({job.Progress * 100:0}%)";
+        }
+    }
+
+    public bool ExportInBackground
+    {
+        get => _exportInBackground;
+        set => SetField(ref _exportInBackground, value);
+    }
+
+    public bool ShowBackgroundExportOption => IsVideoExportMode && ComposeVideo;
 
     public bool MuxWithVideo
     {
@@ -181,6 +205,7 @@ public sealed class ExportViewModel : ViewModelBase
         {
             if (!SetField(ref _composeVideo, value)) return;
             OnPropertyChanged(nameof(SuggestedFileExtension));
+            OnPropertyChanged(nameof(ShowBackgroundExportOption));
         }
     }
 
@@ -404,6 +429,18 @@ public sealed class ExportViewModel : ViewModelBase
             var progress = new Progress<double>(p => Progress = p);
             var format = _engine.Format;
             var bpm = _transport.Tempo.BeatsPerMinute;
+
+            if (ExportInBackground && ComposeVideo)
+            {
+                var start = Kind == ExportKind.Region ? RegionStartBeat : 0;
+                var end = Kind == ExportKind.Region ? RegionEndBeat
+                    : _project.Current.BarCount * Math.Max(1, _project.Current.TimeSignature.Numerator);
+                _renderQueue.Enqueue(path, start, end);
+                Status = "Queued for background export.";
+                Progress = 0;
+                OnPropertyChanged(nameof(RenderQueueStatus));
+                return;
+            }
 
             await Task.Run(() => _export.Export(_project.Current, format, bpm, path, options, progress,
                 _waveformCache));

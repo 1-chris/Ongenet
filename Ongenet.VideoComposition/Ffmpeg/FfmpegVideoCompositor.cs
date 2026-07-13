@@ -5,22 +5,31 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
-using Ongenet.Core.Video;
+using Ongenet.VideoComposition.Rendering;
 using SkiaSharp;
 
-namespace Ongenet.Core.Audio.Files;
+namespace Ongenet.VideoComposition.Ffmpeg;
 
 /// <summary>Bakes the in-app video composition frame-by-frame and encodes to MP4 via ffmpeg.</summary>
-public static class FfmpegVideoCompositor
+public sealed class FfmpegVideoCompositor : IVideoCompositor
 {
-    private const int MasterAudioInputIndex = 1;
-    private const double DefaultFps = 25;
+    private readonly IVideoFrameExtractor _frameExtractor;
+    private readonly IVideoEngine3DLayerRenderer? _engine3D;
 
-    public static void Export(Project project, string wavPath, string outputPath,
-        double durationSeconds, IReadOnlyDictionary<Guid, double>? layerOpacities = null,
+    public FfmpegVideoCompositor(IVideoFrameExtractor frameExtractor, IVideoEngine3DLayerRenderer? engine3D = null)
+    {
+        _frameExtractor = frameExtractor;
+        _engine3D = engine3D;
+    }
+
+    public bool IsAvailable => FfmpegEncoder.IsAvailable;
+
+    public void Export(Project project, string wavPath, string outputPath, double durationSeconds,
+        IReadOnlyDictionary<Guid, double>? layerOpacities = null,
         IVideoWaveformCacheService? waveformCache = null, double bpm = 120,
         double startBeat = 0, IProgress<double>? progress = null)
     {
@@ -29,19 +38,30 @@ public static class FfmpegVideoCompositor
 
         var canvasW = Math.Clamp(project.VideoCanvasWidth, 320, 4096);
         var canvasH = Math.Clamp(project.VideoCanvasHeight, 320, 4096);
-        var fps = DefaultFps;
+        var fps = VideoCompositionTimeMapper.ResolveExportFps(project);
         var frameDuration = 1.0 / fps;
         var totalFrames = Math.Max(1, (int)Math.Ceiling(durationSeconds * fps));
 
         var stemBuffers = new Dictionary<Guid, AudioSampleBuffer>();
-        foreach (var layer in project.VideoLayers.Where(l => l.IsWaveformLayer && l.AudioSourceTrackId is not null))
+        var waveforms = new Dictionary<Guid, AudioWaveform>();
+        foreach (var layer in project.VideoLayers.Where(l =>
+            (l.IsWaveformLayer && l.AudioSourceTrackId is not null)
+            || (l.IsEngine3DLayer && l.Engine3DAudioSourceTrackId is not null)))
         {
-            var id = layer.AudioSourceTrackId!.Value;
+            var id = layer.IsEngine3DLayer ? layer.Engine3DAudioSourceTrackId!.Value : layer.AudioSourceTrackId!.Value;
             if (stemBuffers.ContainsKey(id)) continue;
             stemBuffers[id] = waveformCache.GetOrBuildStemBuffer(project, id, bpm, progress);
+            if (!layer.WaveformFollowPlayhead && layer.IsWaveformLayer)
+                waveforms[id] = waveformCache.GetOrBuild(project, id, bpm, progress);
         }
 
-        using var assets = new VideoCompositionExportAssets { StemBuffers = stemBuffers };
+        using var assets = new VideoCompositionExportAssets(_frameExtractor)
+        {
+            StemBuffers = stemBuffers,
+            Waveforms = waveforms,
+            Engine3DRenderer = _engine3D,
+            Engine3DFrameDt = frameDuration
+        };
         var scope = new OfflineVideoAudioScope(stemBuffers);
         var triggers = new VideoTriggerEngine();
         triggers.Seek(project, startBeat);
@@ -75,7 +95,7 @@ public static class FfmpegVideoCompositor
         psi.ArgumentList.Add("-map");
         psi.ArgumentList.Add("0:v:0");
         psi.ArgumentList.Add("-map");
-        psi.ArgumentList.Add($"{MasterAudioInputIndex}:a:0");
+        psi.ArgumentList.Add("1:a:0");
         if (durationSeconds > 0)
         {
             psi.ArgumentList.Add("-t");
@@ -102,6 +122,8 @@ public static class FfmpegVideoCompositor
         var canvas = surface.Canvas;
         var prevBeat = startBeat;
 
+        double BeatsToSeconds(Project p, double beats) => beats * 60.0 / Math.Max(1, bpm);
+
         try
         {
             for (var frame = 0; frame < totalFrames; frame++)
@@ -111,8 +133,8 @@ public static class FfmpegVideoCompositor
                 triggers.Tick(project, prevBeat, beat, frameDuration);
                 prevBeat = beat;
 
-                VideoCompositionFrameRenderer.Render(canvas, project, timeSeconds, triggers.Runtime, scope, assets,
-                    canvasW, canvasH);
+                VideoCompositionFrameRenderer.Render(canvas, project, timeSeconds, beat,
+                    triggers.Runtime, scope, assets, canvasW, canvasH, BeatsToSeconds);
 
                 canvas.Flush();
                 var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);

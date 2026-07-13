@@ -297,7 +297,13 @@ public sealed record ScriptExpressionMapInfo(
     string Name,
     IReadOnlyList<ScriptExpressionMapEntryInfo> Entries);
 
-public enum ScriptVideoElementKind { Image, AnimatedGif, Video, Waveform }
+public enum ScriptVideoElementKind { Image, AnimatedGif, Video, Waveform, Text }
+
+public enum ScriptVideoWaveformStyle { Bars, Mirrored, Spectrum, Scope3D }
+
+public enum ScriptVideoEngine3DEffectKind { TexturedCube, Particles }
+
+public enum ScriptVideoEngine3DParticleShape { Disc, Quad, Point }
 
 /// <summary>Composited video layer snapshot for scripting.</summary>
 public sealed record ScriptVideoLayerInfo(
@@ -312,7 +318,35 @@ public sealed record ScriptVideoLayerInfo(
     double InPointSeconds = 0,
     double OutPointSeconds = 0,
     Guid? SyncClipId = null,
-    Guid? AudioSourceTrackId = null);
+    Guid? AudioSourceTrackId = null,
+    ScriptVideoWaveformStyle WaveformStyle = ScriptVideoWaveformStyle.Mirrored,
+    bool WaveformFollowPlayhead = true,
+    uint WaveformColorArgb = 0xFF179299,
+    double WaveformX = 0.1,
+    double WaveformY = 0.7,
+    double WaveformWidth = 0.8,
+    double WaveformHeight = 0.12,
+    double Scope3DCameraYaw = 0.5,
+    double Scope3DCameraPitch = 0.32,
+    double Scope3DCameraDistance = 3.8,
+    double Scope3DLineThickness = 0.018,
+    int Scope3DTrailCount = 20,
+    bool Scope3DTransparentBackground = true,
+    ScriptVideoEngine3DEffectKind? Engine3DEffectKind = null,
+    Guid? Engine3DAudioSourceTrackId = null,
+    string? Engine3DImagePath = null,
+    double Engine3DX = 0.25,
+    double Engine3DY = 0.25,
+    double Engine3DWidth = 0.5,
+    double Engine3DHeight = 0.5,
+    double Engine3DCameraYaw = 0.6,
+    double Engine3DCameraPitch = 0.35,
+    double Engine3DCameraDistance = 4.0,
+    int Engine3DParticleCount = 128,
+    double Engine3DParticleSize = 0.08,
+    uint Engine3DParticleColorArgb = 0xFFBB9AF7,
+    ScriptVideoEngine3DParticleShape Engine3DParticleShape = ScriptVideoEngine3DParticleShape.Disc,
+    bool Engine3DTransparentBackground = true);
 
 public sealed record ScriptVideoLayerItemInfo(
     Guid Id,
@@ -324,7 +358,10 @@ public sealed record ScriptVideoLayerItemInfo(
     double Width,
     double Height,
     double Rotation,
-    double Opacity);
+    double Opacity,
+    string TextContent = "",
+    double FontSizePx = 48,
+    uint TextColorArgb = 0xFFFFFFFF);
 
 public enum ScriptVideoTriggerSource { ArrangementClip, SessionClip, MidiNote }
 public enum ScriptVideoTriggerMoment { ClipStart, ClipEnd, NoteOn, NoteOff }
@@ -334,6 +371,11 @@ public sealed record ScriptVideoTriggerInfo(
     Guid Id, Guid TargetLayerId, ScriptVideoTriggerSource Source,
     Guid? TrackId, Guid? ClipId, int? MidiNote,
     ScriptVideoTriggerMoment Moment, ScriptVideoTriggerAction Action, double FadeDurationSeconds);
+
+public sealed record ScriptVideoVisibilityRegionInfo(
+    Guid Id, Guid LayerId, double StartBeat, double EndBeat);
+
+public sealed record ScriptVideoCanvasInfo(int Width, int Height, double ExportFps = 30);
 
 /// <summary>Step sequencer data.</summary>
 public sealed record ScriptStepData(

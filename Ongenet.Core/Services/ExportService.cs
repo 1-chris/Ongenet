@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Audio;
@@ -71,6 +72,14 @@ public static class ExportAudioFormatExtensions
 public sealed class ExportService
 {
     private readonly OfflineRenderer _renderer = new();
+    private readonly IVideoCompositor _videoCompositor;
+    private readonly IVideoMuxer _videoMuxer;
+
+    public ExportService(IVideoCompositor videoCompositor, IVideoMuxer videoMuxer)
+    {
+        _videoCompositor = videoCompositor;
+        _videoMuxer = videoMuxer;
+    }
 
     public void ExportAdmBwf(Project project, AudioFormat format, double bpm, string outputPath,
         ExportOptions options, IProgress<double>? progress = null)
@@ -126,7 +135,7 @@ public sealed class ExportService
                 var muxed = Path.ChangeExtension(outputPath, ".mp4");
                 var duration = ComputeVideoDurationSeconds(project, options, bpm);
                 var startBeat = options.Kind == ExportKind.Region ? options.RegionStartBeat : 0;
-                FfmpegVideoCompositor.Export(project, wavPath, muxed, duration,
+                _videoCompositor.Export(project, wavPath, muxed, duration,
                     waveformCache: waveformCache, bpm: bpm, startBeat: startBeat, progress: progress);
                 if (!muxed.Equals(outputPath, StringComparison.OrdinalIgnoreCase)
                     && outputPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
@@ -141,7 +150,7 @@ public sealed class ExportService
                 if (layer is not null && !string.IsNullOrWhiteSpace(videoPath) && File.Exists(videoPath))
                 {
                     var muxed = Path.ChangeExtension(outputPath, ".mp4");
-                    FfmpegVideoMuxer.Mux(wavPath, videoPath, layer.OffsetSeconds, muxed,
+                    _videoMuxer.Mux(wavPath, videoPath, layer.OffsetSeconds, muxed,
                         layer.InPointSeconds, layer.OutPointSeconds > layer.InPointSeconds ? layer.OutPointSeconds : 0);
                     if (!muxed.Equals(outputPath, StringComparison.OrdinalIgnoreCase)
                         && outputPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
@@ -163,6 +172,23 @@ public sealed class ExportService
             return synced.OutPointSeconds - synced.InPointSeconds;
         var beats = project.BarCount * Math.Max(1, project.TimeSignature.Numerator);
         return beats * 60.0 / Math.Max(1, bpm);
+    }
+
+    public Task ExportCompositedVideoAsync(Project project, string outputPath, double regionStartBeat,
+        double regionEndBeat, IProgress<double>? progress = null,
+        IVideoWaveformCacheService? waveformCache = null)
+    {
+        var format = new AudioFormat(48000, 2);
+        var options = new ExportOptions
+        {
+            Kind = ExportKind.Region,
+            RegionStartBeat = regionStartBeat,
+            RegionEndBeat = regionEndBeat,
+            ComposeVideo = true,
+            AudioFormat = ExportAudioFormat.Wav
+        };
+        return Task.Run(() => Export(project, format, project.Tempo.BeatsPerMinute, outputPath, options, progress,
+            waveformCache));
     }
 
     private static void ExportStems(Project project, AudioFormat format, double bpm, string folder,
@@ -195,7 +221,7 @@ public sealed class ExportService
     private static Project CloneProjectForTrack(Project source, Track track) =>
         CloneProjectForTrackExport(source, track);
 
-    internal static Project CloneProjectForTrackExport(Project source, Track track)
+    public static Project CloneProjectForTrackExport(Project source, Track track)
     {
         var p = new Project { Name = track.Name, Tempo = source.Tempo, TimeSignature = source.TimeSignature, BarCount = source.BarCount };
         var clone = CloneTrackShallow(track);

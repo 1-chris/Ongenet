@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Services.Interfaces;
 
-namespace Ongenet.Core.Video;
+namespace Ongenet.VideoComposition.Rendering;
 
 /// <summary>Feeds offline stem PCM into visualiser capture at a moving export timeline position.</summary>
 public sealed class OfflineVideoAudioScope : IVideoAudioScopeService

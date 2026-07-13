@@ -48,6 +48,8 @@
         <ProjectReference Include="..\Ongenet.Ara\Ongenet.Ara.csproj" />
         <ProjectReference Include="..\Ongenet.Scripting\Ongenet.Scripting.csproj" />
         <ProjectReference Include="..\Ongenet.Scripting.Editor\Ongenet.Scripting.Editor.csproj" />
+        <ProjectReference Include="..\Ongenet.VideoComposition\Ongenet.VideoComposition.csproj" />
+        <ProjectReference Include="..\Ongenet.VideoComposition.Editor\Ongenet.VideoComposition.Editor.csproj" />
         <ProjectReference Include="..\Ongenet.PluginHost\Ongenet.PluginHost.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>

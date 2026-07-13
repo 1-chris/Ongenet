@@ -1,9 +1,10 @@
 using System;
+using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Models.Media;
 using Ongenet.Core.Services.Interfaces;
 using SkiaSharp;
 
-namespace Ongenet.Core.Video;
+namespace Ongenet.VideoComposition.Rendering;
 
 /// <summary>Draws audio visualisers with Skia — shared by live preview and offline export.</summary>
 public static class VideoAudioVisualiserSkiaRenderer
@@ -20,16 +21,30 @@ public static class VideoAudioVisualiserSkiaRenderer
     private static readonly float[] SmoothedMag = new float[FftSize / 2 + 1];
 
     public static void Draw(SKCanvas canvas, VideoLayer layer, IVideoAudioScopeService scope,
-        SKRect rect, double layerOpacity)
+        SKRect rect, double layerOpacity, AudioWaveform? staticWaveform = null, double playheadSeconds = 0)
     {
         if (layer.AudioSourceTrackId is not { } trackId) return;
-        var count = scope.CaptureLatest(trackId, SampleBuffer);
-        if (count <= 0) return;
 
         canvas.Save();
         canvas.ClipRect(rect);
         using var layerPaint = new SKPaint { Color = SKColors.White.WithAlpha((byte)(layerOpacity * 255)) };
         canvas.SaveLayer(new SKRect(rect.Left, rect.Top, rect.Right, rect.Bottom), layerPaint);
+
+        if (!layer.WaveformFollowPlayhead && staticWaveform is not null)
+        {
+            DrawStaticWaveform(canvas, layer, staticWaveform, rect);
+            canvas.Restore();
+            canvas.Restore();
+            return;
+        }
+
+        var count = scope.CaptureLatest(trackId, SampleBuffer);
+        if (count <= 0)
+        {
+            canvas.Restore();
+            canvas.Restore();
+            return;
+        }
 
         switch (layer.WaveformStyle)
         {
@@ -46,6 +61,29 @@ public static class VideoAudioVisualiserSkiaRenderer
 
         canvas.Restore();
         canvas.Restore();
+    }
+
+    private static void DrawStaticWaveform(SKCanvas canvas, VideoLayer layer, AudioWaveform waveform, SKRect rect)
+    {
+        if (waveform.BucketCount <= 0 || waveform.TotalFrames <= 0) return;
+
+        var points = Math.Max(8, (int)rect.Width);
+        using var pen = CreateStrokePaint(layer, rect, (float)Math.Max(1, layer.SpectrumLineThickness));
+        using var path = new SKPath();
+        var started = false;
+        for (var px = 0; px < points; px++)
+        {
+            var startFrame = (long)((double)px / points * waveform.TotalFrames);
+            var endFrame = (long)((double)(px + 1) / points * waveform.TotalFrames);
+            waveform.GetPeak(startFrame, endFrame, out _, out var peak);
+            var x = rect.Left + px * rect.Width / points;
+            var y = rect.MidY - peak * rect.Height * 0.45f;
+            if (!started) { path.MoveTo(x, y); started = true; }
+            else path.LineTo(x, y);
+        }
+
+        if (started)
+            canvas.DrawPath(path, pen);
     }
 
     private static void DrawOscilloscope(SKCanvas canvas, VideoLayer layer, float[] samples, int count, SKRect rect)
