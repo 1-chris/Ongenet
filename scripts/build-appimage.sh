@@ -75,6 +75,19 @@ cp "$DESKTOP_SRC" "$APPDIR/usr/share/applications/net.onge.Ongenet.desktop"
 cp "$ICON" "$APPDIR/usr/share/icons/hicolor/256x256/apps/net.onge.Ongenet.png"
 cp "$ICON" "$APPDIR/ongenet.png"
 
+# appimagetool requires a .desktop file in the AppDir root (Exec=AppRun, Icon without path).
+cat > "$APPDIR/net.onge.Ongenet.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Ongenet
+Comment=Free and open-source digital audio workstation
+Exec=AppRun %F
+Icon=ongenet
+Terminal=false
+Categories=AudioVideo;Audio;Midi;
+StartupWMClass=Ongenet
+EOF
+
 RELEASE_DATE="$(date -u +%Y-%m-%d)"
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@RELEASE_DATE@/$RELEASE_DATE/g" \
   "$METAINFO_SRC" > "$APPDIR/usr/share/metainfo/net.onge.Ongenet.metainfo.xml"
