@@ -434,7 +434,7 @@ executables (the .NET runtime is bundled, so target machines need no .NET instal
 executable is ~100 MB):
 
 ```bash
-./publish-desktop.sh                 # all platforms → dist/Ongenet-<rid>.zip
+./publish-desktop.sh                 # all platforms → dist/Ongenet-<version>-<platform>-portable.zip
 ./publish-desktop.sh linux-x64       # only the listed RID(s)
 ./publish-desktop.sh --symbols       # keep .pdb debug symbols (default strips them for smaller size)
 ./publish-desktop.sh --no-zip        # leave the publish folders, don't zip
@@ -467,13 +467,59 @@ dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release --self-containe
 
 `dist/` is a git-ignored build artifact.
 
+### 7.1 Packaging: installers & portable builds
+
+Every release ships **installers** (recommended) and **portable** ZIPs (extract anywhere).
+
+| Tier | Linux | Windows | macOS |
+|------|-------|---------|-------|
+| **Installer** | `.flatpak`, `.AppImage` (+ `install-appimage.sh`) | `*-win-x64-setup.exe` (Inno Setup) | `.pkg`, `.dmg` |
+| **Portable** | `*-linux-*-portable.zip` | `*-win-x64-portable.zip` | `*-macos-*-portable.zip` |
+
+User settings (`settings.json`, presets) live outside install folders — see §4 — so in-place installer upgrades preserve them.
+
+#### Build commands
+
+```bash
+./publish-desktop.sh                              # portable ZIPs for all platforms
+./scripts/build-appimage.sh linux-x64             # AppImage
+./scripts/install-appimage.sh dist/Ongenet-*.AppImage   # install/upgrade (Linux)
+./scripts/build-flatpak.sh linux-x64              # Flatpak bundle
+./scripts/build-windows-installer.sh              # Inno Setup (Windows, requires iscc)
+./scripts/build-dmg.sh osx-arm64                  # DMG (macOS)
+./scripts/build-macos-pkg.sh osx-arm64            # pkg installer (macOS)
+```
+
+See [packaging/README.md](packaging/README.md) for layout and [packaging/flatpak/FLATHUB.md](packaging/flatpak/FLATHUB.md) for Flathub submission.
+
+#### Upgrade behaviour
+
+| Format | How to upgrade |
+|--------|----------------|
+| Flatpak | `flatpak update net.onge.Ongenet` |
+| AppImage | Re-run `scripts/install-appimage.sh` with the new AppImage |
+| Windows | Re-run the same `*-setup.exe` (same install dir via registry) |
+| macOS pkg | Re-run the same `.pkg` (replaces `/Applications/Ongenet.app`) |
+| Portable | Extract new ZIP over the old folder |
+
+Installers write `install.json` to the per-OS config directory documenting `method`, `installPath`, and `version`.
+
+#### Unsigned installers
+
+- **Windows**: SmartScreen may warn — choose "More info" → "Run anyway" until a code-signing cert is added.
+- **macOS**: Gatekeeper may block unsigned builds — right-click → Open, or `xattr -dr com.apple.quarantine /Applications/Ongenet.app`.
+
+#### License & telemetry
+
+Packaging tools (Inno Setup, AppImageKit, Flatpak) are free and do not change Ongenet's MIT license. Installers ship the root `LICENSE` alongside binaries. No analytics or telemetry is added by any packaging format.
+
 ---
 
 ## 8. Continuous integration & releases
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `.github/workflows/desktop-build.yml` | push/PR to `main`, `v*` tags, manual | Builds self-contained desktop packages for every RID via `publish-desktop.sh` **and** a sideloadable Android APK via `publish-android.sh` (its own JDK 21 + android-workload job), uploads them as artifacts, and — on a `v*` tag — attaches them all to one GitHub Release. |
+| `.github/workflows/desktop-build.yml` | push/PR to `main`, `v*` tags, manual | Runs Core tests, builds **portable** ZIPs for every desktop RID, **Linux** AppImage + Flatpak (x64), **Windows** Inno Setup installer, **macOS** dmg + pkg per arch, and the Android APK. On a `v*` tag, attaches all artifacts to one GitHub Release (installers + portable + APK). |
 | `.github/workflows/deploy-web.yml` | push to `main`, manual | Installs `wasm-tools`, runs `./scripts/build-site.sh` (DocFX site + WASM publish), assembles `_site/` (homepage, guides, dev docs, API at `/`, app at `/app/`), and deploys to GitHub Pages. |
 
 ### Cutting a release
@@ -481,7 +527,8 @@ dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release --self-containe
 1. Bump `<Version>` in `Directory.Build.props` (the single source of truth — it flows into every
    assembly's version and is shown at runtime in the title bar).
 2. Commit, tag `vX.Y.Z`, and push the tag. The Build & Release workflow publishes the GitHub Release with
-   all desktop platform packages **and** the Android APK (`Ongenet-X.Y.Z.apk`) attached.
+   **installers** (Flatpak, AppImage, Windows setup, macOS pkg/dmg), **portable** ZIPs for each desktop
+   RID, and the Android APK (`Ongenet-X.Y.Z.apk`) attached.
 
 ---
 

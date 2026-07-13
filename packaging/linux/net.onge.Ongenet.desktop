@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Ongenet
+Comment=Free and open-source digital audio workstation
+Exec=Ongenet.bin %F
+Icon=net.onge.Ongenet
+Terminal=false
+Categories=AudioVideo;Audio;Midi;
+MimeType=application/x-ongenet;
+StartupWMClass=Ongenet

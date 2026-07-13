@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.onge.Ongenet</id>
+  <name>Ongenet</name>
+  <summary>Free and open-source digital audio workstation</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Ongenet is a free, open-source DAW for Linux, Windows and macOS. Arrange, mix, record,
+      host CLAP/LV2/VST plugins, and export offline — with no account or subscription.
+    </p>
+  </description>
+  <url type="homepage">https://onge.net/</url>
+  <url type="bugtracker">https://github.com/1-chris/Ongenet/issues</url>
+  <url type="vcs-browser">https://github.com/1-chris/Ongenet</url>
+  <developer_name>Ongenet</developer_name>
+  <launchable type="desktop-id">net.onge.Ongenet.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://onge.net/caps/Ongenet_Mocha.png</image>
+      <caption>Main workspace</caption>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@RELEASE_DATE@">
+      <description>
+        <p>See GitHub Releases for notes.</p>
+      </description>
+    </release>
+  </releases>
+</component>

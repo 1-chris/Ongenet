@@ -8,7 +8,8 @@
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+# shellcheck source=scripts/packaging-common.sh
+source "$ROOT/scripts/packaging-common.sh"
 
 RID="${1:-}"
 if [ -z "$RID" ]; then
@@ -18,36 +19,31 @@ if [ -z "$RID" ]; then
   esac
 fi
 
-PUBLISH="$ROOT/Ongenet.Desktop/bin/Release/net10.0/$RID/publish"
+VERSION="$(read_version "$ROOT")"
+SLUG="$(rid_to_release_slug "$RID")"
+PUBLISH="$(publish_dir "$ROOT" "$RID")"
 APP_NAME="Ongenet"
 STAGE="$ROOT/dist/dmg-stage"
-DMG="$ROOT/dist/Ongenet-$RID.dmg"
+DMG="$ROOT/dist/Ongenet-${VERSION}-${SLUG}.dmg"
+ICNS="$ROOT/packaging/icons/Ongenet.icns"
+PLIST_TEMPLATE="$ROOT/packaging/macos/Info.plist.template"
 
-echo "=== Publishing $RID ==="
-dotnet publish "$ROOT/Ongenet.Desktop/Ongenet.Desktop.csproj" -c Release -r "$RID" --self-contained true \
-  -p:DebugType=none -p:DebugSymbols=false
+echo "=== Publishing $RID (v$VERSION) ==="
+if [ ! -d "$PUBLISH" ] || [ -z "$(ls -A "$PUBLISH" 2>/dev/null || true)" ]; then
+  dotnet publish "$ROOT/Ongenet.Desktop/Ongenet.Desktop.csproj" -c Release -r "$RID" --self-contained true \
+    -p:DebugType=none -p:DebugSymbols=false
+fi
+ensure_license_in_publish "$PUBLISH" "$ROOT"
 
 mkdir -p "$STAGE" "$ROOT/dist"
 rm -rf "$STAGE/$APP_NAME.app"
 mkdir -p "$STAGE/$APP_NAME.app/Contents/MacOS" "$STAGE/$APP_NAME.app/Contents/Resources"
 
 cp -a "$PUBLISH/." "$STAGE/$APP_NAME.app/Contents/MacOS/"
+[ -f "$ICNS" ] && cp "$ICNS" "$STAGE/$APP_NAME.app/Contents/Resources/Ongenet.icns"
+[ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$STAGE/$APP_NAME.app/Contents/Resources/LICENSE"
 
-cat > "$STAGE/$APP_NAME.app/Contents/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleName</key><string>Ongenet</string>
-  <key>CFBundleDisplayName</key><string>Ongenet</string>
-  <key>CFBundleIdentifier</key><string>dev.ongenet.desktop</string>
-  <key>CFBundleExecutable</key><string>Ongenet</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>LSMinimumSystemVersion</key><string>12.0</string>
-</dict>
-</plist>
-PLIST
+sed "s/@VERSION@/$VERSION/g" "$PLIST_TEMPLATE" > "$STAGE/$APP_NAME.app/Contents/Info.plist"
 
 chmod +x "$STAGE/$APP_NAME.app/Contents/MacOS/Ongenet" 2>/dev/null || true
 

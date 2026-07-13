@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+# Quit a running Ongenet before replacing /Applications/Ongenet.app
+if pgrep -x Ongenet >/dev/null 2>&1; then
+  osascript -e 'tell application "Ongenet" to quit' 2>/dev/null || true
+  sleep 1
+  pkill -x Ongenet 2>/dev/null || true
+fi
+if [ -d "/Applications/Ongenet.app" ]; then
+  rm -rf "/Applications/Ongenet.app"
+fi
+exit 0

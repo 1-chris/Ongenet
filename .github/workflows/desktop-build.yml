@@ -1,20 +1,8 @@
 name: Build & Release
 
-# Builds the distributable Ongenet packages — self-contained desktop builds for every platform plus a
-# sideloadable Android APK — and (on a v* tag) publishes them all to a single GitHub Release.
-#
-# Desktop: audio uses each OS's native backend (ALSA/PipeWire/JACK/Pulse on Linux, CoreAudio on macOS,
-# WASAPI on Windows) via P/Invoke to the platform's own libraries, so there are no native libraries to
-# compile or bundle — every target is a plain `dotnet publish`:
-#   * linux-x64           : built on an x86_64 Ubuntu runner.
-#   * linux-arm64         : built on an arm64 Ubuntu runner.
-#   * win-x64             : cross-published from the x86_64 Ubuntu runner (pure .NET, no native build).
-#   * osx-arm64 / osx-x64 : built on macOS runners (osx-x64 cross-published from the Apple Silicon runner).
-# Each desktop job ends with dist/Ongenet-<rid>.zip (produced by publish-desktop.sh) uploaded as an artifact.
-#
-# Android: the `android` job sets up JDK 21 + the .NET android workload, provisions the Android SDK, and
-# runs publish-android.sh to emit dist/Ongenet-<version>.apk (debug-signed, for sideloading). No emulator
-# or Android Studio is involved.
+# Builds distributable Ongenet packages — portable ZIPs, native installers (AppImage, Flatpak,
+# Windows Inno Setup, macOS pkg/dmg), and a sideloadable Android APK. On v* tags, publishes all
+# artifacts to a single GitHub Release.
 
 on:
   push:
@@ -22,16 +10,14 @@ on:
     tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch:        # allow manual runs from the Actions tab
+  workflow_dispatch:
 
-# Don't pile up redundant runs for the same ref; cancel the in-progress one when a new push lands.
-# (Tag runs get their own group so a release build is never cancelled by a later branch push.)
 concurrency:
   group: build-release-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: write           # needed by the release job to create/upload a GitHub Release
+  contents: write
 
 env:
   DOTNET_VERSION: "10.0.x"
@@ -41,135 +27,203 @@ jobs:
     name: Core tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install .NET ${{ env.DOTNET_VERSION }}
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+      - run: dotnet test Ongenet.Core.Tests/Ongenet.Core.Tests.csproj --configuration Release --verbosity normal
 
-      - name: Run tests
-        run: dotnet test Ongenet.Core.Tests/Ongenet.Core.Tests.csproj --configuration Release --verbosity normal
-
-  build:
-    name: Build ${{ matrix.rid }}
+  build-portable:
+    name: Portable ${{ matrix.rid }}
     needs: test
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false      # one platform failing shouldn't abandon the others
+      fail-fast: false
       matrix:
         include:
           - { rid: linux-x64,   os: ubuntu-latest }
           - { rid: linux-arm64, os: ubuntu-24.04-arm }
-          - { rid: win-x64,     os: ubuntu-latest }          # cross-published (pure .NET)
-          # Both macOS targets build on the Apple Silicon runner. Intel (macos-13) runners are being
-          # retired, so osx-x64 is cross-published: `dotnet publish -r osx-x64` cross-publishes fine
-          # from an arm64 host.
-          - { rid: osx-arm64, os: macos-14 }
-          - { rid: osx-x64,   os: macos-14 }
+          - { rid: win-x64,     os: ubuntu-latest }
+          - { rid: osx-arm64,   os: macos-14 }
+          - { rid: osx-x64,     os: macos-14 }
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install .NET ${{ env.DOTNET_VERSION }}
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      # `zip` for packaging (publish-desktop.sh falls back to tar.gz if it's missing, but zip is the
-      # expected artifact). macOS runners ship zip already.
       - name: Install zip (Linux)
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends zip
-
-      - name: Publish
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zip
+      - name: Publish portable package
         run: |
           chmod +x publish-desktop.sh
           ./publish-desktop.sh "${{ matrix.rid }}"
-
-      # --- Package artifact -------------------------------------------------------------------------
-      - name: Upload package artifact
+      - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ongenet-${{ matrix.rid }}
+          name: Ongenet-portable-${{ matrix.rid }}
           path: |
-            dist/Ongenet-${{ matrix.rid }}.zip
-            dist/Ongenet-${{ matrix.rid }}.tar.gz
+            dist/Ongenet-*-portable.zip
+            dist/Ongenet-*-portable.tar.gz
           if-no-files-found: error
           retention-days: 14
 
-  # Build the sideloadable Android APK. Kept on its own Linux job because it needs the Android toolchain
-  # (JDK 21 + the .NET android workload + SDK) that the desktop jobs don't.
+  build-linux-installers:
+    name: Linux installers (x64)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder zsync
+          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak --user install -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O /tmp/appimagetool.AppImage
+          chmod +x /tmp/appimagetool.AppImage
+          sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
+      - name: Build AppImage and Flatpak
+        run: |
+          chmod +x scripts/build-appimage.sh scripts/build-flatpak.sh publish-desktop.sh
+          ./publish-desktop.sh --no-zip linux-x64
+          ./scripts/build-appimage.sh linux-x64
+          ./scripts/build-flatpak.sh linux-x64
+      - name: Upload Linux installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ongenet-installers-linux-x64
+          path: |
+            dist/Ongenet-*-linux-x64.AppImage
+            dist/Ongenet-*-linux-x64.flatpak
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows-installer:
+    name: Windows installer
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+      - name: Build setup.exe
+        shell: bash
+        run: |
+          chmod +x scripts/build-windows-installer.sh
+          export PATH="/c/Program Files (x86)/Inno Setup 6:$PATH"
+          ./scripts/build-windows-installer.sh
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ongenet-installers-win-x64
+          path: dist/Ongenet-*-win-x64-setup.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  build-macos-installers:
+    name: macOS installers ${{ matrix.rid }}
+    needs: test
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [ osx-arm64, osx-x64 ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Build dmg and pkg
+        run: |
+          chmod +x scripts/build-dmg.sh scripts/build-macos-pkg.sh publish-desktop.sh
+          ./publish-desktop.sh --no-zip "${{ matrix.rid }}"
+          ./scripts/build-dmg.sh "${{ matrix.rid }}"
+          ./scripts/build-macos-pkg.sh "${{ matrix.rid }}"
+      - name: Upload macOS installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ongenet-installers-${{ matrix.rid }}
+          path: |
+            dist/Ongenet-*-macos-*.dmg
+            dist/Ongenet-*-macos-*.pkg
+          if-no-files-found: error
+          retention-days: 14
+
   android:
     name: Build android
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install .NET ${{ env.DOTNET_VERSION }}
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      # The .NET Android tooling requires exactly JDK 21 (with javac/jar). Temurin 21 provides it and
-      # setup-java points JAVA_HOME at it.
-      - name: Install JDK 21 (Temurin)
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
-
-      - name: Install Android workload
-        run: dotnet workload install android
-
-      # The ubuntu runner ships an Android SDK ($ANDROID_SDK_ROOT); provision the specific platform +
-      # build-tools this project needs into it (and accept the licenses) before building.
-      - name: Provision Android SDK components
+      - run: dotnet workload install android
+      - name: Provision Android SDK
         run: |
           dotnet build Ongenet.Android/Ongenet.Android.csproj -t:InstallAndroidDependencies \
             -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" \
             -p:JavaSdkDirectory="$JAVA_HOME" \
             -p:AcceptAndroidSDKLicenses=True
-
       - name: Publish APK
         run: |
           chmod +x publish-android.sh
-          # setup-java exports JAVA_HOME (Temurin 21) and the runner sets ANDROID_SDK_ROOT; pass them to
-          # the script (its /usr/lib/jvm auto-detection won't find the hostedtoolcache JDK).
           JAVA21_HOME="$JAVA_HOME" ANDROID_SDK="$ANDROID_SDK_ROOT" ./publish-android.sh
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: Ongenet-android
           path: dist/Ongenet-*.apk
           if-no-files-found: error
           retention-days: 14
 
-  # Attach every desktop package and the Android APK to a single GitHub Release, but only when a v* tag
-  # is pushed.
   release:
     name: Publish Release
-    needs: [ build, android ]
+    needs: [ build-portable, build-linux-installers, build-windows-installer, build-macos-installers, android ]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: artifacts          # each artifact lands in artifacts/<name>/...
-
+          path: artifacts
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2   # third-party action; pinned to a major tag
+        uses: softprops/action-gh-release@v2
         with:
+          body: |
+            ## Installers (recommended)
+
+            | Platform | Download | Upgrade |
+            |----------|----------|---------|
+            | Linux x64 | `.flatpak` or `.AppImage` | `flatpak update net.onge.Ongenet` or re-run `install-appimage.sh` |
+            | Windows x64 | `*-win-x64-setup.exe` | Re-run the same setup.exe |
+            | macOS | `*.pkg` or `*.dmg` | Re-run the same pkg/dmg |
+
+            ## Portable
+
+            Self-contained ZIPs — extract anywhere, no system integration. Upgrade by extracting over the previous folder; settings are stored separately.
+
+            See [DEVELOPMENT.md §7.1](https://github.com/1-chris/Ongenet/blob/main/DEVELOPMENT.md#71-packaging-installers--portable-builds) for build details.
           files: |
-            artifacts/**/Ongenet-*.zip
+            artifacts/**/Ongenet-*-portable.zip
+            artifacts/**/Ongenet-*-portable.tar.gz
+            artifacts/**/Ongenet-*.AppImage
+            artifacts/**/Ongenet-*.flatpak
+            artifacts/**/Ongenet-*-win-x64-setup.exe
+            artifacts/**/Ongenet-*-macos-*.dmg
+            artifacts/**/Ongenet-*-macos-*.pkg
             artifacts/**/Ongenet-*.apk
           generate_release_notes: true
           fail_on_unmatched_files: true

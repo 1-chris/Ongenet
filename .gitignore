@@ -99,8 +99,28 @@ logs/
 SharpSignal/
 I2PSharp/
 
-# Ongenet packaging output (publish-desktop.sh)
+# Ongenet packaging output and intermediates
 /dist/
+*.AppImage
+*.flatpak
+*.dmg
+*.pkg
+
+# AppImage AppDir staging (scripts/build-appimage.sh)
+*.AppDir/
+
+# macOS DMG/pkg staging (scripts/build-dmg.sh, build-macos-pkg.sh)
+dist/dmg-stage/
+
+# Flatpak local builds (packaging/flatpak/)
+packaging/flatpak/.flatpak-builder/
+packaging/flatpak/build-dir/
+packaging/flatpak/repo/
+packaging/flatpak/.flatpak-repo/
+packaging/flatpak/build/
+
+# Inno Setup compiler output (if built outside dist/)
+packaging/windows/Output/
 
 # DocFX site build output
 /_site/
