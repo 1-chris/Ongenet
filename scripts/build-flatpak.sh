@@ -73,6 +73,11 @@ finish-args:
 modules:
   - name: ongenet
     buildsystem: simple
+    # Publish output is already Release-stripped; skip flatpak-builder's elfutils
+    # post-process (eu-strip / eu-elfcompress) so CI doesn't need those packages.
+    build-options:
+      strip: false
+      no-debuginfo: true
     build-commands:
       - mkdir -p /app/lib/ongenet /app/bin /app/share/metainfo /app/share/applications
       - mkdir -p /app/share/icons/hicolor/256x256/apps /app/share/licenses/Ongenet
