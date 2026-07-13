@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
@@ -15,12 +16,19 @@ public sealed class VideoWaveformCacheService : IVideoWaveformCacheService
 {
     private readonly OfflineRenderer _renderer = new();
     private readonly Dictionary<Guid, AudioWaveform> _cache = new();
+    private readonly Dictionary<Guid, string> _stemWavPaths = new();
     private int _revision;
 
     public int Revision => _revision;
 
     public void Invalidate()
     {
+        foreach (var path in _stemWavPaths.Values)
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch { /* best effort */ }
+        }
+
+        _stemWavPaths.Clear();
         _cache.Clear();
         _revision++;
     }
@@ -33,6 +41,31 @@ public sealed class VideoWaveformCacheService : IVideoWaveformCacheService
         if (_cache.TryGetValue(trackId, out var cached))
             return cached;
 
+        var buffer = RenderAudioBuffer(project, trackId, bpm, progress);
+        var waveform = AudioWaveform.Build(buffer);
+        _cache[trackId] = waveform;
+        return waveform;
+    }
+
+    public AudioSampleBuffer GetOrBuildStemBuffer(Project project, Guid trackId, double bpm,
+        IProgress<double>? progress = null) => RenderAudioBuffer(project, trackId, bpm, progress);
+
+    public string GetOrBuildStemWavPath(Project project, Guid trackId, double bpm, IProgress<double>? progress = null)
+    {
+        if (_stemWavPaths.TryGetValue(trackId, out var cached) && File.Exists(cached))
+            return cached;
+
+        var buffer = RenderAudioBuffer(project, trackId, bpm, progress);
+        var path = Path.Combine(Path.GetTempPath(), $"ongenet-stem-{trackId:N}.wav");
+        using (var writer = new WavWriter(path, buffer.Channels, buffer.SampleRate, 16))
+            writer.Write(buffer.Samples);
+
+        _stemWavPaths[trackId] = path;
+        return path;
+    }
+
+    private AudioSampleBuffer RenderAudioBuffer(Project project, Guid trackId, double bpm, IProgress<double>? progress)
+    {
         var track = project.Tracks.FirstOrDefault(t => t.Id == trackId)
             ?? throw new InvalidOperationException("Audio source track not found.");
 
@@ -40,13 +73,9 @@ public sealed class VideoWaveformCacheService : IVideoWaveformCacheService
         var totalBeats = Math.Max(1, project.BarCount * beatsPerBar);
         var scope = BuildScope(project, track, totalBeats);
         var format = new AudioFormat { SampleRate = 48000, Channels = 2 };
-        var buffer = scope is not null
+        return scope is not null
             ? _renderer.RenderScopeToBuffer(project, format, bpm, scope, progress)
             : RenderStem(project, track, format, bpm, totalBeats, progress);
-
-        var waveform = AudioWaveform.Build(buffer);
-        _cache[trackId] = waveform;
-        return waveform;
     }
 
     private static ClipRenderScope? BuildScope(Project project, Track track, double totalBeats)

@@ -123,6 +123,12 @@
     <system:String x:Key="Export_Export_AAF_OMF_handoff_XML">AAF/OMF ハンドオフをエクスポート (XML)</system:String>
     <system:String x:Key="Export_Export_ADM_BWF_immersive">ADM BWF をエクスポート (immersive)</system:String>
     <system:String x:Key="Export_Export_Title">エクスポート</system:String>
+    <system:String x:Key="Export_Video_Title">ビデオをエクスポート</system:String>
+    <system:String x:Key="Export_Video_heading">ビデオをエクスポート</system:String>
+    <system:String x:Key="Export_Video_save_title">ビデオをエクスポート</system:String>
+    <system:String x:Key="Export_Audio_save_title">オーディオをエクスポート</system:String>
+    <system:String x:Key="Export_Video_file_type">MP4 ビデオ</system:String>
+    <system:String x:Key="Export_Export_video_action">ビデオをエクスポート…</system:String>
     <system:String x:Key="Export_Export_timeline_XML_post_handoff">タイムライン XML をエクスポート（ポスト連携）</system:String>
     <system:String x:Key="Export_Height">高さ</system:String>
     <system:String x:Key="Export_ITU_R_BS2076_metadata_sidecar_for_broadcast_imme_Tip">放送イマーシブハンドオフ用 ITU-R BS.2076 メタデータサイドカー (OSS)</system:String>

@@ -37,6 +37,7 @@ public sealed class ExportViewModel : ViewModelBase
     private Ongenet.Core.Models.Media.VideoLayer? _selectedVideoLayer;
     private bool _exportAdmBwf;
     private bool _exportAafOmf;
+    private bool _isVideoExportMode;
     private ArrangementMarker? _selectedMarker;
 
     public ExportViewModel(IProjectService project, ITransportService transport, IAudioEngine engine,
@@ -74,13 +75,31 @@ public sealed class ExportViewModel : ViewModelBase
     /// <summary>Presets the dialog for composited MP4 export from the title bar Export video menu.</summary>
     public void ApplyVideoExportPreset()
     {
+        IsVideoExportMode = true;
         Kind = ExportKind.Master;
-        MuxWithVideo = false;
-        ComposeVideo = true;
         ExportTimelineXml = false;
         ExportAdmBwf = false;
         ExportAafOmf = false;
+        MuxWithVideo = false;
+        ComposeVideo = true;
     }
+
+    /// <summary>Resets video-only mode when opening the standard audio export dialog.</summary>
+    public void ApplyAudioExportPreset() => IsVideoExportMode = false;
+
+    public bool IsVideoExportMode
+    {
+        get => _isVideoExportMode;
+        private set
+        {
+            if (!SetField(ref _isVideoExportMode, value)) return;
+            OnPropertyChanged(nameof(ShowAudioExportOptions));
+            OnPropertyChanged(nameof(ShowVideoCompositorPanel));
+        }
+    }
+
+    public bool ShowAudioExportOptions => !IsVideoExportMode;
+    public bool ShowVideoCompositorPanel => IsVideoExportMode || ShowVideoExport;
 
     public string StemSeparationBackend => _stemSeparation.IsDemucsAvailable
         ? "demucs available — choose quality below"
@@ -141,7 +160,8 @@ public sealed class ExportViewModel : ViewModelBase
     public ObservableCollection<Ongenet.Core.Models.Media.VideoLayer> VideoLayers { get; } = new();
 
     public bool HasMarkers => Markers.Count > 0;
-    public bool HasVideoLayers => VideoLayers.Count > 0;
+    public bool HasMuxVideoLayers => VideoLayers.Count > 0;
+    public bool CanComposeVideo => _project.Current.VideoLayers.Count > 0;
     public bool ShowVideoExport => _project.Current.VideoLayers.Count > 0;
 
     public bool MuxWithVideo
@@ -151,7 +171,6 @@ public sealed class ExportViewModel : ViewModelBase
         {
             if (!SetField(ref _muxWithVideo, value)) return;
             OnPropertyChanged(nameof(SuggestedFileExtension));
-            if (!value) ComposeVideo = false;
         }
     }
 
@@ -210,6 +229,7 @@ public sealed class ExportViewModel : ViewModelBase
     }
 
     public bool ShowAdmOption => Surround != SurroundFormat.Stereo;
+    public bool ShowAdmExportOption => ShowAudioExportOptions && ShowAdmOption;
 
     public ArrangementMarker? SelectedMarker
     {

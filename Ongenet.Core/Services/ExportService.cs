@@ -125,12 +125,13 @@ public sealed class ExportService
             {
                 var muxed = Path.ChangeExtension(outputPath, ".mp4");
                 var duration = ComputeVideoDurationSeconds(project, options, bpm);
+                var startBeat = options.Kind == ExportKind.Region ? options.RegionStartBeat : 0;
                 FfmpegVideoCompositor.Export(project, wavPath, muxed, duration,
-                    waveformCache: waveformCache, bpm: bpm);
+                    waveformCache: waveformCache, bpm: bpm, startBeat: startBeat, progress: progress);
                 if (!muxed.Equals(outputPath, StringComparison.OrdinalIgnoreCase)
                     && outputPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
                     File.Move(muxed, outputPath, overwrite: true);
-                return;
+                return true;
             }
 
             if (options.MuxWithVideo && options.VideoTrackId is { } vid)
@@ -145,9 +146,11 @@ public sealed class ExportService
                     if (!muxed.Equals(outputPath, StringComparison.OrdinalIgnoreCase)
                         && outputPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
                         File.Move(muxed, outputPath, overwrite: true);
-                    return;
+                    return true;
                 }
             }
+
+            return false;
         }, outputPath);
     }
 

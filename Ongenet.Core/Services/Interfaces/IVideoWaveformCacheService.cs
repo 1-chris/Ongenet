@@ -12,4 +12,11 @@ public interface IVideoWaveformCacheService
     AudioWaveform? TryGet(Guid trackId);
 
     AudioWaveform GetOrBuild(Models.Audio.Project project, Guid trackId, double bpm, IProgress<double>? progress = null);
+
+    /// <summary>Offline stem PCM for animated visualiser export (cached per track).</summary>
+    AudioSampleBuffer GetOrBuildStemBuffer(Models.Audio.Project project, Guid trackId, double bpm,
+        IProgress<double>? progress = null);
+
+    /// <summary>Offline stem WAV on disk (legacy helper).</summary>
+    string GetOrBuildStemWavPath(Models.Audio.Project project, Guid trackId, double bpm, IProgress<double>? progress = null);
 }

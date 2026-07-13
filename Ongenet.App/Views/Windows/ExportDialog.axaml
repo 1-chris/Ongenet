@@ -18,7 +18,10 @@
 
     <Border Background="{StaticResource CatppuccinBase}" Padding="16">
         <StackPanel Spacing="12">
-            <TextBlock Text="{DynamicResource Export_Export}" FontWeight="SemiBold" FontSize="16"/>
+            <TextBlock Text="{DynamicResource Export_Export}" FontWeight="SemiBold" FontSize="16"
+                       IsVisible="{Binding ShowAudioExportOptions}"/>
+            <TextBlock Text="{DynamicResource Export_Video_heading}" FontWeight="SemiBold" FontSize="16"
+                       IsVisible="{Binding IsVideoExportMode}"/>
 
             <StackPanel Spacing="4">
                 <TextBlock Text="{DynamicResource Export_Kind}" Foreground="{StaticResource CatppuccinSubtext0}"/>
@@ -26,13 +29,13 @@
                           HorizontalAlignment="Stretch"/>
             </StackPanel>
 
-            <StackPanel Spacing="4">
+            <StackPanel Spacing="4" IsVisible="{Binding ShowAudioExportOptions}">
                 <TextBlock Text="{DynamicResource Export_Surround}" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 <ComboBox ItemsSource="{Binding SurroundFormats}" SelectedItem="{Binding Surround, Mode=TwoWay}"
                           HorizontalAlignment="Stretch"/>
             </StackPanel>
 
-            <StackPanel Spacing="4">
+            <StackPanel Spacing="4" IsVisible="{Binding ShowAudioExportOptions}">
                 <TextBlock Text="{DynamicResource Export_Audio_format}" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 <ComboBox ItemsSource="{Binding AudioFormats}" SelectedItem="{Binding AudioFormat, Mode=TwoWay}"
                           HorizontalAlignment="Stretch"/>
@@ -56,16 +59,25 @@
 
             <CheckBox Content="{DynamicResource Export_Export_timeline_XML_post_handoff}"
                       IsChecked="{Binding ExportTimelineXml, Mode=TwoWay}"
+                      IsVisible="{Binding ShowAudioExportOptions}"
                       ToolTip.Tip="{DynamicResource Export_Custom_Ongenet_timeline_XML_for_video_post_refer_Tip}"/>
 
-            <StackPanel Spacing="4" IsVisible="{Binding ShowVideoExport}">
+            <StackPanel Spacing="4" IsVisible="{Binding ShowVideoCompositorPanel}">
                 <CheckBox Content="{DynamicResource Export_Mux_with_video}"
                           IsChecked="{Binding MuxWithVideo, Mode=TwoWay}"
-                          IsEnabled="{Binding HasVideoLayers}"/>
+                          IsVisible="{Binding ShowAudioExportOptions}"
+                          IsEnabled="{Binding HasMuxVideoLayers}"/>
                 <CheckBox Content="{DynamicResource Export_Composited_video}"
                           IsChecked="{Binding ComposeVideo, Mode=TwoWay}"
-                          IsEnabled="{Binding HasVideoLayers}" Margin="16,0,0,0"/>
+                          IsEnabled="{Binding CanComposeVideo}"
+                          IsVisible="{Binding IsVideoExportMode}"/>
+                <CheckBox Content="{DynamicResource Export_Composited_video}"
+                          IsChecked="{Binding ComposeVideo, Mode=TwoWay}"
+                          IsEnabled="{Binding CanComposeVideo}"
+                          IsVisible="{Binding ShowAudioExportOptions}"
+                          Margin="16,0,0,0"/>
                 <ComboBox ItemsSource="{Binding VideoLayers}" SelectedItem="{Binding SelectedVideoLayer, Mode=TwoWay}"
+                          IsVisible="{Binding ShowAudioExportOptions}"
                           IsEnabled="{Binding MuxWithVideo}" PlaceholderText="{DynamicResource Export_Video_layer}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="media:VideoLayer">
@@ -77,14 +89,15 @@
 
             <CheckBox Content="{DynamicResource Export_Export_AAF_OMF_handoff_XML}"
                       IsChecked="{Binding ExportAafOmf, Mode=TwoWay}"
+                      IsVisible="{Binding ShowAudioExportOptions}"
                       ToolTip.Tip="{DynamicResource Export_Structured_XML_interchange_for_post_houses_binar_Tip}"/>
 
             <CheckBox Content="{DynamicResource Export_Export_ADM_BWF_immersive}"
                       IsChecked="{Binding ExportAdmBwf, Mode=TwoWay}"
-                      IsVisible="{Binding ShowAdmOption}"
+                      IsVisible="{Binding ShowAdmExportOption}"
                       ToolTip.Tip="{DynamicResource Export_ITU_R_BS2076_metadata_sidecar_for_broadcast_imme_Tip}"/>
 
-            <StackPanel Spacing="6">
+            <StackPanel Spacing="6" IsVisible="{Binding ShowAudioExportOptions}">
                 <TextBlock Text="{DynamicResource Export_Stem_separation}" FontWeight="SemiBold" FontSize="11"
                            Foreground="{StaticResource CatppuccinOverlay1}"/>
                 <TextBlock Text="{Binding StemSeparationBackend}" FontSize="11"
@@ -104,7 +117,7 @@
                         HorizontalAlignment="Stretch"/>
             </StackPanel>
 
-            <StackPanel Spacing="4">
+            <StackPanel Spacing="4" IsVisible="{Binding ShowAudioExportOptions}">
                 <TextBlock Text="{DynamicResource Export_Bit_depth}" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 <ComboBox ItemsSource="{Binding BitDepths}" SelectedItem="{Binding BitDepth, Mode=TwoWay}"
                           HorizontalAlignment="Stretch"/>
@@ -145,7 +158,10 @@
 
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                 <Button Content="{DynamicResource Export_Cancel}" Click="OnCancel" IsEnabled="{Binding !IsExporting}"/>
-                <Button Content="{DynamicResource Export_Export_2}" Classes="accent" Click="OnExport" IsEnabled="{Binding CanExport}"/>
+                <Button Content="{DynamicResource Export_Export_video_action}" Classes="accent" Click="OnExport" IsEnabled="{Binding CanExport}"
+                        IsVisible="{Binding IsVideoExportMode}"/>
+                <Button Content="{DynamicResource Export_Export_2}" Classes="accent" Click="OnExport" IsEnabled="{Binding CanExport}"
+                        IsVisible="{Binding ShowAudioExportOptions}"/>
             </StackPanel>
         </StackPanel>
     </Border>

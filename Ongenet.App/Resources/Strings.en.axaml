@@ -123,6 +123,12 @@
     <system:String x:Key="Export_Export_AAF_OMF_handoff_XML">Export AAF/OMF handoff (XML)</system:String>
     <system:String x:Key="Export_Export_ADM_BWF_immersive">Export ADM BWF (immersive)</system:String>
     <system:String x:Key="Export_Export_Title">Export</system:String>
+    <system:String x:Key="Export_Video_Title">Export video</system:String>
+    <system:String x:Key="Export_Video_heading">Export video</system:String>
+    <system:String x:Key="Export_Video_save_title">Export video</system:String>
+    <system:String x:Key="Export_Audio_save_title">Export audio</system:String>
+    <system:String x:Key="Export_Video_file_type">MP4 video</system:String>
+    <system:String x:Key="Export_Export_video_action">Export video…</system:String>
     <system:String x:Key="Export_Export_timeline_XML_post_handoff">Export timeline XML (post handoff)</system:String>
     <system:String x:Key="Export_Height">Height</system:String>
     <system:String x:Key="Export_ITU_R_BS2076_metadata_sidecar_for_broadcast_imme_Tip">ITU-R BS.2076 metadata sidecar for broadcast immersive handoff (OSS)</system:String>

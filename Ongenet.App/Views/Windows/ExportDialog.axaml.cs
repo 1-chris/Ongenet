@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Ongenet.App.Localization;
 using Ongenet.App.ViewModels;
 using Ongenet.Core.Services;
 
@@ -28,7 +29,8 @@ public partial class ExportDialog : Window
         var vm = App.ServiceProvider?.GetRequiredService<ExportViewModel>();
         if (vm is null) return;
 
-        var dialog = new ExportDialog { DataContext = vm, _vm = vm };
+        vm.ApplyAudioExportPreset();
+        var dialog = CreateDialog(vm, forVideo: false);
         await dialog.ShowDialog(owner);
     }
 
@@ -38,8 +40,15 @@ public partial class ExportDialog : Window
         if (vm is null) return;
 
         vm.ApplyVideoExportPreset();
-        var dialog = new ExportDialog { DataContext = vm, _vm = vm };
+        var dialog = CreateDialog(vm, forVideo: true);
         await dialog.ShowDialog(owner);
+    }
+
+    private static ExportDialog CreateDialog(ExportViewModel vm, bool forVideo)
+    {
+        var dialog = new ExportDialog { DataContext = vm, _vm = vm };
+        dialog.Title = Loc.Get(forVideo ? "Export_Video_Title" : "Export_Export_Title");
+        return dialog;
     }
 
     private void OnCancel(object? sender, RoutedEventArgs e) => Close();
@@ -63,10 +72,13 @@ public partial class ExportDialog : Window
         }
         else
         {
+            var videoExport = _vm.IsVideoExportMode || _vm.ComposeVideo || _vm.MuxWithVideo;
             var ext = _vm.SuggestedFileExtension;
             var types = new List<FilePickerFileType>
             {
-                new(_vm.AudioFormat.GetDescription()) { Patterns = new[] { $"*.{ext}" } }
+                videoExport
+                    ? new FilePickerFileType(Loc.Get("Export_Video_file_type")) { Patterns = new[] { "*.mp4" } }
+                    : new FilePickerFileType(_vm.AudioFormat.GetDescription()) { Patterns = new[] { $"*.{ext}" } }
             };
             var suggested = _vm.Kind switch
             {
@@ -76,7 +88,7 @@ public partial class ExportDialog : Window
             };
             var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Export audio",
+                Title = Loc.Get(videoExport ? "Export_Video_save_title" : "Export_Audio_save_title"),
                 SuggestedFileName = $"{suggested}.{ext}",
                 DefaultExtension = ext,
                 FileTypeChoices = types

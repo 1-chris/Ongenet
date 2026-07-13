@@ -46,12 +46,18 @@ public static class FfmpegAudioEncoder
             throw new InvalidOperationException($"ffmpeg encode failed: {err.Trim()}");
     }
 
-    public static void ExportViaWav(Action<string> renderWav, string finalPath)
+    /// <summary>
+    /// Renders to a temp WAV via <paramref name="renderWav"/>, then copies or encodes to
+    /// <paramref name="finalPath"/>. Return <c>true</c> from the callback when the final file is
+    /// already written (e.g. composited MP4) to skip audio-only encoding.
+    /// </summary>
+    public static void ExportViaWav(Func<string, bool> renderWav, string finalPath)
     {
         var temp = Path.Combine(Path.GetTempPath(), $"ongenet-export-{Guid.NewGuid():N}.wav");
         try
         {
-            renderWav(temp);
+            var handled = renderWav(temp);
+            if (handled) return;
             if (finalPath.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
             {
                 File.Copy(temp, finalPath, overwrite: true);
