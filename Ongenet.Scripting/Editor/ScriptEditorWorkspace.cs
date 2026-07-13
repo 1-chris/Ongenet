@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Immutable;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -74,12 +77,54 @@ public sealed class ScriptEditorWorkspace : IDisposable
 
 internal static class ScriptMetadataReferences
 {
+    // Must be initialized before All — FromAssembly reads this during the All field initializer.
+    private static readonly string[] TrustedAssemblies = LoadTrustedAssemblies();
+
     public static ImmutableArray<MetadataReference> All { get; } =
     [
-        MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-        MetadataReference.CreateFromFile(typeof(IScriptingApi).Assembly.Location),
-        MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
-        MetadataReference.CreateFromFile(typeof(System.Linq.Enumerable).Assembly.Location),
-        MetadataReference.CreateFromFile(typeof(ImmutableArray).Assembly.Location)
+        FromAssembly(typeof(object).Assembly),
+        FromAssembly(typeof(IScriptingApi).Assembly),
+        FromAssembly(typeof(Console).Assembly),
+        FromAssembly(typeof(System.Linq.Enumerable).Assembly),
+        FromAssembly(typeof(ImmutableArray).Assembly)
     ];
+
+    private static string[] LoadTrustedAssemblies()
+    {
+        var tpa = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+        return string.IsNullOrEmpty(tpa)
+            ? Array.Empty<string>()
+            : tpa.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static MetadataReference FromAssembly(Assembly assembly)
+    {
+        var location = assembly.Location;
+        if (!string.IsNullOrEmpty(location) && File.Exists(location))
+            return MetadataReference.CreateFromFile(location);
+
+        var simpleName = assembly.GetName().Name;
+        if (string.IsNullOrEmpty(simpleName))
+        {
+            throw new InvalidOperationException(
+                $"Cannot create a Roslyn metadata reference for '{assembly.FullName}' (empty Location and no simple name).");
+        }
+
+        var fromTrusted = TrustedAssemblies.FirstOrDefault(path =>
+            string.Equals(Path.GetFileNameWithoutExtension(path), simpleName, StringComparison.OrdinalIgnoreCase));
+        if (fromTrusted is not null && File.Exists(fromTrusted))
+            return MetadataReference.CreateFromFile(fromTrusted);
+
+        foreach (var dir in new[] { AppContext.BaseDirectory, Path.GetDirectoryName(Environment.ProcessPath) })
+        {
+            if (string.IsNullOrEmpty(dir)) continue;
+            var sidecar = Path.Combine(dir, simpleName + ".dll");
+            if (File.Exists(sidecar))
+                return MetadataReference.CreateFromFile(sidecar);
+        }
+
+        throw new InvalidOperationException(
+            $"Cannot create a Roslyn metadata reference for '{assembly.FullName}' " +
+            "(Assembly.Location is empty and no on-disk assembly was found).");
+    }
 }

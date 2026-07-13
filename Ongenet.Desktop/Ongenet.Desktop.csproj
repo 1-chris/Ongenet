@@ -16,9 +16,9 @@
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-        <PublishSingleFile>true</PublishSingleFile>
+        <!-- Not PublishSingleFile: Roslyn's MetadataReference.CreateFromFile needs Assembly.Location,
+             which is empty (and TRUSTED_PLATFORM_ASSEMBLIES is unset) under single-file publish. -->
         <SelfContained>true</SelfContained>
-        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     </PropertyGroup>
 
     <ItemGroup>
