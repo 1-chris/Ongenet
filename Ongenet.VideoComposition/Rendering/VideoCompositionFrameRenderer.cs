@@ -136,7 +136,9 @@ public static class VideoCompositionFrameRenderer
         int width, int height, Func<Project, double, double>? beatsToSeconds = null)
     {
         canvas.Clear(Background);
-        scope.SetTime(timeSeconds);
+        scope.SetTime(beatsToSeconds is not null
+            ? beatsToSeconds(project, playheadBeats)
+            : timeSeconds);
 
         foreach (var layer in project.VideoLayers.OrderBy(l => l.ZOrder))
         {

@@ -25,7 +25,7 @@ public sealed class VideoEngine3DLayerRenderer : IVideoEngine3DLayerRenderer, ID
             || layer.AudioSourceTrackId is not { } trackId)
             return null;
 
-        var state = GetOrCreate(layer.Id, $"waveform:scope3d:{trackId}", () =>
+        var state = GetOrCreate(layer.Id, $"waveform:scope3d:{trackId}", scope, () =>
         {
             var scene = new Scene();
             var viz = new VideoScope3DVisualization(trackId, scope, layer);
@@ -44,7 +44,7 @@ public sealed class VideoEngine3DLayerRenderer : IVideoEngine3DLayerRenderer, ID
         if (!IsAvailable || !layer.IsEngine3DLayer || layer.Engine3DEffectKind is not { } kind)
             return null;
 
-        var state = GetOrCreate(layer.Id, BuildEngine3DCacheTag(layer, kind), () =>
+        var state = GetOrCreate(layer.Id, BuildEngine3DCacheTag(layer, kind), scope, () =>
         {
             var scene = new Scene();
             IEngine3DVisualization viz = kind switch
@@ -68,15 +68,18 @@ public sealed class VideoEngine3DLayerRenderer : IVideoEngine3DLayerRenderer, ID
 
     public void ClearAll() => _states.Clear();
 
-    private LayerVizState GetOrCreate(Guid layerId, string cacheTag, Func<LayerVizState> factory)
+    private LayerVizState GetOrCreate(Guid layerId, string cacheTag, IVideoAudioScopeService scope,
+        Func<LayerVizState> factory)
     {
         if (_states.TryGetValue(layerId, out var existing)
-            && string.Equals(existing.CacheTag, cacheTag, StringComparison.Ordinal))
+            && string.Equals(existing.CacheTag, cacheTag, StringComparison.Ordinal)
+            && ReferenceEquals(existing.Scope, scope))
             return existing;
 
         _states.Remove(layerId);
         var created = factory();
         created.CacheTag = cacheTag;
+        created.Scope = scope;
         _states[layerId] = created;
         return created;
     }
@@ -127,6 +130,7 @@ public sealed class VideoEngine3DLayerRenderer : IVideoEngine3DLayerRenderer, ID
     private sealed class LayerVizState(Scene scene, IEngine3DVisualization viz)
     {
         public string CacheTag { get; set; } = "";
+        public IVideoAudioScopeService? Scope { get; set; }
         public Scene Scene { get; } = scene;
         public IEngine3DVisualization Viz { get; } = viz;
     }

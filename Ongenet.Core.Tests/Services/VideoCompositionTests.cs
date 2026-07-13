@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Media;
@@ -84,5 +85,40 @@ public sealed class VideoTriggerEngineTests
 
         engine.OnSessionClipEvent(project, clipId, VideoTriggerMoment.ClipEnd);
         Assert.True(engine.Runtime.GetOpacity(layerId) <= 0.01);
+    }
+}
+
+public sealed class OfflineVideoAudioScopeTests
+{
+    [Fact]
+    public void CaptureLatest_advances_with_SetTime()
+    {
+        var trackId = Guid.NewGuid();
+        var samples = new float[48000];
+        for (var i = 0; i < samples.Length; i++)
+            samples[i] = i / 48000f;
+        var buffer = new Ongenet.Core.Audio.Files.AudioSampleBuffer(samples, 1, 48000);
+        var scope = new OfflineVideoAudioScope(new Dictionary<Guid, Ongenet.Core.Audio.Files.AudioSampleBuffer>
+        {
+            [trackId] = buffer
+        });
+        var dest = new float[8];
+
+        scope.SetTime(0);
+        var atStart = scope.CaptureLatest(trackId, dest);
+        Assert.True(atStart > 0);
+        Assert.True(dest[atStart - 1] < dest[0] || atStart == 1);
+
+        scope.SetTime(0.5);
+        var atMid = scope.CaptureLatest(trackId, dest);
+        Assert.Equal(8, atMid);
+        Assert.True(dest[atMid - 1] > dest[0]);
+    }
+
+    [Fact]
+    public void CaptureLatest_returns_zero_for_unknown_track()
+    {
+        var scope = new OfflineVideoAudioScope(new Dictionary<Guid, Ongenet.Core.Audio.Files.AudioSampleBuffer>());
+        Assert.Equal(0, scope.CaptureLatest(Guid.NewGuid(), new float[16]));
     }
 }

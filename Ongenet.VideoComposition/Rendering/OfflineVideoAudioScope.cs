@@ -31,6 +31,12 @@ public sealed class OfflineVideoAudioScope : IVideoAudioScopeService
 
         var endFrame = (long)(_timeSeconds * buffer.SampleRate);
         if (endFrame > buffer.FrameCount) endFrame = buffer.FrameCount;
+        if (endFrame <= 0)
+        {
+            if (buffer.FrameCount <= 0) return 0;
+            endFrame = 1;
+        }
+
         var startFrame = Math.Max(0, endFrame - dest.Length);
         var count = (int)(endFrame - startFrame);
         var channels = Math.Max(1, buffer.Channels);
