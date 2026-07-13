@@ -222,7 +222,8 @@ public static class ProjectCloner
             ColorKey = s.ColorKey,
             AutomationCollapsed = s.AutomationCollapsed,
             GroupCollapsed = s.GroupCollapsed,
-            ActivePatternId = s.ActivePatternId
+            ActivePatternId = s.ActivePatternId,
+            LaneHeight = s.LaneHeight
         };
 
         // Clone the instrument rack: a fresh instrument + its own effect chain per slot.
@@ -313,7 +314,7 @@ public static class ProjectCloner
         var target = ProjectFile.BuildTarget(clonedTrack, (int)b.Kind, b.EffectIndex, b.ParamIndex, clonedProject);
         if (target is null) return null;
 
-        var lane = new AutomationLane(target) { IsArmed = s.IsArmed, Binding = b };
+        var lane = new AutomationLane(target) { IsArmed = s.IsArmed, Binding = b, LaneHeight = s.LaneHeight };
         foreach (var p in s.Points) lane.Points.Add(new AutomationPoint(p.Beat, p.Value, p.Curve));
         lane.Sort();
         return lane;

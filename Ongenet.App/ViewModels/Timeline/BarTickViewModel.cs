@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Ongenet.App.Controls;
 
 namespace Ongenet.App.ViewModels.Timeline
 {
@@ -27,12 +28,23 @@ namespace Ongenet.App.ViewModels.Timeline
         /// <summary>Left edge of the tick on the ruler canvas, in pixels.</summary>
         public double Left => _metrics.BeatsToPixels(Beat);
 
+        /// <summary>Whether the bar number is shown at the current zoom (thins labels when zoomed out).</summary>
+        public bool IsLabelVisible
+        {
+            get
+            {
+                var stride = GridMath.BarLabelStride(_metrics.PixelsPerBeat, _metrics.BeatsPerBar);
+                return BarNumber == 1 || (BarNumber - 1) % stride == 0;
+            }
+        }
+
         private void OnMetricsChanged(object? sender, PropertyChangedEventArgs e)
         {
             // Reposition on both zoom (PixelsPerBeat) and time-signature (BeatsPerBar) changes.
             if (e.PropertyName is nameof(TimelineMetrics.PixelsPerBeat) or nameof(TimelineMetrics.BeatsPerBar))
             {
                 OnPropertyChanged(nameof(Left));
+                OnPropertyChanged(nameof(IsLabelVisible));
             }
         }
     }

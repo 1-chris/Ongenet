@@ -45,7 +45,30 @@ namespace Ongenet.App.ViewModels.Timeline
         public Track OwnerTrack => _owner;
         public TimelineMetrics Metrics => _metrics;
 
-        public override double Height => IsExpanded ? RowHeight : 0;
+        public override double DefaultHeight => RowHeight;
+
+        public override double Height => IsExpanded ? ResolveHeight(Model.LaneHeight, DefaultHeight) : 0;
+
+        public override bool SupportsResize => IsExpanded;
+
+        /// <summary>Vertical inset for take clips inside the row.</summary>
+        public double TakeTopInset => Math.Max(2, Height * 8.0 / DefaultHeight);
+
+        /// <summary>Rendered height of take clips inside the row.</summary>
+        public double TakeClipHeight => Math.Max(10, Height - TakeTopInset - 4);
+
+        public override void SetHeight(double height)
+        {
+            if (!IsExpanded) return;
+            height = SnapHeight(height, HalfHeight, DefaultHeight);
+            var stored = Math.Abs(height - DefaultHeight) < 0.5 ? 0 : height;
+            if (Math.Abs(Model.LaneHeight - stored) < 0.5) return;
+            Model.LaneHeight = stored;
+            OnPropertyChanged(nameof(Height));
+            OnPropertyChanged(nameof(IsCompact));
+            OnPropertyChanged(nameof(TakeTopInset));
+            OnPropertyChanged(nameof(TakeClipHeight));
+        }
 
         public string Name => Model.Name;
 
@@ -58,6 +81,10 @@ namespace Ongenet.App.ViewModels.Timeline
                 Model.IsExpanded = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Height));
+                OnPropertyChanged(nameof(SupportsResize));
+                OnPropertyChanged(nameof(IsCompact));
+                OnPropertyChanged(nameof(TakeTopInset));
+                OnPropertyChanged(nameof(TakeClipHeight));
                 OnPropertyChanged(nameof(CollapseGlyph));
             }
         }

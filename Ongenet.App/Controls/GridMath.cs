@@ -28,5 +28,25 @@ namespace Ongenet.App.Controls
             var bar = beatsPerBar < 1 ? 1 : beatsPerBar;
             return bar;
         }
+
+        /// <summary>
+        /// Bar stride for ruler labels: 1 = every bar, 2 = every other bar, etc. Doubles until
+        /// consecutive labels are at least <see cref="MinBarLabelSpacingPx"/> apart.
+        /// </summary>
+        public static int BarLabelStride(double pixelsPerBeat, int beatsPerBar)
+        {
+            if (pixelsPerBeat <= 0) return 1;
+
+            var barPx = (beatsPerBar < 1 ? 1 : beatsPerBar) * pixelsPerBeat;
+            if (barPx <= 0) return 1;
+
+            var stride = 1;
+            while (barPx * stride < MinBarLabelSpacingPx && stride < 1_048_576)
+                stride *= 2;
+            return stride;
+        }
+
+        /// <summary>Minimum horizontal gap between ruler bar numbers, in pixels.</summary>
+        public const double MinBarLabelSpacingPx = 44.0;
     }
 }

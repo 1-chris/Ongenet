@@ -10,9 +10,14 @@ namespace Ongenet.App.ViewModels.Timeline
     /// </summary>
     public class TimelineMetrics : ViewModelBase
     {
+        public const double DefaultHeaderWidth = 140.0;
+        public const double MinHeaderWidth = 100.0;
+        public const double MaxHeaderWidth = 320.0;
+
         private double _pixelsPerBeat = 16.0;
         private double _totalBeats = 128.0;
         private double _horizontalOffset;
+        private double _headerWidth = DefaultHeaderWidth;
         private int _beatsPerBar = 4;
 
         /// <summary>Horizontal zoom: how many pixels one beat occupies.</summary>
@@ -73,6 +78,18 @@ namespace Ongenet.App.ViewModels.Timeline
         {
             get => _horizontalOffset;
             set => SetField(ref _horizontalOffset, value);
+        }
+
+        /// <summary>Width of the track-name header column, in pixels.</summary>
+        public double HeaderWidth
+        {
+            get => _headerWidth;
+            set
+            {
+                var clamped = value < MinHeaderWidth ? MinHeaderWidth
+                    : value > MaxHeaderWidth ? MaxHeaderWidth : value;
+                SetField(ref _headerWidth, clamped);
+            }
         }
 
         /// <summary>Total width of the arrange area, in pixels.</summary>

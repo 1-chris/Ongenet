@@ -81,7 +81,8 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder zsync
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder zsync \
+            libfuse2t64 2>/dev/null || sudo apt-get install -y --no-install-recommends libfuse2
           flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak --user install -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
@@ -116,11 +117,14 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y
       - name: Build setup.exe
-        shell: bash
+        shell: pwsh
         run: |
-          chmod +x scripts/build-windows-installer.sh
-          export PATH="/c/Program Files (x86)/Inno Setup 6:$PATH"
-          ./scripts/build-windows-installer.sh
+          $version = ([regex]::Match((Get-Content Directory.Build.props -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
+          dotnet publish Ongenet.Desktop/Ongenet.Desktop.csproj -c Release -r win-x64 --self-contained true -p:DebugType=none -p:DebugSymbols=false
+          if (-not (Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          & $iscc "/DMyAppVersion=$version" "packaging\windows\ongenet.iss"
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:

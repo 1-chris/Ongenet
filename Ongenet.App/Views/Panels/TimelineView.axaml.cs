@@ -57,6 +57,18 @@ namespace Ongenet.App.Views.Panels
         private bool _bandMoved;     // whether the rubber band actually dragged (vs. a plain empty-space click)
         private int _bandPressRow;   // row under the press, used to select the track on a no-drag click
         private bool _redirectingLaneSelection;
+        private bool _syncingScroll;
+
+        // Row-height resize state.
+        private LaneViewModel? _resizeLane;
+        private double _resizeStartY;
+        private double _resizeStartHeight;
+        private bool _resizingRow;
+
+        // Header-column width resize state.
+        private bool _resizingHeaderWidth;
+        private double _headerWidthStartX;
+        private double _headerWidthStart;
 
         public TimelineView()
         {
@@ -82,6 +94,16 @@ namespace Ongenet.App.Views.Panels
             HeaderScroll.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
             HeaderScroll.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
             HeaderScroll.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+            HeaderScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnHeaderScrollChanged);
+            HeaderScroll.AddHandler(PointerWheelChangedEvent, OnHeaderPointerWheel, RoutingStrategies.Tunnel);
+
+            HeaderScroll.AddHandler(PointerPressedEvent, OnLaneResizePressed, RoutingStrategies.Tunnel);
+            HeaderScroll.AddHandler(PointerMovedEvent, OnLaneResizeMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+            HeaderScroll.AddHandler(PointerReleasedEvent, OnLaneResizeReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+
+            HeaderWidthGrip.AddHandler(PointerPressedEvent, OnHeaderWidthPressed, RoutingStrategies.Tunnel);
+            HeaderWidthGrip.AddHandler(PointerMovedEvent, OnHeaderWidthMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+            HeaderWidthGrip.AddHandler(PointerReleasedEvent, OnHeaderWidthReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
 
             // Clicking the bar ruler sets the start marker.
             RulerScroll.AddHandler(PointerPressedEvent, OnRulerPressed, RoutingStrategies.Tunnel);
@@ -145,6 +167,7 @@ namespace Ongenet.App.Views.Panels
             {
                 _vm.PropertyChanged += OnVmPropertyChanged;
                 _vm.Metrics.PropertyChanged += OnMetricsPropertyChanged;
+                SyncScrollFromMetrics();
                 UpdateOverlays();
             }
 
@@ -230,8 +253,25 @@ namespace Ongenet.App.Views.Panels
 
         private void OnMetricsPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(TimelineMetrics.HorizontalOffset))
+                SyncScrollFromMetrics();
             InvalidateOriginCache();
             UpdateOverlays();
+        }
+
+        private void SyncScrollFromMetrics()
+        {
+            if (_vm is null || _syncingScroll) return;
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            if (_lanesScroll is null) return;
+
+            var x = _vm.Metrics.HorizontalOffset;
+            if (System.Math.Abs(x - _lanesScroll.Offset.X) < 0.5) return;
+
+            _syncingScroll = true;
+            _lanesScroll.Offset = new Vector(x, _lanesScroll.Offset.Y);
+            RulerScroll.Offset = new Vector(x, 0);
+            _syncingScroll = false;
         }
 
         // Positions the playhead/start-marker lines and the ruler play icon. The horizontal origin
@@ -351,6 +391,7 @@ namespace Ongenet.App.Views.Panels
 
         private void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
         {
+            if (_resizingRow) return;
             if (DataContext is not TimelineViewModel vm) return;
 
             var rightClick = e.GetCurrentPoint(null).Properties.IsRightButtonPressed;
@@ -360,6 +401,9 @@ namespace Ongenet.App.Views.Panels
             var v = e.Source as Visual;
             while (v is not null)
             {
+                if (v is StyledElement { Classes: var classes } && classes.Contains("lane-resize"))
+                    return;
+
                 switch ((v as StyledElement)?.DataContext)
                 {
                     case TrackLaneViewModel lane:
@@ -390,6 +434,7 @@ namespace Ongenet.App.Views.Panels
 
         private void OnHeaderMoved(object? sender, PointerEventArgs e)
         {
+            if (_resizingRow) return;
             if (_dragLane is null || DataContext is not TimelineViewModel vm) return;
             if (!e.GetCurrentPoint(HeaderScroll).Properties.IsLeftButtonPressed) { CancelDrag(); return; }
 
@@ -448,15 +493,173 @@ namespace Ongenet.App.Views.Panels
 
         private void OnLanesScrollChanged(object? sender, ScrollChangedEventArgs e)
         {
+            if (_syncingScroll) return;
             _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
             if (_lanesScroll is null) return;
 
             var offset = _lanesScroll.Offset;
+            _syncingScroll = true;
             RulerScroll.Offset = new Vector(offset.X, 0);
             HeaderScroll.Offset = new Vector(0, offset.Y);
             // Publish the horizontal scroll so the per-lane grid repaints clipped to the new visible window.
             if (_vm is not null) _vm.Metrics.HorizontalOffset = offset.X;
+            _syncingScroll = false;
             UpdateOverlays();
+        }
+
+        private void OnHeaderScrollChanged(object? sender, ScrollChangedEventArgs e)
+        {
+            if (_syncingScroll) return;
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            if (_lanesScroll is null) return;
+
+            var y = HeaderScroll.Offset.Y;
+            if (System.Math.Abs(y - _lanesScroll.Offset.Y) < 0.5) return;
+
+            _syncingScroll = true;
+            _lanesScroll.Offset = new Vector(_lanesScroll.Offset.X, y);
+            HeaderScroll.Offset = new Vector(0, y);
+            _syncingScroll = false;
+            UpdateOverlays();
+        }
+
+        private void OnHeaderPointerWheel(object? sender, PointerWheelEventArgs e)
+        {
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                ApplyShiftScrollZoom(e, e.GetPosition(HeaderScroll));
+                return;
+            }
+
+            _lanesScroll ??= LanesList.FindDescendantOfType<ScrollViewer>();
+            if (_lanesScroll is null) return;
+
+            var delta = e.Delta.Y * 48;
+            var y = System.Math.Max(0, _lanesScroll.Offset.Y - delta);
+            _syncingScroll = true;
+            _lanesScroll.Offset = new Vector(_lanesScroll.Offset.X, y);
+            HeaderScroll.Offset = new Vector(0, y);
+            _syncingScroll = false;
+            UpdateOverlays();
+            e.Handled = true;
+        }
+
+        private void OnLaneResizePressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (DataContext is not TimelineViewModel) return;
+            if (!e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
+            if (!IsLaneResizeSource(e.Source as Visual)) return;
+
+            var lane = FindLaneFromVisual(e.Source as Visual);
+            if (lane is null || !lane.SupportsResize) return;
+
+            _resizeLane = lane;
+            _resizeStartY = e.GetPosition(HeaderScroll).Y + HeaderScroll.Offset.Y;
+            _resizeStartHeight = lane.Height;
+            _resizingRow = true;
+            _dragLane = null;
+            _dragging = false;
+            e.Pointer.Capture(HeaderScroll);
+            e.Handled = true;
+        }
+
+        private void OnLaneResizeMoved(object? sender, PointerEventArgs e)
+        {
+            if (!_resizingRow || _resizeLane is null) return;
+            if (!e.GetCurrentPoint(HeaderScroll).Properties.IsLeftButtonPressed)
+            {
+                CancelRowResize();
+                return;
+            }
+
+            var y = e.GetPosition(HeaderScroll).Y + HeaderScroll.Offset.Y;
+            var raw = _resizeStartHeight + (y - _resizeStartY);
+            var snapped = LaneViewModel.SnapHeight(raw, _resizeLane.HalfHeight, _resizeLane.DefaultHeight);
+            _resizeLane.SetHeight(snapped);
+            if (DataContext is TimelineViewModel vm) vm.NotifyRowsLayoutChanged();
+            UpdateOverlays();
+            e.Handled = true;
+        }
+
+        private void OnLaneResizeReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (!_resizingRow) return;
+
+            if (_resizeLane is not null && DataContext is TimelineViewModel vm)
+            {
+                var y = e.GetPosition(HeaderScroll).Y + HeaderScroll.Offset.Y;
+                var raw = _resizeStartHeight + (y - _resizeStartY);
+                var snapped = LaneViewModel.SnapHeight(raw, _resizeLane.HalfHeight, _resizeLane.DefaultHeight);
+                _resizeLane.SetHeight(snapped);
+                vm.NotifyRowsLayoutChanged();
+            }
+
+            CancelRowResize();
+            e.Pointer.Capture(null);
+            e.Handled = true;
+        }
+
+        private void CancelRowResize()
+        {
+            _resizeLane = null;
+            _resizingRow = false;
+        }
+
+        private static LaneViewModel? FindLaneFromVisual(Visual? v)
+        {
+            while (v is not null)
+            {
+                if ((v as StyledElement)?.DataContext is LaneViewModel lane) return lane;
+                v = v.GetVisualParent();
+            }
+
+            return null;
+        }
+
+        private static bool IsLaneResizeSource(Visual? v)
+        {
+            while (v is not null)
+            {
+                if (v is StyledElement { Classes: var classes } && classes.Contains("lane-resize"))
+                    return true;
+                v = v.GetVisualParent();
+            }
+
+            return false;
+        }
+
+        private void OnHeaderWidthPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (_vm is null || !e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
+            _resizingHeaderWidth = true;
+            _headerWidthStartX = e.GetPosition(this).X;
+            _headerWidthStart = _vm.Metrics.HeaderWidth;
+            e.Pointer.Capture(HeaderWidthGrip);
+            e.Handled = true;
+        }
+
+        private void OnHeaderWidthMoved(object? sender, PointerEventArgs e)
+        {
+            if (!_resizingHeaderWidth || _vm is null) return;
+            if (!e.GetCurrentPoint(HeaderWidthGrip).Properties.IsLeftButtonPressed)
+            {
+                _resizingHeaderWidth = false;
+                return;
+            }
+
+            var dx = e.GetPosition(this).X - _headerWidthStartX;
+            _vm.Metrics.HeaderWidth = _headerWidthStart + dx;
+            UpdateOverlays();
+            e.Handled = true;
+        }
+
+        private void OnHeaderWidthReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (!_resizingHeaderWidth) return;
+            _resizingHeaderWidth = false;
+            _vm?.SaveHeaderWidth();
+            e.Pointer.Capture(null);
+            e.Handled = true;
         }
 
         // --- Drag & drop: insert an audio clip on the hovered lane, or a new audio track ---
@@ -1005,9 +1208,12 @@ namespace Ongenet.App.Views.Panels
             var scrollY = _lanesScroll?.Offset.Y ?? 0;
 
             var rowIndex = targetRow;
-            Canvas.SetTop(ClipDragGhost, vm.RowTop(rowIndex) + TrackLaneViewModel.ClipTopInset - scrollY);
+            var clipTop = targetLane?.ClipTopInset ?? TrackLaneViewModel.DefaultClipTopInset;
+            var clipHeight = targetLane?.ClipHeight ?? TrackLaneViewModel.DefaultClipHeight;
+            Canvas.SetTop(ClipDragGhost, vm.RowTop(rowIndex) + clipTop - scrollY);
             Canvas.SetLeft(ClipDragGhost, _dragClip.Left - scrollX);
             ClipDragGhost.Width = System.Math.Max(2, _dragClip.Width);
+            ClipDragGhost.Height = clipHeight;
             ClipDragGhost.IsVisible = true;
         }
 

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Ongenet.App.Localization;
+using Ongenet.App.ViewModels.Timeline;
 
 namespace Ongenet.App.Services;
 
@@ -95,6 +96,9 @@ public sealed class AppSettings
 
     /// <summary>When true, the Video centre tab is shown in the main window.</summary>
     public bool VideoEnabled { get; set; } = true;
+
+    /// <summary>Width of the arrangement timeline track-name column, in pixels.</summary>
+    public double TimelineHeaderWidth { get; set; } = TimelineMetrics.DefaultHeaderWidth;
 }
 
 public sealed class KeyboardShortcutDto

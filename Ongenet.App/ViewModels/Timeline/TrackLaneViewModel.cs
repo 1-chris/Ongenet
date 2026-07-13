@@ -16,11 +16,11 @@ namespace Ongenet.App.ViewModels.Timeline
         /// <summary>Fixed row height shared by the lane and its header, in pixels.</summary>
         public const double RowHeight = 64.0;
 
-        /// <summary>Vertical inset of clips inside a track row, in pixels.</summary>
-        public const double ClipTopInset = 6.0;
+        /// <summary>Default vertical inset of clips inside a track row, in pixels.</summary>
+        public const double DefaultClipTopInset = 6.0;
 
-        /// <summary>Rendered height of clips inside a track row, in pixels.</summary>
-        public const double ClipHeight = 52.0;
+        /// <summary>Default rendered height of clips inside a track row, in pixels.</summary>
+        public const double DefaultClipHeight = 52.0;
 
         private readonly TimelineMetrics _metrics;
         private readonly ITrackActions _actions;
@@ -73,7 +73,27 @@ namespace Ongenet.App.ViewModels.Timeline
         }
 
         /// <summary>Track rows are a fixed height.</summary>
-        public override double Height => RowHeight;
+        public override double DefaultHeight => RowHeight;
+
+        public override double Height => ResolveHeight(Model.LaneHeight, DefaultHeight);
+
+        /// <summary>Vertical inset of clips inside a track row, in pixels.</summary>
+        public double ClipTopInset => Math.Max(2, Height * 6.0 / DefaultHeight);
+
+        /// <summary>Rendered height of clips inside a track row, in pixels.</summary>
+        public double ClipHeight => Math.Max(12, Height - 2 * ClipTopInset);
+
+        public override void SetHeight(double height)
+        {
+            height = SnapHeight(height, HalfHeight, DefaultHeight);
+            var stored = Math.Abs(height - DefaultHeight) < 0.5 ? 0 : height;
+            if (Math.Abs(Model.LaneHeight - stored) < 0.5) return;
+            Model.LaneHeight = stored;
+            OnPropertyChanged(nameof(Height));
+            OnPropertyChanged(nameof(IsCompact));
+            OnPropertyChanged(nameof(ClipTopInset));
+            OnPropertyChanged(nameof(ClipHeight));
+        }
 
         /// <summary>Clip-action delegate, for clip VMs created after construction.</summary>
         public IClipActions ClipActions => _clipActions;

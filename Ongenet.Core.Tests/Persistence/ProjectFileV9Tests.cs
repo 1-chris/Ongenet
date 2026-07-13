@@ -30,7 +30,7 @@ public sealed class ProjectFileV9Tests
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
 
-        Assert.Equal(20, ProjectFile.FormatVersion);
+        Assert.Equal(21, ProjectFile.FormatVersion);
         Assert.Equal(1280, loaded.VideoCanvasWidth);
         Assert.Equal(720, loaded.VideoCanvasHeight);
         Assert.True(loaded.VideoEnabled);

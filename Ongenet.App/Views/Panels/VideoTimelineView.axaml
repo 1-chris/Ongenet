@@ -80,7 +80,8 @@
                         </ItemsControl.Styles>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="tl:BarTickViewModel">
-                                <StackPanel Orientation="Horizontal" Spacing="4" Height="22">
+                                <StackPanel Orientation="Horizontal" Spacing="4" Height="22"
+                                            IsVisible="{Binding IsLabelVisible}">
                                     <Rectangle Width="1" Fill="{StaticResource CatppuccinSurface2}"/>
                                     <TextBlock Text="{Binding BarNumber}" FontSize="10" VerticalAlignment="Center"
                                                Foreground="{StaticResource CatppuccinSubtext0}"/>

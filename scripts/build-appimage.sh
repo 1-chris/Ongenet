@@ -22,10 +22,28 @@ ICON="$ROOT/packaging/icons/ongenet-256.png"
 DESKTOP_SRC="$ROOT/packaging/linux/net.onge.Ongenet.desktop"
 METAINFO_SRC="$ROOT/packaging/flatpak/net.onge.Ongenet.metainfo.xml"
 
-if ! command -v appimagetool >/dev/null 2>&1; then
-  echo "appimagetool not found on PATH — install AppImageKit or set APPIMAGETOOL."
-  exit 1
-fi
+resolve_appimagetool() {
+  if [ -n "${APPIMAGETOOL:-}" ] && [ -x "${APPIMAGETOOL}" ]; then
+    echo "${APPIMAGETOOL}"
+    return
+  fi
+  if command -v appimagetool >/dev/null 2>&1; then
+    command -v appimagetool
+    return
+  fi
+  echo "appimagetool not found on PATH — install AppImageKit or set APPIMAGETOOL." >&2
+  return 1
+}
+
+run_appimagetool() {
+  local tool="$1" arch="$2" appdir="$3" output="$4"
+  local -a extra=()
+  # AppImage-distributed appimagetool needs FUSE unless extracted first (common on CI).
+  if [[ "$tool" == *.AppImage ]]; then
+    extra=(--appimage-extract-and-run)
+  fi
+  ARCH="$arch" "$tool" "${extra[@]}" "$appdir" "$output"
+}
 
 echo "=== Publishing $RID (v$VERSION) ==="
 if [ ! -d "$PUBLISH" ] || [ -z "$(ls -A "$PUBLISH" 2>/dev/null || true)" ]; then
@@ -63,10 +81,7 @@ sed -e "s/@VERSION@/$VERSION/g" -e "s/@RELEASE_DATE@/$RELEASE_DATE/g" \
 
 mkdir -p "$ROOT/dist"
 rm -f "$APPIMAGE"
+APPIMAGETOOL_BIN="$(resolve_appimagetool)"
 ARCH="$(linux_arch_from_rid "$RID")"
-if [ -n "${ARCH:-}" ] && [ "$ARCH" != "$RID" ]; then
-  ARCH="$ARCH" appimagetool "$APPDIR" "$APPIMAGE"
-else
-  appimagetool "$APPDIR" "$APPIMAGE"
-fi
+run_appimagetool "$APPIMAGETOOL_BIN" "$ARCH" "$APPDIR" "$APPIMAGE"
 echo "Created $APPIMAGE"

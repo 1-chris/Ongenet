@@ -191,4 +191,7 @@ public sealed class Track
 
     /// <summary>Software input monitoring for audio tracks (not persisted).</summary>
     public InputMonitoringMode InputMonitoring { get; set; } = InputMonitoringMode.Auto;
+
+    /// <summary>Custom timeline row height in pixels; 0 = the default (64px).</summary>
+    public double LaneHeight { get; set; }
 }

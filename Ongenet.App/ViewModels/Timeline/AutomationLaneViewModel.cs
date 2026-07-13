@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Models.Audio;
@@ -37,7 +38,19 @@ namespace Ongenet.App.ViewModels.Timeline
         /// <summary>The underlying automation lane (points, min/max, arm).</summary>
         public AutomationLane Lane { get; }
 
-        public override double Height => RowHeight;
+        public override double DefaultHeight => RowHeight;
+
+        public override double Height => ResolveHeight(Lane.LaneHeight, DefaultHeight);
+
+        public override void SetHeight(double height)
+        {
+            height = SnapHeight(height, HalfHeight, DefaultHeight);
+            var stored = Math.Abs(height - DefaultHeight) < 0.5 ? 0 : height;
+            if (Math.Abs(Lane.LaneHeight - stored) < 0.5) return;
+            Lane.LaneHeight = stored;
+            OnPropertyChanged(nameof(Height));
+            OnPropertyChanged(nameof(IsCompact));
+        }
 
         /// <summary>Shared timeline metrics (time↔pixel mapping for the curve control).</summary>
         public TimelineMetrics Metrics => _metrics;

@@ -38,5 +38,11 @@ else
 fi
 
 mkdir -p "$ROOT/dist"
-"$ISCC" "/DMyAppVersion=$VERSION" "$ISS"
+
+# Git Bash / MSYS converts /D… to a Windows path, which makes ISCC see two script files.
+if [[ "$(uname -s 2>/dev/null || echo)" == MINGW* ]] || [[ "$(uname -s 2>/dev/null || echo)" == MSYS* ]]; then
+  export MSYS2_ARG_CONV_EXCL='*'
+fi
+
+"$ISCC" "//DMyAppVersion=$VERSION" "$ISS"
 echo "Created dist/Ongenet-${VERSION}-win-x64-setup.exe"

@@ -20,7 +20,7 @@ public sealed class ProjectFileV15Tests
         ProjectFile.Save(project, ms, "test", 0, 8, 0);
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
-        Assert.Equal(20, ProjectFile.FormatVersion);
+        Assert.Equal(21, ProjectFile.FormatVersion);
         Assert.Equal(60, loaded.VideoExportFps, 0);
     }
 }
@@ -139,7 +139,7 @@ public sealed class ProjectFileV19Tests
         ProjectFile.Save(project, ms, "test", 0, 8, 0);
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
-        Assert.Equal(20, ProjectFile.FormatVersion);
+        Assert.Equal(21, ProjectFile.FormatVersion);
         Assert.Equal(VideoWaveformStyle.Scope3D, loaded.VideoLayers[0].WaveformStyle);
         Assert.Equal(12, loaded.VideoLayers[0].Scope3DTrailCount);
         Assert.False(loaded.VideoLayers[0].Scope3DTransparentBackground);

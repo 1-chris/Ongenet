@@ -135,7 +135,25 @@ namespace Ongenet.App.ViewModels
             _transport.TempoChanged += _ => OnProjectTempoChanged();
             _editMode.ModeChanged += () => OnPropertyChanged(nameof(IsSliceMode));
 
+            var headerWidth = _settings.Current.TimelineHeaderWidth;
+            if (headerWidth >= TimelineMetrics.MinHeaderWidth && headerWidth <= TimelineMetrics.MaxHeaderWidth)
+                Metrics.HeaderWidth = headerWidth;
+
             Rebuild();
+        }
+
+        /// <summary>Persists the track-name column width to app settings.</summary>
+        public void SaveHeaderWidth()
+        {
+            _settings.Current.TimelineHeaderWidth = Metrics.HeaderWidth;
+            _settings.CaptureAndSave();
+        }
+
+        /// <summary>Notifies the view after a row height change so overlays and group summaries refresh.</summary>
+        public void NotifyRowsLayoutChanged()
+        {
+            OnPropertyChanged(nameof(RowsTotalHeight));
+            RefreshAllGroupSummaries();
         }
 
         /// <summary>True when Slice mode (click a clip to cut it) is active.</summary>
@@ -1423,8 +1441,8 @@ namespace Ongenet.App.ViewModels
                 var height = Lanes[i].Height;
                 if (Lanes[i] is TrackLaneViewModel track)
                 {
-                    var clipTop = top + TrackLaneViewModel.ClipTopInset;
-                    var clipBottom = clipTop + TrackLaneViewModel.ClipHeight;
+                    var clipTop = top + track.ClipTopInset;
+                    var clipBottom = clipTop + track.ClipHeight;
                     var bandOverlaps = clipTop < maxY && clipBottom > minY;
                     foreach (var clip in track.Clips)
                     {
@@ -1975,8 +1993,9 @@ namespace Ongenet.App.ViewModels
                     stackByTrack[descendantLanes[i].Model.Id] = i;
 
                 var laneCount = descendantLanes.Count;
+                var clipHeight = lane.ClipHeight;
                 var rowStride = laneCount > 0
-                    ? Math.Max(4, (TrackLaneViewModel.ClipHeight - 8) / laneCount)
+                    ? Math.Max(4, (clipHeight - 8) / laneCount)
                     : 10;
                 var barHeight = Math.Max(3, rowStride - 1);
 
@@ -2365,7 +2384,8 @@ namespace Ongenet.App.ViewModels
             {
                 var hover = rows[hoverIdx].Lane;
                 var top = rows[hoverIdx].Top;
-                var topHalf = contentY < top + TrackLaneViewModel.RowHeight / 2;
+                var rowHeight = rows[hoverIdx].Height;
+                var topHalf = contentY < top + rowHeight / 2;
 
                 if (topHalf && !hover.IsMaster)
                 {
@@ -2382,7 +2402,7 @@ namespace Ongenet.App.ViewModels
                     before = hoverIdx + 1 < rows.Count && rows[hoverIdx + 1].Lane.IndentLevel == hover.IndentLevel + 1
                         ? rows[hoverIdx + 1].Lane.Model
                         : null;
-                    indicatorY = top + TrackLaneViewModel.RowHeight;
+                    indicatorY = top + rowHeight;
                     depth = hover.IndentLevel + 1;
                 }
                 else

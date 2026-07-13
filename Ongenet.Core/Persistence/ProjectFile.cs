@@ -30,7 +30,7 @@ public static class ProjectFile
 {
     /// <summary>Bumped whenever the on-disk layout changes. Newer files opened in an older app degrade gracefully.</summary>
     /// <remarks>v2: instrument rack. v3: track routing. v4: patterns, session, warp, takes, multi-out, MPE/groove/drum. v5: pattern tracks, pattern row metadata. v6: ARA pitch offset. v7: poly pitch segments.</remarks>
-    public const int FormatVersion = 20;
+    public const int FormatVersion = 21;
 
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("ONGENPRJ"); // 8 bytes
     private const string ManifestEntry = "ongen.manifest";
@@ -515,6 +515,7 @@ public static class ProjectFile
                     c.WriteDouble(take.StartBeat);
                     c.WriteDouble(take.LengthBeats);
                 }
+                c.WriteDouble(lane.LaneHeight);
             }
 
             c.WriteDouble(t.SurroundWidth);
@@ -527,6 +528,9 @@ public static class ProjectFile
 
             c.WriteInt(t.Modulators.Count);
             foreach (var mod in t.Modulators) WriteModulator(c, mod);
+
+            // v21 per-track row height
+            c.WriteDouble(t.LaneHeight);
         });
     }
 
@@ -560,6 +564,7 @@ public static class ProjectFile
                 c.WriteDouble(pt.Value);
                 c.WriteDouble(pt.Curve);
             }
+            c.WriteDouble(lane.LaneHeight);
         });
     }
 
@@ -800,6 +805,8 @@ public static class ProjectFile
                             LengthBeats = c.ReadDouble()
                         });
                     }
+                    if (fileVersion >= 21)
+                        lane.LaneHeight = c.ReadDouble();
                     track.TakeLanes.Add(lane);
                 }
             }
@@ -824,6 +831,8 @@ public static class ProjectFile
                 for (var i = 0; i < modCount; i++)
                     track.Modulators.Add(ReadModulator(c));
             }
+            if (fileVersion >= 21 && c.ChunkHasMore)
+                track.LaneHeight = c.ReadDouble();
         });
 
         // Populate the audio-thread snapshots the engine reads.
@@ -875,6 +884,8 @@ public static class ProjectFile
             };
             foreach (var pt in points) lane.Points.Add(pt);
             lane.Sort();
+            if (c.ChunkHasMore)
+                lane.LaneHeight = c.ReadDouble();
         });
         return lane;
     }

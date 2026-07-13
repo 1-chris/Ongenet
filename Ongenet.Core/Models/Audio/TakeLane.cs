@@ -12,6 +12,9 @@ public sealed class TakeLane
     public bool IsExpanded { get; set; } = true;
     /// <summary>When true, this lane is preferred for incoming comp recordings.</summary>
     public bool IsArmedForRecord { get; set; }
+
+    /// <summary>Custom timeline row height in pixels; 0 = the default (36px).</summary>
+    public double LaneHeight { get; set; }
 }
 
 public sealed class Take

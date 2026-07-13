@@ -13,10 +13,8 @@
              Automation:AutomationProperties.HelpText="{DynamicResource Timeline_Arrangement_timeline_with_track_lanes_and_clips}">
 
     <UserControl.Resources>
-        <x:Double x:Key="HeaderWidth">140</x:Double>
+        <x:Double x:Key="GutterBarWidth">4</x:Double>
         <x:Double x:Key="RulerHeight">26</x:Double>
-        <x:Double x:Key="ClipTopInset">6</x:Double>
-        <x:Double x:Key="ClipHeight">52</x:Double>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -45,14 +43,15 @@
     </UserControl.Styles>
 
     <Border Background="{StaticResource CatppuccinCrust}">
-        <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="Auto,*">
+        <!-- Row 0/1 reserved for a future video-reference strip; arrangement fills all rows for now. -->
+        <Grid RowDefinitions="Auto,Auto,*">
 
             <!-- timeline grid -->
         <Grid Grid.Row="0" Grid.RowSpan="3" RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
 
             <!-- [0,0] corner above the headers -->
             <Border Grid.Row="0" Grid.Column="0"
-                    Width="{StaticResource HeaderWidth}" Height="{StaticResource RulerHeight}"
+                    Width="{Binding Metrics.HeaderWidth}" Height="{StaticResource RulerHeight}"
                     Background="{StaticResource CatppuccinMantle}"
                     BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,1,1">
                 <TextBlock Text="{DynamicResource Timeline_Tracks}" Margin="8,0" VerticalAlignment="Center" FontSize="11"
@@ -79,7 +78,8 @@
                     </ItemsControl.Styles>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="tl:BarTickViewModel">
-                            <StackPanel Orientation="Horizontal" Spacing="4" Height="26">
+                            <StackPanel Orientation="Horizontal" Spacing="4" Height="26"
+                                        IsVisible="{Binding IsLabelVisible}">
                                 <Rectangle Width="1" Fill="{StaticResource CatppuccinSurface2}"/>
                                 <TextBlock Text="{Binding BarNumber}" FontSize="11"
                                            VerticalAlignment="Center" Margin="0,0,0,1"
@@ -95,7 +95,7 @@
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Hidden"
                           Background="{StaticResource CatppuccinMantle}">
-                <ItemsControl ItemsSource="{Binding Lanes}" Width="{StaticResource HeaderWidth}">
+                <ItemsControl ItemsSource="{Binding Lanes}" Width="{Binding Metrics.HeaderWidth}">
                     <ItemsControl.Styles>
                         <Style Selector="Border.selected">
                             <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
@@ -160,12 +160,13 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="tl:LaneGutterBar">
-                                                <Border Width="8" Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                                <Border Width="{StaticResource GutterBarWidth}" Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <StackPanel Grid.Column="1" Margin="8,6" Spacing="6" VerticalAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="3">
+                                    <Grid Grid.Column="1" Margin="8,6" RowDefinitions="Auto,Auto" VerticalAlignment="Center"
+                                          IsVisible="{Binding !IsCompact}">
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="3">
                                             <Button Classes="chev" Content="{Binding CollapseGlyph}"
                                                     ToolTip.Tip="{DynamicResource Timeline_Collapse_expand_Tip}"
                                                     IsVisible="{Binding ShowCollapse}"
@@ -174,7 +175,8 @@
                                                        VerticalAlignment="Center"
                                                        TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
-                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="5"
+                                                    HorizontalAlignment="Right">
                                             <ToggleButton Classes="strip" Content="{DynamicResource Timeline_M}" ToolTip.Tip="{DynamicResource Timeline_Mute_Tip}"
                                                           IsChecked="{Binding IsMuted, Mode=TwoWay}"
                                                           Foreground="{StaticResource CatppuccinRed}"/>
@@ -186,13 +188,40 @@
                                                           IsVisible="{Binding !IsBus}"
                                                           Foreground="{StaticResource CatppuccinRed}"/>
                                         </StackPanel>
-                                    </StackPanel>
+                                    </Grid>
+                                    <!-- compact: name left, controls pinned right -->
+                                    <Grid Grid.Column="1" ColumnDefinitions="Auto,*,Auto" Margin="6,0"
+                                          VerticalAlignment="Center" IsVisible="{Binding IsCompact}">
+                                        <Button Grid.Column="0" Classes="chev" Content="{Binding CollapseGlyph}"
+                                                ToolTip.Tip="{DynamicResource Timeline_Collapse_expand_Tip}"
+                                                IsVisible="{Binding ShowCollapse}"
+                                                Command="{Binding ToggleCollapseCommand}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   Margin="3,0"/>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3">
+                                            <ToggleButton Classes="strip" Content="{DynamicResource Timeline_M}" ToolTip.Tip="{DynamicResource Timeline_Mute_Tip}"
+                                                          IsChecked="{Binding IsMuted, Mode=TwoWay}"
+                                                          Foreground="{StaticResource CatppuccinRed}"/>
+                                            <ToggleButton Classes="strip" Content="{DynamicResource Timeline_S}" ToolTip.Tip="{DynamicResource Timeline_Solo_Tip}"
+                                                          IsChecked="{Binding IsSoloed, Mode=TwoWay}"
+                                                          Foreground="{StaticResource CatppuccinYellow}"/>
+                                            <ToggleButton Classes="strip record" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_for_recording_Tip}"
+                                                          IsChecked="{Binding IsArmed, Mode=TwoWay}"
+                                                          IsVisible="{Binding !IsBus}"
+                                                          Foreground="{StaticResource CatppuccinRed}"/>
+                                        </StackPanel>
+                                    </Grid>
                                     <!-- live output level -->
                                     <controls:LevelMeterControl Grid.Column="2" Width="6" Margin="0,8,6,8"
                                                                 Level="{Binding MeterLevel}"/>
                                     <!-- inter-row divider, content only (keeps the gutter rails unbroken) -->
                                     <Border Grid.Column="1" Grid.ColumnSpan="2" IsHitTestVisible="False"
                                             BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"/>
+                                    <!-- bottom-edge row height resize -->
+                                    <Border Grid.Column="0" Grid.ColumnSpan="3" VerticalAlignment="Bottom" Height="6"
+                                            Background="Transparent" Cursor="SizeNorthSouth" Classes="lane-resize"
+                                            IsVisible="{Binding SupportsResize}"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -211,25 +240,39 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="tl:LaneGutterBar">
-                                                <Border Width="8" Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+                                                <Border Width="{StaticResource GutterBarWidth}" Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <StackPanel Grid.Column="1" Margin="6,4" Spacing="3" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Name}" FontSize="11"
+                                    <Grid Grid.Column="1" Margin="6,4" RowDefinitions="Auto,Auto" VerticalAlignment="Center"
+                                          IsVisible="{Binding !IsCompact}">
+                                        <TextBlock Grid.Row="0" Text="{Binding Name}" FontSize="11"
                                                    Foreground="{StaticResource CatppuccinSubtext0}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <ToggleButton Classes="strip record" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_to_record_control_moves_Tip}"
+                                        <ToggleButton Grid.Row="1" Classes="strip record" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_to_record_control_moves_Tip}"
                                                       IsChecked="{Binding IsArmed, Mode=TwoWay}"
                                                       Foreground="{StaticResource CatppuccinRed}"
-                                                      HorizontalAlignment="Left"/>
-                                    </StackPanel>
+                                                      HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="6,0"
+                                          VerticalAlignment="Center" IsVisible="{Binding IsCompact}">
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                   Foreground="{StaticResource CatppuccinSubtext0}"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                   Margin="0,0,4,0"/>
+                                        <ToggleButton Grid.Column="1" Classes="strip record" Content="{DynamicResource Timeline_Text}" ToolTip.Tip="{DynamicResource Timeline_Arm_to_record_control_moves_Tip}"
+                                                      IsChecked="{Binding IsArmed, Mode=TwoWay}"
+                                                      Foreground="{StaticResource CatppuccinRed}"/>
+                                    </Grid>
                                     <Button Grid.Column="2" Classes="xbtn" Content="{DynamicResource Timeline_Text_2}" ToolTip.Tip="{DynamicResource Timeline_Remove_automation_Tip}"
                                             VerticalAlignment="Top" Margin="0,4,4,0"
                                             Command="{Binding RemoveCommand}"/>
                                     <!-- inter-row divider, content only (keeps the gutter rail unbroken) -->
                                     <Border Grid.Column="1" Grid.ColumnSpan="2" IsHitTestVisible="False"
                                             BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,0,0,1"/>
+                                    <Border Grid.Column="0" Grid.ColumnSpan="3" VerticalAlignment="Bottom" Height="6"
+                                            Background="Transparent" Cursor="SizeNorthSouth" Classes="lane-resize"
+                                            IsVisible="{Binding SupportsResize}"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -244,6 +287,7 @@
                                         <MenuItem Header="{DynamicResource Timeline_Split_comp_at_playhead}" Command="{Binding SplitCompAtPlayheadCommand}"/>
                                     </ContextMenu>
                                 </Border.ContextMenu>
+                                <Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,8,0" VerticalAlignment="Center">
                                     <Button Classes="chev" Content="{Binding CollapseGlyph}" Command="{Binding ToggleExpandCommand}"
                                             Width="16" Height="16" Padding="0"/>
@@ -252,6 +296,10 @@
                                     <TextBlock Text="{Binding CompSummary}" FontSize="9"
                                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                                 </StackPanel>
+                                <Border VerticalAlignment="Bottom" Height="6" HorizontalAlignment="Stretch"
+                                        Background="Transparent" Cursor="SizeNorthSouth" Classes="lane-resize"
+                                        IsVisible="{Binding SupportsResize}"/>
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.DataTemplates>
@@ -266,10 +314,12 @@
                      DragDrop.AllowDrop="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
-                <!-- Non-virtualizing panel: mixed 64px/56px row heights misalign when recycled. -->
+                <!-- Non-virtualizing panel: mixed 64px/56px row heights misalign when recycled.
+                     MinWidth matches the arrange length so the internal ScrollViewer can scroll
+                     horizontally (ListBoxItem containers otherwise clamp to the viewport width). -->
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel/>
+                        <StackPanel MinWidth="{Binding Metrics.TotalWidth}"/>
                     </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <!-- Right-clicking blank space below the tracks offers to add a track. -->
@@ -289,6 +339,7 @@
                         <Setter Property="Padding" Value="0"/>
                         <Setter Property="Margin" Value="0"/>
                         <Setter Property="MinHeight" Value="0"/>
+                        <Setter Property="MinWidth" Value="{Binding LaneWidth}"/>
                         <!-- Keep lane content pinned to the left so bar 0 sits at x=0 (a fixed-width
                              child with the default Stretch alignment would otherwise be centred when
                              the viewport is wider than the content). -->
@@ -316,9 +367,9 @@
                                 <ItemsControl.ItemContainerTheme>
                                     <ControlTheme TargetType="ContentPresenter" x:DataType="tl:ClipViewModel">
                                         <Setter Property="Canvas.Left" Value="{Binding Left}"/>
-                                        <Setter Property="Canvas.Top" Value="{StaticResource ClipTopInset}"/>
+                                        <Setter Property="Canvas.Top" Value="{Binding $parent[ItemsControl].DataContext.ClipTopInset}"/>
                                         <Setter Property="Width" Value="{Binding Width}"/>
-                                        <Setter Property="Height" Value="{StaticResource ClipHeight}"/>
+                                        <Setter Property="Height" Value="{Binding $parent[ItemsControl].DataContext.ClipHeight}"/>
                                     </ControlTheme>
                                 </ItemsControl.ItemContainerTheme>
                                 <ItemsControl.ItemTemplate>
@@ -436,9 +487,9 @@
                                 <ItemsControl.ItemContainerTheme>
                                     <ControlTheme TargetType="ContentPresenter" x:DataType="tl:PatternClipViewModel">
                                         <Setter Property="Canvas.Left" Value="{Binding Left}"/>
-                                        <Setter Property="Canvas.Top" Value="{StaticResource ClipTopInset}"/>
+                                        <Setter Property="Canvas.Top" Value="{Binding $parent[ItemsControl].DataContext.ClipTopInset}"/>
                                         <Setter Property="Width" Value="{Binding Width}"/>
-                                        <Setter Property="Height" Value="{StaticResource ClipHeight}"/>
+                                        <Setter Property="Height" Value="{Binding $parent[ItemsControl].DataContext.ClipHeight}"/>
                                     </ControlTheme>
                                 </ItemsControl.ItemContainerTheme>
                                 <ItemsControl.ItemTemplate>
@@ -477,9 +528,9 @@
                                 <ItemsControl.ItemContainerTheme>
                                     <ControlTheme TargetType="ContentPresenter" x:DataType="tl:GroupClipSummaryViewModel">
                                         <Setter Property="Canvas.Left" Value="{Binding Left}"/>
-                                        <Setter Property="Canvas.Top" Value="{StaticResource ClipTopInset}"/>
+                                        <Setter Property="Canvas.Top" Value="{Binding $parent[ItemsControl].DataContext.ClipTopInset}"/>
                                         <Setter Property="Width" Value="{Binding Width}"/>
-                                        <Setter Property="Height" Value="{StaticResource ClipHeight}"/>
+                                        <Setter Property="Height" Value="{Binding $parent[ItemsControl].DataContext.ClipHeight}"/>
                                     </ControlTheme>
                                 </ItemsControl.ItemContainerTheme>
                                 <ItemsControl.ItemTemplate>
@@ -592,9 +643,9 @@
                                 <ItemsControl.ItemContainerTheme>
                                     <ControlTheme TargetType="ContentPresenter" x:DataType="tl:TakeViewModel">
                                         <Setter Property="Canvas.Left" Value="{Binding Left}"/>
-                                        <Setter Property="Canvas.Top" Value="8"/>
+                                        <Setter Property="Canvas.Top" Value="{Binding $parent[ItemsControl].DataContext.TakeTopInset}"/>
                                         <Setter Property="Width" Value="{Binding Width}"/>
-                                        <Setter Property="Height" Value="20"/>
+                                        <Setter Property="Height" Value="{Binding $parent[ItemsControl].DataContext.TakeClipHeight}"/>
                                     </ControlTheme>
                                 </ItemsControl.ItemContainerTheme>
                                 <ItemsControl.ItemTemplate>
@@ -625,7 +676,7 @@
                                    FontWeight="SemiBold" Foreground="{StaticResource CatppuccinGreen}"/>
                     </Grid>
                 </Border>
-                <Border Name="ClipDragGhost" Height="{StaticResource ClipHeight}" IsVisible="False" CornerRadius="3" Opacity="0.6"
+                <Border Name="ClipDragGhost" Height="52" IsVisible="False" CornerRadius="3" Opacity="0.6"
                         BorderBrush="{StaticResource CatppuccinMauve}" BorderThickness="2">
                     <Rectangle Fill="{StaticResource CatppuccinMauve}" Opacity="0.25"/>
                 </Border>
@@ -677,6 +728,11 @@
                 <Rectangle Name="DragInsertLine" Height="3" IsVisible="False"
                            Fill="{StaticResource CatppuccinYellow}"/>
             </Canvas>
+
+            <!-- Slim header-column width resize grip (no visible splitter chrome) -->
+            <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Name="HeaderWidthGrip"
+                    Width="4" HorizontalAlignment="Right" Background="Transparent"
+                    Cursor="SizeWestEast" IsHitTestVisible="True"/>
         </Grid>
         </Grid>
     </Border>

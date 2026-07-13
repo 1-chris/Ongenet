@@ -22,6 +22,9 @@ public sealed class AutomationLane
     /// <summary>Serializable description of what this lane drives, for project save/load. Null if unknown.</summary>
     public AutomationBinding? Binding { get; set; }
 
+    /// <summary>Custom timeline row height in pixels; 0 = the default (56px).</summary>
+    public double LaneHeight { get; set; }
+
     public string Name => Target.Name;
     public double Minimum => Target.Minimum;
     public double Maximum => Target.Maximum;
