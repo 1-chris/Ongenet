@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Ongenet.App.Services;
 using Ongenet.App.ViewModels.Instruments;
+using Ongenet.App.Views.Windows;
 
 namespace Ongenet.App.Views.Panels
 {
@@ -23,6 +26,23 @@ namespace Ongenet.App.Views.Panels
             AddHandler(DragDrop.DragOverEvent, OnCardDragOver);
             AddHandler(DragDrop.DropEvent, OnCardDrop);
             AddHandler(DragDrop.DragLeaveEvent, OnCardDragLeave);
+            DataContextChanged += (_, _) => WireSamplerWarnings();
+        }
+
+        private InstrumentSlotViewModel? _wiredVm;
+
+        private void WireSamplerWarnings()
+        {
+            if (_wiredVm is not null) _wiredVm.SamplerLoadWarnings -= OnSamplerWarnings;
+            _wiredVm = DataContext as InstrumentSlotViewModel;
+            if (_wiredVm is not null) _wiredVm.SamplerLoadWarnings += OnSamplerWarnings;
+        }
+
+        private async void OnSamplerWarnings(System.Collections.Generic.IReadOnlyList<string> warnings)
+        {
+            if (TopLevel.GetTopLevel(this) is not Window owner) return;
+            await MessageDialog.Notify(owner, "Sampler load warnings",
+                string.Join("\n", warnings.Take(40)));
         }
 
         // Instrument, instrument-preset and sound-font drops all use the vertical zone (above / replace /
@@ -128,26 +148,16 @@ namespace Ongenet.App.Views.Panels
             if (!string.IsNullOrEmpty(path)) vm.LoadSampleFromPath(path);
         }
 
-        private async void OnLoadSampler(object? sender, RoutedEventArgs e)
+        private void OnLoadSampler(object? sender, RoutedEventArgs e)
         {
-            if (DataContext is not InstrumentSlotViewModel vm) return;
-            var top = TopLevel.GetTopLevel(this);
-            if (top is null) return;
+            if (DataContext is not InstrumentSlotViewModel vm || sender is not Control anchor) return;
+            SoundFontPickFlyout.Show(anchor, path => vm.LoadSamplerFromPath(path), "Load sound-font instrument");
+        }
 
-            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Load sound-font instrument",
-                AllowMultiple = false,
-                FileTypeFilter = new List<FilePickerFileType>
-                {
-                    new("Sound fonts") { Patterns = new[] { "*.sfz", "*.sf2" } },
-                    new("SFZ instrument") { Patterns = new[] { "*.sfz" } },
-                    new("SF2 SoundFont") { Patterns = new[] { "*.sf2" } }
-                }
-            });
-
-            var path = files.FirstOrDefault()?.TryGetLocalPath();
-            if (!string.IsNullOrEmpty(path)) vm.LoadSamplerFromPath(path);
+        private void OnAddSamplerLayer(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not InstrumentSlotViewModel vm || sender is not Control anchor) return;
+            SoundFontPickFlyout.Show(anchor, path => vm.AddSamplerLayerFromPath(path), "Add sound-font layer");
         }
 
         private void OnBendReleased(object? sender, PointerReleasedEventArgs e)

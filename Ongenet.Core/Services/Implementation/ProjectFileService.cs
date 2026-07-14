@@ -276,12 +276,16 @@ public sealed class ProjectFileService : IProjectFileService
         return Path.GetFileNameWithoutExtension(displayName.Trim());
     }
 
-    private void MarkDirty()
+    private void SetDirtyFlag()
     {
         if (_suppressDirty || IsDirty) return;
         IsDirty = true;
         Changed?.Invoke();
     }
+
+    /// <inheritdoc />
+    public void MarkDirty() => SetDirtyFlag();
+
 
     private void SetDirty(bool value) => IsDirty = value;
 

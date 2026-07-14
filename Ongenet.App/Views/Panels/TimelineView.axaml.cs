@@ -132,6 +132,7 @@ namespace Ongenet.App.Views.Panels
             LoopRegionRuler.RenderTransform = _loopRulerXform;
             PunchBracketLeft.RenderTransform = _punchInXform;
             PunchBracketRight.RenderTransform = _punchOutXform;
+            MarkerLaneLines.RenderTransform = _markerLinesXform;
 
             DataContextChanged += OnDataContextChanged;
         }
@@ -147,6 +148,7 @@ namespace Ongenet.App.Views.Panels
         private readonly Avalonia.Media.TranslateTransform _loopRulerXform = new();
         private readonly Avalonia.Media.TranslateTransform _punchInXform = new();
         private readonly Avalonia.Media.TranslateTransform _punchOutXform = new();
+        private readonly Avalonia.Media.TranslateTransform _markerLinesXform = new();
 
         // Cached ContentOriginX results — recomputed only when scroll offset or zoom changes.
         private double _cachedLanesOrigin;
@@ -304,6 +306,12 @@ namespace Ongenet.App.Views.Panels
             _playheadXform.X = playX;
             PlayheadLine.IsVisible = playX >= 0 && playX <= width;
 
+            // Marker guides share content X with the scrolling ruler; shift by lanesOrigin so they
+            // stay aligned while the lanes scroll (Left itself is beat×ppb in content coords).
+            MarkerLaneLines.Width = _vm.Metrics.TotalWidth;
+            MarkerLaneLines.Height = height;
+            _markerLinesXform.X = lanesOrigin;
+
             var rulerOrigin = CachedRulerOrigin();
             var iconX = rulerOrigin + _vm.StartBeat * ppb;
             _startIconXform.X = iconX;
@@ -389,9 +397,58 @@ namespace Ongenet.App.Views.Panels
         private void OnRulerPressed(object? sender, PointerPressedEventArgs e)
         {
             if (_vm is null) return;
+
+            // Marker chrome handles its own clicks (seek / rename / context menu).
+            if (FindMarker(e.Source as Visual) is not null) return;
+
             var x = e.GetPosition(RulerScroll).X + RulerScroll.Offset.X;
             _vm.SetStartBeat(_vm.Metrics.PixelsPerBeat > 0 ? x / _vm.Metrics.PixelsPerBeat : 0);
             e.Handled = true;
+        }
+
+        private void Marker_PointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (_vm is null) return;
+            if (FindMarker(e.Source as Visual) is not { } marker) return;
+
+            // Left-click seeks to the marker; right-click opens the context menu (don't steal it).
+            if (e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
+            {
+                _vm.GoToMarker(marker.Model);
+                e.Handled = true;
+            }
+        }
+
+        private async void Marker_DoubleTapped(object? sender, TappedEventArgs e)
+        {
+            if (_vm is null) return;
+            if (FindMarker(e.Source as Visual) is not { } marker) return;
+            await _vm.RenameMarkerAsync(marker);
+            e.Handled = true;
+        }
+
+        private async void MarkerRename_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_vm is null) return;
+            if ((sender as MenuItem)?.Tag is not ArrangementMarkerViewModel marker) return;
+            await _vm.RenameMarkerAsync(marker);
+        }
+
+        private void MarkerDelete_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_vm is null) return;
+            if ((sender as MenuItem)?.Tag is not ArrangementMarkerViewModel marker) return;
+            _vm.DeleteMarker(marker);
+        }
+
+        private static ArrangementMarkerViewModel? FindMarker(Visual? source)
+        {
+            for (var v = source; v is not null; v = v.GetVisualParent())
+            {
+                if ((v as StyledElement)?.DataContext is ArrangementMarkerViewModel marker)
+                    return marker;
+            }
+            return null;
         }
 
         private void OnHeaderPressed(object? sender, PointerPressedEventArgs e)

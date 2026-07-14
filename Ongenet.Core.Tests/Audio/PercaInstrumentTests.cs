@@ -23,6 +23,8 @@ public class PercaInstrumentTests
     [InlineData(3)] // Open Hat
     [InlineData(4)] // Dark Snare
     [InlineData(5)] // Crash
+    [InlineData(6)] // Rimshot
+    [InlineData(15)] // Clave
     public void PresetRendersAudibleDecayingOneShot(int presetIndex)
     {
         var inst = new PercaInstrument();
@@ -80,6 +82,8 @@ public class PercaInstrumentTests
     public void PresetNamesMatchLoadableIndices()
     {
         var inst = new PercaInstrument();
-        Assert.Equal(new[] { "Init", "House Clap", "Closed Hat", "Open Hat", "Dark Snare", "Crash" }, inst.PresetNames);
+        Assert.Equal(16, inst.PresetNames.Count);
+        Assert.Equal("Init", inst.PresetNames[0]);
+        Assert.Equal("Clave", inst.PresetNames[^1]);
     }
 }

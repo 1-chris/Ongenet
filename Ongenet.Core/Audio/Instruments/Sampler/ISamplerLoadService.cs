@@ -69,4 +69,17 @@ public sealed class SamplerLoadResult
 
     /// <summary>Parser + loader warnings.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = new List<string>();
+
+    /// <summary>SFZ <c>note_offset</c> applied to incoming MIDI notes.</summary>
+    public int NoteOffset { get; init; }
+
+    /// <summary>SFZ <c>octave_offset</c> (×12) applied to incoming MIDI notes.</summary>
+    public int OctaveOffset { get; init; }
+
+    /// <summary>SFZ <c>set_ccN</c> initial values.</summary>
+    public IReadOnlyDictionary<int, int> InitialCcValues { get; init; } =
+        new Dictionary<int, int>();
+
+    /// <summary>SFZ <c>&lt;curve&gt;</c> tables.</summary>
+    public SamplerCurveBank Curves { get; init; } = SamplerCurveBank.Empty;
 }

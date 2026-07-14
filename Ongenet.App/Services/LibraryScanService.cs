@@ -12,8 +12,9 @@ namespace Ongenet.App.Services;
 public sealed record LibraryItem(string Name, string FullPath);
 
 /// <summary>A named group of library items (one per configured scan folder). <see cref="Root"/> is the
-/// scanned folder's full path, so callers can render items relative to it (e.g. as a folder tree).</summary>
-public sealed record LibraryGroup(string Name, string Root, IReadOnlyList<LibraryItem> Items);
+/// scanned folder's full path, so callers can render items relative to it (e.g. as a folder tree).
+/// <see cref="IsFactory"/> marks bundled Core content (read-only in Settings).</summary>
+public sealed record LibraryGroup(string Name, string Root, IReadOnlyList<LibraryItem> Items, bool IsFactory = false);
 
 public interface ILibraryScanService
 {
@@ -24,9 +25,8 @@ public interface ILibraryScanService
 }
 
 /// <summary>
-/// Scans the user-configured folders (from <see cref="AppSettings"/>) for samples (any audio file) and
-/// sound fonts (<c>.sf2</c>/<c>.sfz</c>), grouped by scan folder. Rescans whenever the library settings
-/// change. Enumeration runs off the UI thread; results are published back on it.
+/// Scans factory content roots plus user-configured folders for samples and sound fonts.
+/// Enumeration runs off the UI thread; results are published back on it.
 /// </summary>
 public sealed class LibraryScanService : ILibraryScanService
 {
@@ -50,13 +50,19 @@ public sealed class LibraryScanService : ILibraryScanService
 
     public void Rescan()
     {
-        var samplePaths = _settings.Current.SampleScanPaths.ToList();
-        var sfPaths = _settings.Current.SoundFontScanPaths.ToList();
+        var samplePaths = BuildScanList(AppPaths.FactorySamplesDirectory(), _settings.Current.SampleScanPaths, "Factory Samples");
+        var sfPaths = BuildScanList(AppPaths.FactorySoundFontsDirectory(), _settings.Current.SoundFontScanPaths, "Factory Soundfonts");
 
         Task.Run(() =>
         {
-            var samples = samplePaths.Select(p => ScanFolder(p, IsSample)).Where(g => g.Items.Count > 0).ToList();
-            var soundFonts = sfPaths.Select(p => ScanFolder(p, IsSoundFont)).Where(g => g.Items.Count > 0).ToList();
+            var samples = samplePaths
+                .Select(p => ScanFolder(p.Path, IsSample, p.IsFactory, p.DisplayName))
+                .Where(g => g.Items.Count > 0)
+                .ToList();
+            var soundFonts = sfPaths
+                .Select(p => ScanFolder(p.Path, IsSoundFont, p.IsFactory, p.DisplayName))
+                .Where(g => g.Items.Count > 0)
+                .ToList();
 
             Dispatcher.UIThread.Post(() =>
             {
@@ -67,12 +73,40 @@ public sealed class LibraryScanService : ILibraryScanService
         });
     }
 
+    private static List<(string Path, bool IsFactory, string? DisplayName)> BuildScanList(
+        string? factoryRoot, IEnumerable<string> userPaths, string factoryDisplayName)
+    {
+        var list = new List<(string, bool, string?)>();
+        if (!string.IsNullOrWhiteSpace(factoryRoot) && Directory.Exists(factoryRoot))
+            list.Add((factoryRoot, true, factoryDisplayName));
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (factoryRoot is not null) seen.Add(Path.GetFullPath(factoryRoot));
+
+        foreach (var path in userPaths)
+        {
+            if (string.IsNullOrWhiteSpace(path)) continue;
+            try
+            {
+                var full = Path.GetFullPath(path);
+                if (!seen.Add(full)) continue;
+                list.Add((full, false, null));
+            }
+            catch
+            {
+                list.Add((path, false, null));
+            }
+        }
+
+        return list;
+    }
+
     private bool IsSample(string path) => _audioFiles.IsAudioFile(path);
 
     private static bool IsSoundFont(string path)
         => SoundFontExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
 
-    private static LibraryGroup ScanFolder(string root, Func<string, bool> accept)
+    private static LibraryGroup ScanFolder(string root, Func<string, bool> accept, bool isFactory, string? displayName)
     {
         var items = new List<LibraryItem>();
         try
@@ -92,7 +126,10 @@ public sealed class LibraryScanService : ILibraryScanService
         }
 
         items.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        var name = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } n ? n : root;
-        return new LibraryGroup(name, root, items);
+        var name = displayName
+            ?? (Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } n
+                ? n
+                : root);
+        return new LibraryGroup(name, root, items, isFactory);
     }
 }

@@ -32,7 +32,8 @@ public sealed class ProjectsLibraryViewModel : LibraryListViewModel
     private string? _lastRecordedPath;
 
     public ProjectsLibraryViewModel(IProjectFileService projectFile, IAppSettingsService settings,
-        IInstrumentRegistry instruments, IHistoryService history, ILoggerFactory? loggerFactory = null)
+        IInstrumentRegistry instruments, IHistoryService history, ILibraryOrganizationService org,
+        ILoggerFactory? loggerFactory = null)
     {
         _projectFile = projectFile;
         _settings = settings;
@@ -40,6 +41,7 @@ public sealed class ProjectsLibraryViewModel : LibraryListViewModel
         _history = history;
         _logger = loggerFactory?.CreateLogger("Projects");
         EmptyHint = "Built-in and recently opened projects appear here.";
+        AttachOrganization(org, LibraryItemKeys.Project, LibraryItemKeys.Folder);
 
         _lastRecordedPath = projectFile.CurrentPath;
         _projectFile.Changed += () => Dispatcher.UIThread.Post(OnProjectFileChanged);
@@ -85,8 +87,9 @@ public sealed class ProjectsLibraryViewModel : LibraryListViewModel
                 Title = Path.GetFileNameWithoutExtension(path),
                 Subtitle = Path.GetDirectoryName(path) ?? "",
                 Icon = "🕘",
+                ItemKey = LibraryItemKeys.ProjectKey(path),
                 Activate = () => _ = OpenRecentAsync(path)
-            })));
+            }), itemKey: LibraryItemKeys.NamedFolderKey("projects", "Recent")));
         }
 
         SetRoots(roots);

@@ -22,4 +22,8 @@ public sealed class ArrangementMarkerViewModel : ViewModelBase
     public string Name => Model.Name;
 
     public double Left => _metrics.BeatsToPixels(Model.Beat);
+
+    public void NotifyNameChanged() => OnPropertyChanged(nameof(Name));
+
+    public void NotifyPositionChanged() => OnPropertyChanged(nameof(Left));
 }

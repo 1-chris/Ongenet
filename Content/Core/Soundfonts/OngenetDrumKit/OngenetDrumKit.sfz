@@ -1,0 +1,14 @@
+// Ongenet Drum Kit — procedural factory one-shots (CC0, Ongenet)
+// Map GM-ish drum notes around C1–E2
+<group>
+lovel=0 hivel=127
+ampeg_attack=0.001 ampeg_release=0.15
+
+<region> sample=kick_120bpm_punch.wav key=36 pitch_keycenter=36
+<region> sample=snare_crack.wav key=38 pitch_keycenter=38
+<region> sample=hat_closed.wav key=42 pitch_keycenter=42
+<region> sample=hat_open.wav key=46 pitch_keycenter=46
+<region> sample=tom_low.wav key=43 pitch_keycenter=43
+<region> sample=tom_high.wav key=50 pitch_keycenter=50
+<region> sample=clap_room.wav key=39 pitch_keycenter=39
+<region> sample=ride_tick.wav key=51 pitch_keycenter=51

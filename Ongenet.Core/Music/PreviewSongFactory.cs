@@ -84,7 +84,7 @@ public static class PreviewSongFactory
 
     private static Track BuildKick()
     {
-        var track = NewInstrumentTrack("Kick", "CatppuccinRed", 0.95, PresetInstrument(new KickaInstrument(), "Deep House Kick"));
+        var track = NewInstrumentTrack("Kick", "CatppuccinRed", 0.95, PresetInstrument(new KickaInstrument(), "Techno Thump"));
 
         // Four-on-the-floor. The kick sits out of the intro's first half and the bridge.
         var floor = BarPattern((0.0, 1.0f), (1.0, 1.0f), (2.0, 1.0f), (3.0, 1.0f));
@@ -143,7 +143,8 @@ public static class PreviewSongFactory
 
     private static Track BuildBass(Project project, Guid kickTrackId)
     {
-        var track = NewInstrumentTrack("Bass", "CatppuccinMauve", 0.8, FactoryPresets.DeepSubBass());
+        var track = NewInstrumentTrack("Bass", "CatppuccinMauve", 0.8,
+            PresetInstrument(new BassSynthInstrument(), "Deep Sub"));
 
         // Kick-triggered sidechain: the classic pumping deep-house low end.
         track.Effects.Add(new SidechainEffect

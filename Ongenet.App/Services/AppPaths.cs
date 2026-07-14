@@ -35,6 +35,48 @@ public static class AppPaths
         return dir;
     }
 
+    /// <summary>
+    /// Bundled factory content pack (<c>Content/Core</c>) next to the app binary, or a repo-relative
+    /// fallback during development. Returns <c>null</c> when no pack is present.
+    /// </summary>
+    public static string? FactoryContentDirectory()
+    {
+        var bundled = Path.Combine(AppContext.BaseDirectory, "Content", "Core");
+        if (Directory.Exists(bundled)) return bundled;
+
+        // Dev / test: walk up from the base directory looking for Content/Core.
+        try
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (var i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
+            {
+                var candidate = Path.Combine(dir.FullName, "Content", "Core");
+                if (Directory.Exists(candidate)) return candidate;
+            }
+        }
+        catch { /* ignore */ }
+
+        return null;
+    }
+
+    /// <summary>Factory samples folder inside the content pack, or null.</summary>
+    public static string? FactorySamplesDirectory()
+    {
+        var root = FactoryContentDirectory();
+        if (root is null) return null;
+        var samples = Path.Combine(root, "Samples");
+        return Directory.Exists(samples) ? samples : null;
+    }
+
+    /// <summary>Factory soundfonts folder inside the content pack, or null.</summary>
+    public static string? FactorySoundFontsDirectory()
+    {
+        var root = FactoryContentDirectory();
+        if (root is null) return null;
+        var sf = Path.Combine(root, "Soundfonts");
+        return Directory.Exists(sf) ? sf : null;
+    }
+
     /// <summary>Factory control-surface definitions shipped with the app bundle.</summary>
     public static string FactoryControllersDirectory()
         => Path.Combine(AppContext.BaseDirectory, "Controllers", "Factory");

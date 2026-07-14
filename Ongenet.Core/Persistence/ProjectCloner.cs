@@ -118,6 +118,14 @@ public static class ProjectCloner
         foreach (var section in src.ArrangementSections)
             dst.ArrangementSections.Add(new ArrangementSection { Id = section.Id, MarkerId = section.MarkerId });
 
+        dst.ProjectClipsSortMode = src.ProjectClipsSortMode;
+        foreach (var cat in src.ProjectClipCategories)
+        {
+            var copy = new ProjectClipCategory { Id = cat.Id, Name = cat.Name };
+            foreach (var key in cat.ClipKeys) copy.ClipKeys.Add(key);
+            dst.ProjectClipCategories.Add(copy);
+        }
+
         return dst;
     }
 

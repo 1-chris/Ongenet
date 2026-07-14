@@ -49,6 +49,9 @@ public interface IInstrument : ISampleSource
     /// <summary>Per-note timbre via CC74 (0..127). Default no-op.</summary>
     void NoteTimbre(int midiNote, int value) { }
 
+    /// <summary>Host transport tempo in BPM (for tempo-gated SFZ regions). Default no-op.</summary>
+    void SetHostTempo(double bpm) { }
+
     /// <summary>Creates a fresh copy of this instrument with the same parameters (for track duplication).</summary>
     IInstrument Clone();
 }

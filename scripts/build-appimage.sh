@@ -51,6 +51,7 @@ if [ ! -d "$PUBLISH" ] || [ -z "$(ls -A "$PUBLISH" 2>/dev/null || true)" ]; then
     -p:DebugType=none -p:DebugSymbols=false
 fi
 ensure_license_in_publish "$PUBLISH" "$ROOT"
+ensure_content_in_publish "$PUBLISH" "$ROOT"
 
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" \

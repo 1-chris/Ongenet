@@ -75,6 +75,10 @@
                         Tag="https://github.com/1-chris/Ongenet/blob/main/LICENSE" Click="OpenLink_Click"
                         HorizontalAlignment="Left" Padding="0" Background="Transparent"
                         BorderThickness="0" Cursor="Hand"/>
+                <Button Classes="LegalLink" Content="{DynamicResource Settings_ContentAttribution}"
+                        Click="OpenContentAttribution_Click"
+                        HorizontalAlignment="Left" Padding="0" Background="Transparent"
+                        BorderThickness="0" Cursor="Hand"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

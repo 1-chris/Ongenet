@@ -34,6 +34,7 @@ if [ ! -d "$PUBLISH" ] || [ -z "$(ls -A "$PUBLISH" 2>/dev/null || true)" ]; then
     -p:DebugType=none -p:DebugSymbols=false
 fi
 ensure_license_in_publish "$PUBLISH" "$ROOT"
+ensure_content_in_publish "$PUBLISH" "$ROOT"
 
 rm -rf "$STAGE" "$SCRIPTS"
 mkdir -p "$PKG_ROOT/$APP_NAME.app/Contents/MacOS" \

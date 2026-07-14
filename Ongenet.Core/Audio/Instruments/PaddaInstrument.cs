@@ -273,7 +273,11 @@ public sealed class PaddaInstrument : PolyphonicInstrument, ISampleHost, IPreset
     // ===== Presets =====
 
     private static readonly string[] PresetNamesList =
-        { "Init", "Cathedral Choir", "Tar Pit", "Aurora Shimmer", "Biotope", "Velvet Strings", "Dusk Pads", "Deep Space" };
+        {
+            "Init", "Cathedral Choir", "Tar Pit", "Aurora Shimmer", "Biotope", "Velvet Strings", "Dusk Pads", "Deep Space",
+            "Glass Horizon", "Warm Brass", "Night Pulse", "Ice Choir", "Fogbed",
+            "Analog Swarm", "Silk Drift", "Neon Wash"
+        };
 
     public IReadOnlyList<string> PresetNames => PresetNamesList;
 
@@ -288,6 +292,14 @@ public sealed class PaddaInstrument : PolyphonicInstrument, ISampleHost, IPreset
             case 5: VelvetStrings(); break;
             case 6: DuskPads(); break;
             case 7: DeepSpace(); break;
+            case 8: GlassHorizon(); break;
+            case 9: WarmBrass(); break;
+            case 10: NightPulse(); break;
+            case 11: IceChoir(); break;
+            case 12: Fogbed(); break;
+            case 13: AnalogSwarm(); break;
+            case 14: SilkDrift(); break;
+            case 15: NeonWash(); break;
             default: Reset(); break;
         }
     }
@@ -442,6 +454,81 @@ public sealed class PaddaInstrument : PolyphonicInstrument, ISampleHost, IPreset
         ReverbMix = 0.65; ReverbSize = 0.95; ReverbDamp = 0.25;
         DelayMix = 0.3; DelayTime = 640; DelayFeedback = 0.5;
         Gain = 0.6;
+    }
+
+    private void GlassHorizon()
+    {
+        Reset();
+        WaveA = (int)OscWave.Triangle; LevelA = 0.7;
+        WaveB = (int)OscWave.Saw; OctaveB = 1; LevelB = 0.45;
+        UnisonVoices = 5; UnisonDetune = 10; UnisonWidth = 0.85;
+        Cutoff = 12000; Resonance = 0.5; Attack = 0.8; Release = 2.2;
+        ChorusMix = 0.5; ReverbMix = 0.4; ReverbSize = 0.9; Gain = 0.7;
+    }
+
+    private void WarmBrass()
+    {
+        Reset();
+        WaveA = (int)OscWave.Saw; LevelA = 0.85;
+        WaveB = (int)OscWave.Square; LevelB = 0.4;
+        UnisonVoices = 3; UnisonDetune = 8; Cutoff = 2800; Resonance = 1.5;
+        FilterEnvAmount = 0.4; Attack = 0.12; Decay = 0.35; Sustain = 0.7; Release = 0.4;
+        Drive = 0.35; ChorusMix = 0.2; ReverbMix = 0.15; Gain = 0.75;
+    }
+
+    private void NightPulse()
+    {
+        Reset();
+        WaveA = (int)OscWave.Saw; LevelA = 0.7;
+        WaveB = (int)OscWave.Saw; LevelB = 0.55; CoarseB = 0.05;
+        UnisonVoices = 4; Cutoff = 1600; LfoRate = 0.35; LfoDepth = 0.5; LfoDest = 1;
+        Attack = 0.4; Release = 1.2; ReverbMix = 0.3; DelayMix = 0.2; Gain = 0.72;
+    }
+
+    private void IceChoir()
+    {
+        Reset();
+        WaveA = (int)OscWave.Sine; LevelA = 0.6;
+        WaveB = (int)OscWave.Triangle; OctaveB = 1; LevelB = 0.55;
+        UnisonVoices = 7; UnisonDetune = 18; Cutoff = 14000;
+        Attack = 1.0; Release = 2.5; ChorusMix = 0.55; ReverbMix = 0.5; Gain = 0.68;
+    }
+
+    private void Fogbed()
+    {
+        Reset();
+        WaveA = (int)OscWave.Noise; LevelA = 0.35;
+        WaveB = (int)OscWave.Saw; LevelB = 0.55; OctaveB = -1;
+        UnisonVoices = 5; Cutoff = 1400; Resonance = 2.0; NoiseLevel = 0.35;
+        Attack = 1.5; Release = 2.8; ReverbMix = 0.55; Gain = 0.6;
+    }
+
+    private void AnalogSwarm()
+    {
+        Reset();
+        WaveA = (int)OscWave.Saw; LevelA = 0.8;
+        WaveB = (int)OscWave.Saw; LevelB = 0.8; UnisonVoices = 7; UnisonDetune = 28;
+        Cutoff = 4500; DriftAmount = 0.4; ChorusMix = 0.4; Drive = 0.25;
+        Attack = 0.35; Release = 1.0; Gain = 0.7;
+    }
+
+    private void SilkDrift()
+    {
+        Reset();
+        WaveA = (int)OscWave.Triangle; LevelA = 0.75;
+        WaveB = (int)OscWave.Sine; OctaveB = 1; LevelB = 0.4;
+        UnisonVoices = 4; UnisonDetune = 9; Cutoff = 8000;
+        Attack = 0.7; Release = 1.8; ChorusMix = 0.35; ReverbMix = 0.35; Gain = 0.72;
+    }
+
+    private void NeonWash()
+    {
+        Reset();
+        WaveA = (int)OscWave.Saw; LevelA = 0.7;
+        WaveB = (int)OscWave.Square; OctaveB = 1; LevelB = 0.35;
+        UnisonVoices = 5; Cutoff = 5500; Resonance = 2.5; FilterEnvAmount = 0.3;
+        LfoRate = 0.5; LfoDepth = 0.35; LfoDest = 1;
+        DelayMix = 0.25; ReverbMix = 0.4; Gain = 0.7;
     }
 
     /// <summary>One sounding note: two unison layers + sub + noise → modulated filter → amp envelope.</summary>

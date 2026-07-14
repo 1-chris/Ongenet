@@ -19,6 +19,8 @@ public sealed class DahdsrEnvelope
     private int _holdLeft;        // samples remaining in the hold stage
 
     public double DelaySeconds { get; set; }
+    /// <summary>Level at the start of the attack stage (SFZ <c>*_start</c>), 0..1.</summary>
+    public double StartLevel { get; set; }
     public double AttackSeconds { get; set; } = 0.001;
     public double HoldSeconds { get; set; }
     public double DecaySeconds { get; set; }
@@ -36,10 +38,10 @@ public sealed class DahdsrEnvelope
 
     public void SetSampleRate(int sampleRate) => _sampleRate = sampleRate <= 0 ? 44100 : sampleRate;
 
-    /// <summary>Begins a new note from silence (enters the delay/attack stage).</summary>
+    /// <summary>Begins a new note from <see cref="StartLevel"/> (enters the delay/attack stage).</summary>
     public void Gate()
     {
-        _level = 0.0;
+        _level = StartLevel < 0 ? 0 : StartLevel > 1 ? 1 : StartLevel;
         _delayLeft = Seconds(DelaySeconds);
         _holdLeft = Seconds(HoldSeconds);
         _stage = _delayLeft > 0 ? Stage.Delay : Stage.Attack;
@@ -60,17 +62,21 @@ public sealed class DahdsrEnvelope
         {
             case Stage.Delay:
                 if (--_delayLeft <= 0) _stage = Stage.Attack;
-                _level = 0.0;
+                // Hold start level through delay.
                 break;
 
             case Stage.Attack:
-                _level += StepFor(AttackSeconds);
+            {
+                var span = 1.0 - StartLevel;
+                if (span <= 1e-9) { _level = 1.0; _stage = _holdLeft > 0 ? Stage.Hold : Stage.Decay; break; }
+                _level += StepFor(AttackSeconds) * span;
                 if (_level >= 1.0)
                 {
                     _level = 1.0;
                     _stage = _holdLeft > 0 ? Stage.Hold : Stage.Decay;
                 }
                 break;
+            }
 
             case Stage.Hold:
                 _level = 1.0;

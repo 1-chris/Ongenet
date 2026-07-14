@@ -55,9 +55,33 @@ sample=note.wav
         var doc = SfzParser.Parse(sfz);
 
         Assert.Equal("samples/piano/", doc.Control.DefaultPath); // backslashes normalized
+        Assert.Equal("samples/piano/", doc.Regions[0].DefaultPath);
         Assert.Equal(100, doc.Control.InitialCcValues[7]);
         Assert.Equal(64, doc.Control.InitialCcValues[10]);
         Assert.Equal(0.8f, doc.Regions[0].Opcodes.GetFloat("ampeg_release", 0)); // $REL expanded
+    }
+
+    [Fact]
+    public void SnapshotsDefaultPathPerRegionAcrossControlBlocks()
+    {
+        // VSCO keyswitch banks redefine <control> default_path for each articulation.
+        const string sfz = @"
+<control>
+default_path=Strings\Cello Section\susvib\
+<group> sw_last=c6
+<region> sample=susvib_C3.wav lokey=60 hikey=60
+<control>
+default_path=Strings\Cello Section\pizzT\
+<group> sw_last=d#6
+<region> sample=pizz_C3.wav lokey=60 hikey=60
+";
+        var doc = SfzParser.Parse(sfz);
+
+        Assert.Equal(2, doc.Regions.Count);
+        Assert.Equal("Strings/Cello Section/susvib/", doc.Regions[0].DefaultPath);
+        Assert.Equal("Strings/Cello Section/pizzT/", doc.Regions[1].DefaultPath);
+        // Document.Control reflects the last control block.
+        Assert.Equal("Strings/Cello Section/pizzT/", doc.Control.DefaultPath);
     }
 
     [Fact]

@@ -519,6 +519,14 @@ public sealed class AudioEngine : IAudioEngine
         var effectiveBpm = playing ? EffectiveBpm(prevBeat, transportBpm) : (transportBpm > 0 ? transportBpm : 120.0);
         if (playing && effectiveBpm > 0) _samplesPerBeat = sampleRate * 60.0 / effectiveBpm;
 
+        // Tempo-gated SFZ/SF2 regions (lobpm/hibpm, delay_beats) follow the live transport.
+        if (effectiveBpm > 0)
+        {
+            foreach (var track in _tracks)
+            foreach (var slot in track.ActiveInstruments)
+                slot.Instrument.SetHostTempo(effectiveBpm);
+        }
+
         var curBeat = prevBeat + frames / _samplesPerBeat;
 
         // Looping: wrap the playhead back when it reaches the loop end (an explicit "[ ]" region if set,

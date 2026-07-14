@@ -1,0 +1,14 @@
+// OramicsLM2
+<group>
+lovel=0 hivel=127 ampeg_attack=0.001 ampeg_release=0.2
+
+<region> sample=kick.wav key=36 pitch_keycenter=36
+<region> sample=snare-m.wav key=38 pitch_keycenter=38
+<region> sample=clap.wav key=39 pitch_keycenter=39
+<region> sample=hihat-closed.wav key=42 pitch_keycenter=42
+<region> sample=hihat-open.wav key=46 pitch_keycenter=46
+<region> sample=tom-l.wav key=43 pitch_keycenter=43
+<region> sample=tom-m.wav key=45 pitch_keycenter=45
+<region> sample=tom-h.wav key=50 pitch_keycenter=50
+<region> sample=crash.wav key=49 pitch_keycenter=49
+<region> sample=ride.wav key=51 pitch_keycenter=51

@@ -5,67 +5,261 @@
         x:Class="Ongenet.App.Views.Windows.SamplerZoneEditorWindow"
         x:DataType="vm:SamplerZoneEditorViewModel"
         Title="{Binding Title}"
-        Width="720" Height="560" MinWidth="480" MinHeight="400">
+        Width="1040" Height="720" MinWidth="800" MinHeight="520">
 
     <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
-        <Grid RowDefinitions="Auto,Auto,Auto,*">
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,8">
-                <TextBlock Text="{Binding ZoneCount, StringFormat='{}{0} zone(s)'}"
-                           VerticalAlignment="Center" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <Button Content="{DynamicResource SamplerZone_Apply_changes}" Command="{Binding ApplyCommand}" Padding="12,4"/>
-            </StackPanel>
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+            <!-- Layers -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+                    <Button x:Name="AddLayerButton" Content="{DynamicResource InstrumentSlot_Add_layer}"
+                            Click="OnAddLayer" Padding="12,6"
+                            ToolTip.Tip="{DynamicResource InstrumentSlot_Add_layer_Tip}"
+                            IsEnabled="{Binding !IsAddingLayer}"/>
+                    <Button Content="Apply zone edits" Command="{Binding ApplyCommand}" Padding="12,6"/>
+                    <Button Content="Refresh" Command="{Binding RefreshCommand}" Padding="12,6"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding LayerCount, StringFormat='Layers ({0})'}"
+                               VerticalAlignment="Center" FontWeight="SemiBold"
+                               Foreground="{StaticResource CatppuccinText}"/>
+                    <TextBlock Text="Adding…" FontSize="12" IsVisible="{Binding IsAddingLayer}"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                </StackPanel>
+            </DockPanel>
 
-            <controls:SamplerZoneMapControl Grid.Row="1" Height="180" Margin="0,0,0,8"
-                                            Zones="{Binding Zones}"/>
-
-            <Grid Grid.Row="2" ColumnDefinitions="*,56,56,56,56,56,56,56" Margin="0,0,0,4"
-                  ColumnSpacing="4">
-                <TextBlock Text="{DynamicResource SamplerZone_Sample}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Grid.Column="1" Text="{DynamicResource SamplerZone_Lo_key}" FontSize="10" HorizontalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Grid.Column="2" Text="{DynamicResource SamplerZone_Hi_key}" FontSize="10" HorizontalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Grid.Column="3" Text="{DynamicResource SamplerZone_Lo_vel}" FontSize="10" HorizontalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Grid.Column="4" Text="{DynamicResource SamplerZone_Hi_vel}" FontSize="10" HorizontalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Grid.Column="5" Text="{DynamicResource SamplerZone_Root}" FontSize="10" HorizontalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Grid.Column="6" Text="{DynamicResource SamplerZone_RR_len}" FontSize="10" HorizontalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Grid.Column="7" Text="{DynamicResource SamplerZone_RR_pos}" FontSize="10" HorizontalAlignment="Center"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-            </Grid>
-
-            <ScrollViewer Grid.Row="3">
-                <ItemsControl ItemsSource="{Binding Zones}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:SamplerZoneRowViewModel">
-                            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4"
-                                    Background="{StaticResource CatppuccinSurface0}">
-                                <Grid ColumnDefinitions="*,56,56,56,56,56,56,56" ColumnSpacing="4">
-                                    <TextBlock Grid.Column="0" Text="{Binding SampleName}"
-                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                    <NumericUpDown Grid.Column="1" Value="{Binding LoKey, Mode=TwoWay}"
-                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
-                                    <NumericUpDown Grid.Column="2" Value="{Binding HiKey, Mode=TwoWay}"
-                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
-                                    <NumericUpDown Grid.Column="3" Value="{Binding LoVel, Mode=TwoWay}"
-                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
-                                    <NumericUpDown Grid.Column="4" Value="{Binding HiVel, Mode=TwoWay}"
-                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
-                                    <NumericUpDown Grid.Column="5" Value="{Binding RootKey, Mode=TwoWay}"
-                                                   Minimum="0" Maximum="127" Width="52" FontSize="10"/>
-                                    <NumericUpDown Grid.Column="6" Value="{Binding SeqLength, Mode=TwoWay}"
-                                                   Minimum="1" Maximum="128" Width="52" FontSize="10"/>
-                                    <NumericUpDown Grid.Column="7" Value="{Binding SeqPosition, Mode=TwoWay}"
-                                                   Minimum="1" Maximum="128" Width="52" FontSize="10"/>
+            <Border Grid.Row="1" Background="{StaticResource CatppuccinSurface0}" CornerRadius="4"
+                    Padding="10" Margin="0,0,0,8" MaxHeight="180">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Layers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SamplerLayerRowViewModel">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto,220,Auto,Auto,Auto,Auto"
+                                      ColumnSpacing="10" Margin="0,4" MinHeight="36">
+                                    <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Width="22" Height="22" Padding="0" CornerRadius="3"
+                                            Background="{Binding ColorBrush}"
+                                            ToolTip.Tip="Layer colour — pick a swatch or randomize"
+                                            VerticalAlignment="Center">
+                                        <Button.Flyout>
+                                            <Flyout Placement="Bottom">
+                                                <StackPanel Spacing="6" Width="168">
+                                                    <ItemsControl ItemsSource="{Binding PaletteColors}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <UniformGrid Columns="8"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:SamplerLayerColorChip">
+                                                                <Button Width="18" Height="18" Margin="1" Padding="0"
+                                                                        CornerRadius="2" Background="{Binding Brush}"
+                                                                        Command="{Binding PickCommand}"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <Button Content="Randomize" Command="{Binding RandomizeColorCommand}"
+                                                            HorizontalAlignment="Stretch" Padding="8,4" FontSize="12"/>
+                                                </StackPanel>
+                                            </Flyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                    <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding FileName}" FontSize="12"
+                                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="3" Text="{Binding FormatLabel}" VerticalAlignment="Center"
+                                               Foreground="{StaticResource CatppuccinOverlay1}" Margin="0,0,4,0"/>
+                                    <ComboBox Grid.Column="4" Classes="stretch" FontSize="12" MinWidth="220" MinHeight="32"
+                                              IsVisible="{Binding HasSf2Presets}"
+                                              ItemsSource="{Binding Sf2PresetNames}"
+                                              SelectedIndex="{Binding SelectedSf2Preset, Mode=TwoWay}"/>
+                                    <TextBlock Grid.Column="5" Text="Key mask" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                    <NumericUpDown Grid.Column="6" Value="{Binding MaskLo, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="127" MinWidth="80" Width="88" MinHeight="32"
+                                                   FontSize="12" VerticalAlignment="Center"
+                                                   ShowButtonSpinner="True"/>
+                                    <NumericUpDown Grid.Column="7" Value="{Binding MaskHi, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="127" MinWidth="80" Width="88" MinHeight="32"
+                                                   FontSize="12" VerticalAlignment="Center"
+                                                   ShowButtonSpinner="True"/>
+                                    <Button Grid.Column="8" Content="Remove" Command="{Binding RemoveCommand}"
+                                            Padding="12,6" VerticalAlignment="Center"/>
                                 </Grid>
-                            </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Keyboard coverage -->
+            <StackPanel Grid.Row="2" Margin="0,0,0,8" Spacing="4">
+                <TextBlock Text="Keyboard coverage (hold a key to audition)" FontSize="12"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <controls:PianoCoverageControl x:Name="PianoCoverage" Height="48"
+                                               Coverage="{Binding KeyCoverage}"
+                                               KeyColors="{Binding KeyColors}"
+                                               SelectedKey="{Binding SelectedKey, Mode=TwoWay}"/>
+                <TextBlock Text="{Binding KeyDetailSummary}" FontSize="12"
+                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <ItemsControl ItemsSource="{Binding KeySamples}" MaxHeight="80">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" FontSize="12"
+                                       Foreground="{StaticResource CatppuccinText}"/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </ScrollViewer>
+            </StackPanel>
+
+            <controls:SamplerZoneMapControl Grid.Row="3" Height="140" Margin="0,0,0,8"
+                                            Zones="{Binding Zones}"/>
+
+            <!-- Zone cards -->
+            <DockPanel Grid.Row="4" LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top" Text="Zones" FontSize="12" FontWeight="SemiBold"
+                           Margin="0,0,0,6" Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Zones}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SamplerZoneRowViewModel">
+                                <Border Margin="0,0,0,8" Padding="12" CornerRadius="4"
+                                        Background="{StaticResource CatppuccinSurface0}">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="{Binding SampleName}" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"/>
+
+                                        <WrapPanel Orientation="Horizontal">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Lo key" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding LoKey, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="127" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Hi key" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding HiKey, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="127" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Lo vel" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding LoVel, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="127" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Hi vel" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding HiVel, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="127" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Root" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding RootKey, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="127" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="RR len" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding SeqLength, Mode=TwoWay}"
+                                                               Minimum="1" Maximum="128" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="RR #" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding SeqPosition, Mode=TwoWay}"
+                                                               Minimum="1" Maximum="128" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Gain" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding Gain, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="4" Increment="0.05"
+                                                               Width="100" MinHeight="32" FontSize="12"
+                                                               FormatString="0.##" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                        </WrapPanel>
+
+                                        <WrapPanel Orientation="Horizontal">
+                                            <CheckBox Content="Filter" IsChecked="{Binding HasFilter, Mode=TwoWay}"
+                                                      FontSize="12" VerticalAlignment="Center" Margin="0,0,16,8"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Cutoff" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding Cutoff, Mode=TwoWay}"
+                                                               Minimum="20" Maximum="20000" Increment="10"
+                                                               Width="112" MinHeight="32" FontSize="12"
+                                                               IsEnabled="{Binding HasFilter}" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Q" Width="24" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding FilterQ, Mode=TwoWay}"
+                                                               Minimum="0.05" Maximum="20" Increment="0.05"
+                                                               Width="92" MinHeight="32" FontSize="12"
+                                                               FormatString="0.##" IsEnabled="{Binding HasFilter}"
+                                                               ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Pan" Width="36" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding Pan, Mode=TwoWay}"
+                                                               Minimum="-1" Maximum="1" Increment="0.05"
+                                                               Width="92" MinHeight="32" FontSize="12"
+                                                               FormatString="0.##" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Attack" Width="48" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding AmpAttack, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="10" Increment="0.01"
+                                                               Width="100" MinHeight="32" FontSize="12"
+                                                               FormatString="0.###" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Decay" Width="48" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding AmpDecay, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="10" Increment="0.01"
+                                                               Width="100" MinHeight="32" FontSize="12"
+                                                               FormatString="0.###" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Sustain" Width="52" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding AmpSustain, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="1" Increment="0.01"
+                                                               Width="100" MinHeight="32" FontSize="12"
+                                                               FormatString="0.##" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
+                                                <TextBlock Text="Release" Width="52" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding AmpRelease, Mode=TwoWay}"
+                                                               Minimum="0" Maximum="20" Increment="0.01"
+                                                               Width="100" MinHeight="32" FontSize="12"
+                                                               FormatString="0.###" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
         </Grid>
     </Border>
 </Window>

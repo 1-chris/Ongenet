@@ -200,7 +200,9 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
     private static readonly string[] PresetNamesList =
     {
         "Drumkit", "Trance Kick", "EDM Kick", "Hardstyle Kick", "UKHC Kick",
-        "Oldschool Happy Hardcore Kick", "Hardstyle Zaag", "Hardstyle Piep", "Deep House Kick", "DnB Kick"
+        "Oldschool Happy Hardcore Kick", "Hardstyle Zaag", "Hardstyle Piep", "Deep House Kick", "DnB Kick",
+        "Techno Thump", "Trap 808", "Boom Bap", "Minimal Click", "Industrial",
+        "Gabber Slam", "Soft Analog", "Rubber Bounce"
     };
 
     public IReadOnlyList<string> PresetNames => PresetNamesList;
@@ -218,6 +220,14 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
             case 7: Piep(); break;
             case 8: DeepHouse(); break;
             case 9: Dnb(); break;
+            case 10: TechnoThump(); break;
+            case 11: Trap808(); break;
+            case 12: BoomBap(); break;
+            case 13: MinimalClick(); break;
+            case 14: Industrial(); break;
+            case 15: GabberSlam(); break;
+            case 16: SoftAnalog(); break;
+            case 17: RubberBounce(); break;
             default: Reset(); break; // 0 = Drumkit / init
         }
     }
@@ -363,6 +373,80 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
         TailLengthMs = 550; TailPitch = -5; TailDecayMs = 500; TailLevel = 0.8;
         Width = 0.4; Comb = 0.2; CombFeedback = 0.7;
         Gain = 0.80; Punch = 0.6;
+    }
+
+    private void TechnoThump()
+    {
+        Reset();
+        StartPitch = 24; PitchDecayMs = 45; PitchCurve = 0.55;
+        PunchLevel = 0.55; PunchPitch = 24; PunchDecayMs = 18;
+        ClickLevel = 0.2; TickLevel = 0.15;
+        BodyDecayMs = 280; SubLevel = 0.75; SubDecayMs = 320;
+        Stages = 1; StackMix = 0.2; Gain = 0.88; Punch = 0.45;
+    }
+
+    private void Trap808()
+    {
+        Reset();
+        StartPitch = 48; PitchDecayMs = 80; PitchCurve = 0.4;
+        PunchLevel = 0.35; ClickLevel = 0.1; TickLevel = 0.05;
+        BodyDecayMs = 600; BodyLevel = 0.7;
+        SubLevel = 1.0; SubDecayMs = 900;
+        Stages = 0; StackMix = 0.0; Gain = 0.9; Punch = 0.3;
+    }
+
+    private void BoomBap()
+    {
+        Reset();
+        StartPitch = 20; PitchDecayMs = 28;
+        PunchLevel = 0.7; PunchDecayMs = 12; ClickLevel = 0.45; TickLevel = 0.3;
+        BodyDecayMs = 200; SubLevel = 0.55; SubDecayMs = 220;
+        Stages = 2; StackDriveDb = 3; StackMix = 0.25; Gain = 0.88; Punch = 0.5;
+    }
+
+    private void MinimalClick()
+    {
+        Reset();
+        StartPitch = 18; PitchDecayMs = 18;
+        PunchLevel = 0.8; ClickLevel = 0.7; ClickTone = 6000; TickLevel = 0.5;
+        BodyDecayMs = 120; SubLevel = 0.35; SubDecayMs = 140;
+        Stages = 0; Gain = 0.85; Punch = 0.6;
+    }
+
+    private void Industrial()
+    {
+        Reset();
+        StartPitch = 28; PitchDecayMs = 35;
+        PunchLevel = 0.65; ClickLevel = 0.55; TickLevel = 0.45;
+        BodyWave = 1; BodyDecayMs = 240;
+        SubLevel = 0.5; Stages = 6; StackDriveDb = 7; Character = (int)ShaperType.HardClip;
+        StackMix = 0.65; Width = 0.2; Comb = 0.2; Gain = 0.82; Punch = 0.55;
+    }
+
+    private void GabberSlam()
+    {
+        Hardstyle();
+        StartPitch = 36; PitchDecayMs = 14;
+        Stages = 14; StackDriveDb = 10; StackMix = 0.95;
+        TailLengthMs = 400; TailLevel = 0.7; Gain = 0.78; Punch = 0.7;
+    }
+
+    private void SoftAnalog()
+    {
+        Reset();
+        StartPitch = 22; PitchDecayMs = 50; PitchCurve = 0.45;
+        PunchLevel = 0.3; ClickLevel = 0.15; TickLevel = 0.1;
+        BodyDecayMs = 320; SubLevel = 0.6; SubDecayMs = 380;
+        Stages = 0; Gain = 0.82; Punch = 0.25;
+    }
+
+    private void RubberBounce()
+    {
+        Reset();
+        StartPitch = 30; PitchDecayMs = 55; PitchCurve = 0.35;
+        PunchLevel = 0.5; BodyDecayMs = 260; SubLevel = 0.7; SubDecayMs = 300;
+        Stages = 2; StackDriveDb = 4; Character = (int)ShaperType.Tanh; StackMix = 0.35;
+        TailMode = 1; TailLengthMs = 220; TailLevel = 0.25; Gain = 0.85; Punch = 0.4;
     }
 
     /// <summary>One kick hit: Tok (transient) + Tail (pitch-swept tone → distortion stack) + clean sub.</summary>

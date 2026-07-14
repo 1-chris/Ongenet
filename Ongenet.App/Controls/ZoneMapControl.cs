@@ -95,7 +95,14 @@ namespace Ongenet.App.Controls
                 var yBot = (1.0 - Math.Clamp(z.LoVel, 0, 127) / 127.0) * h;
 
                 var rect = new Rect(x0, yTop, Math.Max(1.0, x1 - x0), Math.Max(1.0, yBot - yTop));
-                var color = _palette.Length > 0 ? _palette[Math.Abs(z.Group) % _palette.Length] : Colors.Gray;
+                Color color;
+                if (z.LayerColorArgb != 0)
+                    color = Color.FromUInt32(z.LayerColorArgb);
+                else
+                {
+                    var colorKey = z.LayerId != Guid.Empty ? z.LayerId.GetHashCode() : z.Group;
+                    color = _palette.Length > 0 ? _palette[Math.Abs(colorKey) % _palette.Length] : Colors.Gray;
+                }
                 var fill = new SolidColorBrush(ThemePalette.WithAlpha(color, 0x55));
                 var border = new Pen(new SolidColorBrush(ThemePalette.WithAlpha(color, 0xCC)), 1);
                 context.DrawRectangle(fill, border, rect);

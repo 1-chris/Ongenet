@@ -125,7 +125,8 @@ self-hosted versioned folder sync.
 | Accessibility                               | **Good** — screen-reader landmarks on transport, timeline, mixer, piano roll, session, Field, library, export       |
 | Windows pro audio                           | **Good** — WASAPI exclusive low-latency; ASIO driver registry enumeration on Windows                          |
 | Autosave / crash recovery                   | **Good** — periodic autosave backups + recovery prompt on launch (Settings → on by default)                        |
-| Content library                             | **Good** — nine demo songs/templates + Field/FX presets via the Library sidebar                                      |
+| Content library                             | **Good** — factory Content/Core (~1.25 GB): Stargate/Oramics + VCSL kit/Strumstick/Kawai piano + VSCO2CE orchestra + tonejs CC-BY bass/organ/xylo, SFZ kits + Inst/FX factory presets + demo songs |
+
 
 
 ### Video composition (desktop)

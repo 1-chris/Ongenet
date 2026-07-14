@@ -12,6 +12,9 @@ public sealed class SfzDocument
 
     public IReadOnlyList<SfzRegion> Regions { get; init; } = new List<SfzRegion>();
 
+    /// <summary>Parsed <c>&lt;curve&gt;</c> tables.</summary>
+    public SamplerCurveBank Curves { get; init; } = SamplerCurveBank.Empty;
+
     /// <summary>Non-fatal issues (unresolved includes/macros, malformed directives) for diagnostics.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = new List<string>();
 }

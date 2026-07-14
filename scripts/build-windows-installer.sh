@@ -32,6 +32,7 @@ if [ ! -f "$PUBLISH/Ongenet.exe" ]; then
     -p:DebugType=none -p:DebugSymbols=false
 fi
 ensure_license_in_publish "$PUBLISH" "$ROOT"
+ensure_content_in_publish "$PUBLISH" "$ROOT"
 
 if ! command -v iscc >/dev/null 2>&1; then
   if [ -x "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then

@@ -1,0 +1,13 @@
+// Auto SFZ for tonejs-instruments bass-electric (CC BY 3.0)
+<group>
+lovel=0 hivel=127 ampeg_attack=0.005 ampeg_release=0.4
+
+<region> sample=As1.ogg key=34 pitch_keycenter=34
+<region> sample=As3.ogg key=58 pitch_keycenter=58
+<region> sample=Cs1.ogg key=25 pitch_keycenter=25
+<region> sample=Cs3.ogg key=49 pitch_keycenter=49
+<region> sample=Cs5.ogg key=73 pitch_keycenter=73
+<region> sample=E2.ogg key=40 pitch_keycenter=40
+<region> sample=E4.ogg key=64 pitch_keycenter=64
+<region> sample=G2.ogg key=43 pitch_keycenter=43
+<region> sample=G4.ogg key=67 pitch_keycenter=67

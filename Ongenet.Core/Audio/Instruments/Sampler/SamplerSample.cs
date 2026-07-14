@@ -1,3 +1,4 @@
+using System.IO;
 using Ongenet.Core.Audio.Files;
 
 namespace Ongenet.Core.Audio.Instruments.Sampler;
@@ -33,6 +34,20 @@ public sealed class SamplerSample
     public long PreloadFrames { get; }
 
     public bool IsStreamed => StreamPath is not null;
+
+    /// <summary>UI label: stream file basename, or an optional override for resident/embedded samples.</summary>
+    public string DisplayName
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(_displayName)) return _displayName;
+            if (StreamPath is { Length: > 0 } p) return Path.GetFileNameWithoutExtension(p);
+            return "(embedded)";
+        }
+        set => _displayName = value ?? string.Empty;
+    }
+
+    private string _displayName = string.Empty;
 
     private SamplerSample(int channels, int sampleRate, long frameCount, AudioSampleBuffer? resident,
         string? streamPath, long dataOffset, int bits, bool isFloat, float[]? preload, long preloadFrames)

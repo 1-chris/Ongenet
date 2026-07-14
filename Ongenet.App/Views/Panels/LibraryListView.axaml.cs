@@ -1,9 +1,15 @@
 using System;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Ongenet.App.Localization;
+using Ongenet.App.Services;
 using Ongenet.App.ViewModels.Library;
+using Ongenet.App.Views.Windows;
 
 namespace Ongenet.App.Views.Panels
 {
@@ -29,9 +35,9 @@ namespace Ongenet.App.Views.Panels
             NodeTree.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
             NodeTree.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel);
             NodeTree.AddHandler(DoubleTappedEvent, OnDoubleTapped);
+            NodeTree.AddHandler(TreeViewItem.ExpandedEvent, OnItemExpanded, RoutingStrategies.Bubble);
         }
 
-        // Only leaves with a drag payload are draggable; folders return null.
         private static LibraryNode? DraggableOf(object? source)
             => (source as Control)?.DataContext is LibraryNode { DragFormat: not null } n ? n : null;
 
@@ -39,6 +45,9 @@ namespace Ongenet.App.Views.Panels
 
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            // Star clicks toggle favourite — don't start a drag from them.
+            if (e.Source is Control c && c.Classes.Contains("library-star")) return;
+
             _pressed = DraggableOf(e.Source);
             _pressArgs = _pressed is not null ? e : null;
             if (_pressed is not null) _pressPoint = e.GetPosition(this);
@@ -65,11 +74,13 @@ namespace Ongenet.App.Views.Panels
         private void OnDoubleTapped(object? sender, TappedEventArgs e)
             => NodeOf(e.Source)?.Activate?.Invoke();
 
+        private void OnItemExpanded(object? sender, RoutedEventArgs e)
+            => TreeBrowseHelper.ScrollExpandedIntoView(NodeTree, e.Source as Control);
+
         private void OnExpandRecursive(object? sender, RoutedEventArgs e) => SetExpanded(sender, true);
 
         private void OnCollapseRecursive(object? sender, RoutedEventArgs e) => SetExpanded(sender, false);
 
-        // The context menu's items inherit the folder row's DataContext (the LibraryNode).
         private static void SetExpanded(object? sender, bool expanded)
         {
             if ((sender as Control)?.DataContext is LibraryNode node) SetExpandedRecursive(node, expanded);
@@ -79,7 +90,72 @@ namespace Ongenet.App.Views.Panels
         {
             if (!node.IsFolder) return;
             node.IsExpanded = expanded;
-            foreach (var child in node.Children) SetExpandedRecursive(child, expanded);
+            foreach (var c in node.Children) SetExpandedRecursive(c, expanded);
+        }
+
+        private void OnToggleFavourite(object? sender, RoutedEventArgs e)
+        {
+            if ((sender as Control)?.DataContext is LibraryNode node)
+                node.ToggleFavourite();
+            e.Handled = true;
+        }
+
+        private async void OnNewCategory(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not LibraryListViewModel vm || vm.Organization is null) return;
+            if ((sender as Control)?.DataContext is not LibraryNode { CanFavourite: true } node) return;
+            var owner = this.FindAncestorOfType<Window>()
+                ?? (Avalonia.Application.Current?.ApplicationLifetime
+                    as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            if (owner is null) return;
+
+            var name = await InputDialog.Prompt(owner,
+                Loc.Get("LibraryOrg_NewCategory_Title", "New category"),
+                Loc.Get("LibraryOrg_NewCategory_Label", "Category name:"),
+                "", Loc.Get("LibraryOrg_Create", "Create"));
+            if (string.IsNullOrWhiteSpace(name)) return;
+            var cat = vm.Organization.CreateCategory(name);
+            vm.Organization.AddToCategory(cat.Id, node.ItemKey);
+        }
+
+        private async void OnAddToCategory(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not LibraryListViewModel vm || vm.Organization is null) return;
+            if ((sender as Control)?.DataContext is not LibraryNode { CanFavourite: true } node) return;
+            var cats = vm.Organization.Categories;
+            if (cats.Count == 0)
+            {
+                OnNewCategory(sender, e);
+                return;
+            }
+
+            var owner = this.FindAncestorOfType<Window>()
+                ?? (Avalonia.Application.Current?.ApplicationLifetime
+                    as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            if (owner is null) return;
+
+            // Simple picker: offer existing names as a single-line prompt with suggestion in label.
+            var names = string.Join(", ", cats.Select(c => c.Name));
+            var chosen = await InputDialog.Prompt(owner,
+                Loc.Get("LibraryOrg_AddToCategory_Title", "Add to category"),
+                Loc.Get("LibraryOrg_AddToCategory_Label", "Category name ({0}):", names),
+                cats[0].Name, Loc.Get("LibraryOrg_Add", "Add"));
+            if (string.IsNullOrWhiteSpace(chosen)) return;
+            var cat = cats.FirstOrDefault(c =>
+                string.Equals(c.Name, chosen.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (cat is null)
+            {
+                cat = vm.Organization.CreateCategory(chosen);
+            }
+            vm.Organization.AddToCategory(cat.Id, node.ItemKey);
+        }
+
+        private void OnRemoveFromCategories(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not LibraryListViewModel vm || vm.Organization is null) return;
+            if ((sender as Control)?.DataContext is not LibraryNode { CanFavourite: true } node) return;
+            foreach (var cat in vm.Organization.Categories.ToList())
+                vm.Organization.RemoveFromCategory(cat.Id, node.ItemKey);
         }
     }
 }

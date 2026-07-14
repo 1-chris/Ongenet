@@ -16,6 +16,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 # shellcheck source=scripts/packaging-common.sh
 source "$ROOT/scripts/packaging-common.sh"
+assert_content_size_mb "$ROOT" 1600
 
 PROJ="$ROOT/Ongenet.Desktop/Ongenet.Desktop.csproj"
 OUTBASE="$ROOT/Ongenet.Desktop/bin/Release/net10.0"
@@ -53,6 +54,7 @@ for rid in $RIDS; do
     dotnet publish "$PROJ" $COMMON -r "$rid" || { echo "publish failed for $rid"; exit 1; }
 
     ensure_license_in_publish "$out" "$ROOT"
+    ensure_content_in_publish "$out" "$ROOT"
 
     case "$rid" in linux-*)
         if [ -f "$out/Ongenet" ]; then

@@ -85,7 +85,7 @@ namespace Ongenet.App.ViewModels.Instruments
             ToggleEnabledCommand = new RelayCommand(() => IsEnabled = !IsEnabled);
             MoveUpCommand = new RelayCommand(() => _move(this, -1));
             MoveDownCommand = new RelayCommand(() => _move(this, +1));
-            OpenZoneEditorCommand = new RelayCommand(OpenZoneEditor, () => HasZones);
+            OpenZoneEditorCommand = new RelayCommand(OpenZoneEditor, () => IsSoundFont);
 
             clock.Tick += OnPlaybackTick;
             RebuildParameters();
@@ -284,6 +284,13 @@ namespace Ongenet.App.ViewModels.Instruments
                 provider.LoadPreset(value);
                 RebuildParameters();
                 RenderPreview();
+                OnPropertyChanged(nameof(SamplerStatus));
+                OnPropertyChanged(nameof(InstrumentName));
+                OnPropertyChanged(nameof(SamplerPresetNames));
+                OnPropertyChanged(nameof(HasSamplerPresets));
+                OnPropertyChanged(nameof(SelectedSamplerPreset));
+                NotifySamplerVisuals();
+                OpenZoneEditorCommand.RaiseCanExecuteChanged();
             }
         }
 
@@ -325,20 +332,33 @@ namespace Ongenet.App.ViewModels.Instruments
 
         public string SamplerStatus => _samplerLoading
             ? $"Loading… {_samplerLoadProgress * 100:0}%"
-            : SamplerInst is { SourcePath.Length: > 0 } s
-                ? $"{System.IO.Path.GetFileName(s.SourcePath)} — {s.Regions.Count} region(s)"
+            : SamplerInst is { } s
+                ? s.LayerCount == 0
+                    ? "(no instrument loaded)"
+                    : s.LayerCount == 1
+                        ? $"{System.IO.Path.GetFileName(s.SourcePath)} — {s.Regions.Count} region(s)"
+                        : $"{s.LayerCount} layers · {s.Regions.Count} regions"
                 : "(no instrument loaded)";
 
         public bool IsSamplerLoading => _samplerLoading;
         public double SamplerLoadProgress => _samplerLoadProgress;
 
-        /// <summary>Loads an <c>.sfz</c> or <c>.sf2</c> file (the loader picks the format by extension).</summary>
-        public void LoadSamplerFromPath(string path) => _ = RunSamplerLoad(path, -1, "Load instrument");
+        /// <summary>Replaces all layers with one <c>.sfz</c> / <c>.sf2</c> file.</summary>
+        public void LoadSamplerFromPath(string path) => _ = RunSamplerLoad(path, replace: true, "Load instrument");
 
-        // --- SF2 preset selection ---
+        /// <summary>Appends an <c>.sfz</c> / <c>.sf2</c> as an additional stacked layer.</summary>
+        public void AddSamplerLayerFromPath(string path) => _ = RunSamplerLoad(path, replace: false, "Add layer");
+
+        // --- SF2 preset selection (first layer) ---
 
         public IReadOnlyList<string> SamplerPresetNames =>
-            SamplerInst?.Presets.Select(p => $"{p.Bank}:{p.Program}  {p.Name}").ToList() ?? (IReadOnlyList<string>)Array.Empty<string>();
+            SamplerInst is not { } s || s.Presets.Count == 0
+                ? Array.Empty<string>()
+                : FormatSf2PresetsHierarchical(s.Presets);
+
+        /// <summary>Bank-aware SF2 preset labels (1:1 with <see cref="SamplerInstrument.Presets"/> indices).</summary>
+        public static IReadOnlyList<string> FormatSf2PresetsHierarchical(IReadOnlyList<SamplerPresetInfo> presets)
+            => presets.Select(p => $"Bank {p.Bank} · {p.Program:D3}  {p.Name}").ToList();
 
         public bool HasSamplerPresets => SamplerPresetNames.Count > 0;
 
@@ -349,11 +369,43 @@ namespace Ongenet.App.ViewModels.Instruments
             {
                 if (SamplerInst is not { } s || _samplerLoading) return;
                 if (value < 0 || value == s.PresetIndex || s.SourcePath.Length == 0) return;
-                _ = RunSamplerLoad(s.SourcePath, value, "Change preset");
+                _ = RunFirstLayerPresetChange(value);
             }
         }
 
-        private async Task RunSamplerLoad(string path, int presetIndex, string historyLabel)
+        private async Task RunFirstLayerPresetChange(int presetIndex)
+        {
+            if (SamplerInst is not { } sampler || _samplerLoading) return;
+            _samplerLoading = true;
+            _samplerLoadProgress = 0;
+            OnPropertyChanged(nameof(SamplerStatus));
+            OnPropertyChanged(nameof(IsSamplerLoading));
+            OnPropertyChanged(nameof(SamplerLoadProgress));
+
+            var progress = new Progress<double>(p =>
+            {
+                _samplerLoadProgress = p;
+                OnPropertyChanged(nameof(SamplerLoadProgress));
+                OnPropertyChanged(nameof(SamplerStatus));
+            });
+            var result = await Task.Run(() => sampler.LoadFirstLayerSf2Program(presetIndex, progress));
+
+            _samplerLoading = false;
+            OnPropertyChanged(nameof(IsSamplerLoading));
+            if (result is null) { OnPropertyChanged(nameof(SamplerStatus)); return; }
+
+            _history.Capture("Change preset");
+            _notifyChanged();
+            RebuildParameters();
+            OnPropertyChanged(nameof(SamplerStatus));
+            OnPropertyChanged(nameof(InstrumentName));
+            OnPropertyChanged(nameof(SamplerPresetNames));
+            OnPropertyChanged(nameof(HasSamplerPresets));
+            OnPropertyChanged(nameof(SelectedSamplerPreset));
+            NotifySamplerVisuals();
+        }
+
+        private async Task RunSamplerLoad(string path, bool replace, string historyLabel)
         {
             if (SamplerInst is not { } sampler || _samplerLoading) return;
             var loader = App.ServiceProvider?.GetService<ISamplerLoadService>();
@@ -371,14 +423,15 @@ namespace Ongenet.App.ViewModels.Instruments
                 OnPropertyChanged(nameof(SamplerLoadProgress));
                 OnPropertyChanged(nameof(SamplerStatus));
             });
-            var result = await Task.Run(() => loader.Load(path, presetIndex, progress));
+            var result = await Task.Run(() => loader.Load(path, -1, progress));
 
             _samplerLoading = false;
             OnPropertyChanged(nameof(IsSamplerLoading));
             if (result is null) { OnPropertyChanged(nameof(SamplerStatus)); return; }
 
             _history.Capture(historyLabel);
-            sampler.ApplyLoad(result);
+            if (replace) sampler.ApplyLoad(result);
+            else sampler.AddLayer(result);
             _notifyChanged(); // a fresh patch needs the engine to (re)prepare the instrument
             RebuildParameters();
             OnPropertyChanged(nameof(SamplerStatus));
@@ -387,17 +440,30 @@ namespace Ongenet.App.ViewModels.Instruments
             OnPropertyChanged(nameof(HasSamplerPresets));
             OnPropertyChanged(nameof(SelectedSamplerPreset));
             NotifySamplerVisuals();
+            OpenZoneEditorCommand.RaiseCanExecuteChanged();
+
+            if (sampler.LastLoadWarnings.Count > 0)
+                SamplerLoadWarnings?.Invoke(sampler.LastLoadWarnings);
         }
+
+        /// <summary>Raised after a load/add-layer when the loader emitted warnings.</summary>
+        public event Action<IReadOnlyList<string>>? SamplerLoadWarnings;
 
         public IReadOnlyList<SamplerRegion> SamplerZones => SamplerInst?.Regions ?? Array.Empty<SamplerRegion>();
         public bool HasZones => SamplerZones.Count > 0;
 
         private void OpenZoneEditor()
         {
-            if (SamplerInst is null || SamplerZones.Count == 0) return;
+            if (SamplerInst is null) return;
             var vm = new SamplerZoneEditorViewModel();
             vm.Load(SamplerInst);
             var win = new Views.Windows.SamplerZoneEditorWindow { DataContext = vm };
+            win.Closed += (_, _) =>
+            {
+                OnPropertyChanged(nameof(SamplerStatus));
+                OnPropertyChanged(nameof(InstrumentName));
+                NotifySamplerVisuals();
+            };
             if (Avalonia.Application.Current?.ApplicationLifetime
                 is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
                 && desktop.MainWindow is not null)

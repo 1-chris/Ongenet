@@ -1,0 +1,47 @@
+// VCSL Acoustic Kit — GM-ish map of curated Versilian Community Sample Library hits (CC0)
+// Sample roots are relative to this file (Soundfonts/VCSL/).
+
+<group>
+lovel=0 hivel=127
+ampeg_attack=0.001 ampeg_release=0.25
+
+// 36 Kick
+<region> key=36 pitch_keycenter=36 sample=Membranophones/Struck Membranophones/Bass Drum 2/bassdrum_hit_f.wav
+// 35 Alt kick
+<region> key=35 pitch_keycenter=35 sample=Membranophones/Struck Membranophones/Bass Drum 1/BDrumNew_hit_v5_rr1_Sum.wav
+// 38 Snare
+<region> key=38 pitch_keycenter=38 sample=Membranophones/Struck Membranophones/Snare Drum, Modern 1/Snare2_HitSN_v5_rr1_Mid.wav
+// 40 Electric snare / alt
+<region> key=40 pitch_keycenter=40 sample=Membranophones/Struck Membranophones/Snare Drum, Modern 2/Snare3M_HitSN_v4_rr1_Mid.wav
+// 37 Side stick-ish (NS)
+<region> key=37 pitch_keycenter=37 sample=Membranophones/Struck Membranophones/Snare Drum, Modern 1/Snare2_HitNS_v4_rr1_Mid.wav
+// 39 Clap
+<region> key=39 pitch_keycenter=39 sample=Idiophones/Struck Idiophones/Claps/Clap_rr1.wav
+// 42 Closed HH
+<region> key=42 pitch_keycenter=42 sample=Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitC_v2_rr1_Mid.wav
+// 44 Pedal HH
+<region> key=44 pitch_keycenter=44 sample=Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_Close_rr1_Mid.wav
+// 46 Open HH
+<region> key=46 pitch_keycenter=46 sample=Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitO_rr1_Mid.wav
+// 41 Low floor tom
+<region> key=41 pitch_keycenter=41 sample=Membranophones/Struck Membranophones/Tom 2/Stick/TomL_HitS_v3_rr1_Mid.wav
+// 43 Low tom
+<region> key=43 pitch_keycenter=43 sample=Membranophones/Struck Membranophones/Tom 2/Stick/TomL_HitS_v4_rr1_Mid.wav
+// 45 Mid tom
+<region> key=45 pitch_keycenter=45 sample=Membranophones/Struck Membranophones/Tom 1/Stick/TomH_HitS_v3_rr1_Mid.wav
+// 47 High mid tom
+<region> key=47 pitch_keycenter=47 sample=Membranophones/Struck Membranophones/Tom 1/Stick/TomH_HitS_v4_rr1_Mid.wav
+// 48 High tom
+<region> key=48 pitch_keycenter=48 sample=Membranophones/Struck Membranophones/Tom 1/Mallet/TomH_HitM_v3_rr1_Mid.wav
+// 49 Crash
+<region> key=49 pitch_keycenter=49 sample=Idiophones/Struck Idiophones/Clash Cymbals 1/cymbal_crash1_mf1.wav
+// 57 Crash 2
+<region> key=57 pitch_keycenter=57 sample=Idiophones/Struck Idiophones/Clash Cymbals 1/cymbal_crash1_ff2.wav
+// 54 Tambourine
+<region> key=54 pitch_keycenter=54 sample=Idiophones/Struck Idiophones/Tambourine 1/Tamb1_Hit_v1_rr1_Mid.wav
+// 56 Cowbell
+<region> key=56 pitch_keycenter=56 sample=Idiophones/Struck Idiophones/Cowbells/Cowbell1_Hit_v3_rr1_Mid.wav
+// 76 Woodblock hi
+<region> key=76 pitch_keycenter=76 sample=Idiophones/Struck Idiophones/Woodblock/wood_click_f_rr1.wav
+// 70 Maracas / shaker
+<region> key=70 pitch_keycenter=70 sample=Idiophones/Struck Idiophones/Shaker, Small/Mid_Shaker_Slap_rr1.wav

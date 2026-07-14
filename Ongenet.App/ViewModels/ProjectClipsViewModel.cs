@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using Ongenet.App.Localization;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
@@ -15,37 +16,45 @@ namespace Ongenet.App.ViewModels;
 
 /// <summary>One unique clip in the Project Clips panel: a representative clip plus every identical
 /// instance of it across the project. Dragging carries the representative's id; the context-menu
-/// actions (rename / delete all) apply to every instance.</summary>
+/// actions (rename / delete all / categories) apply to every instance.</summary>
 public sealed class ProjectClipItemViewModel : ViewModelBase
 {
     private readonly ProjectClipsViewModel _owner;
 
-    public ProjectClipItemViewModel(ProjectClipsViewModel owner, Clip representative, IReadOnlyList<Clip> instances)
+    public ProjectClipItemViewModel(ProjectClipsViewModel owner, Clip representative, IReadOnlyList<Clip> instances,
+        Track primaryTrack, int trackOrder, string contentKey)
     {
         _owner = owner;
         Representative = representative;
         Instances = instances;
+        PrimaryTrack = primaryTrack;
+        TrackOrder = trackOrder;
+        ContentKey = contentKey;
+        ColorKey = primaryTrack.ColorKey;
+        TrackName = primaryTrack.Name;
         RenameAllCommand = new RelayCommand(() => _ = _owner.RenameAllAsync(this));
         DeleteAllCommand = new RelayCommand(() => _ = _owner.DeleteAllAsync(this));
+        AddToCategoryCommand = new RelayCommand(() => _ = _owner.AddToCategoryAsync(this));
+        RemoveFromCategoriesCommand = new RelayCommand(() => _owner.RemoveFromCategories(this));
     }
 
-    /// <summary>The clip whose id rides in the drag payload (any instance would do — they're identical).</summary>
     public Clip Representative { get; }
-
-    /// <summary>Every clip in the project with this exact content.</summary>
     public IReadOnlyList<Clip> Instances { get; }
+    public Track PrimaryTrack { get; }
+    public int TrackOrder { get; }
+    public string ContentKey { get; }
+    public string ColorKey { get; }
+    public string TrackName { get; }
 
     public string Name => Representative.Name;
     public bool IsAudio => Representative.IsAudio;
     public bool IsMidi => Representative.IsMidi;
     public string DragPayload => Representative.Id.ToString();
 
-    // Preview bindings — the same data the timeline's clip miniatures read.
     public IReadOnlyList<MidiNote> Notes => Representative.Notes;
     public double ClipLengthBeats => Representative.LengthBeats;
     public Ongenet.Core.Audio.Files.AudioWaveform? Waveform => Representative.Waveform;
 
-    /// <summary>Fraction of the audio source where this clip's window begins (sliced clips).</summary>
     public double WaveStartFraction
     {
         get
@@ -55,7 +64,6 @@ public sealed class ProjectClipItemViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Fraction of the audio source where this clip's window ends (1 = whole source).</summary>
     public double WaveEndFraction
     {
         get
@@ -88,9 +96,11 @@ public sealed class ProjectClipItemViewModel : ViewModelBase
 
     public RelayCommand RenameAllCommand { get; }
     public RelayCommand DeleteAllCommand { get; }
+    public RelayCommand AddToCategoryCommand { get; }
+    public RelayCommand RemoveFromCategoriesCommand { get; }
 }
 
-/// <summary>A titled group ("MIDI Clips" / "Audio Clips") in the Project Clips panel.</summary>
+/// <summary>A titled group in the Project Clips panel.</summary>
 public sealed class ProjectClipGroupViewModel
 {
     public ProjectClipGroupViewModel(string title, IEnumerable<ProjectClipItemViewModel> items)
@@ -105,23 +115,24 @@ public sealed class ProjectClipGroupViewModel
 
 /// <summary>
 /// The left sidebar's Project Clips tab: every unique MIDI and audio clip in the current project
-/// (identical copies are collapsed into one entry with a ×N count). Entries drag onto the timeline
-/// — MIDI clips onto instrument tracks, audio clips onto audio tracks — and their context menu can
-/// rename or delete every instance at once. Works for any project, including the built-in ones.
+/// (identical copies are collapsed into one entry with a ×N count). Supports user categories and
+/// auto-sort by kind / colour / track.
 /// </summary>
 public sealed class ProjectClipsViewModel : ViewModelBase
 {
     private readonly IProjectService _project;
     private readonly TimelineViewModel _timeline;
+    private readonly IProjectFileService _projectFile;
     private readonly DispatcherTimer _refreshDebounce;
+    private ProjectClipsSortMode _sortMode;
 
     public ProjectClipsViewModel(IProjectService project, IEventAggregator events,
-        TimelineViewModel timeline, Services.IHistoryService history)
+        TimelineViewModel timeline, Services.IHistoryService history, IProjectFileService projectFile)
     {
         _project = project;
         _timeline = timeline;
+        _projectFile = projectFile;
 
-        // Coalesce refresh triggers: edits often arrive in bursts (multi-delete, project load).
         _refreshDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         _refreshDebounce.Tick += (_, _) => { _refreshDebounce.Stop(); Refresh(); };
 
@@ -130,16 +141,49 @@ public sealed class ProjectClipsViewModel : ViewModelBase
         events.Subscribe<ClipChangedEvent>(_ => ScheduleRefresh());
         events.Subscribe<ClipAddedEvent>(_ => ScheduleRefresh());
         events.Subscribe<ClipNotesChangedEvent>(_ => ScheduleRefresh());
-        // Timeline clip deletes don't publish a dedicated event, but they capture history first —
-        // the posted handler runs after the mutation, so the panel stays in sync.
         history.Changed += ScheduleRefresh;
 
+        SortModes = new[]
+        {
+            new ProjectClipsSortModeOption(ProjectClipsSortMode.ByKind, Loc.Get("ProjectClips_Sort_ByKind", "By kind")),
+            new ProjectClipsSortModeOption(ProjectClipsSortMode.ByColour, Loc.Get("ProjectClips_Sort_ByColour", "By colour")),
+            new ProjectClipsSortModeOption(ProjectClipsSortMode.ByTrack, Loc.Get("ProjectClips_Sort_ByTrack", "By track")),
+        };
+
+        NewCategoryCommand = new RelayCommand(() => _ = NewCategoryAsync());
         Refresh();
     }
 
     public ObservableCollection<ProjectClipGroupViewModel> Groups { get; } = new();
 
     public bool IsEmpty => Groups.Count == 0;
+
+    public IReadOnlyList<ProjectClipsSortModeOption> SortModes { get; }
+
+    public ProjectClipsSortMode SortMode
+    {
+        get => _sortMode;
+        set
+        {
+            if (!SetField(ref _sortMode, value)) return;
+            _project.Current.ProjectClipsSortMode = value;
+            _projectFile.MarkDirty();
+            Refresh();
+        }
+    }
+
+    public ProjectClipsSortModeOption? SelectedSortMode
+    {
+        get => SortModes.FirstOrDefault(s => s.Mode == SortMode);
+        set
+        {
+            if (value is null) return;
+            SortMode = value.Mode;
+            OnPropertyChanged();
+        }
+    }
+
+    public RelayCommand NewCategoryCommand { get; }
 
     private void ScheduleRefresh()
     {
@@ -155,28 +199,93 @@ public sealed class ProjectClipsViewModel : ViewModelBase
 
     private void Refresh()
     {
-        var unique = _project.Current.Tracks
-            .Where(t => !t.IsBus)
-            .SelectMany(t => t.Clips)
-            .GroupBy(Signature)
-            .Select(g => new ProjectClipItemViewModel(this, g.First(), g.ToList()))
-            .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+        var project = _project.Current;
+        _sortMode = project.ProjectClipsSortMode;
+        OnPropertyChanged(nameof(SortMode));
+        OnPropertyChanged(nameof(SelectedSortMode));
+
+        var trackIndex = 0;
+        var pairs = new List<(Track Track, Clip Clip, int Order)>();
+        foreach (var t in project.Tracks.Where(t => !t.IsBus))
+        {
+            var order = trackIndex++;
+            foreach (var c in t.Clips)
+                pairs.Add((t, c, order));
+        }
+
+        var unique = pairs
+            .GroupBy(p => Signature(p.Clip))
+            .Select(g =>
+            {
+                var first = g.First();
+                var clips = g.Select(x => x.Clip).ToList();
+                return new ProjectClipItemViewModel(this, first.Clip, clips, first.Track, first.Order, g.Key);
+            })
             .ToList();
 
         Groups.Clear();
-        var midi = unique.Where(i => !i.IsAudio).ToList();
-        var audio = unique.Where(i => i.IsAudio).ToList();
-        if (midi.Count > 0) Groups.Add(new ProjectClipGroupViewModel("MIDI Clips", midi));
-        if (audio.Count > 0) Groups.Add(new ProjectClipGroupViewModel("Audio Clips", audio));
+
+        // User categories first (only those with at least one matching clip).
+        var byKey = unique.ToDictionary(i => i.ContentKey, StringComparer.Ordinal);
+        foreach (var cat in project.ProjectClipCategories)
+        {
+            var items = cat.ClipKeys
+                .Select(k => byKey.TryGetValue(k, out var item) ? item : null)
+                .Where(i => i is not null)
+                .Cast<ProjectClipItemViewModel>()
+                .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (items.Count > 0)
+                Groups.Add(new ProjectClipGroupViewModel(cat.Name, items));
+        }
+
+        switch (project.ProjectClipsSortMode)
+        {
+            case ProjectClipsSortMode.ByColour:
+                foreach (var g in unique.GroupBy(i => i.ColorKey)
+                             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    Groups.Add(new ProjectClipGroupViewModel(
+                        ColourLabel(g.Key),
+                        g.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)));
+                }
+                break;
+
+            case ProjectClipsSortMode.ByTrack:
+                foreach (var g in unique.GroupBy(i => (i.TrackOrder, i.TrackName))
+                             .OrderBy(g => g.Key.TrackOrder))
+                {
+                    Groups.Add(new ProjectClipGroupViewModel(
+                        g.Key.TrackName,
+                        g.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)));
+                }
+                break;
+
+            default:
+                var midi = unique.Where(i => !i.IsAudio)
+                    .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+                var audio = unique.Where(i => i.IsAudio)
+                    .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+                if (midi.Count > 0)
+                    Groups.Add(new ProjectClipGroupViewModel(Loc.Get("ProjectClips_Group_Midi", "MIDI Clips"), midi));
+                if (audio.Count > 0)
+                    Groups.Add(new ProjectClipGroupViewModel(Loc.Get("ProjectClips_Group_Audio", "Audio Clips"), audio));
+                break;
+        }
+
         OnPropertyChanged(nameof(IsEmpty));
     }
 
+    private static string ColourLabel(string colorKey)
+        => colorKey.StartsWith("Catppuccin", StringComparison.Ordinal)
+            ? colorKey["Catppuccin".Length..]
+            : colorKey;
+
     /// <summary>
     /// Two clips are "the same clip" when their name, length and content match — for MIDI the full
-    /// note data, for audio the source (file or in-memory buffer) and its slice window. Copies made
-    /// by duplicating/dragging collapse into one entry; an edited copy becomes its own entry.
+    /// note data, for audio the source (file or in-memory buffer) and its slice window.
     /// </summary>
-    private static string Signature(Clip c)
+    internal static string Signature(Clip c)
     {
         var sb = new StringBuilder();
         sb.Append(c.IsAudio ? "A|" : "M|").Append(c.Name).Append('|')
@@ -231,7 +340,75 @@ public sealed class ProjectClipsViewModel : ViewModelBase
         ScheduleRefresh();
     }
 
+    internal async System.Threading.Tasks.Task NewCategoryAsync()
+    {
+        var owner = OwnerWindow();
+        if (owner is null) return;
+        var name = await Views.Windows.InputDialog.Prompt(owner,
+            Loc.Get("ProjectClips_NewCategory_Title", "New category"),
+            Loc.Get("ProjectClips_NewCategory_Label", "Category name:"),
+            "", Loc.Get("LibraryOrg_Create", "Create"));
+        if (string.IsNullOrWhiteSpace(name)) return;
+        _project.Current.ProjectClipCategories.Add(new ProjectClipCategory { Name = name.Trim() });
+        MarkProjectDirty();
+        Refresh();
+    }
+
+    internal async System.Threading.Tasks.Task AddToCategoryAsync(ProjectClipItemViewModel item)
+    {
+        var owner = OwnerWindow();
+        if (owner is null) return;
+        var cats = _project.Current.ProjectClipCategories;
+        if (cats.Count == 0)
+        {
+            await NewCategoryAsync();
+            cats = _project.Current.ProjectClipCategories;
+            if (cats.Count == 0) return;
+            cats[^1].ClipKeys.Add(item.ContentKey);
+            MarkProjectDirty();
+            Refresh();
+            return;
+        }
+
+        var names = string.Join(", ", cats.Select(c => c.Name));
+        var chosen = await Views.Windows.InputDialog.Prompt(owner,
+            Loc.Get("ProjectClips_AddToCategory_Title", "Add to category"),
+            Loc.Get("LibraryOrg_AddToCategory_Label", "Category name ({0}):", names),
+            cats[0].Name, Loc.Get("LibraryOrg_Add", "Add"));
+        if (string.IsNullOrWhiteSpace(chosen)) return;
+        var cat = cats.FirstOrDefault(c =>
+            string.Equals(c.Name, chosen.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (cat is null)
+        {
+            cat = new ProjectClipCategory { Name = chosen.Trim() };
+            cats.Add(cat);
+        }
+        if (!cat.ClipKeys.Contains(item.ContentKey))
+            cat.ClipKeys.Add(item.ContentKey);
+        MarkProjectDirty();
+        Refresh();
+    }
+
+    internal void RemoveFromCategories(ProjectClipItemViewModel item)
+    {
+        var changed = false;
+        foreach (var cat in _project.Current.ProjectClipCategories)
+        {
+            if (cat.ClipKeys.Remove(item.ContentKey)) changed = true;
+        }
+        if (!changed) return;
+        MarkProjectDirty();
+        Refresh();
+    }
+
+    private void MarkProjectDirty() => _projectFile.MarkDirty();
+
     private static Avalonia.Controls.Window? OwnerWindow()
         => (Avalonia.Application.Current?.ApplicationLifetime
             as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+}
+
+public sealed record ProjectClipsSortModeOption(ProjectClipsSortMode Mode, string Label)
+{
+    public override string ToString() => Label;
 }

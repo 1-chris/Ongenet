@@ -101,7 +101,7 @@ public class Sf2LoaderTests
 
             if (inst.Presets.Count >= 2)
             {
-                var switched = inst.LoadPreset(1);
+                var switched = inst.LoadFirstLayerSf2Program(1);
                 Assert.NotNull(switched);
                 Assert.Equal(1, inst.PresetIndex);
             }

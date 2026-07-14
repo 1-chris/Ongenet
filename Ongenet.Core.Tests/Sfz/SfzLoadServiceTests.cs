@@ -133,4 +133,38 @@ public class SfzLoadServiceTests : IDisposable
         Assert.Empty(result!.MissingSamples);
         Assert.Equal(1, result.Library.Count);
     }
+
+    [Fact]
+    public void ResolvesPerArticulationDefaultPathAcrossControlBlocks()
+    {
+        // Mimics VSCO *-KS.sfz: each articulation redefines <control> default_path.
+        WriteWav(Path.Combine(_dir, "Strings", "susvib", "tone.wav"), 0.5f, 200);
+        WriteWav(Path.Combine(_dir, "Strings", "pizz", "tone.wav"), 0.25f, 200);
+        var sfzPath = Path.Combine(_dir, "ks.sfz");
+        File.WriteAllText(sfzPath, @"
+<control>
+default_path=Strings\susvib\
+<group> sw_default=c6 sw_lokey=c6 sw_hikey=c#6 sw_last=c6
+<region> sample=tone.wav lokey=60 hikey=60 pitch_keycenter=60
+<control>
+default_path=Strings\pizz\
+<group> sw_last=c#6
+<region> sample=tone.wav lokey=60 hikey=60 pitch_keycenter=60
+");
+
+        var result = _service.Load(sfzPath);
+
+        Assert.NotNull(result);
+        Assert.Empty(result!.MissingSamples);
+        Assert.Equal(2, result.Library.Count);
+        Assert.Equal(2, result.Regions.Count);
+
+        var inst = new SamplerInstrument();
+        inst.Prepare(new AudioFormat(44100, 1));
+        inst.ApplyLoad(result);
+        inst.NoteOn(60, 1f); // uses sw_default=c6 → first articulation
+        var buffer = new float[64];
+        inst.Render(buffer);
+        Assert.True(buffer[0] > 0.2f);
+    }
 }

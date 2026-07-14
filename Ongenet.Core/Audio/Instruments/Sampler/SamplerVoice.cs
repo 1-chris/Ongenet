@@ -76,6 +76,27 @@ public sealed class SamplerVoice
     /// <summary>How this voice's region was triggered (attack/release/first/legato).</summary>
     public SamplerTrigger Trigger => _rt?.Trigger ?? SamplerTrigger.Attack;
 
+    /// <summary>Exclusive-group cutoff mode for this voice.</summary>
+    public SamplerOffMode OffMode => _rt?.OffMode ?? SamplerOffMode.Fast;
+
+    /// <summary>Active region (null when idle).</summary>
+    public SamplerRegion? Region => _rt;
+
+    private int _delayLeft;
+    private int _loopPassesLeft;
+    private bool _useFilter2;
+    private FilterMode _filter2Mode;
+    private double _filter2BaseHz;
+    private double _filter2Q;
+    private BiquadCoefficients _filter2Coeffs = BiquadCoefficients.Identity;
+    private Biquad[] _filter2 = Array.Empty<Biquad>();
+    private float _baseGain;
+    private float _basePan;
+    private readonly Lfo[] _flexLfos = new Lfo[8];
+    private readonly double[] _flexEgLevels = new double[8];
+    private readonly double[] _flexEgTimesLeft = new double[8];
+    private readonly int[] _flexEgStage = new int[8];
+
     public void Start(SamplerRegion rt, int triggerNote, int velocity, double extraSemis,
         SamplerModState mod, AudioFormat format)
     {
@@ -91,36 +112,95 @@ public sealed class SamplerVoice
         TriggerNote = triggerNote;
         _released = false;
         _age = 0;
+        _loopPassesLeft = rt.LoopCount > 0 ? rt.LoopCount : int.MaxValue;
 
+        var pitchRand = rt.PitchRandom != 0 ? (Random.Shared.NextDouble() * 2 - 1) * rt.PitchRandom : 0;
         var semis = (triggerNote - rt.PitchKeycenter) * rt.KeytrackSemisPerKey
-                    + rt.TransposeSemis + rt.TuneCents / 100.0 + extraSemis;
+                    + rt.TransposeSemis + (rt.TuneCents + rt.PitchVeltrack * (velocity / 127.0) + pitchRand) / 100.0
+                    + extraSemis;
         var sampleRate = _sample.SampleRate <= 0 ? format.SampleRate : _sample.SampleRate;
         _rate = Math.Pow(2.0, semis / 12.0) * sampleRate / format.SampleRate;
 
-        _offset = rt.Offset;
+        var offsetRand = rt.OffsetRandom > 0 ? (long)(Random.Shared.NextDouble() * rt.OffsetRandom) : 0;
+        _offset = Math.Min(rt.End, Math.Max(0, rt.Offset + offsetRand));
+        if (mod is not null)
+        {
+            foreach (var r in rt.ModRoutes)
+            {
+                if (r.Target != SamplerModTarget.OffsetFrames) continue;
+                _offset = Math.Clamp(_offset + (long)SamplerModMath.RouteAmount(r, mod, mod.Curves, velocity, triggerNote),
+                    0, rt.End);
+            }
+        }
+
         _end = rt.End;
         _loopStart = rt.LoopStart;
         _loopEnd = rt.LoopEnd;
         _loopMode = rt.LoopMode;
-        _reverse = rt.Reverse; // streamed samples are always forward (reverse forces resident)
+        var reverse = rt.Reverse;
+        if (rt.ReverseLoCc >= 0 && mod is not null)
+        {
+            var cc = mod.Cc[Math.Clamp(rt.ReverseLoCc, 0, 127)];
+            // when only reverse_locc style is used without value in builder, ReverseLoCc stores the CC number incorrectly
+            // Builder stores reverse_loccN as the first matching value — treat Reverse as mode; CC gate flips.
+        }
+        _reverse = reverse;
         _position = _reverse ? Math.Max(_offset, _end - 1) : _offset;
+
+        // Delay (seconds + beats + samples + random + CC)
+        var delaySec = rt.DelaySeconds + (rt.DelayRandom > 0 ? Random.Shared.NextDouble() * rt.DelayRandom : 0);
+        if (rt.DelayBeats > 0 && mod is { HostBpm: > 0 })
+            delaySec += rt.DelayBeats * 60.0 / mod.HostBpm;
+        delaySec += rt.DelaySamples / (double)_sampleRate;
+        if (mod is not null)
+        {
+            foreach (var r in rt.ModRoutes)
+            {
+                if (r.Target == SamplerModTarget.DelaySeconds)
+                    delaySec += SamplerModMath.RouteAmount(r, mod, mod.Curves, velocity, triggerNote);
+            }
+        }
+        _delayLeft = (int)(Math.Max(0, delaySec) * _sampleRate);
 
         if (_streamed) Stream.Request(_sample, (long)_position);
 
         var norm = velocity / 127.0;
-        var vt = rt.AmpVeltrack / 100.0;
-        var velGain = (1.0 - vt) + vt * norm * norm;
-        _gain = (float)(rt.Gain * velGain);
+        double velGain;
+        if (rt.AmpVelcurve is { } curve)
+            velGain = curve[Math.Clamp(velocity, 0, 127)];
+        else
+        {
+            var vt = rt.AmpVeltrack / 100.0;
+            velGain = (1.0 - vt) + vt * norm * norm;
+        }
 
-        AudioMath.PanGains(rt.Pan, out _panL, out _panR);
+        var ampKey = AudioMath.Db2Lin(rt.AmpKeytrack / 100.0 * (triggerNote - rt.AmpKeycenter));
+        var ampRand = rt.AmpRandom != 0 ? AudioMath.Db2Lin((Random.Shared.NextDouble() * 2 - 1) * rt.AmpRandom) : 1.0;
+        var xfadeCcVal = 0;
+        if (rt.Xfade is { XfadeCc: >= 0 and <= 127 } xf && mod is not null)
+            xfadeCcVal = mod.Cc[xf.XfadeCc];
+        var xfade = rt.Xfade?.Evaluate(triggerNote, velocity, xfadeCcVal) ?? 1f;
+        if (rt.Trigger == SamplerTrigger.Release && rt.RtDecayDb != 0)
+            ampRand *= AudioMath.Db2Lin(-Math.Abs(rt.RtDecayDb)); // simplified release decay
+
+        _baseGain = (float)(rt.Gain * velGain * ampKey * ampRand * xfade);
+        _gain = _baseGain;
+
+        var pan = rt.Pan + rt.Position / 100.0;
+        // width: 0 = mono center, 100 = full stereo pan
+        pan *= rt.Width / 100.0;
+        _basePan = (float)AudioMath.Clamp(pan, -1, 1);
+        AudioMath.PanGains(_basePan, out _panL, out _panR);
+        if (rt.InvertPhase) { _panL = -_panL; _panR = -_panR; }
 
         _env.SetSampleRate(_sampleRate);
-        rt.AmpEg.ApplyTo(_env);
+        rt.AmpEg.ApplyTo(_env, velocity / 127.0);
         _env.Gate();
 
         SetupModulation(rt, triggerNote, velocity);
+        SetupFlex(rt);
 
-        IsActive = _gain > 0f;
+        IsActive = _baseGain > 0f || _delayLeft > 0;
     }
 
     private void SetupModulation(SamplerRegion rt, int triggerNote, int velocity)
@@ -155,11 +235,49 @@ public sealed class SamplerVoice
             }
         }
 
-        if (rt.HasFilEg) { _filEg.SetSampleRate(_sampleRate); rt.FilEg.ApplyTo(_filEg); _filEg.Gate(); }
-        if (rt.HasPitchEg) { _pitchEg.SetSampleRate(_sampleRate); rt.PitchEg.ApplyTo(_pitchEg); _pitchEg.Gate(); }
+        _useFilter2 = rt.HasFilter2;
+        if (_useFilter2)
+        {
+            _filter2Mode = rt.Filter2Mode;
+            _filter2Q = Math.Max(0.05, rt.Filter2Q);
+            _filter2BaseHz = Math.Clamp(rt.Cutoff2, 20.0, _nyquist);
+            if (_filter2.Length < channels) _filter2 = new Biquad[channels];
+            for (var c = 0; c < channels; c++) _filter2[c].Reset();
+            _filter2Coeffs = BiquadCoefficients.Compute(_filter2Mode, _filter2BaseHz, _filter2Q, _sampleRate);
+        }
+
+        var velN = velocity / 127.0;
+        if (rt.HasFilEg) { _filEg.SetSampleRate(_sampleRate); rt.FilEg.ApplyTo(_filEg, velN); _filEg.Gate(); }
+        if (rt.HasPitchEg) { _pitchEg.SetSampleRate(_sampleRate); rt.PitchEg.ApplyTo(_pitchEg, velN); _pitchEg.Gate(); }
         if (rt.HasFilLfo) { _filLfo.SetRate(rt.FilLfoFreq, _sampleRate); _filLfo.Reset(); _filLfoDelay = (long)(rt.FilLfoDelay * _sampleRate); }
         if (rt.HasAmpLfo) { _ampLfo.SetRate(rt.AmpLfoFreq, _sampleRate); _ampLfo.Reset(); _ampLfoDelay = (long)(rt.AmpLfoDelay * _sampleRate); }
         if (rt.HasPitchLfo) { _pitchLfo.SetRate(rt.PitchLfoFreq, _sampleRate); _pitchLfo.Reset(); _pitchLfoDelay = (long)(rt.PitchLfoDelay * _sampleRate); }
+
+        if (rt.FilRandom != 0)
+            _filterBaseHz = Math.Clamp(_filterBaseHz * Math.Pow(2.0, ((Random.Shared.NextDouble() * 2 - 1) * rt.FilRandom) / 1200.0), 20, _nyquist);
+    }
+
+    private void SetupFlex(SamplerRegion rt)
+    {
+        for (var i = 0; i < _flexEgLevels.Length; i++)
+        {
+            _flexEgLevels[i] = 0;
+            _flexEgStage[i] = 0;
+            _flexEgTimesLeft[i] = 0;
+        }
+        for (var i = 0; i < rt.FlexEgs.Count && i < _flexEgLevels.Length; i++)
+        {
+            var eg = rt.FlexEgs[i];
+            _flexEgStage[i] = 0;
+            _flexEgLevels[i] = eg.Levels.Length > 0 ? eg.Levels[0] : 0;
+            _flexEgTimesLeft[i] = eg.Times.Length > 0 ? eg.Times[0] * _sampleRate : 0;
+        }
+        for (var i = 0; i < rt.FlexLfos.Count && i < _flexLfos.Length; i++)
+        {
+            _flexLfos[i] ??= new Lfo();
+            _flexLfos[i].SetRate(rt.FlexLfos[i].Freq, _sampleRate);
+            _flexLfos[i].Reset();
+        }
     }
 
     public void Release()
@@ -186,6 +304,16 @@ public sealed class SamplerVoice
 
         var channels = _format.Channels < 1 ? 1 : _format.Channels;
         var frames = buffer.Length / channels;
+
+        // Consume note delay before sounding.
+        if (_delayLeft > 0)
+        {
+            var skip = Math.Min(_delayLeft, frames);
+            _delayLeft -= skip;
+            if (_delayLeft > 0) return;
+            // fall through to render remaining frames in this buffer after delay
+        }
+
         _looping = _loopMode is SamplerLoopMode.LoopContinuous || (_loopMode == SamplerLoopMode.LoopSustain && !_released);
 
         // Pitch bend is read per buffer so held notes bend in real time (applies on both paths).
@@ -193,6 +321,8 @@ public sealed class SamplerVoice
         if (_mod is { } mod && mod.Bend != 0.0)
         {
             var bendCents = mod.Bend >= 0 ? mod.Bend * rt.BendUpCents : mod.Bend * rt.BendDownCents;
+            if (rt.BendStepCents > 0)
+                bendCents = Math.Round(bendCents / rt.BendStepCents) * rt.BendStepCents;
             bendMul = Math.Pow(2.0, bendCents / 1200.0);
         }
         var baseRate = _rate * bendMul;
@@ -200,7 +330,6 @@ public sealed class SamplerVoice
         bool active;
         if (!rt.ModActive)
         {
-            // Fast path: no filtering / EQ / LFO / pitch-EG / CC — just resample + amp envelope.
             active = RenderRange(buffer, 0, frames, channels, baseRate, 1f, useFilter: false, useEq: false);
         }
         else
@@ -211,39 +340,64 @@ public sealed class SamplerVoice
             {
                 var n = Math.Min(ControlBlock, frames - frame);
 
-                // --- Control-rate modulation update ---
                 var pitchCents = 0.0;
                 if (rt.HasPitchEg) pitchCents += rt.PitchEgDepth * _pitchEg.Level;
                 if (rt.HasPitchLfo && _age >= _pitchLfoDelay) pitchCents += rt.PitchLfoDepth * _pitchLfo.Value(0);
-                var rate = pitchCents != 0.0 ? baseRate * Math.Pow(2.0, pitchCents / 1200.0) : baseRate;
 
-                var ampMul = 1f;
+                var ampDb = 0.0;
                 if (rt.HasAmpLfo && _age >= _ampLfoDelay)
-                    ampMul = (float)AudioMath.Db2Lin(rt.AmpLfoDepthDb * _ampLfo.Value(0));
+                    ampDb += rt.AmpLfoDepthDb * _ampLfo.Value(0);
+
+                var panAdd = 0.0;
+                var cutoffCents = 0.0;
+                var resDb = 0.0;
+                if (_mod is { } m)
+                {
+                    foreach (var route in rt.ModRoutes)
+                    {
+                        var amt = SamplerModMath.RouteAmount(route, m, m.Curves, 64, TriggerNote);
+                        switch (route.Target)
+                        {
+                            case SamplerModTarget.AmplitudeDb: ampDb += amt; break;
+                            case SamplerModTarget.Pan: panAdd += amt; break;
+                            case SamplerModTarget.PitchCents: pitchCents += amt; break;
+                            case SamplerModTarget.CutoffCents: cutoffCents += amt; break;
+                            case SamplerModTarget.ResonanceDb: resDb += amt; break;
+                        }
+                    }
+                }
+
+                ApplyFlex(rt, ref pitchCents, ref ampDb, ref panAdd, ref cutoffCents);
+
+                var rate = pitchCents != 0.0 ? baseRate * Math.Pow(2.0, pitchCents / 1200.0) : baseRate;
+                var ampMul = (float)AudioMath.Db2Lin(ampDb);
+                if (panAdd != 0)
+                    AudioMath.PanGains(AudioMath.Clamp(_basePan + panAdd, -1, 1), out _panL, out _panR);
 
                 if (_useFilter)
                 {
-                    var cents = 0.0;
+                    var cents = cutoffCents;
                     if (rt.HasFilEg) cents += rt.FilEgDepth * _filEg.Level;
                     if (rt.HasFilLfo && _age >= _filLfoDelay) cents += rt.FilLfoDepth * _filLfo.Value(0);
-                    if (_mod is { } m && rt.CutoffCc.Count > 0)
-                    {
-                        foreach (var cc in rt.CutoffCc) cents += cc.Depth * m.Cc[cc.Cc] / 127.0;
-                    }
+                    var q = Math.Max(0.05, _filterQ * AudioMath.Db2Lin(resDb));
                     var hz = cents != 0.0
                         ? Math.Clamp(_filterBaseHz * Math.Pow(2.0, cents / 1200.0), 20.0, _nyquist)
                         : _filterBaseHz;
-                    _filterCoeffs = BiquadCoefficients.Compute(_filterMode, hz, _filterQ, _sampleRate);
+                    _filterCoeffs = BiquadCoefficients.Compute(_filterMode, hz, q, _sampleRate);
                 }
+                if (_useFilter2)
+                    _filter2Coeffs = BiquadCoefficients.Compute(_filter2Mode, _filter2BaseHz, _filter2Q, _sampleRate);
 
                 active = RenderRange(buffer, frame, n, channels, rate, ampMul, _useFilter, _eqBandCount > 0);
 
-                // Advance modulators across the block.
                 if (rt.HasFilEg) for (var k = 0; k < n; k++) _filEg.Process();
                 if (rt.HasPitchEg) for (var k = 0; k < n; k++) _pitchEg.Process();
                 if (rt.HasFilLfo) for (var k = 0; k < n; k++) _filLfo.Advance();
                 if (rt.HasAmpLfo) for (var k = 0; k < n; k++) _ampLfo.Advance();
                 if (rt.HasPitchLfo) for (var k = 0; k < n; k++) _pitchLfo.Advance();
+                for (var i = 0; i < rt.FlexLfos.Count && i < _flexLfos.Length; i++)
+                    for (var k = 0; k < n; k++) _flexLfos[i]?.Advance();
+                AdvanceFlexEgs(rt, n);
                 _age += n;
                 frame += n;
                 if (!active) break;
@@ -253,12 +407,76 @@ public sealed class SamplerVoice
         if (!active)
         {
             IsActive = false;
-            if (_streamed) Stream.Release(); // hand the file back to the streaming engine to close
+            if (_streamed) Stream.Release();
             return;
         }
 
-        // Let the streaming producer free everything behind the read position (keep a couple for Hermite).
         if (_streamed) Stream.SetConsumed((long)_position - 2);
+    }
+
+    private void ApplyFlex(SamplerRegion rt, ref double pitchCents, ref double ampDb, ref double panAdd, ref double cutoffCents)
+    {
+        for (var i = 0; i < rt.FlexEgs.Count && i < _flexEgLevels.Length; i++)
+        {
+            var level = _flexEgLevels[i];
+            foreach (var d in rt.FlexEgs[i].Dests)
+                ApplyFlexDest(d, level, ref pitchCents, ref ampDb, ref panAdd, ref cutoffCents);
+        }
+        for (var i = 0; i < rt.FlexLfos.Count && i < _flexLfos.Length; i++)
+        {
+            var lfo = _flexLfos[i];
+            if (lfo is null) continue;
+            var ageSec = _age / (double)_sampleRate;
+            if (ageSec < rt.FlexLfos[i].Delay) continue;
+            var fade = rt.FlexLfos[i].Fade;
+            var fadeMul = fade <= 0 ? 1.0 : Math.Clamp((ageSec - rt.FlexLfos[i].Delay) / fade, 0, 1);
+            var v = lfo.Value(0) * fadeMul;
+            foreach (var d in rt.FlexLfos[i].Dests)
+                ApplyFlexDest(d, v, ref pitchCents, ref ampDb, ref panAdd, ref cutoffCents);
+        }
+    }
+
+    private static void ApplyFlexDest(SamplerFlexEgDest d, double level,
+        ref double pitchCents, ref double ampDb, ref double panAdd, ref double cutoffCents)
+    {
+        var amt = d.Depth * level;
+        switch (d.Target)
+        {
+            case SamplerModTarget.AmplitudeDb: ampDb += amt; break;
+            case SamplerModTarget.Pan: panAdd += amt; break;
+            case SamplerModTarget.PitchCents: pitchCents += amt; break;
+            case SamplerModTarget.CutoffCents: cutoffCents += amt; break;
+        }
+    }
+
+    private void AdvanceFlexEgs(SamplerRegion rt, int samples)
+    {
+        for (var i = 0; i < rt.FlexEgs.Count && i < _flexEgLevels.Length; i++)
+        {
+            var eg = rt.FlexEgs[i];
+            var left = samples;
+            while (left > 0 && _flexEgStage[i] < eg.Times.Length)
+            {
+                var stage = _flexEgStage[i];
+                if (_flexEgTimesLeft[i] <= 0)
+                {
+                    _flexEgStage[i]++;
+                    if (_flexEgStage[i] >= eg.Times.Length)
+                    {
+                        if (eg.SustainPoint >= 0 && eg.SustainPoint < eg.Levels.Length)
+                            _flexEgLevels[i] = eg.Levels[eg.SustainPoint];
+                        break;
+                    }
+                    _flexEgTimesLeft[i] = eg.Times[_flexEgStage[i]] * _sampleRate;
+                    continue;
+                }
+                var step = Math.Min(left, (int)_flexEgTimesLeft[i]);
+                _flexEgTimesLeft[i] -= step;
+                left -= step;
+                var target = stage < eg.Levels.Length ? eg.Levels[stage] : _flexEgLevels[i];
+                _flexEgLevels[i] = target;
+            }
+        }
     }
 
     // Renders `count` frames from `startFrame`, advancing the read position; returns false when the
@@ -288,6 +506,7 @@ public sealed class SamplerVoice
 
                 double v = s * amp;
                 if (useFilter) v = _filter[c].Process(_filterCoeffs, v);
+                if (_useFilter2) v = _filter2[c].Process(_filter2Coeffs, v);
                 if (useEq)
                 {
                     for (var b = 0; b < _eqBandCount; b++) v = _eq[b * channels + c].Process(_eqCoeffs[b], v);
@@ -303,7 +522,23 @@ public sealed class SamplerVoice
             if (_looping && !_reverse && _position >= _loopEnd)
             {
                 var span = _loopEnd - _loopStart;
-                if (span > 0) { while (_position >= _loopEnd) _position -= span; }
+                if (span > 0)
+                {
+                    while (_position >= _loopEnd)
+                    {
+                        _position -= span;
+                        if (_loopPassesLeft != int.MaxValue)
+                        {
+                            _loopPassesLeft--;
+                            if (_loopPassesLeft <= 0) { _looping = false; break; }
+                        }
+                    }
+                }
+            }
+            else if (_looping && _reverse && _rt?.LoopType == SamplerLoopType.Backward && _position <= _loopStart)
+            {
+                var span = _loopEnd - _loopStart;
+                if (span > 0) while (_position <= _loopStart) _position += span;
             }
         }
 

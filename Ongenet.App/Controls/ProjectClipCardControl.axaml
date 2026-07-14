@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:controls="using:Ongenet.App.Controls"
+             x:Class="Ongenet.App.Controls.ProjectClipCardControl"
+             x:DataType="vm:ProjectClipItemViewModel">
+
+    <Border Name="Root" Padding="0,3" Background="Transparent" CornerRadius="3">
+        <Border.Styles>
+            <Style Selector="Border#Root:pointerover">
+                <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+            </Style>
+        </Border.Styles>
+        <Border.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="{DynamicResource ProjectClips_Rename}" Command="{Binding RenameAllCommand}"/>
+                <MenuItem Header="{DynamicResource ProjectClips_Delete_all_from_project}" Command="{Binding DeleteAllCommand}"/>
+                <Separator/>
+                <MenuItem Header="{DynamicResource ProjectClips_AddToCategory}" Command="{Binding AddToCategoryCommand}"/>
+                <MenuItem Header="{DynamicResource ProjectClips_RemoveFromCategories}" Command="{Binding RemoveFromCategoriesCommand}"/>
+            </ContextMenu>
+        </Border.ContextMenu>
+        <DockPanel>
+            <Border DockPanel.Dock="Left" Width="3" CornerRadius="1.5" Margin="0,1,8,1"
+                    Background="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"/>
+            <StackPanel Spacing="3">
+                <StackPanel>
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Detail}" FontSize="10"
+                               Foreground="{StaticResource CatppuccinOverlay1}"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                <Border Height="22" CornerRadius="2" ClipToBounds="True"
+                        Background="{StaticResource CatppuccinSurface0}">
+                    <Panel>
+                        <controls:WaveformControl Waveform="{Binding Waveform}"
+                                                  StartFraction="{Binding WaveStartFraction}"
+                                                  EndFraction="{Binding WaveEndFraction}"
+                                                  IsVisible="{Binding IsAudio}"
+                                                  IsHitTestVisible="False"
+                                                  Fill="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"
+                                                  Opacity="0.75" Margin="2,1"/>
+                        <controls:MidiNoteMiniControl Notes="{Binding Notes}"
+                                                      ClipLengthBeats="{Binding ClipLengthBeats}"
+                                                      IsVisible="{Binding IsMidi}"
+                                                      IsHitTestVisible="False"
+                                                      Fill="{Binding ColorKey, Converter={StaticResource ColorKeyToBrush}}"
+                                                      Opacity="0.85" Margin="2,2"/>
+                    </Panel>
+                </Border>
+            </StackPanel>
+        </DockPanel>
+    </Border>
+</UserControl>

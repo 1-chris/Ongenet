@@ -136,7 +136,12 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
 
     // ===== Presets =====
 
-    private static readonly string[] PresetNamesList = { "Init", "House Clap", "Closed Hat", "Open Hat", "Dark Snare", "Crash" };
+    private static readonly string[] PresetNamesList =
+    {
+        "Init", "House Clap", "Closed Hat", "Open Hat", "Dark Snare", "Crash",
+        "Rimshot", "Shaker", "Tom Low", "Tom High", "Ride Tick",
+        "Snap", "Noise Sweep", "Metal Hit", "Soft Brush", "Clave"
+    };
 
     public IReadOnlyList<string> PresetNames => PresetNamesList;
 
@@ -149,6 +154,16 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
             case 3: OpenHat(); break;
             case 4: DarkSnare(); break;
             case 5: Crash(); break;
+            case 6: Rimshot(); break;
+            case 7: Shaker(); break;
+            case 8: TomLow(); break;
+            case 9: TomHigh(); break;
+            case 10: RideTick(); break;
+            case 11: Snap(); break;
+            case 12: NoiseSweep(); break;
+            case 13: MetalHit(); break;
+            case 14: SoftBrush(); break;
+            case 15: Clave(); break;
             default: Reset(); break;
         }
     }
@@ -224,6 +239,83 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
         AttackMs = 0.3; DecayMs = 1750; Curve = 0.28;
         ToneLevel = 0.25; ToneType = 1; ToneFreq = 6800; ToneDecayMs = 1500;
         Gain = 0.6; Width = 0.6;
+    }
+
+    private void Rimshot()
+    {
+        Reset();
+        Mode = 0; FilterType = 1; Cutoff = 2800; Resonance = 1.5; Drive = 0.45;
+        AttackMs = 0.2; DecayMs = 90; Taps = 2; SpreadMs = 4; TapDecayMs = 15;
+        ToneLevel = 0.55; ToneType = 1; ToneFreq = 2200; ToneDecayMs = 40;
+        Gain = 0.9; Width = 0.25;
+    }
+
+    private void Shaker()
+    {
+        Reset();
+        Mode = 1; FilterType = 0; Cutoff = 7000; Resonance = 0.8; Drive = 0.15;
+        AttackMs = 0.5; DecayMs = 110; Curve = 0.6;
+        ToneLevel = 0.2; ToneFreq = 5500; ToneDecayMs = 80;
+        Gain = 0.7; Width = 0.5;
+    }
+
+    private void TomLow()
+    {
+        Reset();
+        Mode = 0; FilterType = 1; Cutoff = 400; Resonance = 1.2; Drive = 0.2;
+        DecayMs = 350; ToneLevel = 0.9; ToneType = 0; ToneFreq = 120; ToneDecayMs = 280;
+        Gain = 0.85; Width = 0.15;
+    }
+
+    private void TomHigh()
+    {
+        TomLow();
+        ToneFreq = 220; Cutoff = 800; DecayMs = 280; ToneDecayMs = 200;
+    }
+
+    private void RideTick()
+    {
+        Reset();
+        Mode = 1; FilterType = 0; Cutoff = 9000; Resonance = 1.0;
+        AttackMs = 0.15; DecayMs = 180; ToneLevel = 0.5; ToneType = 1; ToneFreq = 7500;
+        ToneDecayMs = 150; Gain = 0.65; Width = 0.4;
+    }
+
+    private void Snap()
+    {
+        Reset();
+        Mode = 0; FilterType = 1; Cutoff = 2200; Resonance = 0.9; Drive = 0.5;
+        AttackMs = 0.15; DecayMs = 70; Taps = 1; ToneLevel = 0.3; Gain = 0.88; Width = 0.35;
+    }
+
+    private void NoiseSweep()
+    {
+        Reset();
+        Mode = 1; FilterType = 1; Cutoff = 800; Resonance = 4.0; Color = 0.2;
+        AttackMs = 5; DecayMs = 900; Curve = 0.35; Gain = 0.6; Width = 0.55;
+    }
+
+    private void MetalHit()
+    {
+        Reset();
+        Mode = 0; FilterType = 1; Cutoff = 3500; Resonance = 3.0; Drive = 0.55;
+        DecayMs = 400; ToneLevel = 0.7; ToneType = 1; ToneFreq = 4200; ToneDecayMs = 350;
+        Gain = 0.75; Width = 0.45;
+    }
+
+    private void SoftBrush()
+    {
+        Reset();
+        Mode = 1; FilterType = 0; Cutoff = 4500; Resonance = 0.6; Drive = 0.05;
+        AttackMs = 2; DecayMs = 500; Curve = 0.4; Gain = 0.55; Width = 0.5;
+    }
+
+    private void Clave()
+    {
+        Reset();
+        Mode = 0; FilterType = 1; Cutoff = 1800; Resonance = 2.0; Drive = 0.25;
+        AttackMs = 0.1; DecayMs = 60; ToneLevel = 0.85; ToneType = 0; ToneFreq = 1600;
+        ToneDecayMs = 50; Gain = 0.9; Width = 0.2;
     }
 
     /// <summary>One percussion hit: noise (+ tone layer) → colour LP → resonant filter → drive → width.</summary>

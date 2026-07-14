@@ -63,31 +63,74 @@
                           HorizontalScrollBarVisibility="Hidden"
                           VerticalScrollBarVisibility="Disabled"
                           Background="{StaticResource CatppuccinMantle}">
-                <!-- ItemsControl is sized explicitly so its Canvas panel has room (otherwise ticks clip to 0x0).
-                     Left-aligned so it doesn't centre (and drift from the lanes) when the viewport is wider. -->
-                <ItemsControl ItemsSource="{Binding Bars}" HorizontalAlignment="Left"
-                              Width="{Binding Metrics.TotalWidth}" Height="{StaticResource RulerHeight}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.Styles>
-                        <Style Selector="ContentPresenter" x:DataType="tl:BarTickViewModel">
-                            <Setter Property="Canvas.Left" Value="{Binding Left}"/>
-                            <Setter Property="Canvas.Top" Value="0"/>
-                        </Style>
-                    </ItemsControl.Styles>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="tl:BarTickViewModel">
-                            <StackPanel Orientation="Horizontal" Spacing="4" Height="26"
-                                        IsVisible="{Binding IsLabelVisible}">
-                                <Rectangle Width="1" Fill="{StaticResource CatppuccinSurface2}"/>
-                                <TextBlock Text="{Binding BarNumber}" FontSize="11"
-                                           VerticalAlignment="Center" Margin="0,0,0,1"
-                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- Sized explicitly so Canvas panels have room; left-aligned so ticks don't centre
+                     (and drift from the lanes) when the viewport is wider than the arrangement. -->
+                <Grid HorizontalAlignment="Left"
+                      Width="{Binding Metrics.TotalWidth}" Height="{StaticResource RulerHeight}">
+                    <ItemsControl ItemsSource="{Binding Bars}"
+                                  Width="{Binding Metrics.TotalWidth}" Height="{StaticResource RulerHeight}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.Styles>
+                            <Style Selector="ContentPresenter" x:DataType="tl:BarTickViewModel">
+                                <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                <Setter Property="Canvas.Top" Value="0"/>
+                            </Style>
+                        </ItemsControl.Styles>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="tl:BarTickViewModel">
+                                <StackPanel Orientation="Horizontal" Spacing="4" Height="26"
+                                            IsVisible="{Binding IsLabelVisible}">
+                                    <Rectangle Width="1" Fill="{StaticResource CatppuccinSurface2}"/>
+                                    <TextBlock Text="{Binding BarNumber}" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,0,1"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- Named arrangement markers sit in the scrolling ruler so labels stay aligned. -->
+                    <ItemsControl Name="RulerMarkers" ItemsSource="{Binding Markers}"
+                                  Width="{Binding Metrics.TotalWidth}" Height="{StaticResource RulerHeight}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.Styles>
+                            <Style Selector="ContentPresenter" x:DataType="tl:ArrangementMarkerViewModel">
+                                <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                                <Setter Property="Canvas.Top" Value="0"/>
+                                <Setter Property="ZIndex" Value="1"/>
+                            </Style>
+                        </ItemsControl.Styles>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="tl:ArrangementMarkerViewModel">
+                                <StackPanel Orientation="Horizontal" Spacing="2" Margin="-4,1,0,0"
+                                            Background="Transparent"
+                                            ToolTip.Tip="{DynamicResource Timeline_Marker_Tip}"
+                                            DoubleTapped="Marker_DoubleTapped"
+                                            PointerPressed="Marker_PointerPressed">
+                                    <StackPanel.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="{DynamicResource Timeline_Rename}"
+                                                      Tag="{Binding}"
+                                                      Click="MarkerRename_Click"/>
+                                            <MenuItem Header="{DynamicResource Timeline_Delete_marker}"
+                                                      Tag="{Binding}"
+                                                      Click="MarkerDelete_Click"/>
+                                        </ContextMenu>
+                                    </StackPanel.ContextMenu>
+                                    <Path Data="M0,0 L8,0 L4,8 Z" Fill="{StaticResource CatppuccinYellow}"
+                                          Width="8" Height="8" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="SemiBold"
+                                               VerticalAlignment="Top" Margin="0,1,0,0"
+                                               Foreground="{StaticResource CatppuccinYellow}"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="120"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </ScrollViewer>
 
             <!-- [1,0] track headers — scroll driven vertically by the lanes -->
@@ -687,6 +730,23 @@
                 <Rectangle Name="LoopRegion" IsVisible="False" Fill="{StaticResource CatppuccinSky}" Opacity="0.12"/>
                 <Rectangle Name="StartMarkerLine" Width="1" IsVisible="False"
                            Fill="{StaticResource CatppuccinOverlay1}"/>
+                <ItemsControl Name="MarkerLaneLines" ItemsSource="{Binding Markers}" IsHitTestVisible="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.Styles>
+                        <Style Selector="ContentPresenter" x:DataType="tl:ArrangementMarkerViewModel">
+                            <Setter Property="Canvas.Left" Value="{Binding Left}"/>
+                            <Setter Property="Canvas.Top" Value="0"/>
+                        </Style>
+                    </ItemsControl.Styles>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="tl:ArrangementMarkerViewModel">
+                            <Rectangle Width="1" Fill="{StaticResource CatppuccinYellow}" Opacity="0.35"
+                                       Height="{Binding $parent[ItemsControl].Bounds.Height}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <Rectangle Name="PlayheadLine" Width="2" IsVisible="False"
                            Fill="{StaticResource CatppuccinGreen}"/>
                 <Border Name="Band" IsVisible="False"
@@ -695,7 +755,7 @@
                 </Border>
             </Canvas>
 
-            <!-- Start-marker play icon in the ruler -->
+            <!-- Start-marker play icon + punch brackets in the ruler (viewport-anchored) -->
             <Canvas Grid.Row="0" Grid.Column="1" Name="RulerOverlay" IsHitTestVisible="False" ClipToBounds="True">
                 <Rectangle Name="LoopRegionRuler" IsVisible="False" Height="{StaticResource RulerHeight}"
                            Fill="{StaticResource CatppuccinSky}" Opacity="0.25"/>
@@ -705,21 +765,6 @@
                         BorderBrush="{StaticResource CatppuccinRed}" BorderThickness="0,0,2,0"/>
                 <Path Name="StartMarkerIcon" IsVisible="False" Data="M0,0 L9,5 L0,10 Z"
                       Fill="{StaticResource CatppuccinGreen}"/>
-                <ItemsControl ItemsSource="{Binding Markers}" IsHitTestVisible="False">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <Canvas/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="tl:ArrangementMarkerViewModel">
-                            <StackPanel Canvas.Left="{Binding Left}" Spacing="0">
-                                <Path Data="M0,0 L8,0 L4,8 Z" Fill="{StaticResource CatppuccinYellow}" Width="8" Height="8"/>
-                                <TextBlock Text="{Binding Name}" FontSize="9" Foreground="{StaticResource CatppuccinYellow}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
             </Canvas>
 
             <!-- Track-reorder drag indicator: a horizontal insertion line spanning headers + lanes,

@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:d="https://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.App.ViewModels"
              xmlns:controls="using:Ongenet.App.Controls"
@@ -9,71 +9,53 @@
              x:DataType="vm:ProjectClipsViewModel">
 
     <Border Background="{StaticResource CatppuccinMantle}">
-        <Panel>
-            <TextBlock Text="{DynamicResource ProjectClips_The_projects_MIDI_and_audio_clips_appear_here_Dr}"
-                       IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
-                       Margin="12" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
-
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl Name="GroupsList" ItemsSource="{Binding Groups}" Margin="6,4">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ProjectClipGroupViewModel">
-                            <StackPanel>
-                                <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="Bold"
-                                           Margin="2,8,0,2"
-                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                <ItemsControl ItemsSource="{Binding Items}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:ProjectClipItemViewModel">
-                                            <!-- A draggable clip card; drag starts in code-behind. -->
-                                            <Border Margin="0,2" Padding="8,5" CornerRadius="4"
-                                                    Background="{StaticResource CatppuccinSurface0}"
-                                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
-                                                <Border.ContextMenu>
-                                                    <ContextMenu>
-                                                        <MenuItem Header="{DynamicResource ProjectClips_Rename}" Command="{Binding RenameAllCommand}"/>
-                                                        <MenuItem Header="{DynamicResource ProjectClips_Delete_all_from_project}" Command="{Binding DeleteAllCommand}"/>
-                                                    </ContextMenu>
-                                                </Border.ContextMenu>
-                                                <StackPanel Spacing="4">
-                                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                                        <TextBlock Text="{DynamicResource ProjectClips_Text}" VerticalAlignment="Center" FontSize="11"/>
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Text="{Binding Detail}" FontSize="10"
-                                                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                    <!-- Miniature preview: the same controls the timeline clips use. -->
-                                                    <Border Height="26" CornerRadius="3" ClipToBounds="True"
-                                                            Background="{StaticResource CatppuccinMantle}">
-                                                        <Panel>
-                                                            <controls:WaveformControl Waveform="{Binding Waveform}"
-                                                                                      StartFraction="{Binding WaveStartFraction}"
-                                                                                      EndFraction="{Binding WaveEndFraction}"
-                                                                                      IsVisible="{Binding IsAudio}"
-                                                                                      IsHitTestVisible="False"
-                                                                                      Fill="{StaticResource CatppuccinMauve}"
-                                                                                      Opacity="0.7" Margin="2,2"/>
-                                                            <controls:MidiNoteMiniControl Notes="{Binding Notes}"
-                                                                                          ClipLengthBeats="{Binding ClipLengthBeats}"
-                                                                                          IsVisible="{Binding IsMidi}"
-                                                                                          IsHitTestVisible="False"
-                                                                                          Fill="{StaticResource CatppuccinMauve}"
-                                                                                          Opacity="0.8" Margin="3,3"/>
-                                                        </Panel>
-                                                    </Border>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
+        <DockPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="6,6,6,2">
+                <controls:IconButton DockPanel.Dock="Right" Classes="flat"
+                                     Width="28" Height="28" IconSize="16"
+                                     Icon="{StaticResource IconPlus}"
+                                     Command="{Binding NewCategoryCommand}"
+                                     ToolTip.Tip="{DynamicResource ProjectClips_NewCategory_Tip}"/>
+                <ComboBox ItemsSource="{Binding SortModes}"
+                          SelectedItem="{Binding SelectedSortMode}"
+                          HorizontalAlignment="Stretch"
+                          FontSize="11"
+                          MinHeight="28"
+                          ToolTip.Tip="{DynamicResource ProjectClips_Sort_Tip}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProjectClipsSortModeOption">
+                            <TextBlock Text="{Binding Label}"/>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Panel>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </DockPanel>
+
+            <Panel>
+                <TextBlock Text="{DynamicResource ProjectClips_The_projects_MIDI_and_audio_clips_appear_here_Dr}"
+                           IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
+                           Margin="12" FontSize="11" Foreground="{StaticResource CatppuccinOverlay1}"/>
+
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl Name="GroupsList" ItemsSource="{Binding Groups}" Margin="6,4">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProjectClipGroupViewModel">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="Bold"
+                                               Margin="2,8,0,2"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ProjectClipItemViewModel">
+                                                <controls:ProjectClipCardControl DataContext="{Binding}"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Panel>
+        </DockPanel>
     </Border>
 </UserControl>

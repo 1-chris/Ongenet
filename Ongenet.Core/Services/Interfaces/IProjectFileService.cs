@@ -56,4 +56,7 @@ public interface IProjectFileService
     /// <summary>Swaps in an in-memory project (e.g. a built-in demo song): syncs the transport to its
     /// tempo and clears the file/dirty state, like opening a file that has no path yet.</summary>
     void LoadProject(Models.Audio.Project project);
+
+    /// <summary>Marks the open project dirty (e.g. after sidebar-only metadata edits).</summary>
+    void MarkDirty();
 }

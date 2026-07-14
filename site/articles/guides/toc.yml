@@ -4,6 +4,8 @@
   href: getting-started.md
 - name: Samples & libraries
   href: samples-and-libraries.md
+- name: Factory content
+  href: factory-content.md
 - name: Plugins
   href: plugins.md
 - name: Timeline & clips

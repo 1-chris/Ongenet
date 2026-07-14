@@ -87,14 +87,14 @@ public sealed class Sf2Loader
             var presetGens = Merge(presetGlobal, zoneGens);
             var instIdx = presetGens[Sf2Gen.Instrument].Raw;
             if (instIdx >= file.Instruments.Count - 1) { warnings.Add("SF2: preset references an invalid instrument."); continue; }
-            FlattenInstrument(file, instIdx, presetGens, regions, cache);
+            FlattenInstrument(file, instIdx, presetGens, regions, cache, warnings);
         }
     }
 
     // Walks one instrument's zones; each non-global zone points at a sample and becomes a region.
     private static void FlattenInstrument(Sf2File file, int instIdx,
         IReadOnlyDictionary<Sf2Gen, Sf2GenItem> presetGens, List<SamplerRegion> regions,
-        Dictionary<int, SamplerSample> cache)
+        Dictionary<int, SamplerSample> cache, List<string> warnings)
     {
         var zoneStart = file.Instruments[instIdx].BagNdx;
         var zoneEnd = file.Instruments[instIdx + 1].BagNdx;
@@ -123,7 +123,15 @@ public sealed class Sf2Loader
                 cache[sampIdx] = sample;
             }
 
-            var region = BuildRegion(instGens, presetGens, shdr, sample, regions.Count);
+            var instMods = Sf2Modulator.ZoneMods(file.InstBags, file.InstMods, z);
+            // Merge default modulators when zone lists are empty (SF2 players always apply defaults).
+            if (instMods.Count == 0)
+            {
+                instMods.Add(Sf2Modulator.DefaultVelToAtten);
+                instMods.Add(Sf2Modulator.DefaultCc1ToVibPitch);
+            }
+
+            var region = BuildRegion(instGens, presetGens, shdr, sample, regions.Count, instMods, warnings);
             // Skip dead zones: when the preset range and instrument range don't overlap the intersection
             // is empty (lo > hi), so the region could never be triggered.
             if (region.LoKey <= region.HiKey && region.LoVel <= region.HiVel) regions.Add(region);
@@ -137,7 +145,7 @@ public sealed class Sf2Loader
     /// </summary>
     public static SamplerRegion BuildRegion(IReadOnlyDictionary<Sf2Gen, Sf2GenItem> instGens,
         IReadOnlyDictionary<Sf2Gen, Sf2GenItem> presetGens, in Sf2SampleHeader shdr, SamplerSample sample,
-        int rrKey)
+        int rrKey, List<Sf2ModItem>? mods = null, List<string>? warnings = null)
     {
         int InstVal(Sf2Gen g) => instGens.TryGetValue(g, out var it) ? it.Short : Sf2Convert.Default(g);
         int PresetOff(Sf2Gen g) => presetGens.TryGetValue(g, out var it) ? it.Short : 0;
@@ -145,6 +153,14 @@ public sealed class Sf2Loader
         // generator is instrument-only, in which case the preset never contributes).
         int Comb(Sf2Gen g) => InstVal(g) + (Sf2Convert.IsInstrumentOnly(g) ? 0 : PresetOff(g));
         double Sec(Sf2Gen g) => Sf2Convert.TimecentsToSeconds(Comb(g));
+        // Key-number scaling of EG hold/decay (SF2 §8.1.3).
+        double SecKeyScaled(Sf2Gen timeGen, Sf2Gen scaleGen, int key)
+        {
+            var t = Comb(timeGen);
+            var scale = Comb(scaleGen); // timecents per key
+            var keyed = t + scale * (key - 60);
+            return Sf2Convert.TimecentsToSeconds(keyed);
+        }
 
         // Key/velocity ranges: instrument range narrowed by the preset's range (intersection).
         (int Lo, int Hi) Range(Sf2Gen g)
@@ -180,17 +196,23 @@ public sealed class Sf2Loader
         }
 
         var forcedVel = instGens.TryGetValue(Sf2Gen.Velocity, out var fv) && fv.Short >= 0;
-        var ampVeltrack = forcedVel ? 0.0 : 100.0; // SF2's default velocity→attenuation modulator (concave)
+        var ampVeltrack = forcedVel ? 0.0 : 100.0; // replaced below by modulators when present
+
+        // Keynum used for EG scaling (fixed pitch zones use Keynum gen).
+        var egKey = keynum >= 0 ? keynum : root;
 
         var ampEg = new SamplerEgSpec
         {
             Delay = Sec(Sf2Gen.DelayVolEnv),
             Attack = Sec(Sf2Gen.AttackVolEnv),
-            Hold = Sec(Sf2Gen.HoldVolEnv),
-            Decay = Sec(Sf2Gen.DecayVolEnv),
+            Hold = SecKeyScaled(Sf2Gen.HoldVolEnv, Sf2Gen.KeynumToVolEnvHold, egKey),
+            Decay = SecKeyScaled(Sf2Gen.DecayVolEnv, Sf2Gen.KeynumToVolEnvDecay, egKey),
             Sustain = Sf2Convert.SustainCentibelsToLevel(Comb(Sf2Gen.SustainVolEnv)),
             Release = Sec(Sf2Gen.ReleaseVolEnv)
         };
+
+        if (Comb(Sf2Gen.ChorusEffectsSend) != 0 || Comb(Sf2Gen.ReverbEffectsSend) != 0)
+            warnings?.Add("SF2 chorus/reverb sends are not routed (no effect bus).");
 
         // --- Filter ---
         var fc = Comb(Sf2Gen.InitialFilterFc);
@@ -205,8 +227,8 @@ public sealed class Sf2Loader
         {
             Delay = Sec(Sf2Gen.DelayModEnv),
             Attack = Sec(Sf2Gen.AttackModEnv),
-            Hold = Sec(Sf2Gen.HoldModEnv),
-            Decay = Sec(Sf2Gen.DecayModEnv),
+            Hold = SecKeyScaled(Sf2Gen.HoldModEnv, Sf2Gen.KeynumToModEnvHold, egKey),
+            Decay = SecKeyScaled(Sf2Gen.DecayModEnv, Sf2Gen.KeynumToModEnvDecay, egKey),
             Sustain = Math.Clamp(1.0 - Comb(Sf2Gen.SustainModEnv) / 1000.0, 0.0, 1.0),
             Release = Sec(Sf2Gen.ReleaseModEnv)
         };
@@ -251,6 +273,10 @@ public sealed class Sf2Loader
 
         var excl = InstVal(Sf2Gen.ExclusiveClass);
 
+        var modList = mods ?? new List<Sf2ModItem> { Sf2Modulator.DefaultVelToAtten, Sf2Modulator.DefaultCc1ToVibPitch };
+        var (velTrackFromMods, routes) = Sf2Modulator.ApplyToRoutes(modList, ampVeltrack);
+        if (!forcedVel) ampVeltrack = velTrackFromMods;
+
         return new SamplerRegion
         {
             Sample = sample,
@@ -266,6 +292,7 @@ public sealed class Sf2Loader
             Pan = pan,
             AmpVeltrack = ampVeltrack,
             AmpEg = ampEg,
+            ModRoutes = routes,
             Offset = offset,
             End = end,
             LoopMode = loopMode,

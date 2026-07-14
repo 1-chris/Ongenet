@@ -1,15 +1,15 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:d="https://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:lib="using:Ongenet.App.ViewModels.Library"
+             xmlns:controls="using:Ongenet.App.Controls"
              mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="600"
              x:Class="Ongenet.App.Views.Panels.LibraryListView"
              x:DataType="lib:LibraryListViewModel">
 
     <Border Background="{StaticResource CatppuccinMantle}">
         <DockPanel>
-            <!-- Instant search box (filters the tree below as you type). -->
             <TextBox Classes="search" DockPanel.Dock="Top" Text="{Binding SearchText, Mode=TwoWay}"
                      PlaceholderText="{DynamicResource LibraryList_Search}" Margin="6,6,6,2"/>
 
@@ -19,52 +19,87 @@
 
                 <TreeView Name="NodeTree" ItemsSource="{Binding Roots}" Background="Transparent"
                           Margin="2,2,2,4"
-                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto">
                     <TreeView.Styles>
-                        <!-- Bind expansion back to the node so search can force-expand; tighten row spacing. -->
                         <Style Selector="TreeViewItem" x:DataType="lib:LibraryNode">
                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                             <Setter Property="MinHeight" Value="0"/>
                             <Setter Property="Padding" Value="2,0"/>
                         </Style>
+                        <Style Selector="Border.library-row:pointerover">
+                            <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+                        </Style>
                     </TreeView.Styles>
                     <TreeView.ItemTemplate>
                         <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="lib:LibraryNode">
-                            <Panel>
-                                <!-- Folder row: a bold group header. -->
-                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,2"
-                                            IsVisible="{Binding IsFolder}">
-                                    <StackPanel.ContextMenu>
-                                        <ContextMenu>
-                                            <MenuItem Header="{DynamicResource LibraryList_Expand_recursively}" Click="OnExpandRecursive"/>
-                                            <MenuItem Header="{DynamicResource LibraryList_Collapse_recursively}" Click="OnCollapseRecursive"/>
-                                        </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <TextBlock Text="{Binding Icon}" IsVisible="{Binding HasIcon}"
-                                               FontSize="11" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="Bold"
-                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
-                                </StackPanel>
+                            <Border Classes="library-row" Padding="2,2" CornerRadius="3" Background="Transparent">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{DynamicResource LibraryList_Expand_recursively}"
+                                                  Click="OnExpandRecursive"
+                                                  IsVisible="{Binding IsFolder}"/>
+                                        <MenuItem Header="{DynamicResource LibraryList_Collapse_recursively}"
+                                                  Click="OnCollapseRecursive"
+                                                  IsVisible="{Binding IsFolder}"/>
+                                        <Separator IsVisible="{Binding CanFavourite}"/>
+                                        <MenuItem Header="{DynamicResource LibraryOrg_AddToCategory}"
+                                                  Click="OnAddToCategory"
+                                                  IsVisible="{Binding CanFavourite}"/>
+                                        <MenuItem Header="{DynamicResource LibraryOrg_NewCategory}"
+                                                  Click="OnNewCategory"
+                                                  IsVisible="{Binding CanFavourite}"/>
+                                        <MenuItem Header="{DynamicResource LibraryOrg_RemoveFromCategories}"
+                                                  Click="OnRemoveFromCategories"
+                                                  IsVisible="{Binding CanFavourite}"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <DockPanel>
+                                    <controls:IconButton DockPanel.Dock="Right" Classes="flat library-star"
+                                                         Width="22" Height="22" CornerRadius="4" IconSize="14"
+                                                         IsVisible="{Binding CanFavourite}"
+                                                         Click="OnToggleFavourite"
+                                                         ToolTip.Tip="{DynamicResource LibraryOrg_Favourite_Tip}"
+                                                         Icon="{Binding IsFavourite, Converter={x:Static lib:FavouriteStarConverter.Instance}}"
+                                                         Classes.active="{Binding IsFavourite}">
+                                        <controls:IconButton.Styles>
+                                            <Style Selector="controls|IconButton.library-star /template/ Path#PART_Icon">
+                                                <Setter Property="Fill" Value="{StaticResource CatppuccinOverlay1}"/>
+                                            </Style>
+                                            <Style Selector="controls|IconButton.library-star.active /template/ Path#PART_Icon">
+                                                <Setter Property="Fill" Value="{StaticResource CatppuccinYellow}"/>
+                                            </Style>
+                                            <Style Selector="controls|IconButton.library-star:pointerover /template/ Path#PART_Icon">
+                                                <Setter Property="Fill" Value="{StaticResource CatppuccinYellow}"/>
+                                            </Style>
+                                        </controls:IconButton.Styles>
+                                    </controls:IconButton>
 
-                                <!-- Leaf row: a draggable item card. -->
-                                <Border Margin="0,2" Padding="8,5" CornerRadius="4"
-                                        IsVisible="{Binding !IsFolder}"
-                                        Background="{StaticResource CatppuccinSurface0}"
-                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <!-- Folder row -->
+                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,1"
+                                                IsVisible="{Binding IsFolder}">
                                         <TextBlock Text="{Binding Icon}" IsVisible="{Binding HasIcon}"
-                                                   VerticalAlignment="Center"/>
+                                                   FontSize="11" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="Bold"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    </StackPanel>
+
+                                    <!-- Leaf row: plain text (no card chrome) -->
+                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,1"
+                                                IsVisible="{Binding !IsFolder}">
+                                        <TextBlock Text="{Binding Icon}" IsVisible="{Binding HasIcon}"
+                                                   VerticalAlignment="Center" FontSize="11"/>
                                         <StackPanel>
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12"
                                                        TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Text="{Binding Subtitle}" FontSize="10"
                                                        IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                       Foreground="{StaticResource CatppuccinOverlay1}"
+                                                       TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                     </StackPanel>
-                                </Border>
-                            </Panel>
+                                </DockPanel>
+                            </Border>
                         </TreeDataTemplate>
                     </TreeView.ItemTemplate>
                 </TreeView>

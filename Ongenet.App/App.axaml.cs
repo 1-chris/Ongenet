@@ -98,6 +98,7 @@ namespace Ongenet.App
             // Library: filesystem scan (samples/soundfonts) + preset aggregation (factory + user presets).
             services.AddSingleton<Services.ILibraryScanService, Services.LibraryScanService>();
             services.AddSingleton<Services.IPresetLibrary, Services.PresetLibrary>();
+            services.AddSingleton<Services.ILibraryOrganizationService, Services.LibraryOrganizationService>();
 
             // Parameter automation: creates lanes from the "Create automation track" right-click.
             services.AddSingleton<Services.IAutomationService, Services.AutomationService>();
@@ -234,6 +235,14 @@ namespace Ongenet.App
             // (persistence runs without DI, so it needs a static handle to the decoders).
             Core.Audio.Instruments.Sampler.SamplerInstrument.Loader =
                 ServiceProvider.GetService<Core.Audio.Instruments.Sampler.ISamplerLoadService>();
+            Core.Audio.Instruments.Sampler.SamplerInstrument.FactoryPathResolver = rel =>
+            {
+                var root = Services.AppPaths.FactorySoundFontsDirectory();
+                if (root is null) return null;
+                var path = System.IO.Path.GetFullPath(System.IO.Path.Combine(root,
+                    rel.Replace('/', System.IO.Path.DirectorySeparatorChar)));
+                return System.IO.File.Exists(path) ? path : null;
+            };
 
             // Register the Field modular instrument/effect and the module-wrapper nodes for every
             // instrument/effect/plugin (done after the provider is built to avoid a construction cycle).

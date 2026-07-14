@@ -80,7 +80,8 @@
                     <Button Classes="flat compact" Content="{DynamicResource Transport_P_2}" Command="{Binding SetPunchOutCommand}"
                             ToolTip.Tip="{DynamicResource Transport_Set_punch_out_to_cursor_Tip}"/>
                     <Button Classes="flat compact" Content="{DynamicResource Transport_Clear_punch}" Command="{Binding ClearPunchCommand}"
-                            IsVisible="{Binding HasPunchRegion}"/>
+                            IsVisible="{Binding HasPunchRegion}"
+                            ToolTip.Tip="{DynamicResource Transport_Clear_punch_Tip}"/>
                     <Button Classes="flat compact" Content="{DynamicResource Transport_M}" Command="{Binding AddMarkerAtPlayheadCommand}"
                             ToolTip.Tip="{DynamicResource Transport_Add_arrangement_marker_at_playhead_Tip}"/>
                     <Button Classes="flat compact" Content="{DynamicResource Transport_M_2}" Command="{Binding GoToNextMarkerCommand}"

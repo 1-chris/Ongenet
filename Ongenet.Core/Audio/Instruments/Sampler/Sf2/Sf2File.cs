@@ -18,9 +18,11 @@ public sealed class Sf2File
     public required IReadOnlyList<Sf2PresetHeader> Presets { get; init; }
     public required IReadOnlyList<Sf2Bag> PresetBags { get; init; }
     public required IReadOnlyList<Sf2GenItem> PresetGens { get; init; }
+    public IReadOnlyList<Sf2ModItem> PresetMods { get; init; } = System.Array.Empty<Sf2ModItem>();
     public required IReadOnlyList<Sf2InstHeader> Instruments { get; init; }
     public required IReadOnlyList<Sf2Bag> InstBags { get; init; }
     public required IReadOnlyList<Sf2GenItem> InstGens { get; init; }
+    public IReadOnlyList<Sf2ModItem> InstMods { get; init; } = System.Array.Empty<Sf2ModItem>();
     public required IReadOnlyList<Sf2SampleHeader> SampleHeaders { get; init; }
 
     // The sample pool: 16-bit signed PCM in `Data` at `SmplOffset` (length `SmplFrames` points), with the

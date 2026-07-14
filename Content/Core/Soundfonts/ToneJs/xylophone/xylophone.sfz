@@ -1,0 +1,12 @@
+// Auto SFZ for tonejs-instruments xylophone (CC BY 3.0)
+<group>
+lovel=0 hivel=127 ampeg_attack=0.005 ampeg_release=0.4
+
+<region> sample=C5.ogg key=72 pitch_keycenter=72
+<region> sample=C6.ogg key=84 pitch_keycenter=84
+<region> sample=C7.ogg key=96 pitch_keycenter=96
+<region> sample=C8.ogg key=108 pitch_keycenter=108
+<region> sample=G4.ogg key=67 pitch_keycenter=67
+<region> sample=G5.ogg key=79 pitch_keycenter=79
+<region> sample=G6.ogg key=91 pitch_keycenter=91
+<region> sample=G7.ogg key=103 pitch_keycenter=103

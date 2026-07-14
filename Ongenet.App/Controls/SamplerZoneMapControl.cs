@@ -8,7 +8,7 @@ using Ongenet.App.ViewModels;
 
 namespace Ongenet.App.Controls;
 
-/// <summary>Graphical piano-key / velocity map for SFZ sampler zones.</summary>
+/// <summary>Graphical piano-key / velocity map for sampler zones, coloured by layer.</summary>
 public sealed class SamplerZoneMapControl : Control
 {
     public static readonly StyledProperty<IReadOnlyList<SamplerZoneRowViewModel>?> ZonesProperty =
@@ -45,12 +45,10 @@ public sealed class SamplerZoneMapControl : Control
 
         context.FillRectangle(Brush.Parse("#1e1e2e"), bounds);
 
-        // Velocity axis label
         context.DrawText(new FormattedText("Velocity →",
             CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
             new Typeface("fonts:Inter#Inter"), 9, Brush.Parse("#a6adc8")), new Point(44, 2));
 
-        // Draw white/black key rows (one octave blocks repeated)
         for (var octave = 0; octave < 11; octave++)
         {
             var baseY = 18 + octave * keyHeight;
@@ -58,7 +56,6 @@ public sealed class SamplerZoneMapControl : Control
             DrawKeyRow(context, 40, baseY, keyWidth, keyHeight, octave * 12, zones);
         }
 
-        // MIDI note labels
         for (var n = 0; n <= 127; n += 12)
         {
             var row = n / 12;
@@ -87,9 +84,11 @@ public sealed class SamplerZoneMapControl : Control
             var right = x + (hi - baseNote + 1) / 12.0 * w;
             var velFrac = (z.HiVel - z.LoVel + 1) / 127.0;
             var zoneH = Math.Max(3, h * velFrac * 0.85);
-            var brush = SelectedIndex == i
-                ? Brush.Parse("#cba6f7")
-                : Brush.Parse("#89b4fa");
+            var color = z.LayerColorArgb != 0
+                ? Color.FromUInt32(z.LayerColorArgb)
+                : Color.Parse("#89b4fa");
+            if (SelectedIndex == i) color = Color.Parse("#f5e0dc");
+            var brush = new SolidColorBrush(Color.FromArgb(0xBB, color.R, color.G, color.B));
             ctx.FillRectangle(brush, new Rect(left, y + (h - zoneH) * 0.5, right - left, zoneH));
         }
     }

@@ -74,11 +74,14 @@
 
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0"
                                 VerticalAlignment="Center" IsVisible="{Binding IsSoundFont}">
-                        <Button Content="{DynamicResource InstrumentSlot_Zones}" Command="{Binding OpenZoneEditorCommand}"
-                                ToolTip.Tip="{DynamicResource InstrumentSlot_Open_sampler_zone_list_editor_Tip}"
+                        <Button Content="{DynamicResource InstrumentSlot_Editor}" Command="{Binding OpenZoneEditorCommand}"
+                                ToolTip.Tip="{DynamicResource InstrumentSlot_Open_sampler_editor_Tip}"
 />
                         <Button Content="{DynamicResource InstrumentSlot_Load}" Click="OnLoadSampler"
                                 ToolTip.Tip="{DynamicResource InstrumentSlot_Load_an_SFZ_patch_or_SF2_SoundFont_Tip}"
+/>
+                        <Button Content="{DynamicResource InstrumentSlot_Add_layer}" Click="OnAddSamplerLayer"
+                                ToolTip.Tip="{DynamicResource InstrumentSlot_Add_layer_Tip}"
 />
                         <ComboBox Classes="stretch" MinWidth="180" MaxWidth="240" VerticalAlignment="Center"
                                   IsVisible="{Binding HasSamplerPresets}"

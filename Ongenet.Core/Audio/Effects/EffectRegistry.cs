@@ -35,6 +35,7 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(DelayEffect.TypeId, "Delay", () => new DelayEffect(), CatDelayReverb),
         new EffectInfo(ReverbEffect.TypeId, "Reverb", () => new ReverbEffect(), CatDelayReverb),
         new EffectInfo(DistortionEffect.TypeId, "Distortion", () => new DistortionEffect(), CatDistortion),
+        new EffectInfo(ExciterEffect.TypeId, "Exciter", () => new ExciterEffect(), CatDistortion),
         new EffectInfo(ClipperEffect.TypeId, "Clipper", () => new ClipperEffect(), CatDistortion),
         new EffectInfo(BitcrusherEffect.TypeId, "Bitcrusher", () => new BitcrusherEffect(), CatDistortion),
         new EffectInfo(VocoderEffect.TypeId, "Vocoder", () => new VocoderEffect(), CatPitch),

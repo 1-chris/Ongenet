@@ -540,10 +540,9 @@ namespace Ongenet.App.ViewModels
             }
         }
 
-        private void AddMarkerAtPlayhead()
+        private async void AddMarkerAtPlayhead()
         {
-            var n = _project.Current.Markers.Count + 1;
-            _timeline.AddMarkerAtPlayhead($"Marker {n}");
+            await _timeline.AddMarkerAtPlayheadInteractiveAsync();
             GoToNextMarkerCommand.RaiseCanExecuteChanged();
             GoToPreviousMarkerCommand.RaiseCanExecuteChanged();
         }

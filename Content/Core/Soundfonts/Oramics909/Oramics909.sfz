@@ -1,0 +1,14 @@
+// Oramics909
+<group>
+lovel=0 hivel=127 ampeg_attack=0.001 ampeg_release=0.2
+
+<region> sample=kick.wav key=36 pitch_keycenter=36
+<region> sample=snare.wav key=38 pitch_keycenter=38
+<region> sample=clap-1.wav key=39 pitch_keycenter=39
+<region> sample=hihat-closed.wav key=42 pitch_keycenter=42
+<region> sample=hihat-open-1.wav key=46 pitch_keycenter=46
+<region> sample=tom-l.wav key=43 pitch_keycenter=43
+<region> sample=tom-h.wav key=50 pitch_keycenter=50
+<region> sample=cymbal.wav key=49 pitch_keycenter=49
+<region> sample=ride.wav key=51 pitch_keycenter=51
+<region> sample=rim.wav key=37 pitch_keycenter=37

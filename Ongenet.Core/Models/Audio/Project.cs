@@ -109,4 +109,10 @@ public sealed class Project
 
     /// <summary>Control Room monitor/cue profiles.</summary>
     public List<ControlRoomProfile> ControlRoomProfiles { get; } = new();
+
+    /// <summary>Grouping mode for the Project Clips sidebar.</summary>
+    public ProjectClipsSortMode ProjectClipsSortMode { get; set; } = ProjectClipsSortMode.ByKind;
+
+    /// <summary>User-owned categories of unique clips (by content signature) for the Project Clips panel.</summary>
+    public List<ProjectClipCategory> ProjectClipCategories { get; } = new();
 }

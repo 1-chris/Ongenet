@@ -1,39 +1,67 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:d="https://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.App.ViewModels"
              xmlns:fs="using:Ongenet.App.ViewModels.FileSystem"
+             xmlns:lib="using:Ongenet.App.ViewModels.Library"
+             xmlns:controls="using:Ongenet.App.Controls"
              mc:Ignorable="d" d:DesignWidth="260" d:DesignHeight="600"
              x:Class="Ongenet.App.Views.Panels.FileBrowserView"
              x:DataType="vm:FileBrowserViewModel">
 
     <Border Background="{StaticResource CatppuccinMantle}">
         <DockPanel>
-            <!-- Disable horizontal scrolling so deep nesting doesn't push a scrollbar; long names wrap to
-                 the next line and stay within the sidebar width. -->
             <TreeView Name="FileTree" ItemsSource="{Binding Roots}" Background="Transparent" Margin="4,0,4,4"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
                 <TreeView.Styles>
-                    <!-- Bind each item's expansion back to the VM so children load lazily; tighten the
-                         per-row vertical space (default TreeViewItem padding wastes a lot). -->
                     <Style Selector="TreeViewItem" x:DataType="fs:FileNodeViewModel">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                         <Setter Property="MinHeight" Value="0"/>
                         <Setter Property="Padding" Value="2,0"/>
                     </Style>
+                    <Style Selector="Border.library-row:pointerover">
+                        <Setter Property="Background" Value="{StaticResource CatppuccinSurface0}"/>
+                    </Style>
                 </TreeView.Styles>
                 <TreeView.ItemTemplate>
                     <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="fs:FileNodeViewModel">
-                        <!-- DockPanel (not a horizontal StackPanel) so the name fills the remaining width
-                             and wraps; the icon stays pinned at the top-left. -->
-                        <DockPanel Margin="0,1">
-                            <TextBlock DockPanel.Dock="Left" Text="{DynamicResource FileBrowser_Text}" IsVisible="{Binding IsDirectory}"
-                                       VerticalAlignment="Top" Margin="0,0,6,0"/>
-                            <TextBlock DockPanel.Dock="Left" Text="{DynamicResource FileBrowser_Text_2}" IsVisible="{Binding !IsDirectory}"
-                                       VerticalAlignment="Top" Margin="0,0,6,0"/>
-                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                        </DockPanel>
+                        <Border Classes="library-row" Padding="2,2" CornerRadius="3" Background="Transparent">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{DynamicResource LibraryOrg_AddToCategory}"
+                                              Click="OnAddToCategory"
+                                              IsVisible="{Binding CanFavourite}"/>
+                                    <MenuItem Header="{DynamicResource LibraryOrg_NewCategory}"
+                                              Click="OnNewCategory"
+                                              IsVisible="{Binding CanFavourite}"/>
+                                    <MenuItem Header="{DynamicResource LibraryOrg_RemoveFromCategories}"
+                                              Click="OnRemoveFromCategories"
+                                              IsVisible="{Binding CanFavourite}"/>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <DockPanel>
+                                <controls:IconButton DockPanel.Dock="Right" Classes="flat library-star"
+                                                     Width="22" Height="22" CornerRadius="4" IconSize="14"
+                                                     IsVisible="{Binding CanFavourite}"
+                                                     Click="OnToggleFavourite"
+                                                     ToolTip.Tip="{DynamicResource LibraryOrg_Favourite_Tip}"
+                                                     Icon="{Binding IsFavourite, Converter={x:Static lib:FavouriteStarConverter.Instance}}"/>
+                                <Panel>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasIcon}">
+                                        <TextBlock Text="{Binding Icon}" FontSize="11" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <DockPanel IsVisible="{Binding !HasIcon}">
+                                        <TextBlock DockPanel.Dock="Left" Text="{DynamicResource FileBrowser_Text}"
+                                                   IsVisible="{Binding IsDirectory}" VerticalAlignment="Top" Margin="0,0,6,0"/>
+                                        <TextBlock DockPanel.Dock="Left" Text="{DynamicResource FileBrowser_Text_2}"
+                                                   IsVisible="{Binding !IsDirectory}" VerticalAlignment="Top" Margin="0,0,6,0"/>
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                </Panel>
+                            </DockPanel>
+                        </Border>
                     </TreeDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>

@@ -29,9 +29,11 @@ public static class Sf2Reader
         Sf2PresetHeader[]? phdr = null;
         Sf2Bag[]? pbag = null;
         Sf2GenItem[]? pgen = null;
+        IReadOnlyList<Sf2ModItem> pmod = Array.Empty<Sf2ModItem>();
         Sf2InstHeader[]? inst = null;
         Sf2Bag[]? ibag = null;
         Sf2GenItem[]? igen = null;
+        IReadOnlyList<Sf2ModItem> imod = Array.Empty<Sf2ModItem>();
         Sf2SampleHeader[]? shdr = null;
 
         var pos = 12;
@@ -68,11 +70,12 @@ public static class Sf2Reader
                                 case "phdr": phdr = ReadPresetHeaders(data, bp, bs); break;
                                 case "pbag": pbag = ReadBags(data, bp, bs); break;
                                 case "pgen": pgen = ReadGens(data, bp, bs); break;
+                                case "pmod": pmod = Sf2Modulator.ReadMods(data, bp, bs); break;
                                 case "inst": inst = ReadInstHeaders(data, bp, bs); break;
                                 case "ibag": ibag = ReadBags(data, bp, bs); break;
                                 case "igen": igen = ReadGens(data, bp, bs); break;
+                                case "imod": imod = Sf2Modulator.ReadMods(data, bp, bs); break;
                                 case "shdr": shdr = ReadSampleHeaders(data, bp, bs); break;
-                                // pmod / imod modulators are not used by this engine; skipped.
                             }
                         });
                         break;
@@ -93,9 +96,11 @@ public static class Sf2Reader
             Presets = phdr,
             PresetBags = pbag,
             PresetGens = pgen,
+            PresetMods = pmod,
             Instruments = inst,
             InstBags = ibag,
             InstGens = igen,
+            InstMods = imod,
             SampleHeaders = shdr,
             Data = data,
             SmplOffset = smplOffset,

@@ -30,7 +30,7 @@ public static class ProjectFile
 {
     /// <summary>Bumped whenever the on-disk layout changes. Newer files opened in an older app degrade gracefully.</summary>
     /// <remarks>v2: instrument rack. v3: track routing. v4: patterns, session, warp, takes, multi-out, MPE/groove/drum. v5: pattern tracks, pattern row metadata. v6: ARA pitch offset. v7: poly pitch segments.</remarks>
-    public const int FormatVersion = 21;
+    public const int FormatVersion = 22;
 
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("ONGENPRJ"); // 8 bytes
     private const string ManifestEntry = "ongen.manifest";
@@ -340,6 +340,17 @@ public static class ProjectFile
                 c.WriteDouble(kf.Width);
                 c.WriteDouble(kf.Height);
                 c.WriteDouble(kf.Opacity);
+            }
+
+            // Project Clips sidebar organisation (v22+, trailing — older readers stop via ChunkHasMore).
+            c.WriteInt((int)p.ProjectClipsSortMode);
+            c.WriteInt(p.ProjectClipCategories.Count);
+            foreach (var cat in p.ProjectClipCategories)
+            {
+                c.WriteGuid(cat.Id);
+                c.WriteString(cat.Name);
+                c.WriteInt(cat.ClipKeys.Count);
+                foreach (var key in cat.ClipKeys) c.WriteString(key);
             }
         });
     }
@@ -1353,6 +1364,24 @@ public static class ProjectFile
                         });
                     }
                 }
+            }
+        }
+
+        if (c.ChunkHasMore)
+        {
+            project.ProjectClipsSortMode = (ProjectClipsSortMode)c.ReadInt();
+            var catCount = c.ReadInt();
+            for (var i = 0; i < catCount; i++)
+            {
+                var cat = new ProjectClipCategory
+                {
+                    Id = c.ReadGuid(),
+                    Name = c.ReadString()
+                };
+                var keyCount = c.ReadInt();
+                for (var k = 0; k < keyCount; k++)
+                    cat.ClipKeys.Add(c.ReadString());
+                project.ProjectClipCategories.Add(cat);
             }
         }
     }

@@ -17,6 +17,7 @@ using Ongenet.Core.Models.Events;
 using Ongenet.Core.Models.Media;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.App.Localization;
 using Ongenet.App.Services;
 using Ongenet.App.ViewModels.Panels;
 using Ongenet.App.ViewModels.Timeline;
@@ -1847,6 +1848,55 @@ namespace Ongenet.App.ViewModels
                 Name = name,
                 Beat = _transport.PlayheadBeats
             });
+            RefreshMarkers();
+        }
+
+        /// <summary>Prompts for a name, then adds an arrangement marker at the playhead.</summary>
+        public async Task AddMarkerAtPlayheadInteractiveAsync()
+        {
+            var owner = OwnerWindow();
+            var defaultName = Loc.Format("Timeline_Marker_default_name", _project.Current.Markers.Count + 1);
+            if (owner is null)
+            {
+                AddMarkerAtPlayhead(defaultName);
+                return;
+            }
+
+            var name = await Views.Windows.InputDialog.Prompt(
+                owner,
+                Loc.Get("Timeline_Add_marker_Title"),
+                Loc.Get("Timeline_Marker_name_Label"),
+                defaultName,
+                Loc.Get("Dialog_OK"));
+            if (name is null) return;
+            AddMarkerAtPlayhead(name);
+        }
+
+        public async Task RenameMarkerAsync(ArrangementMarkerViewModel marker)
+        {
+            var owner = OwnerWindow();
+            if (owner is null) return;
+
+            var name = await Views.Windows.InputDialog.Prompt(
+                owner,
+                Loc.Get("Timeline_Rename_marker_Title"),
+                Loc.Get("Timeline_Marker_name_Label"),
+                marker.Name,
+                Loc.Get("Dialog_OK"));
+            if (name is null || name == marker.Model.Name) return;
+
+            _history.Capture("Rename marker");
+            marker.Model.Name = name;
+            marker.NotifyNameChanged();
+        }
+
+        public void DeleteMarker(ArrangementMarkerViewModel marker)
+        {
+            if (!_project.Current.Markers.Contains(marker.Model)) return;
+            _history.Capture("Delete marker");
+            _project.Current.Markers.Remove(marker.Model);
+            // Drop playlist sections that pointed at the removed marker.
+            _project.Current.ArrangementSections.RemoveAll(s => s.MarkerId == marker.Model.Id);
             RefreshMarkers();
         }
 

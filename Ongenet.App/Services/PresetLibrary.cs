@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Field;
+using Ongenet.Core.Audio.Field.Patches;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Persistence;
 
@@ -41,12 +43,13 @@ public interface IPresetLibrary
 
 /// <summary>
 /// Aggregates <c>.ongenpreset</c> files under the config presets directory into instrument/effect groups
-/// for the library tabs, and writes new user presets. On first run it materializes the built-in
-/// <see cref="IPresetProvider"/> presets (Kicka, Padda, …) as factory <c>.ongenpreset</c> files, so every
-/// preset — built-in or user — flows through the same unified format and browser.
+/// for the library tabs, and writes new user presets. On startup it materializes factory presets into
+/// <c>Presets/Factory</c>, rewriting that tree when <see cref="FactoryContentVersion"/> rises.
 /// </summary>
 public sealed class PresetLibrary : IPresetLibrary
 {
+    private const string VersionStampFileName = ".factory-version";
+
     private readonly IInstrumentRegistry _instruments;
     private readonly IEffectRegistry _effects;
 
@@ -163,10 +166,55 @@ public sealed class PresetLibrary : IPresetLibrary
         return Path.Combine(dir, Sanitize(name) + ".ongenpreset");
     }
 
-    // Writes the built-in IPresetProvider presets as factory .ongenpreset files (once; skipped if present).
     private void EnsureFactoryPresets()
     {
         var factoryDir = AppPaths.FactoryPresetsDirectory();
+        var stampPath = Path.Combine(factoryDir, VersionStampFileName);
+        var installed = ReadInstalledVersion(stampPath);
+        var rewrite = installed != FactoryContentVersion.Current;
+
+        if (rewrite)
+            ClearFactoryPresets(factoryDir);
+
+        MaterializeInstrumentProviders(factoryDir, force: rewrite);
+        MaterializeInstrumentDefinitions(factoryDir, force: rewrite);
+        MaterializeEffectDefinitions(factoryDir, force: rewrite);
+        MaterializeChainDefinitions(factoryDir, force: rewrite);
+        MaterializeFieldInstrumentPatches(factoryDir, force: rewrite);
+        MaterializeFieldEffectPatches(factoryDir, force: rewrite);
+
+        try { File.WriteAllText(stampPath, FactoryContentVersion.Current.ToString(CultureInfo.InvariantCulture)); }
+        catch { /* stamp is best-effort */ }
+    }
+
+    private static int ReadInstalledVersion(string stampPath)
+    {
+        try
+        {
+            if (!File.Exists(stampPath)) return -1;
+            return int.TryParse(File.ReadAllText(stampPath).Trim(), NumberStyles.Integer,
+                CultureInfo.InvariantCulture, out var v)
+                ? v
+                : -1;
+        }
+        catch { return -1; }
+    }
+
+    private static void ClearFactoryPresets(string factoryDir)
+    {
+        try
+        {
+            if (!Directory.Exists(factoryDir)) return;
+            foreach (var file in Directory.EnumerateFiles(factoryDir, "*.ongenpreset", SearchOption.AllDirectories))
+            {
+                try { File.Delete(file); } catch { /* continue */ }
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
+    private void MaterializeInstrumentProviders(string factoryDir, bool force)
+    {
         foreach (var info in _instruments.Available)
         {
             IInstrument instrument;
@@ -179,7 +227,7 @@ public sealed class PresetLibrary : IPresetLibrary
             {
                 var presetName = provider.PresetNames[i];
                 var path = Path.Combine(dir, Sanitize(presetName) + ".ongenpreset");
-                if (File.Exists(path)) continue;
+                if (!force && File.Exists(path)) continue;
                 try
                 {
                     Directory.CreateDirectory(dir);
@@ -193,48 +241,64 @@ public sealed class PresetLibrary : IPresetLibrary
                 }
             }
         }
+    }
 
-        // Code-defined factory presets for instruments without an IPresetProvider (e.g. 3x Osc).
+    private static void MaterializeInstrumentDefinitions(string factoryDir, bool force)
+    {
         foreach (var def in FactoryPresets.Definitions)
         {
             var dir = Path.Combine(factoryDir, Sanitize(def.InstrumentDisplayName));
             var path = Path.Combine(dir, Sanitize(def.PresetName) + ".ongenpreset");
-            if (File.Exists(path)) continue;
+            if (!force && File.Exists(path)) continue;
             try
             {
                 Directory.CreateDirectory(dir);
                 using var fs = File.Create(path);
                 PresetFile.SaveInstrument(def.Create(), def.PresetName, "Factory", fs);
             }
-            catch
-            {
-                // Skip a preset that fails to materialize; the rest still work.
-            }
+            catch { /* skip */ }
         }
+    }
 
-        // Factory FX chains (ready-made insert stacks) for the FX Chains tab.
+    private static void MaterializeEffectDefinitions(string factoryDir, bool force)
+    {
+        foreach (var def in FactoryPresets.EffectDefinitions)
+        {
+            var dir = Path.Combine(factoryDir, Sanitize(def.EffectDisplayName));
+            var path = Path.Combine(dir, Sanitize(def.PresetName) + ".ongenpreset");
+            if (!force && File.Exists(path)) continue;
+            try
+            {
+                Directory.CreateDirectory(dir);
+                using var fs = File.Create(path);
+                PresetFile.SaveEffect(def.Create(), def.PresetName, "Factory", fs);
+            }
+            catch { /* skip */ }
+        }
+    }
+
+    private static void MaterializeChainDefinitions(string factoryDir, bool force)
+    {
         foreach (var def in FactoryPresets.ChainDefinitions)
         {
             var dir = Path.Combine(factoryDir, "FX Chains");
             var path = Path.Combine(dir, Sanitize(def.PresetName) + ".ongenpreset");
-            if (File.Exists(path)) continue;
+            if (!force && File.Exists(path)) continue;
             try
             {
                 Directory.CreateDirectory(dir);
                 using var fs = File.Create(path);
                 PresetFile.SaveChain(def.Create(), def.PresetName, "Factory", fs);
             }
-            catch
-            {
-                // Skip a chain that fails to materialize; the rest still work.
-            }
+            catch { /* skip */ }
         }
-
-        // Factory Field instrument patches for the Field Patches library group.
-        MaterializeFieldPatches(factoryDir);
     }
 
-    private void MaterializeFieldPatches(string factoryDir)
+    /// <summary>
+    /// Materializes designed Field instrument patches (not the type-clone wrappers) as FieldPatch presets.
+    /// Full Field instrument presets already land via <see cref="IPresetProvider"/> under the Field group.
+    /// </summary>
+    private void MaterializeFieldInstrumentPatches(string factoryDir, bool force)
     {
         IInstrument field;
         try { field = _instruments.Create(FieldInstrument.Id); }
@@ -242,12 +306,17 @@ public sealed class PresetLibrary : IPresetLibrary
 
         if (field is not IPresetProvider provider) return;
 
-        var names = new[] { "Prism Lead", "Crystal Pluck", "Reese Bass", "Nova Saw" };
+        // Performance-named patches only — avoid duplicating type clones as FieldPatch copies.
+        var names = new[]
+        {
+            "Prism Lead", "Crystal Pluck", "Reese Bass", "Nova Saw",
+            "Aether Lead", "Solace Lead", "Acid Bass", "Ambient Pad"
+        };
         var dir = Path.Combine(factoryDir, "Field Patches");
         foreach (var name in names)
         {
             var path = Path.Combine(dir, Sanitize(name) + ".ongenpreset");
-            if (File.Exists(path)) continue;
+            if (!force && File.Exists(path)) continue;
             var index = provider.PresetNames.ToList().IndexOf(name);
             if (index < 0) continue;
             try
@@ -257,10 +326,35 @@ public sealed class PresetLibrary : IPresetLibrary
                 using var fs = File.Create(path);
                 PresetFile.SaveFieldPatch(field, name, "Factory", fs);
             }
-            catch
+            catch { /* skip */ }
+        }
+    }
+
+    private void MaterializeFieldEffectPatches(string factoryDir, bool force)
+    {
+        IAudioEffect effect;
+        try { effect = _effects.Create(FieldEffect.Id); }
+        catch { return; }
+
+        if (effect is not FieldEffect fieldEffect) return;
+
+        // Designed + useful Field effect graphs (skip pure module wrappers of every stock FX).
+        var names = new[] { "Ducked Delay", "Filter", "Delay", "Distortion", "Bitcrusher", "Tremolo", "Compressor" };
+        var dir = Path.Combine(factoryDir, "Field Effects");
+        foreach (var name in names)
+        {
+            var path = Path.Combine(dir, Sanitize(name) + ".ongenpreset");
+            if (!force && File.Exists(path)) continue;
+            var index = FieldBuiltInPatches.EffectPatchNames.ToList().IndexOf(name);
+            if (index < 0) continue;
+            try
             {
-                // Skip a patch that fails to materialize; the rest still work.
+                Directory.CreateDirectory(dir);
+                fieldEffect.LoadBuiltInPatch(index);
+                using var fs = File.Create(path);
+                PresetFile.SaveEffect(fieldEffect, name, "Factory", fs);
             }
+            catch { /* skip */ }
         }
     }
 

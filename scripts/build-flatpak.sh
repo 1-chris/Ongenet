@@ -35,6 +35,7 @@ if [ ! -f "$PUBLISH/Ongenet.bin" ]; then
   fi
 fi
 ensure_license_in_publish "$PUBLISH" "$ROOT"
+ensure_content_in_publish "$PUBLISH" "$ROOT"
 
 mkdir -p "$BUILD_DIR/sources/publish" "$ROOT/dist" "$REPO_DIR"
 rm -rf "$BUILD_DIR/sources/publish"/*

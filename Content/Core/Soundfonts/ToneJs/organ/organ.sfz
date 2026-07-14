@@ -1,0 +1,15 @@
+// Auto SFZ for tonejs-instruments organ (CC BY 3.0)
+<group>
+lovel=0 hivel=127 ampeg_attack=0.005 ampeg_release=0.4
+
+<region> sample=A1.ogg key=33 pitch_keycenter=33
+<region> sample=A3.ogg key=57 pitch_keycenter=57
+<region> sample=A5.ogg key=81 pitch_keycenter=81
+<region> sample=C2.ogg key=36 pitch_keycenter=36
+<region> sample=C4.ogg key=60 pitch_keycenter=60
+<region> sample=C6.ogg key=84 pitch_keycenter=84
+<region> sample=Ds2.ogg key=39 pitch_keycenter=39
+<region> sample=Ds4.ogg key=63 pitch_keycenter=63
+<region> sample=Fs1.ogg key=30 pitch_keycenter=30
+<region> sample=Fs3.ogg key=54 pitch_keycenter=54
+<region> sample=Fs5.ogg key=78 pitch_keycenter=78

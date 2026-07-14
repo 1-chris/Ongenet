@@ -47,3 +47,44 @@ ensure_license_in_publish() {
     cp "$root/LICENSE" "$publish/LICENSE"
   fi
 }
+
+# Copy Content/Core into the publish tree (samples / SFZ). No-op if pack is absent.
+ensure_content_in_publish() {
+  local publish="$1" root="$2"
+  local src="$root/Content/Core"
+  local dest="$publish/Content/Core"
+  if [ ! -d "$src" ]; then
+    return 0
+  fi
+  mkdir -p "$dest"
+  # Prefer rsync when available; fall back to cp -R
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "$src/" "$dest/"
+  else
+    rm -rf "$dest"
+    mkdir -p "$(dirname "$dest")"
+    cp -R "$src" "$dest"
+  fi
+  if [ -f "$src/ATTRIBUTION.md" ]; then
+    cp "$src/ATTRIBUTION.md" "$publish/CONTENT_ATTRIBUTION.md" 2>/dev/null || true
+  fi
+}
+
+# Fail if Content/Core exceeds size ceiling (uncompressed MB). Usage: assert_content_size_mb ROOT [MAX_MB]
+assert_content_size_mb() {
+  local root="$1"
+  local max_mb="${2:-1600}"
+  local src="$root/Content/Core"
+  if [ ! -d "$src" ]; then
+    return 0
+  fi
+  local bytes
+  bytes=$(du -sk "$src" | awk '{print $1}')
+  local mb=$((bytes / 1024))
+  if [ "$mb" -gt "$max_mb" ]; then
+    echo "ERROR: Content/Core is ${mb} MB (limit ${max_mb} MB)" >&2
+    return 1
+  fi
+  echo "Content/Core size OK: ${mb} MB (limit ${max_mb} MB)"
+}
+

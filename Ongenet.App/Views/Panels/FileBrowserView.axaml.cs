@@ -1,10 +1,14 @@
 using System;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
+using Ongenet.App.Localization;
 using Ongenet.App.ViewModels;
 using Ongenet.App.ViewModels.FileSystem;
+using Ongenet.App.Views.Windows;
 
 namespace Ongenet.App.Views.Panels
 {
@@ -24,30 +28,33 @@ namespace Ongenet.App.Views.Panels
         {
             InitializeComponent();
 
-            // Tunnel so we see the press before the TreeView consumes it for selection.
             FileTree.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
             FileTree.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel);
+            FileTree.AddHandler(TreeViewItem.ExpandedEvent, OnItemExpanded, RoutingStrategies.Bubble);
             FileTree.SelectionChanged += OnSelectionChanged;
         }
 
-        // Previewing a selected audio file (waveform + stats + optional auto-play) is handled by the
-        // shared AudioPreviewViewModel docked under the library tabs.
+        private void OnItemExpanded(object? sender, RoutedEventArgs e)
+            => TreeBrowseHelper.ScrollExpandedIntoView(FileTree, e.Source as Control);
+
         private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
-            if (FileTree.SelectedItem is not FileNodeViewModel { IsDirectory: false } node) return;
+            if (FileTree.SelectedItem is not FileNodeViewModel { IsDirectory: false, IsSynthetic: false } node) return;
             if (App.ServiceProvider?.GetService(typeof(AudioPreviewViewModel)) is AudioPreviewViewModel preview)
                 preview.Select(node.FullPath);
         }
 
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            if (e.Source is Control c && c.Classes.Contains("library-star")) return;
+
             _pressedNode = null;
             _pressArgs = null;
-            if ((e.Source as Control)?.DataContext is FileNodeViewModel { IsDirectory: false } node)
+            if ((e.Source as Control)?.DataContext is FileNodeViewModel { IsDirectory: false, IsSynthetic: false } node)
             {
                 _pressPoint = e.GetPosition(this);
                 _pressedNode = node;
-                _pressArgs = e; // DoDragDropAsync requires the originating pressed event
+                _pressArgs = e;
             }
         }
 
@@ -63,7 +70,6 @@ namespace Ongenet.App.Views.Panels
             var delta = e.GetPosition(this) - _pressPoint;
             if (Math.Abs(delta.X) < DragThreshold && Math.Abs(delta.Y) < DragThreshold) return;
 
-            // Only audio files are draggable onto the timeline.
             if (DataContext is not FileBrowserViewModel vm || _pressArgs is null || !vm.IsAudioFile(_pressedNode.FullPath))
             {
                 _pressedNode = null;
@@ -76,14 +82,69 @@ namespace Ongenet.App.Views.Panels
             _pressedNode = null;
             _pressArgs = null;
 
-            try
-            {
-                await DragDrop.DoDragDropAsync(pressArgs, data, DragDropEffects.Copy);
-            }
-            catch (Exception)
-            {
-                // A failed drag shouldn't take the app down.
-            }
+            try { await DragDrop.DoDragDropAsync(pressArgs, data, DragDropEffects.Copy); }
+            catch (Exception) { /* cancelled */ }
         }
+
+        private void OnToggleFavourite(object? sender, RoutedEventArgs e)
+        {
+            if ((sender as Control)?.DataContext is FileNodeViewModel node)
+                node.ToggleFavourite();
+            e.Handled = true;
+        }
+
+        private async void OnNewCategory(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not FileBrowserViewModel vm) return;
+            if ((sender as Control)?.DataContext is not FileNodeViewModel { CanFavourite: true } node) return;
+            var owner = OwnerWindow();
+            if (owner is null) return;
+
+            var name = await InputDialog.Prompt(owner,
+                Loc.Get("LibraryOrg_NewCategory_Title", "New category"),
+                Loc.Get("LibraryOrg_NewCategory_Label", "Category name:"),
+                "", Loc.Get("LibraryOrg_Create", "Create"));
+            if (string.IsNullOrWhiteSpace(name)) return;
+            var cat = vm.Organization.CreateCategory(name);
+            vm.Organization.AddToCategory(cat.Id, node.ItemKey);
+        }
+
+        private async void OnAddToCategory(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not FileBrowserViewModel vm) return;
+            if ((sender as Control)?.DataContext is not FileNodeViewModel { CanFavourite: true } node) return;
+            var cats = vm.Organization.Categories;
+            if (cats.Count == 0)
+            {
+                OnNewCategory(sender, e);
+                return;
+            }
+
+            var owner = OwnerWindow();
+            if (owner is null) return;
+            var names = string.Join(", ", cats.Select(c => c.Name));
+            var chosen = await InputDialog.Prompt(owner,
+                Loc.Get("LibraryOrg_AddToCategory_Title", "Add to category"),
+                Loc.Get("LibraryOrg_AddToCategory_Label", "Category name ({0}):", names),
+                cats[0].Name, Loc.Get("LibraryOrg_Add", "Add"));
+            if (string.IsNullOrWhiteSpace(chosen)) return;
+            var cat = cats.FirstOrDefault(c =>
+                string.Equals(c.Name, chosen.Trim(), StringComparison.OrdinalIgnoreCase));
+            cat ??= vm.Organization.CreateCategory(chosen);
+            vm.Organization.AddToCategory(cat.Id, node.ItemKey);
+        }
+
+        private void OnRemoveFromCategories(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not FileBrowserViewModel vm) return;
+            if ((sender as Control)?.DataContext is not FileNodeViewModel { CanFavourite: true } node) return;
+            foreach (var cat in vm.Organization.Categories.ToList())
+                vm.Organization.RemoveFromCategory(cat.Id, node.ItemKey);
+        }
+
+        private Window? OwnerWindow()
+            => this.FindAncestorOfType<Window>()
+               ?? (Avalonia.Application.Current?.ApplicationLifetime
+                   as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
     }
 }

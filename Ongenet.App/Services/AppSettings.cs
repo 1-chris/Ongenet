@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Ongenet.App.Localization;
 using Ongenet.App.ViewModels.Timeline;
@@ -99,6 +100,20 @@ public sealed class AppSettings
 
     /// <summary>Width of the arrangement timeline track-name column, in pixels.</summary>
     public double TimelineHeaderWidth { get; set; } = TimelineMetrics.DefaultHeaderWidth;
+
+    /// <summary>Stable library item keys marked as favourites (see <see cref="LibraryItemKeys"/>).</summary>
+    public List<string> LibraryFavourites { get; set; } = new();
+
+    /// <summary>User-owned library categories that can hold any mix of item keys (including folders).</summary>
+    public List<LibraryCategoryDto> LibraryCategories { get; set; } = new();
+}
+
+/// <summary>A user-created library category persisted in app settings.</summary>
+public sealed class LibraryCategoryDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = "";
+    public List<string> ItemKeys { get; set; } = new();
 }
 
 public sealed class KeyboardShortcutDto
