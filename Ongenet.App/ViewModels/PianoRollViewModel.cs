@@ -41,7 +41,9 @@ namespace Ongenet.App.ViewModels
         private Action? _onPatternStepsSynced;
 
         private bool _scaleSnapEnabled;
+        private bool _scaleHighlightEnabled;
         private bool _showExpressionLane;
+        private bool _showVelocityEditor;
 
         public PianoRollViewModel(IProjectService project, ISelectionService selection,
             IEventAggregator events, IEditModeService editMode, IPreviewService preview,
@@ -152,6 +154,13 @@ namespace Ongenet.App.ViewModels
             }
         }
 
+        /// <summary>When true, the resizable per-note velocity editor lane is shown under the note grid.</summary>
+        public bool ShowVelocityEditor
+        {
+            get => _showVelocityEditor;
+            set => SetField(ref _showVelocityEditor, value);
+        }
+
         /// <summary>Shared time/pitch↔pixel mapping.</summary>
         public PianoRollMetrics Metrics { get; } = new();
 
@@ -160,6 +169,13 @@ namespace Ongenet.App.ViewModels
         {
             get => _scaleSnapEnabled;
             set => SetField(ref _scaleSnapEnabled, value);
+        }
+
+        /// <summary>When true, piano-roll grid rows in the selected key/scale are highlighted.</summary>
+        public bool ScaleHighlightEnabled
+        {
+            get => _scaleHighlightEnabled;
+            set => SetField(ref _scaleHighlightEnabled, value);
         }
 
         /// <summary>Scale root pitch class (0 = C) — synced with the project transport key.</summary>
@@ -483,6 +499,33 @@ namespace Ongenet.App.ViewModels
 
             Publish();
         }
+
+        /// <summary>
+        /// Sets a note's velocity (clamped 0..1), refreshes its view model, and publishes. History is
+        /// captured by the caller once per gesture.
+        /// </summary>
+        public void SetNoteVelocity(NoteViewModel note, float velocity)
+        {
+            if (!TrySetNoteVelocity(note, velocity)) return;
+            Publish();
+        }
+
+        /// <summary>
+        /// Writes a clamped velocity without publishing — use when applying many notes in one gesture,
+        /// then call <see cref="PublishNoteEdits"/>.
+        /// </summary>
+        public bool TrySetNoteVelocity(NoteViewModel note, float velocity)
+        {
+            if (_clip is null) return false;
+            var clamped = Math.Clamp(velocity, 0f, 1f);
+            if (Math.Abs(note.Model.Velocity - clamped) < 1e-6f) return false;
+            note.Model.Velocity = clamped;
+            note.RefreshFromModel();
+            return true;
+        }
+
+        /// <summary>Publishes note changes after a batched velocity (or similar) edit.</summary>
+        public void PublishNoteEdits() => Publish();
 
         // --- Slicing ---
 

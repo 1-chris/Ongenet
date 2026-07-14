@@ -95,15 +95,21 @@ public static class MusicTheory
     public static int ClampNote(int note) => note < 0 ? 0 : note > 127 ? 127 : note;
 
     /// <summary>
+    /// True when <paramref name="midiNote"/>'s pitch class belongs to the given key/scale.
+    /// </summary>
+    public static bool IsInScale(int midiNote, int rootPitchClass, ScaleType scale)
+    {
+        var allowed = ScalePitchClassMask(rootPitchClass, scale);
+        return allowed[((midiNote % 12) + 12) % 12];
+    }
+
+    /// <summary>
     /// Snaps a (possibly fractional) MIDI note to the nearest note whose pitch class is in the given
     /// key/scale. Used by auto-tune to pull a detected pitch to the closest in-key note.
     /// </summary>
     public static int SnapToScale(double midiFloat, int rootPitchClass, ScaleType scale)
     {
-        var intervals = ScaleIntervals(scale);
-        var allowed = new bool[12];
-        var root = ((rootPitchClass % 12) + 12) % 12;
-        foreach (var iv in intervals) allowed[(root + iv) % 12] = true;
+        var allowed = ScalePitchClassMask(rootPitchClass, scale);
 
         // Pick the in-scale note with the smallest true (fractional) distance to midiFloat — NOT a
         // round-to-semitone-then-search, which can pick a further note when the fractional part
@@ -125,5 +131,15 @@ public static class MusicTheory
         }
 
         return ClampNote(best);
+    }
+
+    /// <summary>12-entry mask of pitch classes belonging to the given key/scale.</summary>
+    private static bool[] ScalePitchClassMask(int rootPitchClass, ScaleType scale)
+    {
+        var intervals = ScaleIntervals(scale);
+        var allowed = new bool[12];
+        var root = ((rootPitchClass % 12) + 12) % 12;
+        foreach (var iv in intervals) allowed[(root + iv) % 12] = true;
+        return allowed;
     }
 }

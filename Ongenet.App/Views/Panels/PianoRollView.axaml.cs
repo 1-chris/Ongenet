@@ -60,6 +60,11 @@ namespace Ongenet.App.Views.Panels
         private bool _centeredOnMiddleC;
         private bool _centerScheduled;
 
+        private const double DefaultVelocityLaneHeight = 100;
+        private const double MinVelocityLaneHeight = 48;
+        private const int VelocityLaneRowIndex = 4;
+        private double _savedVelocityLaneHeight = DefaultVelocityLaneHeight;
+
         public PianoRollView()
         {
             InitializeComponent();
@@ -74,9 +79,11 @@ namespace Ongenet.App.Views.Panels
             PrGridScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnGridScrollChanged);
             PrKeysScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnKeysScrollChanged);
             PrRulerScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnRulerScrollChanged);
+            PrVelocityScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnVelocityScrollChanged);
             PrGridScroll.AddHandler(PointerWheelChangedEvent, OnGridPointerWheel, RoutingStrategies.Tunnel);
             PrRulerScroll.AddHandler(PointerWheelChangedEvent, OnRulerPointerWheel, RoutingStrategies.Tunnel);
             PrKeysScroll.AddHandler(PointerWheelChangedEvent, OnKeysPointerWheel, RoutingStrategies.Tunnel);
+            PrVelocityScroll.AddHandler(PointerWheelChangedEvent, OnVelocityPointerWheel, RoutingStrategies.Tunnel);
             PianoGrid.PointerPressed += OnGridPressed;
             PianoGrid.PointerMoved += OnGridMoved;
             PianoGrid.PointerReleased += OnGridReleased;
@@ -133,9 +140,46 @@ namespace Ongenet.App.Views.Panels
 
         private void OnDataContextChanged(object? sender, EventArgs e)
         {
-            if (_vm is not null) _vm.ClipBound -= OnClipBound;
+            if (_vm is not null)
+            {
+                _vm.ClipBound -= OnClipBound;
+                _vm.PropertyChanged -= OnViewModelPropertyChanged;
+            }
+
             _vm = DataContext as PianoRollViewModel;
-            if (_vm is not null) _vm.ClipBound += OnClipBound;
+            if (_vm is not null)
+            {
+                _vm.ClipBound += OnClipBound;
+                _vm.PropertyChanged += OnViewModelPropertyChanged;
+                ApplyVelocityLaneVisibility(_vm.ShowVelocityEditor);
+            }
+        }
+
+        private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(PianoRollViewModel.ShowVelocityEditor) && sender is PianoRollViewModel vm)
+                ApplyVelocityLaneVisibility(vm.ShowVelocityEditor);
+        }
+
+        private void ApplyVelocityLaneVisibility(bool show)
+        {
+            var row = PianoRollRoot.RowDefinitions[VelocityLaneRowIndex];
+            if (show)
+            {
+                var height = Math.Max(MinVelocityLaneHeight, _savedVelocityLaneHeight);
+                row.MinHeight = MinVelocityLaneHeight;
+                row.Height = new GridLength(height);
+            }
+            else
+            {
+                var current = PrVelocityScroll.Bounds.Height;
+                if (current >= MinVelocityLaneHeight)
+                    _savedVelocityLaneHeight = current;
+                else if (row.Height.IsAbsolute && row.Height.Value > 0)
+                    _savedVelocityLaneHeight = row.Height.Value;
+                row.MinHeight = 0;
+                row.Height = new GridLength(0);
+            }
         }
 
         private void OnClipBound()
@@ -148,6 +192,7 @@ namespace Ongenet.App.Views.Panels
             var offset = PrGridScroll.Offset;
             PrRulerScroll.Offset = new Vector(offset.X, 0);
             PrKeysScroll.Offset = new Vector(0, offset.Y);
+            PrVelocityScroll.Offset = new Vector(offset.X, 0);
             _syncingScroll = false;
         }
 
@@ -174,8 +219,21 @@ namespace Ongenet.App.Views.Panels
             _syncingScroll = false;
         }
 
+        private void OnVelocityScrollChanged(object? sender, ScrollChangedEventArgs e)
+        {
+            if (_syncingScroll) return;
+            var x = PrVelocityScroll.Offset.X;
+            if (Math.Abs(x - PrGridScroll.Offset.X) < 0.5) return;
+            _syncingScroll = true;
+            PrGridScroll.Offset = new Vector(x, PrGridScroll.Offset.Y);
+            _syncingScroll = false;
+        }
+
         private void OnGridPointerWheel(object? sender, PointerWheelEventArgs e) =>
             ApplyShiftScrollZoom(e, e.GetPosition(PrGridScroll));
+
+        private void OnVelocityPointerWheel(object? sender, PointerWheelEventArgs e) =>
+            ApplyShiftScrollZoom(e, e.GetPosition(PrVelocityScroll));
 
         private void OnRulerPointerWheel(object? sender, PointerWheelEventArgs e) =>
             ApplyShiftScrollZoom(e, e.GetPosition(PrRulerScroll));

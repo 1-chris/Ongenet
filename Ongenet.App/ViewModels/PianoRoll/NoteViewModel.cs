@@ -27,6 +27,9 @@ namespace Ongenet.App.ViewModels.PianoRoll
         public double Top => _metrics.NoteToY(Model.Note);
         public double Height => PianoRollMetrics.KeyHeight - 1;
 
+        /// <summary>Note velocity in 0..1 (mirrors <see cref="MidiNote.Velocity"/>).</summary>
+        public float Velocity => Model.Velocity;
+
         public bool IsSelected
         {
             get => _isSelected;
@@ -39,6 +42,7 @@ namespace Ongenet.App.ViewModels.PianoRoll
             OnPropertyChanged(nameof(Left));
             OnPropertyChanged(nameof(Width));
             OnPropertyChanged(nameof(Top));
+            OnPropertyChanged(nameof(Velocity));
         }
 
         private void OnMetricsChanged(object? sender, PropertyChangedEventArgs e)

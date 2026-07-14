@@ -531,11 +531,16 @@
     <system:String x:Key="PianoRoll_Multi_select_tool_click_drag_a_rubber_band_over__Tip">複数選択ツール: ノート上をドラッグしてラバーバンド選択</system:String>
     <system:String x:Key="PianoRoll_Quantize">クオンタイズ</system:String>
     <system:String x:Key="PianoRoll_Quantize_note_starts_and_lengths_to_the_current__Tip">ノート開始と長さを現在のグリッドにクオンタイズ</system:String>
+    <system:String x:Key="PianoRoll_Scale_highlight">スケールハイライト</system:String>
     <system:String x:Key="PianoRoll_Scale_snap">スケールスナップ</system:String>
+    <system:String x:Key="PianoRoll_Highlight_rows_in_the_selected_key_scale_Tip">選択キー/スケールに含まれるピアノロールの行をハイライト</system:String>
     <system:String x:Key="PianoRoll_Select">選択</system:String>
     <system:String x:Key="PianoRoll_Show_the_per_beat_CC74_pressure_expression_lane_Tip">拍ごとの CC74/プレッシャーエクスプレッションレーンを表示</system:String>
+    <system:String x:Key="PianoRoll_Show_the_per_note_velocity_editor_Tip">ノートごとのベロシティエディターを表示（サイズ変更可）</system:String>
     <system:String x:Key="PianoRoll_Slice">スライス</system:String>
     <system:String x:Key="PianoRoll_Slice_tool_click_drag_a_line_to_cut_through_one__Tip">スライスツール: 線をドラッグして 1 つ以上のノートをカット</system:String>
+    <system:String x:Key="PianoRoll_Velocity">ベロシティ</system:String>
+    <system:String x:Key="PianoRoll_Velocity_editor">ベロシティエディター</system:String>
     <system:String x:Key="PianoRoll_Snap_drawn_and_moved_notes_to_the_selected_key_s_Tip">描画・移動したノートを選択キー/スケールにスナップ</system:String>
     <system:String x:Key="Plugin_Plugin_Title">プラグイン</system:String>
     <system:String x:Key="Preview_Auto">自動</system:String>

@@ -16,7 +16,15 @@
 
     <Border Background="{StaticResource CatppuccinCrust}"
             BorderBrush="{StaticResource CatppuccinCrust}" BorderThickness="0,1,0,0">
-        <Grid RowDefinitions="Auto,Auto,*,Auto" ColumnDefinitions="Auto,*">
+        <Grid Name="PianoRollRoot" ColumnDefinitions="Auto,*">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*" MinHeight="40"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="0" MinHeight="0"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
             <!-- control bar (spans the full width, above the ruler) -->
             <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
@@ -44,18 +52,21 @@
                             ToolTip.Tip="{DynamicResource PianoRoll_Quantize_note_starts_and_lengths_to_the_current__Tip}"/>
                     <Button Classes="compact" Content="{DynamicResource PianoRoll_Groove}" Command="{Binding ApplyGrooveCommand}"
                             ToolTip.Tip="{DynamicResource PianoRoll_Apply_the_projects_active_groove_to_note_timing_Tip}"/>
+                    <ToggleButton Classes="toggle compact" Content="{DynamicResource PianoRoll_Velocity}" IsChecked="{Binding ShowVelocityEditor}"
+                                  ToolTip.Tip="{DynamicResource PianoRoll_Show_the_per_note_velocity_editor_Tip}"/>
                     <ToggleButton Classes="toggle compact" Content="{DynamicResource PianoRoll_MPE}" IsChecked="{Binding ShowExpressionLane}"
                                   ToolTip.Tip="{DynamicResource PianoRoll_Show_the_per_beat_CC74_pressure_expression_lane_Tip}"/>
                     <Border Width="1" Margin="3,1" Background="{StaticResource CatppuccinSurface0}"/>
+                    <CheckBox Content="{DynamicResource PianoRoll_Scale_highlight}" IsChecked="{Binding ScaleHighlightEnabled}"
+                              FontSize="11" VerticalAlignment="Center"
+                              ToolTip.Tip="{DynamicResource PianoRoll_Highlight_rows_in_the_selected_key_scale_Tip}"/>
                     <CheckBox Content="{DynamicResource PianoRoll_Scale_snap}" IsChecked="{Binding ScaleSnapEnabled}"
                               FontSize="11" VerticalAlignment="Center"
                               ToolTip.Tip="{DynamicResource PianoRoll_Snap_drawn_and_moved_notes_to_the_selected_key_s_Tip}"/>
                     <ComboBox Classes="compact" ItemsSource="{Binding ScaleRootNotes}" SelectedIndex="{Binding ScaleRootIndex}"
-                              Width="52" VerticalAlignment="Center"
-                              IsEnabled="{Binding ScaleSnapEnabled}"/>
+                              Width="52" VerticalAlignment="Center"/>
                     <ComboBox Classes="compact" ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}"
-                              Width="120" VerticalAlignment="Center"
-                              IsEnabled="{Binding ScaleSnapEnabled}"/>
+                              Width="120" VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
@@ -122,7 +133,10 @@
                     <controls:PianoRollBackgroundControl IsHitTestVisible="False"
                                                          PixelsPerBeat="{Binding Metrics.PixelsPerBeat}"
                                                          TotalBeats="{Binding Metrics.TotalBeats}"
-                                                         BeatsPerBar="{Binding Metrics.BeatsPerBar}"/>
+                                                         BeatsPerBar="{Binding Metrics.BeatsPerBar}"
+                                                         ScaleHighlightEnabled="{Binding ScaleHighlightEnabled}"
+                                                         ScaleRootPitchClass="{Binding ScaleRootIndex}"
+                                                         SelectedScale="{Binding SelectedScale}"/>
                     <Border Name="Band" IsVisible="False" IsHitTestVisible="False"
                             HorizontalAlignment="Left" VerticalAlignment="Top"
                             Background="{StaticResource CatppuccinMauve}" Opacity="0.2"
@@ -158,13 +172,35 @@
                 </Panel>
             </ScrollViewer>
 
-            <Border Grid.Row="3" Grid.Column="0" IsVisible="{Binding ShowExpressionLane}"
+            <GridSplitter Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="VelocitySplitter"
+                          ResizeDirection="Rows" HorizontalAlignment="Stretch" Height="4"
+                          IsVisible="{Binding ShowVelocityEditor}"
+                          Background="{StaticResource CatppuccinCrust}"/>
+
+            <Border Grid.Row="4" Grid.Column="0" Name="VelocityGutter"
+                    Width="{StaticResource KeyGutterWidth}"
+                    IsVisible="{Binding ShowVelocityEditor}"
+                    Background="{StaticResource CatppuccinMantle}" BorderBrush="{StaticResource CatppuccinCrust}"
+                    BorderThickness="0,0,1,0" Padding="4">
+                <TextBlock Text="{DynamicResource PianoRoll_Velocity_editor}" FontSize="9"
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+            </Border>
+            <ScrollViewer Grid.Row="4" Grid.Column="1" Name="PrVelocityScroll"
+                          IsVisible="{Binding ShowVelocityEditor}"
+                          HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                          Background="{StaticResource CatppuccinMantle}">
+                <controls:VelocityLaneControl Width="{Binding Metrics.TotalWidth}"
+                                              MinHeight="48"/>
+            </ScrollViewer>
+
+            <Border Grid.Row="5" Grid.Column="0" IsVisible="{Binding ShowExpressionLane}"
                     Background="{StaticResource CatppuccinMantle}" BorderBrush="{StaticResource CatppuccinCrust}"
                     BorderThickness="0,1,1,0" Padding="4">
                 <TextBlock Text="{DynamicResource PianoRoll_MPE_74}" FontSize="9" VerticalAlignment="Center"
                            Foreground="{StaticResource CatppuccinOverlay1}"/>
             </Border>
-            <ScrollViewer Grid.Row="3" Grid.Column="1" IsVisible="{Binding ShowExpressionLane}"
+            <ScrollViewer Grid.Row="5" Grid.Column="1" IsVisible="{Binding ShowExpressionLane}"
                           HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
                           Height="52" Background="{StaticResource CatppuccinMantle}">
                 <ItemsControl ItemsSource="{Binding ExpressionPoints}">

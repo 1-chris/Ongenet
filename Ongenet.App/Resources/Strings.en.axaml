@@ -531,11 +531,16 @@
     <system:String x:Key="PianoRoll_Multi_select_tool_click_drag_a_rubber_band_over__Tip">Multi-select tool: click-drag a rubber band over notes</system:String>
     <system:String x:Key="PianoRoll_Quantize">Quantize</system:String>
     <system:String x:Key="PianoRoll_Quantize_note_starts_and_lengths_to_the_current__Tip">Quantize note starts and lengths to the current grid</system:String>
+    <system:String x:Key="PianoRoll_Scale_highlight">Scale highlight</system:String>
     <system:String x:Key="PianoRoll_Scale_snap">Scale snap</system:String>
+    <system:String x:Key="PianoRoll_Highlight_rows_in_the_selected_key_scale_Tip">Highlight piano-roll rows that belong to the selected key/scale</system:String>
     <system:String x:Key="PianoRoll_Select">Select</system:String>
     <system:String x:Key="PianoRoll_Show_the_per_beat_CC74_pressure_expression_lane_Tip">Show the per-beat CC74/pressure expression lane</system:String>
+    <system:String x:Key="PianoRoll_Show_the_per_note_velocity_editor_Tip">Show the resizable per-note velocity editor</system:String>
     <system:String x:Key="PianoRoll_Slice">Slice</system:String>
     <system:String x:Key="PianoRoll_Slice_tool_click_drag_a_line_to_cut_through_one__Tip">Slice tool: click-drag a line to cut through one or more notes</system:String>
+    <system:String x:Key="PianoRoll_Velocity">Velocity</system:String>
+    <system:String x:Key="PianoRoll_Velocity_editor">Velocity editor</system:String>
     <system:String x:Key="PianoRoll_Snap_drawn_and_moved_notes_to_the_selected_key_s_Tip">Snap drawn and moved notes to the selected key/scale</system:String>
     <system:String x:Key="Plugin_Plugin_Title">Plugin</system:String>
     <system:String x:Key="Preview_Auto">Auto</system:String>
