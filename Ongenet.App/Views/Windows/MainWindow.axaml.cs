@@ -48,8 +48,9 @@ namespace Ongenet.App.Views.Windows
             AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, OnGlobalKeyUp, RoutingStrategies.Tunnel);
             // Clicking a tab on a collapsed panel expands it (and selects that tab). Tunnel + handledEventsToo
-            // so we run before the TabItem consumes the press.
+            // so we run before the TabItem/ListBoxItem consumes the press.
             BottomTabs.AddHandler(PointerPressedEvent, OnBottomTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+            LeftTabStrip.AddHandler(PointerPressedEvent, OnLeftTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
             RightTabStrip.AddHandler(PointerPressedEvent, OnRightTabsPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
             // Start with the Files/Instruments sidebar collapsed to its sideways tab strip.
             SetRightCollapsed(true);
@@ -222,13 +223,17 @@ namespace Ongenet.App.Views.Windows
             if (_bottomCollapsed) SetBottomCollapsed(false);
         }
 
-        private void ToggleLeftPanel(object? sender, RoutedEventArgs e)
+        private void ToggleLeftPanel(object? sender, RoutedEventArgs e) => SetLeftCollapsed(!_leftCollapsed);
+
+        private void SetLeftCollapsed(bool collapsed)
         {
-            _leftCollapsed = !_leftCollapsed;
-            LeftContent.IsVisible = !_leftCollapsed;
-            LeftSplitter.IsVisible = !_leftCollapsed;
-            LeftSplitterCol.Width = new GridLength(_leftCollapsed ? 0 : 4);
-            if (_leftCollapsed)
+            if (collapsed == _leftCollapsed) return;
+            _leftCollapsed = collapsed;
+            // Hide the content panel so the Auto-sized column shrinks to just the sideways tab strip.
+            LeftContent.IsVisible = !collapsed;
+            LeftSplitter.IsVisible = !collapsed;
+            LeftSplitterCol.Width = new GridLength(collapsed ? 0 : 4);
+            if (collapsed)
             {
                 _leftSaved = LeftCol.Width;
                 LeftCol.Width = GridLength.Auto;
@@ -239,6 +244,12 @@ namespace Ongenet.App.Views.Windows
                 LeftCol.Width = _leftSaved;
                 LeftToggle.Content = "◂";
             }
+        }
+
+        // Clicking a sideways tab on the collapsed left strip expands the panel (the click also selects it).
+        private void OnLeftTabsPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (_leftCollapsed) SetLeftCollapsed(false);
         }
 
         private void ToggleRightPanel(object? sender, RoutedEventArgs e) => SetRightCollapsed(!_rightCollapsed);

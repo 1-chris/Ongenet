@@ -9,6 +9,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio.Midi;
+using Ongenet.App.Controls;
 using Ongenet.App.Services;
 using Ongenet.App.ViewModels;
 using Ongenet.App.ViewModels.PianoRoll;
@@ -19,7 +20,7 @@ namespace Ongenet.App.Views.Panels
     /// <summary>
     /// Piano-roll editor. Mirrors the timeline's scroll-sync (grid is master; ruler follows X,
     /// key gutter follows Y); handles note add/move/resize/delete, clickable keys, middle-mouse
-    /// zoom, and (in Select mode) rubber-band multi-select + Delete.
+    /// and Shift+scroll zoom, and (in Select mode) rubber-band multi-select + Delete.
     /// </summary>
     public partial class PianoRollView : UserControl
     {
@@ -73,6 +74,9 @@ namespace Ongenet.App.Views.Panels
             PrGridScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnGridScrollChanged);
             PrKeysScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnKeysScrollChanged);
             PrRulerScroll.AddHandler(ScrollViewer.ScrollChangedEvent, OnRulerScrollChanged);
+            PrGridScroll.AddHandler(PointerWheelChangedEvent, OnGridPointerWheel, RoutingStrategies.Tunnel);
+            PrRulerScroll.AddHandler(PointerWheelChangedEvent, OnRulerPointerWheel, RoutingStrategies.Tunnel);
+            PrKeysScroll.AddHandler(PointerWheelChangedEvent, OnKeysPointerWheel, RoutingStrategies.Tunnel);
             PianoGrid.PointerPressed += OnGridPressed;
             PianoGrid.PointerMoved += OnGridMoved;
             PianoGrid.PointerReleased += OnGridReleased;
@@ -168,6 +172,37 @@ namespace Ongenet.App.Views.Panels
             _syncingScroll = true;
             PrGridScroll.Offset = new Vector(x, PrGridScroll.Offset.Y);
             _syncingScroll = false;
+        }
+
+        private void OnGridPointerWheel(object? sender, PointerWheelEventArgs e) =>
+            ApplyShiftScrollZoom(e, e.GetPosition(PrGridScroll));
+
+        private void OnRulerPointerWheel(object? sender, PointerWheelEventArgs e) =>
+            ApplyShiftScrollZoom(e, e.GetPosition(PrRulerScroll));
+
+        private void OnKeysPointerWheel(object? sender, PointerWheelEventArgs e) =>
+            ApplyShiftScrollZoom(e, e.GetPosition(PrKeysScroll));
+
+        private void ApplyShiftScrollZoom(PointerWheelEventArgs e, Point viewportPos)
+        {
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)) return;
+            if (DataContext is not PianoRollViewModel vm) return;
+
+            var scrollX = PrGridScroll.Offset.X;
+            var anchorBeat = vm.Metrics.PixelsPerBeat > 0
+                ? (viewportPos.X + scrollX) / vm.Metrics.PixelsPerBeat
+                : 0;
+            var (zoomDelta, panDelta) = ShiftScrollZoom.ResolveWheelDeltas(e.Delta);
+            if (Math.Abs(zoomDelta) < 1e-6 && Math.Abs(panDelta) < 1e-6) return;
+
+            ShiftScrollZoom.ApplyBeatTimeline(
+                anchorBeat, viewportPos, vm.Metrics.PixelsPerBeat,
+                zoomDelta, panDelta, scrollX,
+                out var newPpb, out var newScrollX);
+
+            vm.Metrics.PixelsPerBeat = newPpb;
+            PrGridScroll.Offset = new Vector(newScrollX, PrGridScroll.Offset.Y);
+            e.Handled = true;
         }
 
         // --- Clickable keys (preview only, no note added) ---

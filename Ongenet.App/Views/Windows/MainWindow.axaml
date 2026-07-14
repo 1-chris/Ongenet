@@ -205,29 +205,20 @@
                         <RowDefinition Height="432"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Left: track settings (collapsible) -->
-                    <Grid Grid.Column="0" Grid.Row="0" RowDefinitions="Auto,*" Background="{StaticResource CatppuccinMantle}">
-                        <Border Grid.Row="0" Height="26" Background="{StaticResource CatppuccinSurface0}">
-                            <Button Name="LeftToggle" Content="◂" Click="ToggleLeftPanel"
-                                    HorizontalAlignment="Right" VerticalAlignment="Center"
-                                    Background="Transparent" Padding="8,0" FontSize="11"
-                                    Foreground="{StaticResource CatppuccinSubtext0}"
-                                    ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
-                        </Border>
+                    <!-- Left: track settings with sideways tabs (collapsible to just the tabs).
+                         [selected panel] | [collapse toggle + sideways tab strip toward center]. -->
+                    <Grid Grid.Column="0" Grid.Row="0" ColumnDefinitions="*,Auto" Background="{StaticResource CatppuccinMantle}">
                         <!-- Track-oriented project sidebar: controls, clip catalog, and pattern/channel rack. -->
-                        <Panel Grid.Row="1" Name="LeftContent" MinWidth="180">
-                            <TabControl Background="{StaticResource CatppuccinMantle}"
-                                        IsVisible="{Binding !IsVideoEditingMode}">
-                                <TabItem Header="{DynamicResource Main_Track_Controls}">
-                                    <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
-                                </TabItem>
-                                <TabItem Header="{DynamicResource Main_Project_Clips}">
-                                    <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
-                                </TabItem>
-                                <TabItem Header="{DynamicResource Main_Channel_Rack}">
-                                    <views:ChannelRackView DataContext="{Binding BottomPanel.ChannelRack}"/>
-                                </TabItem>
-                            </TabControl>
+                        <Panel Grid.Column="0" Name="LeftContent" MinWidth="180"
+                               Background="{StaticResource CatppuccinMantle}">
+                            <Grid IsVisible="{Binding !IsVideoEditingMode}">
+                                <views:TrackInspectorView IsVisible="{Binding #TabTrackControls.IsSelected}"
+                                                          DataContext="{Binding TrackInspector}"/>
+                                <views:ProjectClipsView IsVisible="{Binding #TabProjectClips.IsSelected}"
+                                                        DataContext="{Binding ProjectClips}"/>
+                                <views:ChannelRackView IsVisible="{Binding #TabChannelRack.IsSelected}"
+                                                       DataContext="{Binding BottomPanel.ChannelRack}"/>
+                            </Grid>
                             <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsVideoEditingMode}">
                                 <Border Grid.Row="0" Padding="8,4" Background="{StaticResource CatppuccinSurface0}">
                                     <TextBlock Text="{DynamicResource VideoResources_Title}" FontSize="11" FontWeight="SemiBold"
@@ -236,6 +227,44 @@
                                 <views:VideoResourcesView Grid.Row="1" DataContext="{Binding VideoResources}"/>
                             </Grid>
                         </Panel>
+
+                        <DockPanel Grid.Column="1" Background="{StaticResource CatppuccinSurface0}">
+                            <Border DockPanel.Dock="Top" Height="26">
+                                <Button Name="LeftToggle" Content="◂" Click="ToggleLeftPanel"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Width="24" Padding="0" FontSize="11"
+                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                        Background="Transparent"
+                                        Foreground="{StaticResource CatppuccinSubtext0}"
+                                        ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
+                            </Border>
+                            <ListBox Name="LeftTabStrip" SelectedIndex="0" FontSize="12"
+                                     Background="Transparent" BorderThickness="0" Padding="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     IsVisible="{Binding !IsVideoEditingMode}">
+                                <ListBox.Styles>
+                                    <Style Selector="ListBoxItem">
+                                        <Setter Property="Padding" Value="3,10"/>
+                                        <Setter Property="MinHeight" Value="0"/>
+                                        <Setter Property="CornerRadius" Value="0"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                    </Style>
+                                    <Style Selector="ListBoxItem:selected">
+                                        <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+                                    </Style>
+                                </ListBox.Styles>
+                                <ListBoxItem Name="TabTrackControls"><controls:VerticalTabLabel Text="{DynamicResource Main_Track_Controls}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabProjectClips"><controls:VerticalTabLabel Text="{DynamicResource Main_Project_Clips}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabChannelRack"><controls:VerticalTabLabel Text="{DynamicResource Main_Channel_Rack}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                            </ListBox>
+                        </DockPanel>
                     </Grid>
                     <GridSplitter Grid.Column="1" Grid.Row="0" Name="LeftSplitter" ResizeDirection="Columns"
                                   Background="{StaticResource CatppuccinCrust}"/>
