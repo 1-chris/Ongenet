@@ -99,6 +99,7 @@ namespace Ongenet.App
             services.AddSingleton<Services.ILibraryScanService, Services.LibraryScanService>();
             services.AddSingleton<Services.IPresetLibrary, Services.PresetLibrary>();
             services.AddSingleton<Services.ILibraryOrganizationService, Services.LibraryOrganizationService>();
+            services.AddSingleton<Services.IFieldDefinitionLibrary, Services.FieldDefinitionLibrary>();
 
             // Parameter automation: creates lanes from the "Create automation track" right-click.
             services.AddSingleton<Services.IAutomationService, Services.AutomationService>();
@@ -165,6 +166,7 @@ namespace Ongenet.App
             services.AddSingleton<ViewModels.Library.InstrumentPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.EffectChainPresetLibraryViewModel>();
+            services.AddSingleton<ViewModels.Library.ModulatorPresetLibraryViewModel>();
             services.AddSingleton<ViewModels.Library.ProjectsLibraryViewModel>();
             services.AddSingleton<ViewModels.ProjectClipsViewModel>();
             services.AddSingleton<ViewModels.Panels.MixerViewModel>();
@@ -250,6 +252,9 @@ namespace Ongenet.App
                 ServiceProvider.GetRequiredService<Core.Audio.Field.IFieldNodeRegistry>(),
                 ServiceProvider.GetRequiredService<Core.Audio.Instruments.IInstrumentRegistry>(),
                 ServiceProvider.GetRequiredService<Core.Audio.Effects.IEffectRegistry>());
+
+            // Scan user-authored Field instruments/effects into the registries (after fallbacks are installed).
+            ServiceProvider.GetRequiredService<Services.IFieldDefinitionLibrary>().Rescan();
 
             // Replace the blank startup project with a built-in song so a fresh launch opens on
             // something that plays. Must run after FieldBootstrap (some songs use Field patches)

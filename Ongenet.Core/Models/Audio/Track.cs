@@ -83,7 +83,11 @@ public sealed class Track
     public InstrumentSlot[] ActiveInstruments => _activeInstruments;
 
     /// <summary>Publishes the current <see cref="Instruments"/> list to the audio thread.</summary>
-    public void CommitInstruments() => _activeInstruments = Instruments.ToArray();
+    public void CommitInstruments()
+    {
+        RackMacroApplier.Apply(this);
+        _activeInstruments = Instruments.ToArray();
+    }
 
     /// <summary>Instrument/drum rack layout (macros, pad grid).</summary>
     public InstrumentRackSettings Rack { get; set; } = new();
@@ -140,6 +144,17 @@ public sealed class Track
 
     /// <summary>Publishes the current <see cref="Modulators"/> list to the audio thread.</summary>
     public void CommitModulators() => _activeModulators = Modulators.ToArray();
+
+    /// <summary>Registry-backed modulator slots. Edit, then call <see cref="CommitModulatorSlots"/>.</summary>
+    public List<ModulatorSlot> ModulatorSlots { get; } = new();
+
+    private volatile ModulatorSlot[] _activeModulatorSlots = Array.Empty<ModulatorSlot>();
+
+    /// <summary>Lock-free snapshot of modulator slots read by the audio engine.</summary>
+    public ModulatorSlot[] ActiveModulatorSlots => _activeModulatorSlots;
+
+    /// <summary>Publishes the current <see cref="ModulatorSlots"/> list to the audio thread.</summary>
+    public void CommitModulatorSlots() => _activeModulatorSlots = ModulatorSlots.ToArray();
 
     /// <summary>Transient UI state: whether this track's automation lanes are collapsed in the timeline.</summary>
     public bool AutomationCollapsed { get; set; }

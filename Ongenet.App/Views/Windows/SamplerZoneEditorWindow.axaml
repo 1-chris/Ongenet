@@ -183,6 +183,13 @@
                                                                FontSize="12" ShowButtonSpinner="True"/>
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="RR grp" Width="56" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <NumericUpDown Value="{Binding RoundRobinKey, Mode=TwoWay}"
+                                                               Minimum="-999999" Maximum="999999" Width="92" MinHeight="32"
+                                                               FontSize="12" ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
                                                 <TextBlock Text="Gain" Width="56" VerticalAlignment="Center" FontSize="12"
                                                            Foreground="{StaticResource CatppuccinOverlay1}"/>
                                                 <NumericUpDown Value="{Binding Gain, Mode=TwoWay}"
@@ -204,13 +211,21 @@
                                                                IsEnabled="{Binding HasFilter}" ShowButtonSpinner="True"/>
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
-                                                <TextBlock Text="Q" Width="24" VerticalAlignment="Center" FontSize="12"
+                                                <TextBlock Text="Res" Width="24" VerticalAlignment="Center" FontSize="12"
                                                            Foreground="{StaticResource CatppuccinOverlay1}"/>
                                                 <NumericUpDown Value="{Binding FilterQ, Mode=TwoWay}"
                                                                Minimum="0.05" Maximum="20" Increment="0.05"
                                                                Width="92" MinHeight="32" FontSize="12"
                                                                FormatString="0.##" IsEnabled="{Binding HasFilter}"
                                                                ShowButtonSpinner="True"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
+                                                <TextBlock Text="Mode" Width="40" VerticalAlignment="Center" FontSize="12"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <ComboBox ItemsSource="{Binding FilterModeOptions}"
+                                                          SelectedIndex="{Binding FilterModeIndex, Mode=TwoWay}"
+                                                          Width="72" MinHeight="32" FontSize="12"
+                                                          IsEnabled="{Binding HasFilter}"/>
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,8">
                                                 <TextBlock Text="Pan" Width="36" VerticalAlignment="Center" FontSize="12"

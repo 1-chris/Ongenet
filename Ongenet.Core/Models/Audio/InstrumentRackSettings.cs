@@ -43,7 +43,7 @@ public sealed class InstrumentRackSettings
             {
                 PadIndex = i,
                 MidiNote = 36 + i,
-                InstrumentSlotIndex = Math.Min(i, 0),
+                InstrumentSlotIndex = i,
                 Label = $"Pad {i + 1}"
             });
         }

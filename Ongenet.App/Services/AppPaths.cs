@@ -27,6 +27,22 @@ public static class AppPaths
         return dir;
     }
 
+    /// <summary>User Field instrument definitions (<c>&lt;config&gt;/Instruments/Field</c>).</summary>
+    public static string UserFieldInstrumentsDirectory()
+    {
+        var dir = Path.Combine(ConfigDirectory(), "Instruments", "Field");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    /// <summary>User Field effect definitions (<c>&lt;config&gt;/Effects/Field</c>).</summary>
+    public static string UserFieldEffectsDirectory()
+    {
+        var dir = Path.Combine(ConfigDirectory(), "Effects", "Field");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
     /// <summary>Factory (built-in) presets directory (<c>&lt;config&gt;/Presets/Factory</c>), materialized once.</summary>
     public static string FactoryPresetsDirectory()
     {

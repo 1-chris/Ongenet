@@ -74,8 +74,7 @@ public sealed class BitcrusherNode : FieldNode
     public double Bits { get; set; } = 8;
     public double Downsample { get; set; } = 1;
 
-    private float[] _hold = Array.Empty<float>();
-    private int[] _counter = Array.Empty<int>();
+    private BitcrusherDsp[] _dsp = Array.Empty<BitcrusherDsp>();
 
     public BitcrusherNode()
     {
@@ -89,42 +88,28 @@ public sealed class BitcrusherNode : FieldNode
     public override void Prepare(AudioFormat format, int maxBlock, int voiceCount)
     {
         base.Prepare(format, maxBlock, voiceCount);
-        _hold = new float[VoiceCount];
-        _counter = new int[VoiceCount];
+        _dsp = new BitcrusherDsp[VoiceCount];
+        for (var i = 0; i < VoiceCount; i++) _dsp[i] = new BitcrusherDsp();
     }
 
     public override void ResetVoice(int voice)
     {
-        if (voice >= _hold.Length) return;
-        _hold[voice] = 0;
-        _counter[voice] = 0;
+        if (voice >= _dsp.Length) return;
+        _dsp[voice].Reset();
     }
 
     public override void ProcessBlock(FieldRenderContext ctx)
     {
-        var v = ctx.Voice;
+        var d = _dsp[ctx.Voice];
         var input = ctx.Input(0);
         var outBuf = ctx.Output(0);
-        var hold = _hold[v];
-        var counter = _counter[v];
         for (var i = 0; i < ctx.Frames; i++)
         {
-            var bits = ModValue(ctx, 0, Bits, i);
-            var ds = Math.Max(1, (int)ModValue(ctx, 1, Downsample, i));
-            if (counter <= 0)
-            {
-                var levels = Math.Pow(2.0, bits);
-                var q = levels <= 1 ? 1.0 : (levels - 1);
-                hold = (float)(Math.Round(input[i] * 0.5 * q) / q * 2.0);
-                counter = ds;
-            }
-
-            counter--;
-            outBuf[i] = hold;
+            d.Bits = ModValue(ctx, 0, Bits, i);
+            d.Downsample = ModValue(ctx, 1, Downsample, i);
+            d.Mix = 1;
+            outBuf[i] = d.Process(input[i]);
         }
-
-        _hold[v] = hold;
-        _counter[v] = counter;
     }
 }
 

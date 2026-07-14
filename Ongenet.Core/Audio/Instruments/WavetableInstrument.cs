@@ -48,6 +48,9 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
     // --- Output ---
     public double Level { get; set; } = 0.8;
 
+    /// <summary>When true, loaded samples are resynthesized via additive partials from an FFT analysis.</summary>
+    public bool ResynthFromSample { get; set; }
+
     private const int MaxUnison = 7;
 
     private volatile Wavetable _table;
@@ -56,6 +59,8 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
     private AudioSampleBuffer? _loadedSample;
     private WavetablePreset _preset = WavetablePreset.Basic;
     private int _seed;
+    private float[] _resynthMagnitudes = Array.Empty<float>();
+    private int _resynthBinCount;
 
     public WavetableInstrument() : base(16)
     {
@@ -86,13 +91,27 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
     {
         _loadedSample = sample;
         SampleName = name;
-        SetTable(WavetableGenerator.FromSample(sample));
+        if (ResynthFromSample)
+        {
+            _resynthMagnitudes = BuildResynthMagnitudes(sample);
+            _resynthBinCount = _resynthMagnitudes.Length;
+            _table = WavetableGenerator.BuildPreset(WavetablePreset.Basic);
+            System.Threading.Interlocked.Increment(ref _revision);
+        }
+        else
+        {
+            _resynthMagnitudes = Array.Empty<float>();
+            _resynthBinCount = 0;
+            SetTable(WavetableGenerator.FromSample(sample));
+        }
     }
 
     /// <summary>Regenerates the table from a built-in procedural preset (the inspector's preset buttons).</summary>
     public void LoadPreset(WavetablePreset preset, int seed = 0)
     {
         _loadedSample = null;
+        _resynthMagnitudes = Array.Empty<float>();
+        _resynthBinCount = 0;
         _preset = preset;
         _seed = preset == WavetablePreset.Random ? (seed == 0 ? Environment.TickCount : seed) : 0;
         SampleName = preset.ToString();
@@ -103,6 +122,33 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
     {
         _table = table;
         System.Threading.Interlocked.Increment(ref _revision);
+    }
+
+    private static float[] BuildResynthMagnitudes(AudioSampleBuffer sample)
+    {
+        const int fftSize = 2048;
+        var mono = SampleMixdown.ToMono(sample, guard: false);
+        var re = new double[fftSize];
+        var im = new double[fftSize];
+        var count = Math.Min(fftSize, mono.Length);
+        for (var i = 0; i < count; i++) re[i] = mono[i];
+        Fft.Forward(re, im);
+        var bins = fftSize / 2;
+        var mags = new float[bins];
+        var peak = 0f;
+        for (var k = 0; k < bins; k++)
+        {
+            mags[k] = (float)Math.Sqrt(re[k] * re[k] + im[k] * im[k]);
+            if (mags[k] > peak) peak = mags[k];
+        }
+
+        if (peak > 1e-6f)
+        {
+            var gain = 1f / peak;
+            for (var k = 0; k < bins; k++) mags[k] *= gain;
+        }
+
+        return mags;
     }
 
     private IReadOnlyList<Parameter>? _parameters;
@@ -129,6 +175,7 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
         new FloatParameter("LFO Rate", 0.01, 20.0, () => LfoRate, v => LfoRate = v, "0.00", "Hz", 2.0) { Group = "LFO" },
         new FloatParameter("LFO Depth", 0.0, 1.0, () => LfoDepth, v => LfoDepth = v, "0%", "", 1.0) { Group = "LFO" },
 
+        new BoolParameter("Resynth", () => ResynthFromSample, v => ResynthFromSample = v) { Group = "Oscillator" },
         new FloatParameter("Level", 0.0, 1.0, () => Level, v => Level = v, "0%", "", 1.0) { Group = "Output" }
     };
 
@@ -159,7 +206,8 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
             Position = Position, Warp = Warp, Shape = Shape, UnisonVoices = UnisonVoices, DetuneCents = DetuneCents, Spread = Spread,
             FilterType = FilterType, Cutoff = Cutoff, Resonance = Resonance,
             AttackSeconds = AttackSeconds, DecaySeconds = DecaySeconds, SustainLevel = SustainLevel, ReleaseSeconds = ReleaseSeconds,
-            LfoWaveIndex = LfoWaveIndex, LfoRate = LfoRate, LfoDepth = LfoDepth, Level = Level
+            LfoWaveIndex = LfoWaveIndex, LfoRate = LfoRate, LfoDepth = LfoDepth, Level = Level,
+            ResynthFromSample = ResynthFromSample
         };
         if (_loadedSample is not null) c.LoadSample(_loadedSample, SampleName ?? "");
         else c.LoadPreset(_preset, _seed);
@@ -174,6 +222,7 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
         writer.WriteBool(_loadedSample is not null);
         writer.WriteInt((int)_preset);
         writer.WriteInt(_seed);
+        writer.WriteBool(ResynthFromSample);
     }
 
     public void ReadProjectState(OngenReader reader)
@@ -181,6 +230,7 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
         var fromSample = reader.ReadBool();
         var preset = (WavetablePreset)reader.ReadInt();
         var seed = reader.ReadInt();
+        ResynthFromSample = reader.ChunkHasMore && reader.ReadBool();
         // If a sample was embedded, LoadSample has already (re)built the table — leave it. Otherwise rebuild
         // the procedural preset (with its saved seed for Random) so it sounds identical on reload.
         if (!fromSample)
@@ -188,6 +238,11 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
             _preset = preset;
             _seed = seed;
             SetTable(WavetableGenerator.BuildPreset(preset, seed: seed));
+        }
+        else if (ResynthFromSample && _loadedSample is not null)
+        {
+            _resynthMagnitudes = BuildResynthMagnitudes(_loadedSample);
+            _resynthBinCount = _resynthMagnitudes.Length;
         }
     }
 
@@ -223,6 +278,7 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
         private readonly WavetableInstrument _inst;
         private readonly AdsrEnvelope _env = new();
         private readonly OnePole _posSmooth = new();
+        private readonly AdditivePartialEngine _resynth = new();
         private readonly Random _rng = new();
         private readonly float[] _phase = new float[MaxUnison];
         private Biquad _filterL, _filterR;
@@ -251,6 +307,14 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
             _env.SustainLevel = _inst.SustainLevel;
             _env.ReleaseSeconds = _inst.ReleaseSeconds;
             _env.Gate();
+
+            if (_inst.ResynthFromSample && _inst._resynthBinCount > 0)
+            {
+                _resynth.SetSampleRate(_sampleRate);
+                _resynth.PartialCount = 16;
+                _resynth.ImportSpectrum(_inst._resynthMagnitudes, _inst._resynthBinCount);
+                _resynth.SetFundamental(_baseFreq);
+            }
         }
 
         public override void Release() => _env.Release();
@@ -260,6 +324,7 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
             var channels = Format.Channels < 1 ? 1 : Format.Channels;
             var frames = buffer.Length / channels;
             var table = _inst.Table; // snapshot (immutable)
+            var useResynth = _inst.ResynthFromSample && _inst._resynthBinCount > 0;
 
             var unison = Math.Clamp(_inst.UnisonVoices, 1, MaxUnison);
             var detune = (float)_inst.DetuneCents;
@@ -293,19 +358,28 @@ public sealed class WavetableInstrument : PolyphonicInstrument, ISampleHost, IPr
                 var pos = (float)_posSmooth.ProcessLP(blockPos);
 
                 float l = 0f, r = 0f;
-                for (var i = 0; i < unison; i++)
+                if (useResynth)
                 {
-                    var ph = _phase[i];
-                    if (warp == 1) ph = WarpPwm(ph, shape);
-                    else if (warp == 2) ph = WarpBend(ph, shape);
+                    _resynth.SetFundamental(_baseFreq);
+                    var s = _resynth.Process();
+                    l = r = s;
+                }
+                else
+                {
+                    for (var i = 0; i < unison; i++)
+                    {
+                        var ph = _phase[i];
+                        if (warp == 1) ph = WarpPwm(ph, shape);
+                        else if (warp == 2) ph = WarpBend(ph, shape);
 
-                    var s = table.Read(pos, ph, inc[i]); // band-limited read (alias-free)
-                    if (warp == 0) s = Fold(s * shapeDrive);
+                        var s = table.Read(pos, ph, inc[i]);
+                        if (warp == 0) s = Fold(s * shapeDrive);
 
-                    l += s * panL[i];
-                    r += s * panR[i];
-                    _phase[i] += inc[i];
-                    if (_phase[i] >= 1f) _phase[i] -= 1f;
+                        l += s * panL[i];
+                        r += s * panR[i];
+                        _phase[i] += inc[i];
+                        if (_phase[i] >= 1f) _phase[i] -= 1f;
+                    }
                 }
 
                 l = (float)_filterL.Process(coeffs, l * uGain);

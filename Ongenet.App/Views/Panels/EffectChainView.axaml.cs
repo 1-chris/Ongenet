@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.App.ViewModels.Effects;
@@ -158,6 +160,26 @@ namespace Ongenet.App.Views.Panels
         {
             if ((sender as Control)?.DataContext is not EffectViewModel vm || vm.Editor is null) return;
             PluginEditorHost.Toggle(vm.Editor, vm.Name, TopLevel.GetTopLevel(this) as Window);
+        }
+
+        private async void OnLoadImpulse(object? sender, RoutedEventArgs e)
+        {
+            if ((sender as Control)?.DataContext is not ConvolutionEffectViewModel vm) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top is null) return;
+
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Load impulse response",
+                AllowMultiple = false,
+                FileTypeFilter = new List<FilePickerFileType>
+                {
+                    new("Audio") { Patterns = new[] { "*.wav", "*.wave" } }
+                }
+            });
+
+            var path = files.FirstOrDefault()?.TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path)) vm.LoadImpulseFromPath(path);
         }
 
         // Refresh the matching effect card's open/close button when its editor's state changes.

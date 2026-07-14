@@ -26,6 +26,9 @@ public sealed class MultibandCompressorEffect : IAudioEffect
     /// <summary>Extra top-end lift on the high band (dB) — the "inflated" trance sheen.</summary>
     public double HighBoostDb { get; set; } = 3.0;
 
+    /// <summary>Factory mastering macro preset index.</summary>
+    public int MasteringPresetIndex { get; set; }
+
     // Fixed crossover points (Hz): low/mid around the body split, mid/high around the presence split.
     private const double LowCrossHz = 200.0;
     private const double HighCrossHz = 2500.0;
@@ -47,6 +50,7 @@ public sealed class MultibandCompressorEffect : IAudioEffect
     private Biquad[] _lpState = Array.Empty<Biquad>();
     private Biquad[] _hpState = Array.Empty<Biquad>();
     private EnvelopeFollower[,] _env = new EnvelopeFollower[0, 0];
+    private int _lastPresetIndex = -1;
 
     public string Name => "Multiband (OTT)";
 
@@ -54,6 +58,9 @@ public sealed class MultibandCompressorEffect : IAudioEffect
 
     public IReadOnlyList<Parameter> Parameters => _parameters ??= new Parameter[]
     {
+        new ChoiceParameter("Preset",
+            Array.ConvertAll(MasteringPresetBank.MultibandPresets, p => p.Name),
+            () => MasteringPresetIndex, v => MasteringPresetIndex = v),
         new FloatParameter("Depth", 0.0, 1.0, () => Depth, v => Depth = v),
         new FloatParameter("High Boost", 0.0, 9.0, () => HighBoostDb, v => HighBoostDb = v, "0.#", "dB")
     };
@@ -91,11 +98,12 @@ public sealed class MultibandCompressorEffect : IAudioEffect
 
     public IAudioEffect Clone() => new MultibandCompressorEffect
     {
-        Enabled = Enabled, Depth = Depth, HighBoostDb = HighBoostDb
+        Enabled = Enabled, Depth = Depth, HighBoostDb = HighBoostDb, MasteringPresetIndex = MasteringPresetIndex
     };
 
     public void Process(Span<float> buffer)
     {
+        ApplyPresetIfChanged();
         var lpState = _lpState;
         var hpState = _hpState;
         var env = _env;
@@ -151,5 +159,14 @@ public sealed class MultibandCompressorEffect : IAudioEffect
             gainDb = Math.Min(MaxUpwardDb, (ThresholdDb - levelDb) * (1.0 - 1.0 / UpRatio));
 
         return (float)AudioMath.Db2Lin(gainDb);
+    }
+
+    private void ApplyPresetIfChanged()
+    {
+        if (MasteringPresetIndex == _lastPresetIndex) return;
+        _lastPresetIndex = MasteringPresetIndex;
+        var preset = MasteringPresetBank.GetMultiband(MasteringPresetIndex);
+        Depth = preset.Depth;
+        HighBoostDb = preset.HighBoostDb;
     }
 }

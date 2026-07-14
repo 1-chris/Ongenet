@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Ongenet.Core.Audio.Field.Nodes;
+using Ongenet.Core.Audio.Instruments;
 
 namespace Ongenet.Core.Audio.Field.Patches;
 
@@ -17,14 +18,15 @@ public static class FieldBuiltInPatches
     {
         "Oscillator", "3x Osc", "FM Synth", "Wavetable", "Padda", "Basic Sampler", "Kicka", "Granular", "Sampler (SFZ)",
         "Perca", "Prism Lead", "Reese Bass", "Nova Saw", "Crystal Pluck", "Aether Lead", "Solace Lead", "Acid Bass",
-        "Comet Riser", "Scale Lead", "Ambient Pad"
+        "Comet Riser", "Scale Lead", "Ambient Pad", "Polymer", "Organ", "Phase-4", "Drum Model", "Polysynth"
     };
 
     public static readonly IReadOnlyList<string> EffectPatchNames = new[]
     {
         "EQ", "Filter", "Compressor", "Limiter", "Gate", "Sidechain", "Chorus", "Phaser", "Flanger", "Tremolo",
         "Stuttero", "Delay", "Reverb", "Distortion", "Bitcrusher", "Vocoder", "Auto-Tune", "Stereo Width",
-        "Live Difference", "Utility", "3D Scope", "Ducked Delay"
+        "Live Difference", "Utility", "3D Scope", "Ducked Delay", "Saturator", "Rotary", "Sculpt", "Blur", "Ring Mod",
+        "Convolution", "Dynamics", "Delay+", "Spectrum", "Tuner", "Amp", "Ladder", "Pitch Shifter"
     };
 
     public static void BuildInstrument(int index, FieldGraph g, IFieldNodeRegistry reg)
@@ -52,6 +54,11 @@ public static class FieldBuiltInPatches
             case 17: CometRiser(g); break;
             case 18: ScaleLead(g); break;
             case 19: AmbientPad(g); break;
+            case 20: Polymer(g); break;
+            case 21: Organ(g); break;
+            case 22: Phase4(g); break;
+            case 23: DrumModel(g); break;
+            case 24: ModuleInstrument(g, reg, PolysynthInstrument.TypeId); break;
             default: Oscillator(g); break;
         }
     }
@@ -68,6 +75,11 @@ public static class FieldBuiltInPatches
             case "Tremolo": Tremolo(g); break;
             case "Compressor": StereoCompressor(g); break;
             case "Ducked Delay": DuckedDelay(g); break;
+            case "Saturator": StereoSaturator(g); break;
+            case "Rotary": StereoRotary(g); break;
+            case "Sculpt": StereoSculpt(g); break;
+            case "Blur": StereoBlur(g); break;
+            case "Ring Mod": StereoRingMod(g); break;
             default: ModuleEffect(g, reg, EffectIdFor(index)); break;
         }
     }
@@ -588,6 +600,90 @@ public static class FieldBuiltInPatches
         g.Connect(sampler.Id, "r", outN.Id, "r");
     }
 
+    /// <summary>Polymer-style subtractive voice: dual osc → filter (env + LFO matrix) → amp env → out.</summary>
+    private static void Polymer(FieldGraph g)
+    {
+        var note = Add(g, new NoteInNode { X = 40, Y = 220 });
+        var oscA = Add(g, new WaveOscNode { X = 220, Y = 80, WaveIndex = 2, Level = 0.65 });
+        var oscB = Add(g, new WaveOscNode { X = 220, Y = 220, WaveIndex = 2, Fine = 14, Level = 0.55 });
+        var mix = Add(g, new AddNode { X = 420, Y = 150 });
+        var filt = Add(g, new BiquadFilterNode { X = 600, Y = 150, Cutoff = 2400, Resonance = 1.2 });
+        var filtEnv = Add(g, new AdsrNode { X = 600, Y = 360, Attack = 0.002, Decay = 0.35, Sustain = 0.2, Release = 0.2 });
+        var filtScale = Add(g, new GainNode { X = 760, Y = 360, Amount = 0.12 });
+        var ampEnv = Add(g, new AdsrNode { X = 600, Y = 520, Attack = 0.004, Decay = 0.2, Sustain = 0.65, Release = 0.25 });
+        var lfo = Add(g, new LfoNode { X = 220, Y = 400, Rate = 0.35, Depth = 0.25, Unipolar = true });
+        var vca = Add(g, new GainNode { X = 820, Y = 150, Amount = 0.28 });
+        var outN = Add(g, new AudioOutNode { X = 1020, Y = 150 });
+
+        g.Connect(note.Id, "pitch", oscA.Id, "pitch");
+        g.Connect(note.Id, "pitch", oscB.Id, "pitch");
+        g.Connect(oscA.Id, "out", mix.Id, "a");
+        g.Connect(oscB.Id, "out", mix.Id, "b");
+        g.Connect(mix.Id, "out", filt.Id, "in");
+        g.Connect(note.Id, "gate", filtEnv.Id, "gate");
+        g.Connect(note.Id, "gate", ampEnv.Id, "gate");
+        g.Connect(filtEnv.Id, "out", filtScale.Id, "in");
+        g.Connect(filtScale.Id, "out", filt.Id, "mod:1");
+        g.Connect(lfo.Id, "out", filt.Id, "mod:2");
+        g.Connect(filt.Id, "out", vca.Id, "in");
+        g.Connect(ampEnv.Id, "out", vca.Id, "cv");
+        Stereo(g, vca, "out", outN);
+    }
+
+    private static void Organ(FieldGraph g)
+    {
+        var note = Add(g, new NoteInNode { X = 40, Y = 180 });
+        var organ = Add(g, new DrawbarOrganNode { X = 240, Y = 120, Fundamental = 0.9, Odd = 0.7, Even = 0.6 });
+        var adsr = Add(g, new AdsrNode { X = 240, Y = 340, Attack = 0.01, Sustain = 0.85, Release = 0.3 });
+        var vca = Add(g, new GainNode { X = 460, Y = 180, Amount = 0.28 });
+        var outN = Add(g, new AudioOutNode { X = 680, Y = 180 });
+        g.Connect(note.Id, "pitch", organ.Id, "pitch");
+        g.Connect(organ.Id, "out", vca.Id, "in");
+        g.Connect(note.Id, "gate", adsr.Id, "gate");
+        g.Connect(adsr.Id, "out", vca.Id, "cv");
+        Stereo(g, vca, "out", outN);
+    }
+
+    private static void Phase4(FieldGraph g)
+    {
+        var note = Add(g, new NoteInNode { X = 40, Y = 220 });
+        var o1 = Add(g, new PhaseDistortionNode { X = 220, Y = 60, Distort = 0.35 });
+        var o2 = Add(g, new PhaseDistortionNode { X = 220, Y = 180, Distort = 0.55, Frequency = 440 });
+        var o3 = Add(g, new PhaseDistortionNode { X = 220, Y = 300, Distort = 0.45 });
+        var o4 = Add(g, new PhaseDistortionNode { X = 220, Y = 420, Distort = 0.65 });
+        var mixA = Add(g, new AddNode { X = 440, Y = 120 });
+        var mixB = Add(g, new AddNode { X = 580, Y = 240 });
+        var adsr = Add(g, new AdsrNode { X = 580, Y = 420, Attack = 0.004, Decay = 0.2, Sustain = 0.6, Release = 0.25 });
+        var vca = Add(g, new GainNode { X = 760, Y = 240, Amount = 0.24 });
+        var outN = Add(g, new AudioOutNode { X = 960, Y = 240 });
+        foreach (var o in new[] { o1, o2, o3, o4 }) g.Connect(note.Id, "pitch", o.Id, "pitch");
+        g.Connect(o1.Id, "out", mixA.Id, "a");
+        g.Connect(o2.Id, "out", mixA.Id, "b");
+        g.Connect(mixA.Id, "out", mixB.Id, "a");
+        g.Connect(o3.Id, "out", mixB.Id, "b");
+        var mixC = Add(g, new AddNode { X = 700, Y = 320 });
+        g.Connect(mixB.Id, "out", mixC.Id, "a");
+        g.Connect(o4.Id, "out", mixC.Id, "b");
+        g.Connect(mixC.Id, "out", vca.Id, "in");
+        g.Connect(note.Id, "gate", adsr.Id, "gate");
+        g.Connect(adsr.Id, "out", vca.Id, "cv");
+        Stereo(g, vca, "out", outN);
+    }
+
+    private static void DrumModel(FieldGraph g)
+    {
+        var note = Add(g, new NoteInNode { X = 40, Y = 200 });
+        var pitchEnv = Add(g, new DrumPitchEnvNode { X = 220, Y = 80, Start = 180, Sweep = -36, Decay = 0.22 });
+        var trigger = Add(g, new DrumTriggerNode { X = 420, Y = 160, Pitch = 80, Decay = 0.35, Noise = 0.3 });
+        var shaper = Add(g, new SoftClipNode { X = 620, Y = 160, Drive = 1.4 });
+        var outN = Add(g, new AudioOutNode { X = 820, Y = 160 });
+        g.Connect(note.Id, "gate", trigger.Id, "gate");
+        g.Connect(note.Id, "gate", pitchEnv.Id, "gate");
+        g.Connect(pitchEnv.Id, "out", trigger.Id, "mod:0");
+        g.Connect(trigger.Id, "out", shaper.Id, "in");
+        Stereo(g, shaper, "out", outN);
+    }
+
     // ---- Effect patches (primitive decompositions) ----
 
     private static void StereoFilter(FieldGraph g)
@@ -648,6 +744,66 @@ public static class FieldBuiltInPatches
         g.Connect(inN.Id, "r", cr.Id, "in");
         g.Connect(cl.Id, "out", outN.Id, "l");
         g.Connect(cr.Id, "out", outN.Id, "r");
+    }
+
+    private static void StereoSaturator(FieldGraph g)
+    {
+        var inN = Add(g, new AudioInNode { X = 60, Y = 160 });
+        var dl = Add(g, new WaveShaperNode { X = 300, Y = 80, Drive = 2.5 });
+        var dr = Add(g, new WaveShaperNode { X = 300, Y = 260, Drive = 2.5 });
+        var outN = Add(g, new AudioOutNode { X = 560, Y = 160 });
+        g.Connect(inN.Id, "l", dl.Id, "in");
+        g.Connect(inN.Id, "r", dr.Id, "in");
+        g.Connect(dl.Id, "out", outN.Id, "l");
+        g.Connect(dr.Id, "out", outN.Id, "r");
+    }
+
+    private static void StereoRotary(FieldGraph g)
+    {
+        var inN = Add(g, new AudioInNode { X = 60, Y = 160 });
+        var dl = Add(g, new RotaryNode { X = 300, Y = 80, Speed = 0.6, Mix = 1.0 });
+        var dr = Add(g, new RotaryNode { X = 300, Y = 260, Speed = 0.6, Mix = 1.0 });
+        var outN = Add(g, new AudioOutNode { X = 560, Y = 160 });
+        g.Connect(inN.Id, "l", dl.Id, "in");
+        g.Connect(inN.Id, "r", dr.Id, "in");
+        g.Connect(dl.Id, "out", outN.Id, "l");
+        g.Connect(dr.Id, "out", outN.Id, "r");
+    }
+
+    private static void StereoSculpt(FieldGraph g)
+    {
+        var inN = Add(g, new AudioInNode { X = 60, Y = 160 });
+        var sl = Add(g, new HarmonicSculptNode { X = 300, Y = 80, Shape = 0.2 });
+        var sr = Add(g, new HarmonicSculptNode { X = 300, Y = 260, Shape = 0.2 });
+        var outN = Add(g, new AudioOutNode { X = 560, Y = 160 });
+        g.Connect(inN.Id, "l", sl.Id, "in");
+        g.Connect(inN.Id, "r", sr.Id, "in");
+        g.Connect(sl.Id, "out", outN.Id, "l");
+        g.Connect(sr.Id, "out", outN.Id, "r");
+    }
+
+    private static void StereoBlur(FieldGraph g)
+    {
+        var inN = Add(g, new AudioInNode { X = 60, Y = 160 });
+        var dl = Add(g, new AllpassDiffuserNode { X = 300, Y = 80, Size = 0.7, Feedback = 0.55 });
+        var dr = Add(g, new AllpassDiffuserNode { X = 300, Y = 260, Size = 0.7, Feedback = 0.55 });
+        var outN = Add(g, new AudioOutNode { X = 560, Y = 160 });
+        g.Connect(inN.Id, "l", dl.Id, "in");
+        g.Connect(inN.Id, "r", dr.Id, "in");
+        g.Connect(dl.Id, "out", outN.Id, "l");
+        g.Connect(dr.Id, "out", outN.Id, "r");
+    }
+
+    private static void StereoRingMod(FieldGraph g)
+    {
+        var inN = Add(g, new AudioInNode { X = 60, Y = 160 });
+        var dl = Add(g, new RingModNode { X = 300, Y = 80, Frequency = 440, Mix = 0.85 });
+        var dr = Add(g, new RingModNode { X = 300, Y = 260, Frequency = 440, Mix = 0.85 });
+        var outN = Add(g, new AudioOutNode { X = 560, Y = 160 });
+        g.Connect(inN.Id, "l", dl.Id, "in");
+        g.Connect(inN.Id, "r", dr.Id, "in");
+        g.Connect(dl.Id, "out", outN.Id, "l");
+        g.Connect(dr.Id, "out", outN.Id, "r");
     }
 
     private static void Tremolo(FieldGraph g)
@@ -796,6 +952,19 @@ public static class FieldBuiltInPatches
         "Live Difference" => "live-difference",
         "Utility" => "utility",
         "3D Scope" => "waveform-visualizer",
+        "Sculpt" => "sculpt",
+        "Blur" => "blur",
+        "Ring Mod" => "ring_mod",
+        "Convolution" => "convolution",
+        "Rotary" => "rotary",
+        "Dynamics" => "dynamics",
+        "Delay+" => "delay_plus",
+        "Spectrum" => "spectrum",
+        "Tuner" => "tuner",
+        "Saturator" => "saturator",
+        "Amp" => "amp",
+        "Ladder" => "ladder",
+        "Pitch Shifter" => "pitch_shifter",
         _ => "utility"
     };
 }

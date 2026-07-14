@@ -4,6 +4,8 @@ using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Midi;
+using Ongenet.Core.Audio.MidiFx;
+using Ongenet.Core.Audio.Modulation;
 using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Media;
@@ -21,8 +23,11 @@ namespace Ongenet.Core.Persistence;
 /// </summary>
 public static class ProjectCloner
 {
-    public static Project Clone(Project src, IInstrumentRegistry instruments, IEffectRegistry effects)
+    public static Project Clone(Project src, IInstrumentRegistry instruments, IEffectRegistry effects,
+        IMidiEffectRegistry? midiEffects = null, IModulatorRegistry? modulators = null)
     {
+        midiEffects ??= new MidiEffectRegistry();
+        modulators ??= new ModulatorRegistry();
         var dst = new Project
         {
             Name = src.Name,
@@ -32,7 +37,7 @@ public static class ProjectCloner
         };
 
         foreach (var t in src.Tracks)
-            dst.Tracks.Add(CloneTrack(t, instruments, effects, dst));
+            dst.Tracks.Add(CloneTrack(t, instruments, effects, midiEffects, modulators, dst));
 
         // MIDI mappings re-point to the cloned owner track (matched by preserved Id); the runtime target
         // is left null and rebuilt from the binding by the mapping service after the snapshot is restored.
@@ -214,7 +219,8 @@ public static class ProjectCloner
         return null;
     }
 
-    private static Track CloneTrack(Track s, IInstrumentRegistry instruments, IEffectRegistry effects, Project dst)
+    private static Track CloneTrack(Track s, IInstrumentRegistry instruments, IEffectRegistry effects,
+        IMidiEffectRegistry midiEffects, IModulatorRegistry modulators, Project dst)
     {
         var t = new Track
         {
@@ -231,7 +237,8 @@ public static class ProjectCloner
             AutomationCollapsed = s.AutomationCollapsed,
             GroupCollapsed = s.GroupCollapsed,
             ActivePatternId = s.ActivePatternId,
-            LaneHeight = s.LaneHeight
+            LaneHeight = s.LaneHeight,
+            Rack = CloneRack(s.Rack)
         };
 
         // Clone the instrument rack: a fresh instrument + its own effect chain per slot.
@@ -253,12 +260,33 @@ public static class ProjectCloner
         foreach (var mod in s.Modulators)
             t.Modulators.Add(CloneModulator(mod));
 
+        foreach (var slot in s.ModulatorSlots)
+            t.ModulatorSlots.Add(CloneModulatorSlot(slot, modulators));
+
+        foreach (var mfx in s.MidiEffects)
+            t.MidiEffects.Add(MidiEffectCloner.Clone(mfx, midiEffects));
+
         t.CommitInstruments();
         t.CommitEffects();
         t.CommitMidiEffects();
         t.CommitAutoLanes();
         t.CommitModulators();
+        t.CommitModulatorSlots();
         return t;
+    }
+
+    private static InstrumentRackSettings CloneRack(InstrumentRackSettings s)
+    {
+        var d = new InstrumentRackSettings { Kind = s.Kind };
+        foreach (var m in s.Macros)
+            d.Macros.Add(new RackMacroKnob { Label = m.Label, TargetParameterId = m.TargetParameterId, Value = m.Value });
+        foreach (var p in s.DrumPads)
+            d.DrumPads.Add(new DrumPadSlot
+            {
+                PadIndex = p.PadIndex, MidiNote = p.MidiNote,
+                InstrumentSlotIndex = p.InstrumentSlotIndex, Label = p.Label
+            });
+        return d;
     }
 
     private static TrackModulator CloneModulator(TrackModulator s)
@@ -270,6 +298,16 @@ public static class ProjectCloner
             RateHz = s.RateHz,
             Depth = s.Depth,
             Wave = s.Wave,
+            Target = s.Target
+        };
+
+    private static ModulatorSlot CloneModulatorSlot(ModulatorSlot s, IModulatorRegistry registry)
+        => new()
+        {
+            Id = s.Id,
+            Enabled = s.Enabled,
+            Depth = s.Depth,
+            Source = ModulatorCloner.Clone(s.Source, registry),
             Target = s.Target
         };
 

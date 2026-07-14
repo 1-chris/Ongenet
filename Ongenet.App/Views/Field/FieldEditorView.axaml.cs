@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -73,6 +74,30 @@ public partial class FieldEditorView : UserControl
         base.OnDataContextChanged(e);
         ClearVisuals();
         RepositionVisuals();
+        RefreshBindLists();
+    }
+
+    private void RefreshBindLists()
+    {
+        if (DataContext is not FieldEditorViewModel vm) return;
+        if (this.FindControl<ListBox>("ParamBindList") is { } paramsList)
+        {
+            paramsList.ItemsSource = vm.Surface.EnumerateBindableParameters()
+                .Select(p => new BindOption(p.Label, p.NodeId, p.ParamIndex))
+                .ToList();
+        }
+
+        if (this.FindControl<ListBox>("SignalBindList") is { } signals)
+        {
+            signals.ItemsSource = vm.Surface.EnumerateSignalNodes()
+                .Select(p => new BindOption(p.Label, p.NodeId, -1))
+                .ToList();
+        }
+    }
+
+    private sealed record BindOption(string Label, Guid NodeId, int ParamIndex)
+    {
+        public override string ToString() => Label;
     }
 
     private void ClearVisuals()
@@ -157,6 +182,66 @@ public partial class FieldEditorView : UserControl
     private void OnExitGroup(object? sender, RoutedEventArgs e)
     {
         if (DataContext is FieldEditorViewModel vm) vm.ExitGroup();
+    }
+
+    private void OnShowGraph(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm) vm.ShowGraphMode();
+    }
+
+    private void OnShowInterface(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm)
+        {
+            vm.ShowInterfaceMode();
+            RefreshBindLists();
+        }
+    }
+
+    private void OnSaveDefinition(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm) vm.SaveAsDefinition();
+    }
+
+    private void OnAddWidget(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not FieldEditorViewModel vm) return;
+        if (sender is Button { Tag: FieldWidgetKind kind })
+            vm.Surface.AddWidget(kind);
+    }
+
+    private void OnDeleteWidget(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm) vm.Surface.DeleteSelected();
+    }
+
+    private void OnDuplicateWidget(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm) vm.Surface.DuplicateSelected();
+    }
+
+    private void OnBringFront(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm) vm.Surface.BringSelectedToFront();
+    }
+
+    private void OnSendBack(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is FieldEditorViewModel vm) vm.Surface.SendSelectedToBack();
+    }
+
+    private void OnBindParameter(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not FieldEditorViewModel vm) return;
+        if (this.FindControl<ListBox>("ParamBindList")?.SelectedItem is BindOption opt)
+            vm.Surface.BindSelectedToParameter(opt.NodeId, opt.ParamIndex);
+    }
+
+    private void OnBindSignal(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not FieldEditorViewModel vm) return;
+        if (this.FindControl<ListBox>("SignalBindList")?.SelectedItem is BindOption opt)
+            vm.Surface.BindSelectedToSignal(opt.NodeId);
     }
 
     private async void OnSavePatch(object? sender, RoutedEventArgs e)

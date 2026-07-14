@@ -1,9 +1,12 @@
 using System;
+using System.Linq;
 using Avalonia.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.App.ViewModels;
 using Ongenet.App.Views.Windows;
+using Ongenet.Core.Audio.Instruments.Sampler;
 using Ongenet.Core.Models.Audio;
+using Ongenet.Core.Models.Events;
 
 namespace Ongenet.App.Services;
 
@@ -22,6 +25,30 @@ public sealed class AudioEditorService : IAudioEditorService
         var vm = EnsureWindow();
         vm.OpenClip(clip);
         _window!.Activate();
+    }
+
+    /// <summary>Returns the first sampler on an instrument track, or creates one when none exists.</summary>
+    public static SamplerInstrument? FindTargetSampler(Project project)
+    {
+        foreach (var track in project.Tracks)
+        {
+            if (track.Kind != TrackKind.Instrument) continue;
+            foreach (var slot in track.Instruments)
+            {
+                if (slot.Instrument is SamplerInstrument sampler)
+                    return sampler;
+            }
+        }
+
+        var created = new SamplerInstrument();
+        var newTrack = new Track
+        {
+            Name = "Sampler",
+            Kind = TrackKind.Instrument
+        };
+        newTrack.Instruments.Add(new InstrumentSlot(created));
+        project.Tracks.Add(newTrack);
+        return created;
     }
 
     private AudioEditorViewModel EnsureWindow()

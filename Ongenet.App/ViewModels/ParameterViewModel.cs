@@ -9,12 +9,17 @@ namespace Ongenet.App.ViewModels
     /// <summary>Base view model for one editable instrument/effect parameter.</summary>
     public abstract class ParameterViewModel : ViewModelBase
     {
-        protected ParameterViewModel(string name) => Name = name;
+        protected ParameterViewModel(string name, string? group = null)
+        {
+            Name = name;
+            Group = group ?? string.Empty;
+        }
 
         /// <summary>Undo history, resolved on demand (these VMs are created by a factory, not DI).</summary>
         private protected static IHistoryService? History => App.ServiceProvider?.GetService<IHistoryService>();
 
         public string Name { get; }
+        public string Group { get; }
 
         /// <summary>
         /// Re-reads the underlying parameter and raises change notifications, so a value written
@@ -37,7 +42,7 @@ namespace Ongenet.App.ViewModels
     {
         private readonly FloatParameter _parameter;
 
-        public FloatParameterViewModel(FloatParameter parameter) : base(parameter.Name) => _parameter = parameter;
+        public FloatParameterViewModel(FloatParameter parameter) : base(parameter.Name, parameter.Group) => _parameter = parameter;
 
         /// <summary>The underlying core parameter (used to build an automation target).</summary>
         public FloatParameter Parameter => _parameter;
@@ -94,7 +99,7 @@ namespace Ongenet.App.ViewModels
     {
         private readonly BoolParameter _parameter;
 
-        public BoolParameterViewModel(BoolParameter parameter) : base(parameter.Name) => _parameter = parameter;
+        public BoolParameterViewModel(BoolParameter parameter) : base(parameter.Name, parameter.Group) => _parameter = parameter;
 
         /// <summary>The underlying core parameter (used to build an automation target).</summary>
         public BoolParameter Parameter => _parameter;
@@ -119,7 +124,7 @@ namespace Ongenet.App.ViewModels
     {
         private readonly ChoiceParameter _parameter;
 
-        public ChoiceParameterViewModel(ChoiceParameter parameter) : base(parameter.Name) => _parameter = parameter;
+        public ChoiceParameterViewModel(ChoiceParameter parameter) : base(parameter.Name, parameter.Group) => _parameter = parameter;
 
         public IReadOnlyList<string> Options => _parameter.Options;
 

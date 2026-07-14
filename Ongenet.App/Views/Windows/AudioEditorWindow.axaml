@@ -11,13 +11,42 @@
                    Foreground="{StaticResource CatppuccinSubtext0}"/>
 
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
-            <TextBlock Grid.Column="0" Text="{DynamicResource AudioEditor_MultitrackHint}"
-                       VerticalAlignment="Center" FontSize="11"
-                       Foreground="{StaticResource CatppuccinSubtext1}"/>
+            <StackPanel Grid.Column="0" Spacing="6">
+                <TextBlock Text="{DynamicResource AudioEditor_MultitrackHint}"
+                           VerticalAlignment="Center" FontSize="11"
+                           Foreground="{StaticResource CatppuccinSubtext1}"/>
+                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ActiveEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <Button Content="{DynamicResource AudioEditor_SliceToGrid}" Command="{Binding SliceToGridCommand}" Padding="10,4"/>
+                    <Button Content="{DynamicResource AudioEditor_ApplyBeatWarp}" Command="{Binding ApplyBeatGridWarpCommand}" Padding="10,4"/>
+                    <Button Content="{DynamicResource AudioEditor_ExportToSampler}" Command="{Binding ExportToSamplerCommand}" Padding="10,4"/>
+                    <CheckBox Content="{DynamicResource AudioEditor_TransientSafe}" IsChecked="{Binding TransientSafeWarp, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding SliceDetectModes}" SelectedItem="{Binding SliceDetectMode, Mode=TwoWay}"
+                              MinWidth="120" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasSlices}">
+                    <ListBox ItemsSource="{Binding Slices}" SelectedItem="{Binding SelectedSlice, Mode=TwoWay}"
+                             MinWidth="280" MinHeight="72" MaxHeight="120">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AudioEditorSliceItemViewModel">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <CheckBox IsChecked="{Binding Selected, Mode=TwoWay}"/>
+                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                        <Button Content="{DynamicResource AudioEditor_MoveSliceUp}" Command="{Binding MoveSliceUpCommand}"
+                                CommandParameter="{Binding SelectedSlice}" Padding="8,4"/>
+                        <Button Content="{DynamicResource AudioEditor_MoveSliceDown}" Command="{Binding MoveSliceDownCommand}"
+                                CommandParameter="{Binding SelectedSlice}" Padding="8,4"/>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
             <Button Grid.Column="1" Content="{DynamicResource AudioEditor_RemoveLane}"
                     Command="{Binding RemoveLaneCommand}" CommandParameter="{Binding ActiveLane}"
                     IsEnabled="{Binding ActiveLane, Converter={x:Static ObjectConverters.IsNotNull}}"
-                    Padding="10,4"/>
+                    Padding="10,4" VerticalAlignment="Top"/>
         </Grid>
 
         <Grid ColumnDefinitions="220,*">

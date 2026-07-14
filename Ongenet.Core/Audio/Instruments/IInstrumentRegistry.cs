@@ -18,6 +18,15 @@ public interface IInstrumentRegistry
     /// <summary>Adds a dynamically-discovered instrument type (idempotent by id) and raises <see cref="Changed"/>.</summary>
     void Register(InstrumentInfo info);
 
+    /// <summary>Removes a dynamically registered instrument type (built-ins cannot be removed).</summary>
+    bool Unregister(string id);
+
+    /// <summary>
+    /// Installs a last-resort factory used when <see cref="Create"/> cannot find a registered id
+    /// (e.g. snapshot-load of a deleted user Field instrument).
+    /// </summary>
+    void SetFallbackCreate(Func<string, IInstrument?> fallback);
+
     /// <summary>Raised when the set of available instruments changes (so the UI can refresh).</summary>
     event Action? Changed;
 }

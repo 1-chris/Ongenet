@@ -29,6 +29,7 @@ public sealed class PhaserEffect : IAudioEffect
     public double Feedback { get; set; } = 0.4;
     public double Mix { get; set; } = 0.5;
     public int StagesIndex { get; set; } = 1; // → 4 stages
+    public bool Enhanced { get; set; }
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
@@ -47,7 +48,8 @@ public sealed class PhaserEffect : IAudioEffect
         new FloatParameter("Depth", 0.0, 1.0, () => Depth, v => Depth = v),
         new FloatParameter("Feedback", -0.95, 0.95, () => Feedback, v => Feedback = v),
         new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v),
-        new ChoiceParameter("Stages", StageNames, () => StagesIndex, v => StagesIndex = v)
+        new ChoiceParameter("Stages", StageNames, () => StagesIndex, v => StagesIndex = v),
+        new BoolParameter("Enhanced", () => Enhanced, v => Enhanced = v)
     };
 
     public void Prepare(AudioFormat format)
@@ -65,7 +67,8 @@ public sealed class PhaserEffect : IAudioEffect
 
     public IAudioEffect Clone() => new PhaserEffect
     {
-        Enabled = Enabled, RateHz = RateHz, Depth = Depth, Feedback = Feedback, Mix = Mix, StagesIndex = StagesIndex
+        Enabled = Enabled, RateHz = RateHz, Depth = Depth, Feedback = Feedback, Mix = Mix,
+        StagesIndex = StagesIndex, Enhanced = Enhanced
     };
 
     public void Process(Span<float> buffer)
@@ -76,9 +79,11 @@ public sealed class PhaserEffect : IAudioEffect
         if (x1.Length == 0 || y1.Length == 0 || fb.Length == 0) return;
         var channels = Math.Min(_channels, Math.Min(x1.Length, Math.Min(y1.Length, fb.Length)));
         var mix = (float)Math.Clamp(Mix, 0, 1);
-        var fbAmt = Math.Clamp(Feedback, -0.95, 0.95);
+        var fbAmt = Math.Clamp(Feedback, -0.95, 0.95) * (Enhanced ? 1.15f : 1f);
         var depth = Math.Clamp(Depth, 0, 1);
         var stages = StageCounts[Math.Clamp(StagesIndex, 0, StageCounts.Length - 1)];
+        var minFc = Enhanced ? 120.0 : MinFc;
+        var maxFc = Enhanced ? 4000.0 : MaxFc;
         _lfo.SetRate(RateHz, _sampleRate);
 
         var frames = buffer.Length / channels;
@@ -88,7 +93,7 @@ public sealed class PhaserEffect : IAudioEffect
             for (var c = 0; c < channels; c++)
             {
                 var lfo = _lfo.Value(c == 1 ? 0.25 : 0.0);
-                var fc = MinFc * Math.Pow(MaxFc / MinFc, depth * (0.5 + 0.5 * lfo));
+                var fc = minFc * Math.Pow(maxFc / minFc, depth * (0.5 + 0.5 * lfo));
                 var t = Math.Tan(Math.PI * fc / _sampleRate);
                 var a = (t - 1.0) / (t + 1.0);
 

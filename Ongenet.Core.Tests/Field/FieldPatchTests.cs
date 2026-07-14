@@ -53,6 +53,21 @@ public class FieldPatchTests
         for (var i = 0; i < FieldBuiltInPatches.InstrumentPatchNames.Count; i++)
         {
             inst.LoadPreset(i);
+            Assert.True(inst.HasCustomSurface,
+                $"instrument patch '{FieldBuiltInPatches.InstrumentPatchNames[i]}' has no editable surface");
+            Assert.NotEmpty(inst.Surface.Widgets);
+            Assert.NotEmpty(inst.Surface.ExposedControls);
+            foreach (var exposed in inst.Surface.ExposedControls)
+            {
+                var binding = new FieldParameterBinding
+                {
+                    NodeId = exposed.NodeId,
+                    ParamIndex = exposed.ParamIndex,
+                    ExpectedKind = exposed.ExpectedKind
+                };
+                Assert.True(FieldExposedParameters.TryResolve(inst.Graph, binding, out _),
+                    $"unresolved control '{exposed.DisplayName}' in '{FieldBuiltInPatches.InstrumentPatchNames[i]}'");
+            }
             inst.NoteOn(60, 1.0f);
             for (var b = 0; b < 3; b++)
             {
@@ -118,6 +133,20 @@ public class FieldPatchTests
         for (var i = 0; i < FieldEffect.BuiltInPatchNames.Count; i++)
         {
             fx.LoadBuiltInPatch(i);
+            Assert.True(fx.HasCustomSurface,
+                $"effect patch '{FieldEffect.BuiltInPatchNames[i]}' has no editable surface");
+            Assert.NotEmpty(fx.Surface.Widgets);
+            foreach (var exposed in fx.Surface.ExposedControls)
+            {
+                var binding = new FieldParameterBinding
+                {
+                    NodeId = exposed.NodeId,
+                    ParamIndex = exposed.ParamIndex,
+                    ExpectedKind = exposed.ExpectedKind
+                };
+                Assert.True(FieldExposedParameters.TryResolve(fx.Graph, binding, out _),
+                    $"unresolved control '{exposed.DisplayName}' in '{FieldEffect.BuiltInPatchNames[i]}'");
+            }
             var buffer = new float[256 * 2];
             for (var n = 0; n < buffer.Length; n++) buffer[n] = 0.3f * MathF.Sin(n * 0.05f);
             fx.Process(buffer);

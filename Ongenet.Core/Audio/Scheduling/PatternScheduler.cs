@@ -69,18 +69,21 @@ public sealed class PatternScheduler : IPlaybackScheduler
                         var velocity = (float)Math.Clamp(step.Velocity * channel.Volume, 0f, 1f);
                         var stepPan = Math.Clamp(step.Pan, -1f, 1f);
                         var (mappedNote, mappedVel) = DrumMapProcessor.Apply(context.Project, track, step.Note, velocity);
+                        var noteSlots = InstrumentRackRouting.ResolveSlots(track, slots, mappedNote);
+                        if (noteSlots is null) continue;
 
                         if (midiFxChain.IsEmpty)
                         {
-                            notes.Add(new ScheduledNoteEvent(track.Id, onBeat, offBeat, slots, midiAwareFx, mappedNote, mappedVel, 1f, stepPan));
+                            notes.Add(new ScheduledNoteEvent(track.Id, onBeat, offBeat, noteSlots, midiAwareFx, mappedNote, mappedVel, 1f, stepPan));
                         }
                         else
                         {
-                            foreach (var expanded in midiFxChain.ExpandNote(onBeat, offBeat, mappedNote, mappedVel))
+                            foreach (var expanded in midiFxChain.ExpandNote(onBeat, offBeat, mappedNote, mappedVel, context.Bpm))
                             {
                                 if (expanded.OffBeat <= startBeat) continue;
-                                notes.Add(new ScheduledNoteEvent(track.Id, expanded.OnBeat, expanded.OffBeat, slots,
-                                    midiAwareFx, expanded.Note, expanded.Velocity, 1f, stepPan));
+                                var expandedSlots = InstrumentRackRouting.ResolveSlots(track, slots, expanded.Note);
+                                if (expandedSlots is null) continue;
+                                notes.Add(MidiFxScheduleHelper.ToEvent(track.Id, expanded, expandedSlots, midiAwareFx, 1f, stepPan));
                             }
                         }
                     }
@@ -88,7 +91,7 @@ public sealed class PatternScheduler : IPlaybackScheduler
             }
         }
 
-        notes.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
+        notes.Sort((a, b) => (a.OnBeat + a.TimingOffsetBeats).CompareTo(b.OnBeat + b.TimingOffsetBeats));
         return new PlaybackSchedule { Notes = notes.ToArray() };
     }
 

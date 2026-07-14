@@ -44,7 +44,7 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 
 ### Automation design (v1)
 
-Ongenet uses **automation lanes** under tracks (right-click a control → *Automate*), not Bitwig-style
+Ongenet uses **automation lanes** under tracks (right-click a control → *Automate*), not separate
 **automation clips** as first-class timeline objects. Lanes record and playback curves during arrange
 and offline export. Linked clip groups (`LinkedClipGroupId`) cover pattern reuse; alias-style editing is
 via **Clip → Link clones** in the timeline context menu.
@@ -705,7 +705,7 @@ Ongenet targets a **feature-complete open-source DAW**.
 
 | Competitor term | Ongenet equivalent |
 | --- | --- |
-| Bitwig **Grid** / FL **Patcher** | **Field** |
+| Modular **Grid** / FL **Patcher** | **Field** |
 | FL **Factory** | **Library** (Projects + presets) |
 | Ableton **Session View** | **Session** tab |
 | FL **Channel Rack / Patterns** | **Channel Rack** + pattern tracks |

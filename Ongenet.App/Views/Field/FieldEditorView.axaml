@@ -10,28 +10,40 @@
              x:Class="Ongenet.App.Views.Field.FieldEditorView">
     <Grid RowDefinitions="Auto,*">
         <!-- Toolbar -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,Auto,Auto" Margin="6" ColumnSpacing="8">
-            <TextBlock Grid.Column="0" Text="{DynamicResource FieldEditor_Preset}" VerticalAlignment="Center"
-                       Foreground="{StaticResource CatppuccinSubtext0}"/>
-            <ComboBox Grid.Column="1" Width="160" ItemsSource="{Binding PresetNames}"
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="6" ColumnSpacing="6">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+                <Button Content="Graph" Click="OnShowGraph" Padding="8,2"
+                        Background="{Binding IsGraphMode, Converter={x:Null}}"/>
+                <Button Content="Interface" Click="OnShowInterface" Padding="8,2"/>
+            </StackPanel>
+
+            <TextBlock Grid.Column="1" Text="{DynamicResource FieldEditor_Preset}" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext0}" IsVisible="{Binding IsGraphMode}"/>
+            <ComboBox Grid.Column="2" Width="140" ItemsSource="{Binding PresetNames}"
                       SelectedIndex="{Binding SelectedPreset, Mode=TwoWay}"
-                      PlaceholderText="{DynamicResource FieldEditor_Built_in_patch}"/>
-            <Button Grid.Column="2" Content="{DynamicResource FieldEditor_Root}" IsVisible="{Binding CanExitGroup}"
+                      PlaceholderText="{DynamicResource FieldEditor_Built_in_patch}"
+                      IsVisible="{Binding IsGraphMode}"/>
+            <Button Grid.Column="3" Content="{DynamicResource FieldEditor_Root}" IsVisible="{Binding CanExitGroup}"
                     Click="OnExitGroup" Padding="8,2"/>
-            <TextBlock Grid.Column="3" Text="{Binding BreadcrumbText}" VerticalAlignment="Center"
-                       Foreground="{StaticResource CatppuccinSubtext1}" FontSize="11"/>
-            <TextBlock Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Foreground="{StaticResource CatppuccinSubtext1}"
-                       Text="{DynamicResource FieldEditor_Middle_drag_pan_scroll_zoom_double_click_group_E}"/>
-            <TextBox Grid.Column="5" Width="120" PlaceholderText="{DynamicResource FieldEditor_Patch_name}"
-                     Text="{Binding PatchName, Mode=TwoWay}"/>
-            <Button Grid.Column="6" Content="{DynamicResource FieldEditor_Save_patch}" Click="OnSavePatch" Padding="8,2"/>
-            <Button Grid.Column="7" Content="{DynamicResource FieldEditor_Load_patch}" Click="OnLoadPatch" Padding="8,2" Margin="0,0,6,0"/>
-            <Button Grid.Column="8" Name="PopOutButton" Content="{DynamicResource FieldEditor_Pop_out}"/>
+            <TextBlock Grid.Column="4" Text="{Binding BreadcrumbText}" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinSubtext1}" FontSize="11"
+                       IsVisible="{Binding IsGraphMode}"/>
+
+            <TextBox Grid.Column="6" Width="120" PlaceholderText="Name"
+                     Text="{Binding SaveDefinitionName, Mode=TwoWay}" VerticalAlignment="Center"/>
+            <Button Grid.Column="7" Content="{Binding SaveDefinitionButtonText}" Click="OnSaveDefinition" Padding="8,2"
+                    ToolTip.Tip="Save this graph and interface as a Library instrument or effect"/>
+            <Button Grid.Column="8" Content="{DynamicResource FieldEditor_Save_patch}" Click="OnSavePatch" Padding="8,2"
+                    IsVisible="{Binding IsGraphMode}"/>
+            <Button Grid.Column="9" Content="{DynamicResource FieldEditor_Load_patch}" Click="OnLoadPatch" Padding="8,2"
+                    IsVisible="{Binding IsGraphMode}"/>
+            <Button Grid.Column="10" Name="PopOutButton" Content="{DynamicResource FieldEditor_Pop_out}"/>
+            <TextBlock Grid.Column="11" Text="{Binding StatusMessage}" VerticalAlignment="Center" FontSize="10"
+                       Foreground="{StaticResource CatppuccinSubtext0}" MaxWidth="160" TextTrimming="CharacterEllipsis"/>
         </Grid>
 
-        <!-- Body: palette | canvas | inspector -->
-        <Grid Grid.Row="1" ColumnDefinitions="190,*,230">
+        <!-- Graph mode -->
+        <Grid Grid.Row="1" ColumnDefinitions="190,*,230" IsVisible="{Binding IsGraphMode}">
             <Border Grid.Column="0" Background="{StaticResource CatppuccinMantle}"
                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="0,0,1,0">
                 <ScrollViewer>
@@ -60,7 +72,6 @@
 
             <Panel Grid.Column="1" ClipToBounds="True">
                 <field:FieldCanvasControl Name="Canvas"/>
-                <!-- Live GPU visualizations (scope, wavetable) positioned over their nodes. -->
                 <Canvas Name="VisualOverlay" IsHitTestVisible="False"/>
             </Panel>
 
@@ -71,8 +82,6 @@
                         <TextBlock Text="{Binding SelectedNodeName}" FontWeight="SemiBold"
                                    Foreground="{StaticResource CatppuccinText}"
                                    IsVisible="{Binding HasSelection}"/>
-
-                        <!-- Resource loaders for sample / soundfont nodes -->
                         <StackPanel Spacing="4" Margin="0,4,0,0"
                                     IsVisible="{Binding SelectedIsSampleHost}">
                             <Button Content="{DynamicResource FieldEditor_Load_sample}" Name="LoadSampleButton" Click="OnLoadSample"
@@ -87,13 +96,75 @@
                             <TextBlock Text="{Binding SelectedResourceStatus}" FontSize="10" TextWrapping="Wrap"
                                        Foreground="{StaticResource CatppuccinSubtext0}"/>
                         </StackPanel>
-
-                        <panels:ParametersView DataContext="{Binding SelectedParameters}"
-                                               Margin="0,6,0,0"/>
+                        <panels:ParametersView DataContext="{Binding SelectedParameters}" Margin="0,6,0,0"/>
                         <TextBlock Text="{DynamicResource FieldEditor_Select_a_node_to_edit_its_parameters}"
                                    TextWrapping="Wrap" FontSize="11"
                                    Foreground="{StaticResource CatppuccinSubtext0}"
                                    IsVisible="{Binding !HasSelection}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- Interface mode -->
+        <Grid Grid.Row="1" ColumnDefinitions="150,*,220" IsVisible="{Binding IsInterfaceMode}">
+            <Border Grid.Column="0" Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="0,0,1,0">
+                <ScrollViewer>
+                    <StackPanel Margin="6" Spacing="4">
+                        <TextBlock Text="Widgets" FontWeight="SemiBold" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinMauve}"/>
+                        <ItemsControl ItemsSource="{Binding Surface.PaletteKinds}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding}" Tag="{Binding}" Click="OnAddWidget"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                            Padding="6,2" Margin="0,1" FontSize="11"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Border Margin="8" BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1"
+                        HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <field:FieldSurfaceCanvas DataContext="{Binding Surface}"/>
+                </Border>
+            </ScrollViewer>
+
+            <Border Grid.Column="2" Background="{StaticResource CatppuccinMantle}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1,0,0,0">
+                <ScrollViewer>
+                    <StackPanel Margin="8" Spacing="6">
+                        <TextBlock Text="Selection" FontWeight="SemiBold" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinMauve}"/>
+                        <TextBlock Text="{Binding Surface.SelectedKindName}" FontSize="11"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <TextBox PlaceholderText="Label" Text="{Binding Surface.SelectedLabel, Mode=TwoWay}"
+                                 IsEnabled="{Binding Surface.CanEditSelection}"/>
+                        <TextBlock Text="{Binding Surface.BindingStatus}" FontSize="10"
+                                   Foreground="{StaticResource CatppuccinSubtext1}"/>
+                        <Button Content="Delete" Click="OnDeleteWidget" IsEnabled="{Binding Surface.CanEditSelection}"/>
+                        <Button Content="Duplicate" Click="OnDuplicateWidget" IsEnabled="{Binding Surface.CanEditSelection}"/>
+                        <Button Content="Bring front" Click="OnBringFront" IsEnabled="{Binding Surface.CanEditSelection}"/>
+                        <Button Content="Send back" Click="OnSendBack" IsEnabled="{Binding Surface.CanEditSelection}"/>
+
+                        <TextBlock Text="Bind parameter" FontWeight="SemiBold" FontSize="11" Margin="0,8,0,0"
+                                   Foreground="{StaticResource CatppuccinMauve}"/>
+                        <ListBox Name="ParamBindList" MaxHeight="160" FontSize="10"/>
+                        <Button Content="Bind selected param" Click="OnBindParameter"
+                                IsEnabled="{Binding Surface.CanEditSelection}"/>
+
+                        <TextBlock Text="Bind signal" FontWeight="SemiBold" FontSize="11" Margin="0,8,0,0"
+                                   Foreground="{StaticResource CatppuccinMauve}"/>
+                        <ListBox Name="SignalBindList" MaxHeight="120" FontSize="10"/>
+                        <Button Content="Bind selected signal" Click="OnBindSignal"
+                                IsEnabled="{Binding Surface.CanEditSelection}"/>
+
+                        <TextBlock Text="{Binding Surface.Status}" FontSize="10" TextWrapping="Wrap"
+                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

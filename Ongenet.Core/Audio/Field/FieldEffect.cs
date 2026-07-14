@@ -12,7 +12,8 @@ namespace Ongenet.Core.Audio.Field;
 /// <summary>
 /// The Field modular effect: the same graph engine as <see cref="FieldInstrument"/>, but fed the track's
 /// incoming audio (via an Audio In node) and processed in place. Supports tempo/sidechain context, MIDI
-/// (for note-driven effects), and a source track for sidechain/vocoder-style patches.
+/// (for note-driven effects), and a source track for sidechain/vocoder-style patches. User definitions
+/// may expose a custom control surface and top-level parameters.
 /// </summary>
 public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEffect, ISourceTrackEffect, IProjectStatefulComponent
 {
@@ -24,6 +25,12 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
     private readonly object _compileLock = new();
     private readonly MidiEventFifo _fifo = new();
     private readonly List<MidiMessage> _midi = new();
+
+    private string _typeId = Id;
+    private string _displayName = "Field";
+    private Guid? _definitionId;
+    private FieldSurfaceDefinition _surface = new();
+    private List<Parameter> _parameters = new();
 
     private volatile CompiledGraph? _compiled;
     private volatile int _compiledRevision = -1;
@@ -37,26 +44,75 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
         if (buildDefault) FieldPatches.BuildBeginnerEffect(_graph);
     }
 
-    public string Name => "Field";
-    public string TypeId => Id;
+    /// <summary>Creates an empty host with the given type id for project/preset fallback loading.</summary>
+    public static FieldEffect CreateShell(IFieldNodeRegistry registry, string typeId, string? displayName = null)
+    {
+        var fx = new FieldEffect(registry, buildDefault: false);
+        fx._typeId = typeId;
+        fx._displayName = string.IsNullOrWhiteSpace(displayName) ? "Field Effect" : displayName!;
+        fx._definitionId = FieldGraphDefinition.TryParseDefinitionId(typeId);
+        return fx;
+    }
+
+    public string Name => _displayName;
+    public string TypeId => _typeId;
     public bool Enabled { get; set; } = true;
-    public IReadOnlyList<Parameter> Parameters => Array.Empty<Parameter>();
+    public IReadOnlyList<Parameter> Parameters => _parameters;
     public Guid? SourceTrackId { get; set; }
+    public Guid? DefinitionId => _definitionId;
+    public FieldSurfaceDefinition Surface => _surface;
+    public bool HasCustomSurface => _surface.Widgets.Count > 0;
+    public bool IsUserDefinition => FieldGraphDefinition.IsUserEffectType(_typeId);
 
     public FieldGraph Graph => _graph;
     public CompiledGraph? Compiled => _compiled;
+    public IFieldNodeRegistry Registry => _registry;
 
     public void SetContext(EffectContext context) => _ctx = context;
 
-    /// <summary>The built-in effect decomposition patches (EQ, Filter, Compressor, ...).</summary>
-    public static System.Collections.Generic.IReadOnlyList<string> BuiltInPatchNames => Patches.FieldBuiltInPatches.EffectPatchNames;
+    public static IReadOnlyList<string> BuiltInPatchNames => FieldBuiltInPatches.EffectPatchNames;
 
-    /// <summary>Replaces the graph with the built-in decomposition patch at <paramref name="index"/>.</summary>
     public void LoadBuiltInPatch(int index)
     {
-        Patches.FieldBuiltInPatches.BuildEffect(index, _graph, _registry);
+        if (IsUserDefinition) return;
+        FieldBuiltInPatches.BuildEffect(index, _graph, _registry);
+        _surface = FieldBuiltInSurfaces.BuildEffect(index, _graph);
+        RebuildExposedParameters();
         Recompile(_maxBlock);
     }
+
+    public void ApplyDefinition(FieldGraphDefinition definition, FieldGraph graph)
+    {
+        AdoptLibraryIdentity(definition);
+        CopyGraph(graph, _graph);
+        RebuildExposedParameters();
+        Recompile(_maxBlock);
+    }
+
+    /// <summary>Marks this live host as a saved library definition without replacing the graph.</summary>
+    public void AdoptLibraryIdentity(FieldGraphDefinition definition)
+    {
+        _typeId = definition.TypeId;
+        _displayName = definition.DisplayName;
+        _definitionId = definition.DefinitionId;
+        _surface = definition.Surface.Clone();
+        RebuildExposedParameters();
+    }
+
+    public void SetSurface(FieldSurfaceDefinition surface)
+    {
+        _surface = surface.Clone();
+        RebuildExposedParameters();
+    }
+
+    public void SetDisplayName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        _displayName = name.Trim();
+    }
+
+    public void RebuildExposedParameters()
+        => _parameters = FieldExposedParameters.Build(_graph, _surface.ExposedControls);
 
     public void Prepare(AudioFormat format)
     {
@@ -83,7 +139,7 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
     public void Process(Span<float> buffer)
     {
         var compiled = _compiled;
-        if (compiled is null) return; // prepared by the engine before the first block
+        if (compiled is null) return;
 
         _fifo.Drain(_midi);
         foreach (var m in _midi)
@@ -111,7 +167,6 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
             sidechain = ctx.Sidechain.Read(srcId, out scChannels);
         }
 
-        // Process in chunks no larger than the compiled block size (no audio-thread recompilation).
         var channels = _format.Channels < 1 ? 1 : _format.Channels;
         var frames = buffer.Length / channels;
         var max = compiled.MaxBlock;
@@ -128,22 +183,33 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
     {
         var copy = new FieldEffect(_registry, buildDefault: false) { Enabled = Enabled, SourceTrackId = SourceTrackId };
         using var ms = new MemoryStream();
-        using (var w = new OngenWriter(ms)) FieldGraphSerializer.Write(w, _graph);
+        using (var w = new OngenWriter(ms)) WriteProjectState(w);
         ms.Position = 0;
-        using (var r = new OngenReader(ms)) FieldGraphSerializer.Read(r, copy._graph, _registry);
+        using (var r = new OngenReader(ms)) copy.ReadProjectState(r);
         return copy;
     }
 
     public void WriteProjectState(OngenWriter writer)
-    {
-        writer.WriteNullableGuid(SourceTrackId);
-        FieldGraphSerializer.Write(writer, _graph);
-    }
+        => FieldHostState.WriteEffect(writer, SourceTrackId, _typeId, _displayName, _definitionId, _surface, _graph);
 
     public void ReadProjectState(OngenReader reader)
     {
-        SourceTrackId = reader.ReadNullableGuid();
-        FieldGraphSerializer.Read(reader, _graph, _registry);
+        FieldHostState.ReadEffect(reader, out var sourceTrackId, out var typeId, out var displayName,
+            out var definitionId, out var surface, _graph, _registry);
+        SourceTrackId = sourceTrackId;
+        _typeId = string.IsNullOrEmpty(typeId) ? Id : typeId;
+        _displayName = string.IsNullOrEmpty(displayName) ? "Field" : displayName;
+        _definitionId = definitionId;
+        _surface = surface;
+        RebuildExposedParameters();
         Recompile(_maxBlock);
+    }
+
+    private void CopyGraph(FieldGraph source, FieldGraph dest)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new OngenWriter(ms)) FieldGraphSerializer.Write(w, source);
+        ms.Position = 0;
+        using (var r = new OngenReader(ms)) FieldGraphSerializer.Read(r, dest, _registry);
     }
 }

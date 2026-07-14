@@ -3,9 +3,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:inst="using:Ongenet.App.ViewModels.Instruments"
+             xmlns:vm="using:Ongenet.App.ViewModels"
              xmlns:panels="using:Ongenet.App.Views.Panels"
              xmlns:controls="using:Ongenet.App.Controls"
              xmlns:field="using:Ongenet.App.Views.Field"
+             xmlns:fieldControls="using:Ongenet.App.Controls.Field"
              mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="260"
              x:Class="Ongenet.App.Views.Panels.InstrumentSlotView"
              x:DataType="inst:InstrumentSlotViewModel">
@@ -23,8 +25,15 @@
 
     <Border Name="CardRoot" Margin="0,0,0,8" Padding="10" CornerRadius="4"
             DragDrop.AllowDrop="True"
+            Classes.selected="{Binding IsSelected}"
             Background="{StaticResource CatppuccinSurface0}"
             BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+        <Border.Styles>
+            <Style Selector="Border#CardRoot.selected">
+                <Setter Property="BorderBrush" Value="{StaticResource CatppuccinMauve}"/>
+                <Setter Property="BorderThickness" Value="2"/>
+            </Style>
+        </Border.Styles>
         <Grid>
         <StackPanel Spacing="6">
 
@@ -115,14 +124,135 @@
                             </Flyout>
                         </Button.Flyout>
                     </Button>
+
+                    <Button Content="{Binding FieldEditorToggleText}" Command="{Binding ToggleFieldEditorCommand}"
+                            IsVisible="{Binding HasCustomFieldSurface}" VerticalAlignment="Center"
+                            Margin="8,0,0,0"
+                            ToolTip.Tip="Switch between the custom interface and the Field graph editor"/>
                 </WrapPanel>
             </DockPanel>
 
-            <!-- Parameters -->
-            <panels:GroupedParametersView DataContext="{Binding ParameterGroups}"/>
+            <!-- Parameters (hidden when a Field custom surface already presents the same controls). -->
+            <panels:GroupedParametersView DataContext="{Binding ParameterGroups}"
+                                          IsVisible="{Binding ShowGenericParameters}"/>
+
+            <!-- Nested instruments for container devices (Layer, Chain, Drum Machine, etc.).
+                 Wrapper keeps the slot DataContext so visibility is not evaluated against a null Container. -->
+            <Panel IsVisible="{Binding IsContainer}">
+                <panels:ContainerInstrumentView DataContext="{Binding Container}"/>
+            </Panel>
+
+            <!-- Organ: Hammond-style drawbar row + remaining groups -->
+            <StackPanel Spacing="8" IsVisible="{Binding IsOrgan}">
+                <Border CornerRadius="4" Padding="10"
+                        Background="{StaticResource CatppuccinCrust}"
+                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="DRAWBARS" FontSize="11" FontWeight="Bold"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <ItemsControl ItemsSource="{Binding OrganDrawbars}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.DataTemplates>
+                                <DataTemplate x:DataType="vm:FloatParameterViewModel">
+                                    <StackPanel Width="44" HorizontalAlignment="Center">
+                                        <Slider Minimum="{Binding Min}" Maximum="{Binding Max}"
+                                                Value="{Binding Value, Mode=TwoWay}"
+                                                Orientation="Vertical" Height="100"/>
+                                        <TextBlock Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                        <TextBlock Text="{Binding ValueText}" FontSize="8" HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource CatppuccinSubtext1}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.DataTemplates>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <panels:GroupedParametersView DataContext="{Binding NonDrawbarParameterGroups}"/>
+            </StackPanel>
+
+            <!-- Phase-4: four-operator macro panel + filter/envelope groups -->
+            <StackPanel Spacing="8" IsVisible="{Binding IsPhase4}">
+                <Border CornerRadius="4" Padding="10"
+                        Background="{StaticResource CatppuccinCrust}"
+                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                    <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0" Spacing="4">
+                            <TextBlock Text="Op 1" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding Phase4Op1Params}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="3,0" Spacing="4">
+                            <TextBlock Text="Op 2" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding Phase4Op2Params}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="3,0" Spacing="4">
+                            <TextBlock Text="Op 3" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding Phase4Op3Params}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Margin="6,0,0,0" Spacing="4">
+                            <TextBlock Text="Op 4" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding Phase4Op4Params}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <panels:GroupedParametersView DataContext="{Binding Phase4TailParameterGroups}"/>
+            </StackPanel>
+
+            <!-- FM Synth: four-operator panel + matrix / filter / envelopes -->
+            <StackPanel Spacing="8" IsVisible="{Binding IsFmSynth}">
+                <Border CornerRadius="4" Padding="10"
+                        Background="{StaticResource CatppuccinCrust}"
+                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                    <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0" Spacing="4">
+                            <TextBlock Text="Op 1" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding FmOp1Params}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="3,0" Spacing="4">
+                            <TextBlock Text="Op 2" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding FmOp2Params}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="3,0" Spacing="4">
+                            <TextBlock Text="Op 3" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding FmOp3Params}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Margin="6,0,0,0" Spacing="4">
+                            <TextBlock Text="Op 4" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding FmOp4Params}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <TextBlock Text="Tip: add Arpeggiator, Humanize, or Scale MIDI FX on this track for performance control."
+                           FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <panels:GroupedParametersView DataContext="{Binding FmTailParameterGroups}"/>
+            </StackPanel>
+
+            <!-- User Field instrument: authored freeform surface -->
+            <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding ShowFieldSurface}"
+                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1"
+                    HorizontalAlignment="Left">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                              MaxHeight="320">
+                    <fieldControls:FieldSurfaceCanvas DataContext="{Binding FieldSurface}"/>
+                </ScrollViewer>
+            </Border>
 
             <!-- Field: the full modular node-graph editor embedded in the instrument card. -->
-            <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding IsField}" Height="420"
+            <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding ShowFieldEditor}" Height="420"
                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                 <field:FieldEditorView DataContext="{Binding FieldEditor}"/>
             </Border>

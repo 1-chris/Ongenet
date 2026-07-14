@@ -8,9 +8,9 @@ public class BassSynthInstrumentTests
     public void LoadPresetAppliesNamedPatches()
     {
         var inst = new BassSynthInstrument();
-        Assert.Equal(9, inst.PresetNames.Count);
+        Assert.Equal(10, inst.PresetNames.Count);
         Assert.Equal("Init", inst.PresetNames[0]);
-        Assert.Equal("Funky Slap", inst.PresetNames[^1]);
+        Assert.Equal("303 Sequence", inst.PresetNames[^1]);
 
         inst.LoadPreset(1); // Deep Sub
         Assert.Equal(0, inst.Wave); // Sine

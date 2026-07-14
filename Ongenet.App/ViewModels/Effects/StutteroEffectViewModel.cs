@@ -215,6 +215,7 @@ namespace Ongenet.App.ViewModels.Effects
             {
                 var g = gvm.Gesture;
                 CurveTargets.Add(new CurveTargetViewModel("Gate (per-slice)", () => g.Gate, null));
+                CurveTargets.Add(new CurveTargetViewModel("Volume (per-slice)", () => g.Volume, null));
                 CurveTargets.Add(new CurveTargetViewModel("Stutter Rate",
                     () => g.Rate ??= NewRamp(), () => g.Rate = null));
                 CurveTargets.Add(new CurveTargetViewModel("Filter Cutoff",

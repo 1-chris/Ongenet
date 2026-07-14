@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Midi;
+using Ongenet.Core.Audio.Midi;
+using Ongenet.Core.Audio.MidiFx;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Services.Interfaces;
 
@@ -92,7 +95,8 @@ public sealed class SessionScheduler : IPlaybackScheduler
                     continue;
                 }
 
-                ScheduleSourceClip(notes, clips, track, src, sc, baseLaunch, startBeat, channels, sampleRate, context.Bpm);
+                ScheduleSourceClip(notes, clips, track, src, sc, baseLaunch, startBeat, channels, sampleRate,
+                    context.Bpm, context.Project, context.Project.ActiveGroove);
 
                 if (!loop) break;
                 iteration++;
@@ -100,7 +104,7 @@ public sealed class SessionScheduler : IPlaybackScheduler
             }
         }
 
-        notes.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
+        notes.Sort((a, b) => (a.OnBeat + a.TimingOffsetBeats).CompareTo(b.OnBeat + b.TimingOffsetBeats));
         return new PlaybackSchedule
         {
             Notes = notes.ToArray(),
@@ -119,12 +123,16 @@ public sealed class SessionScheduler : IPlaybackScheduler
         double startBeat,
         int channels,
         int sampleRate,
-        double bpm)
+        double bpm,
+        Project project,
+        GrooveTemplate? groove)
     {
         if (src.IsMidi && track.Kind == TrackKind.Instrument)
         {
             var slots = track.ActiveInstruments;
-            var midiFx = MidiEffectsOf(track);
+            var midiAwareFx = MidiEffectsOf(track);
+            var midiFxChain = new MidiEffectChain(track.ActiveMidiEffects);
+            var sources = new List<MidiSourceNote>();
             foreach (var note in src.Notes)
             {
                 var relOn = note.StartBeat;
@@ -132,10 +140,31 @@ public sealed class SessionScheduler : IPlaybackScheduler
                 if (relOn >= sc.LengthBeats) continue;
                 if (relOff > sc.LengthBeats) relOff = sc.LengthBeats;
 
-                var onBeat = launchBeat + relOn;
-                var offBeat = launchBeat + relOff;
+                var onBeat = GrooveMath.Apply(launchBeat + relOn, groove);
+                var offBeat = onBeat + (relOff - relOn);
                 if (offBeat <= startBeat) continue;
-                notes.Add(new ScheduledNoteEvent(track.Id, onBeat, offBeat, slots, midiFx, note.Note, note.Velocity));
+                var (mappedNote, mappedVel) = DrumMapProcessor.Apply(project, track, note.Note, note.Velocity);
+                sources.Add(new MidiSourceNote(onBeat, offBeat, mappedNote, mappedVel, note.HumanizeTicks));
+            }
+
+            if (midiFxChain.IsEmpty)
+            {
+                foreach (var srcNote in sources)
+                {
+                    var noteSlots = InstrumentRackRouting.ResolveSlots(track, slots, srcNote.Note);
+                    if (noteSlots is null || srcNote.OffBeat <= startBeat) continue;
+                    notes.Add(MidiFxScheduleHelper.ToEvent(track.Id, srcNote, noteSlots, midiAwareFx));
+                }
+            }
+            else
+            {
+                foreach (var expanded in midiFxChain.ExpandNotes(sources, bpm))
+                {
+                    if (expanded.OffBeat <= startBeat) continue;
+                    var noteSlots = InstrumentRackRouting.ResolveSlots(track, slots, expanded.Note);
+                    if (noteSlots is null) continue;
+                    notes.Add(MidiFxScheduleHelper.ToEvent(track.Id, expanded, noteSlots, midiAwareFx));
+                }
             }
         }
         else if (src.IsAudio && src.Samples is not null)

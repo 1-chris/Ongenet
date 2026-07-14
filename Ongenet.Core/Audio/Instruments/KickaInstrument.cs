@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Instruments.Drums;
 using Ongenet.Core.Audio.Parameters;
 
 namespace Ongenet.Core.Audio.Instruments;
@@ -450,9 +451,8 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
     }
 
     /// <summary>One kick hit: Tok (transient) + Tail (pitch-swept tone → distortion stack) + clean sub.</summary>
-    private sealed class KickVoice : Voice
+    private sealed class KickVoice : DrumVoice
     {
-        private const float VoiceGain = 0.9f;
         private const double CombDelayMs = 1.2;
 
         private readonly KickaInstrument _inst;
@@ -468,21 +468,18 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
         private readonly OnePole _xL = new();
         private readonly OnePole _xR = new();
         private Biquad _clickHp;
-        private static uint _seed = 1;
 
         private CurveEnvelope _pitchEnv, _bodyEnv, _subEnv, _clickEnv, _tickEnv, _tailEnv, _punchEnv, _punchPitchEnv;
         private double _baseHz, _startPitch, _punchPitch;
-        private long _elapsed, _totalSamples;
-        private float _velocity;
 
         public KickVoice(KickaInstrument inst) => _inst = inst;
 
         public override void Start(int midiNote, float velocity, AudioFormat format)
         {
             base.Start(midiNote, velocity, format);
-            _velocity = velocity;
+            Velocity = velocity;
             var sr = format.SampleRate;
-            var seed = _seed++ * 2654435761u + (uint)midiNote;
+            var seed = NextSeed(midiNote);
 
             _baseHz = MusicalMath.NoteToFrequency(_inst.BasePitch + (midiNote - ReferenceNote));
             _startPitch = _inst.StartPitch;
@@ -521,12 +518,8 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
                 Math.Max(_tickEnv.TotalSeconds, _punchEnv.TotalSeconds));
             // The tail (forward decay or reverse swell) sits in place after the punch, so include it either way.
             var total = _inst.TailMode != 0 ? Math.Max(punchTail, _tailEnv.TotalSeconds) : punchTail;
-            _totalSamples = (long)((total + 0.02) * sr) + 1;
-            _elapsed = 0;
+            BeginTimeline(total, sr);
         }
-
-        // Kicks are one-shots: NoteOff is ignored; the voice ends on its own timeline.
-        public override void Release() { }
 
         public override void Render(Span<float> buffer)
         {
@@ -546,7 +539,7 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
             var combMix = (float)_inst.Comb;
             var width = (float)_inst.Width;
             var mode = _inst.TailMode;
-            var amp = _velocity * (float)_inst.Gain * VoiceGain;
+            var amp = Velocity * (float)_inst.Gain * VoiceGain;
             var outDrive = 1f + (float)_inst.Punch * 2.5f;
             var stereo = channels >= 2 && (combMix > 0.001f || width > 0.001f);
 
@@ -556,7 +549,7 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
 
             for (var frame = 0; frame < frames; frame++)
             {
-                var tp = _elapsed / (double)sr; // the punch is always on the beat (t = 0)
+                var tp = Elapsed / (double)sr; // the punch is always on the beat (t = 0)
 
                 // --- Tail tonal bus (body + tonal tail layer) → distortion stack ---
                 double tonalDry = 0;
@@ -626,20 +619,16 @@ public sealed class KickaInstrument : PolyphonicInstrument, IPresetProvider, IPr
 
                     var sL = (float)Math.Tanh(l * amp * outDrive);
                     var sR = (float)Math.Tanh(r * amp * outDrive);
-                    var bi = frame * channels;
-                    buffer[bi] += sL;
-                    buffer[bi + 1] += sR;
-                    for (var c = 2; c < channels; c++) buffer[bi + c] += 0.5f * (sL + sR);
+                    WriteStereo(buffer, frame, channels, sL, sR);
                 }
                 else
                 {
                     var mono = tonal + tok + (float)subClean;
                     var s = (float)Math.Tanh(mono * amp * outDrive);
-                    var bi = frame * channels;
-                    for (var c = 0; c < channels; c++) buffer[bi + c] += s;
+                    WriteMono(buffer, frame, channels, s);
                 }
 
-                if (++_elapsed >= _totalSamples) { IsActive = false; return; }
+                if (AdvanceTimeline()) return;
             }
         }
     }

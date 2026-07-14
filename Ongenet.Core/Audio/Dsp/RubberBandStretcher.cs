@@ -38,7 +38,7 @@ internal static class RubberBandStretcher
 
     /// <summary>Duration-preserving time stretch (unity pitch) for warp Complex segments.</summary>
     public static float[] TimeStretch(float[] input, int channels, int sampleRate, double timeRatio,
-        IProgress<double>? progress = null)
+        bool transientSafe = true, IProgress<double>? progress = null)
     {
         var frames = input.Length / channels;
         if (frames <= 0 || Math.Abs(timeRatio - 1.0) < 1e-6)
@@ -46,6 +46,9 @@ internal static class RubberBandStretcher
             progress?.Report(1.0);
             return input;
         }
+
+        if (!transientSafe)
+            return LinearTimeStretch(input, channels, frames, timeRatio, progress);
 
         var output = new float[frames * channels];
         for (var c = 0; c < channels; c++)
@@ -60,6 +63,29 @@ internal static class RubberBandStretcher
             if (channelOut.Length != channelIn.Length)
                 channelOut = FitToLength(channelOut, channelIn.Length);
             Interleave(output, channels, channelOut, c);
+        }
+
+        progress?.Report(1.0);
+        return output;
+    }
+
+    private static float[] LinearTimeStretch(float[] input, int channels, long frames, double timeRatio,
+        IProgress<double>? progress)
+    {
+        var targetLen = Math.Max(1, (int)Math.Round(frames * timeRatio));
+        var output = new float[targetLen * channels];
+        for (long f = 0; f < targetLen; f++)
+        {
+            var srcPos = f * (frames - 1.0) / Math.Max(1.0, targetLen - 1.0);
+            var f0 = (long)Math.Floor(srcPos);
+            var frac = (float)(srcPos - f0);
+            var f1 = Math.Min(frames - 1, f0 + 1);
+            var baseOut = f * channels;
+            var base0 = f0 * channels;
+            var base1 = f1 * channels;
+            for (var c = 0; c < channels; c++)
+                output[baseOut + c] = input[base0 + c] + (input[base1 + c] - input[base0 + c]) * frac;
+            if ((f & 0x3FF) == 0) progress?.Report(f / (double)targetLen);
         }
 
         progress?.Report(1.0);

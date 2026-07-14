@@ -8,12 +8,13 @@ namespace Ongenet.Core.Audio.Effects;
 
 /// <summary>
 /// A classic analysis/synthesis (filter-bank) vocoder. The track this effect sits on is the
-/// <i>modulator</i> (e.g. a voice); the user picks a <i>carrier</i> track (e.g. a synth) whose output
+/// <i>modulator</i> (e.g. a voice); the user picks a <i>carrier</i> track whose output
 /// is read through the engine's <see cref="ISidechainBus"/>. Each of N log-spaced bands of the carrier
 /// is scaled by the modulator's envelope in that band, so the carrier "speaks" with the modulator's
 /// articulation. Reuses <see cref="FilterBank"/> + <see cref="EnvelopeFollower"/>.
 /// </summary>
-public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectStatefulComponent, ISourceTrackEffect
+public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectStatefulComponent,
+    ISourceTrackEffect, IVocoderAnalysisSource
 {
     public const string TypeId = "vocoder";
 
@@ -27,38 +28,32 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
     public string Name => "Vocoder";
     public bool Enabled { get; set; } = true;
 
-    /// <summary>Index into <see cref="BandOptions"/> (number of analysis bands); default 16.</summary>
     public int BandsIndex { get; set; } = 1;
-
-    /// <summary>Dry/wet blend (0 = dry modulator, 1 = full vocoded).</summary>
     public double Mix { get; set; } = 1.0;
-
-    /// <summary>Band-envelope attack (ms) — lower tracks the modulator's transients more sharply.</summary>
     public double AttackMs { get; set; } = 5.0;
-
-    /// <summary>Band-envelope release (ms).</summary>
     public double ReleaseMs { get; set; } = 30.0;
-
-    /// <summary>Make-up gain applied to the vocoded signal (dB).</summary>
-    public double OutputDb { get; set; } = 0.0;
-
-    /// <summary>Carrier track/group whose output is shaped by the modulator; null = bypass (dry).</summary>
+    public double OutputDb { get; set; }
+    public double FormantShift { get; set; }
     public Guid? SourceTrackId { get; set; }
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
     private EffectContext? _ctx;
+    private double _lastFormantShift = double.NaN;
+    private float[] _bandLevels = Array.Empty<float>();
 
-    // The whole DSP graph (filter banks + envelopes + scratch buffers, pre-built for every band-count
-    // option). It is built entirely on the prepare thread and published with a single atomic field
-    // assignment, so the audio thread's Process always sees a complete graph — never a half-filled
-    // array. Process performs NO allocation, so it can't race a rebuild.
+    int IVocoderAnalysisSource.BandCount =>
+        BandOptions[Math.Clamp(BandsIndex, 0, BandOptions.Length - 1)];
+
+    ReadOnlySpan<float> IVocoderAnalysisSource.BandLevels =>
+        _bandLevels.AsSpan(0, BandOptions[Math.Clamp(BandsIndex, 0, BandOptions.Length - 1)]);
+
     private sealed class Graph
     {
-        public required FilterBank[][] Mod;          // [bandOption][channel]
-        public required FilterBank[][] Car;          // [bandOption][channel]
-        public required EnvelopeFollower[][][] Env;  // [bandOption][channel][band]
-        public required float[] ModBuf;              // scratch, sized to the max band count
+        public required FilterBank[][] Mod;
+        public required FilterBank[][] Car;
+        public required EnvelopeFollower[][][] Env;
+        public required float[] ModBuf;
         public required float[] CarBuf;
         public required int Channels;
     }
@@ -73,7 +68,8 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
         new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v, "0%", "", 1.0),
         new FloatParameter("Attack", 0.1, 100.0, () => AttackMs, v => AttackMs = v, "0.#", "ms", 2.0),
         new FloatParameter("Release", 2.0, 500.0, () => ReleaseMs, v => ReleaseMs = v, "0", "ms", 2.0),
-        new FloatParameter("Output", -24.0, 24.0, () => OutputDb, v => OutputDb = v, "0.#", "dB", 1.0)
+        new FloatParameter("Output", -24.0, 24.0, () => OutputDb, v => OutputDb = v, "0.#", "dB", 1.0),
+        new FloatParameter("Formant Shift", -12.0, 12.0, () => FormantShift, v => FormantShift = v, "0.#", "st")
     };
 
     public void SetContext(EffectContext context) => _ctx = context;
@@ -83,8 +79,6 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
 
-        // Pre-build the graph for every band-count option so a live Bands change is just an index
-        // switch in Process (no audio-thread allocation). Build into locals, publish atomically last.
         var opts = BandOptions.Length;
         var mod = new FilterBank[opts][];
         var car = new FilterBank[opts][];
@@ -102,10 +96,7 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
             for (var ch = 0; ch < _channels; ch++)
             {
                 mod[o][ch] = new FilterBank();
-                mod[o][ch].Configure(bands, MinBandHz, MaxBandHz, _sampleRate);
                 car[o][ch] = new FilterBank();
-                car[o][ch].Configure(bands, MinBandHz, MaxBandHz, _sampleRate);
-
                 env[o][ch] = new EnvelopeFollower[bands];
                 for (var b = 0; b < bands; b++)
                 {
@@ -121,28 +112,33 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
             ModBuf = new float[maxBands], CarBuf = new float[maxBands],
             Channels = _channels
         };
+        _bandLevels = new float[maxBands];
+        _lastFormantShift = double.NaN;
+        ApplyFormantShift();
     }
 
     public void Process(Span<float> buffer)
     {
-        var g = _graph;            // single atomic read: a complete graph or null
+        var g = _graph;
         if (g is null) return;
+
+        if (FormantShift != _lastFormantShift) ApplyFormantShift();
 
         var channels = g.Channels < 1 ? 1 : g.Channels;
         var frames = buffer.Length / channels;
         var opt = Math.Clamp(BandsIndex, 0, BandOptions.Length - 1);
         var bands = BandOptions[opt];
 
+        if (_bandLevels.Length < bands) _bandLevels = new float[bands];
+
         var modBanks = g.Mod[opt];
         var carBanks = g.Car[opt];
         var envBanks = g.Env[opt];
 
-        // Refresh envelope ballistics (cheap, no allocation; lets Attack/Release respond live).
         for (var ch = 0; ch < channels; ch++)
             for (var b = 0; b < bands; b++)
                 envBanks[ch][b].SetTimes(AttackMs, ReleaseMs, _sampleRate);
 
-        // Fetch the carrier track's output from the sidechain bus.
         var src = ReadOnlySpan<float>.Empty;
         var srcChannels = 1;
         if (_ctx is not null && SourceTrackId is { } id)
@@ -152,7 +148,7 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
         }
 
         var srcFrames = srcChannels > 0 ? src.Length / srcChannels : 0;
-        if (srcFrames == 0) return; // no carrier → leave the dry modulator untouched
+        if (srcFrames == 0) return;
 
         var mix = AudioMath.Clamp(Mix, 0.0, 1.0);
         var outGain = (float)AudioMath.Db2Lin(OutputDb);
@@ -162,6 +158,8 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
 
         for (var f = 0; f < frames; f++)
         {
+            Array.Clear(_bandLevels, 0, bands);
+
             for (var ch = 0; ch < channels; ch++)
             {
                 var i = f * channels + ch;
@@ -184,6 +182,7 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
                     var m = modSpan[b];
                     if (m < 0) m = -m;
                     var e = (float)env[b].Process(m);
+                    _bandLevels[b] = Math.Max(_bandLevels[b], e);
                     wet += carSpan[b] * e;
                 }
 
@@ -191,6 +190,28 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
                 buffer[i] = (float)(dry * (1.0 - mix) + wet * mix);
             }
         }
+    }
+
+    private void ApplyFormantShift()
+    {
+        var g = _graph;
+        if (g is null) return;
+
+        var ratio = Math.Pow(2.0, Math.Clamp(FormantShift, -12, 12) / 12.0);
+        var minHz = Math.Clamp(MinBandHz * ratio, 20, 16000);
+        var maxHz = Math.Clamp(MaxBandHz * ratio, minHz * 2, 20000);
+
+        for (var o = 0; o < BandOptions.Length; o++)
+        {
+            var bands = BandOptions[o];
+            for (var ch = 0; ch < g.Channels; ch++)
+            {
+                g.Mod[o][ch].Configure(bands, minHz, maxHz, _sampleRate);
+                g.Car[o][ch].Configure(bands, minHz, maxHz, _sampleRate);
+            }
+        }
+
+        _lastFormantShift = FormantShift;
     }
 
     public IAudioEffect Clone() => new VocoderEffect
@@ -201,10 +222,10 @@ public sealed class VocoderEffect : IAudioEffect, IContextualEffect, IProjectSta
         AttackMs = AttackMs,
         ReleaseMs = ReleaseMs,
         OutputDb = OutputDb,
+        FormantShift = FormantShift,
         SourceTrackId = SourceTrackId
     };
 
-    // The carrier-track reference isn't a generic Parameter, so persist it as custom state.
     public void WriteProjectState(OngenWriter writer)
     {
         writer.WriteBool(SourceTrackId.HasValue);

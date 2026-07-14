@@ -257,6 +257,7 @@ public sealed class SamplerRegion
         FilterMode? filterMode = null,
         double? cutoff = null,
         double? filterQ = null,
+        int? roundRobinKey = null,
         IReadOnlyList<SamplerModRoute>? modRoutes = null,
         IReadOnlyList<SamplerCcMod>? cutoffCc = null)
         => new()
@@ -294,7 +295,7 @@ public sealed class SamplerRegion
             InvertPhase = InvertPhase,
             SeqLength = seqLength ?? SeqLength,
             SeqPosition = seqPosition ?? SeqPosition,
-            RoundRobinKey = RoundRobinKey,
+            RoundRobinKey = roundRobinKey ?? RoundRobinKey,
             LoRand = LoRand,
             HiRand = HiRand,
             Group = Group,

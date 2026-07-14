@@ -6,8 +6,8 @@ using Ongenet.Core.Audio.Parameters;
 namespace Ongenet.Core.Audio.Effects;
 
 /// <summary>
-/// A harmonic enhancer: high-pass the input, waveshape the bright band, then blend back with
-/// the dry signal. Adds air / edge without muddying the lows.
+/// A harmonic enhancer: high-pass the input, waveshape the bright band, optional bass harmonic
+/// enhancement, then blend back with the dry signal.
 /// </summary>
 public sealed class ExciterEffect : IAudioEffect
 {
@@ -24,10 +24,12 @@ public sealed class ExciterEffect : IAudioEffect
     public double ToneHz { get; set; } = 3500.0;
     public int Mode { get; set; }
     public double OutputDb { get; set; }
+    public double BassEnhance { get; set; }
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
     private Biquad[] _hp = new Biquad[2];
+    private BassHarmonicEnhancerDsp[] _bass = Array.Empty<BassHarmonicEnhancerDsp>();
     private BiquadCoefficients _coeffs = BiquadCoefficients.Identity;
     private double _lastTone = double.NaN, _lastSr = double.NaN;
 
@@ -41,7 +43,8 @@ public sealed class ExciterEffect : IAudioEffect
         new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v),
         new FloatParameter("Tone", 200.0, 12000.0, () => ToneHz, v => ToneHz = v, "0", "Hz", 3.0),
         new ChoiceParameter("Mode", ModeNames, () => Mode, v => Mode = v),
-        new FloatParameter("Output", -24.0, 12.0, () => OutputDb, v => OutputDb = v, "0.#", "dB")
+        new FloatParameter("Output", -24.0, 12.0, () => OutputDb, v => OutputDb = v, "0.#", "dB"),
+        new FloatParameter("Bass Enhance", 0.0, 1.0, () => BassEnhance, v => BassEnhance = v)
     };
 
     public void Prepare(AudioFormat format)
@@ -49,7 +52,13 @@ public sealed class ExciterEffect : IAudioEffect
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
         _hp = new Biquad[_channels];
-        _lastTone = double.NaN; // force coefficient recompute
+        _bass = new BassHarmonicEnhancerDsp[_channels];
+        for (var c = 0; c < _channels; c++)
+        {
+            _bass[c] = new BassHarmonicEnhancerDsp();
+            _bass[c].Prepare(_sampleRate);
+        }
+        _lastTone = double.NaN;
     }
 
     public IAudioEffect Clone() => new ExciterEffect
@@ -59,7 +68,8 @@ public sealed class ExciterEffect : IAudioEffect
         Mix = Mix,
         ToneHz = ToneHz,
         Mode = Mode,
-        OutputDb = OutputDb
+        OutputDb = OutputDb,
+        BassEnhance = BassEnhance
     };
 
     public void Process(Span<float> buffer)
@@ -78,8 +88,10 @@ public sealed class ExciterEffect : IAudioEffect
         var drive = (float)Math.Max(1e-6, Drive);
         var mix = (float)Math.Clamp(Mix, 0, 1);
         var output = (float)AudioMath.Db2Lin(OutputDb);
+        var bassAmt = (float)Math.Clamp(BassEnhance, 0, 1);
         var type = (ShaperType)Math.Clamp(Mode, 0, 3);
         var hp = _hp;
+        var bass = _bass;
 
         var frames = buffer.Length / channels;
         for (var frame = 0; frame < frames; frame++)
@@ -88,7 +100,10 @@ public sealed class ExciterEffect : IAudioEffect
             for (var c = 0; c < channels; c++)
             {
                 var dry = buffer[i + c];
-                var bright = (float)hp[c].Process(coeffs, dry);
+                var bassDsp = bass[c];
+                bassDsp.Amount = bassAmt;
+                var withBass = bassDsp.Process(dry);
+                var bright = (float)hp[c].Process(coeffs, withBass);
                 var excited = WaveShaper.Shape(bright, type, drive);
                 buffer[i + c] = (dry * (1 - mix) + excited * mix) * output;
             }

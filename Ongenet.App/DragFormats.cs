@@ -23,6 +23,9 @@ namespace Ongenet.App
         /// <summary>Payload: the full path of an FX-chain <c>.ongenpreset</c> dragged from the FX Chains tab.</summary>
         public static readonly DataFormat<string> EffectChain = DataFormat.CreateStringApplicationFormat("net.ongenet.fxchain");
 
+        /// <summary>Payload: the full path of a modulator-chain <c>.ongenpreset</c>.</summary>
+        public static readonly DataFormat<string> ModulatorChain = DataFormat.CreateStringApplicationFormat("net.ongenet.modchain");
+
         /// <summary>Payload: the full path of a sound font (.sf2/.sfz) dragged from the Soundfonts tab.</summary>
         public static readonly DataFormat<string> SoundFont = DataFormat.CreateStringApplicationFormat("net.ongenet.soundfont");
 

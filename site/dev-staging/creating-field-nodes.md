@@ -1,7 +1,6 @@
 # The Field modular system & creating nodes
 
-**Field** is Ongenet's modular node-graph instrument and effect — a patchable "grid" (in the spirit of
-Bitwig's Grid) where you wire small components together to build synths, effects and modulation from
+**Field** is Ongenet's modular node-graph instrument and effect — a patchable "grid" where you wire small components together to build synths, effects and modulation from
 scratch. It ships as both an **instrument** (`TypeId "field"`, appears in the Instruments list) and an
 **effect** (appears in the add-effect menu under *Field*), sharing one engine.
 

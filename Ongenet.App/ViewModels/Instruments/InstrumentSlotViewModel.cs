@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.Core.Audio;
+using Ongenet.Core.Audio.Containers;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Field;
@@ -50,10 +51,14 @@ namespace Ongenet.App.ViewModels.Instruments
         private readonly DispatcherTimer _previewTimer;
         private readonly List<ParameterViewModel> _subscribedParams = new();
         private float[] _previewBuffer = Array.Empty<float>();
+        private bool _isSelected;
+
+        public event Action? SelectRequested;
 
         public InstrumentSlotViewModel(InstrumentSlot slot, Guid ownerTrackId, IProjectService project,
             IAudioFileService audioFiles,
-            ITransportService transport, IHistoryService history, IEffectRegistry effects, IPlaybackClock clock,
+            ITransportService transport, IHistoryService history, IEffectRegistry effects,
+            IInstrumentRegistry instruments, IPlaybackClock clock,
             Action notifyChanged, Action<InstrumentSlotViewModel> remove, Action<InstrumentSlotViewModel, int> move,
             Action<InstrumentSlotViewModel, string, bool> insertRelative, Action<InstrumentSlotViewModel, string> replaceWith,
             Action<InstrumentSlotViewModel, string, bool> insertPresetRelative, Action<InstrumentSlotViewModel, string> replacePresetWith,
@@ -80,6 +85,13 @@ namespace Ongenet.App.ViewModels.Instruments
 
             Effects = new EffectChainViewModel(slot.Effects, slot.CommitEffects, notifyChanged,
                 effects, history, transport, clock);
+
+            if (Instrument is ContainerInstrumentBase containerBase)
+            {
+                Container = new ContainerInstrumentViewModel(containerBase, instruments, history, audioFiles,
+                    effects, transport, clock, notifyChanged);
+                Container.RebuildAddable();
+            }
 
             RemoveCommand = new RelayCommand(() => _remove(this));
             ToggleEnabledCommand = new RelayCommand(() => IsEnabled = !IsEnabled);
@@ -166,6 +178,13 @@ namespace Ongenet.App.ViewModels.Instruments
         /// <summary>The slot's own (pre) effect chain editor.</summary>
         public EffectChainViewModel Effects { get; }
 
+        /// <summary>Nested instrument editor when this slot hosts a container device.</summary>
+        public ContainerInstrumentViewModel? Container { get; }
+
+        public bool IsContainer => Instrument is ContainerInstrumentBase;
+
+        public bool IsXyInstrument => Instrument is XyInstrument;
+
         public RelayCommand RemoveCommand { get; }
         public RelayCommand ToggleEnabledCommand { get; }
         public RelayCommand MoveUpCommand { get; }
@@ -174,6 +193,14 @@ namespace Ongenet.App.ViewModels.Instruments
 
         public bool IsFirst { get; set; }
         public bool IsLast { get; set; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set => SetField(ref _isSelected, value);
+        }
+
+        public void RequestSelect() => SelectRequested?.Invoke();
 
         /// <summary>Which edit a drag dropped onto this card performs, by the pointer's vertical zone.</summary>
         public enum RackDropZone { Above, Replace, Below }
@@ -282,6 +309,18 @@ namespace Ongenet.App.ViewModels.Instruments
                 if (value < 0 || PresetProvider is not { } provider) return;
                 _history.Capture("Load preset");
                 provider.LoadPreset(value);
+                if (Instrument is FieldInstrument)
+                {
+                    _fieldEditor?.ReloadSurfaceFromHost();
+                    _fieldSurface = null;
+                    _forceFieldEditor = false;
+                    OnPropertyChanged(nameof(HasCustomFieldSurface));
+                    OnPropertyChanged(nameof(ShowFieldEditor));
+                    OnPropertyChanged(nameof(ShowFieldSurface));
+                    OnPropertyChanged(nameof(ShowGenericParameters));
+                    OnPropertyChanged(nameof(FieldSurface));
+                    OnPropertyChanged(nameof(FieldEditorToggleText));
+                }
                 RebuildParameters();
                 RenderPreview();
                 OnPropertyChanged(nameof(SamplerStatus));
@@ -515,10 +554,41 @@ namespace Ongenet.App.ViewModels.Instruments
 
         public void ResetPitchBend() => PitchBendValue = 8192;
 
-        // --- Field modular instrument (embedded node-graph editor) ---
+        // --- Field modular instrument (embedded node-graph editor / custom surface) ---
 
         private FieldEditorViewModel? _fieldEditor;
+        private FieldSurfaceViewModel? _fieldSurface;
+        private bool _forceFieldEditor;
+        private RelayCommand? _toggleFieldEditorCommand;
+
         public bool IsField => Instrument is FieldInstrument;
+        public bool HasCustomFieldSurface => Instrument is FieldInstrument { HasCustomSurface: true };
+
+        /// <summary>True when the graph editor should be shown (sandbox Field, or after Edit Graph).</summary>
+        public bool ShowFieldEditor => IsField && (_forceFieldEditor || !HasCustomFieldSurface);
+
+        /// <summary>True when the authored custom surface should be shown in the rack card.</summary>
+        public bool ShowFieldSurface => IsField && HasCustomFieldSurface && !_forceFieldEditor;
+
+        /// <summary>
+        /// Generic parameter strip. Hidden for Field hosts that already have a custom surface — those
+        /// exposed controls are rendered by the surface itself (showing both would duplicate every knob).
+        /// Organ/Phase-4 use bespoke panels for their primary controls.
+        /// </summary>
+        public bool ShowGenericParameters => !(IsField && HasCustomFieldSurface) && !IsOrgan && !IsPhase4 &&
+            !IsFmSynth && !IsXyInstrument;
+
+        public RelayCommand ToggleFieldEditorCommand => _toggleFieldEditorCommand ??= new(() =>
+        {
+            _forceFieldEditor = !_forceFieldEditor;
+            OnPropertyChanged(nameof(ShowFieldEditor));
+            OnPropertyChanged(nameof(ShowFieldSurface));
+            OnPropertyChanged(nameof(ShowGenericParameters));
+            OnPropertyChanged(nameof(FieldEditorToggleText));
+            if (!_forceFieldEditor) RebuildParameters();
+        });
+
+        public string FieldEditorToggleText => _forceFieldEditor ? "Show interface" : "Edit graph";
 
         /// <summary>The node-graph editor for the Field instrument, or null for other instruments.</summary>
         public FieldEditorViewModel? FieldEditor
@@ -528,9 +598,20 @@ namespace Ongenet.App.ViewModels.Instruments
                 if (Instrument is not FieldInstrument fi) return null;
                 return _fieldEditor ??= new FieldEditorViewModel(fi.Graph,
                     App.ServiceProvider?.GetService<IFieldNodeRegistry>() ?? new FieldNodeRegistry(),
-                    fi.Recompile, fi.PresetNames,
+                    () => { fi.Recompile(); RebuildParameters(); }, fi.PresetNames,
                     i => { fi.LoadPreset(i); RebuildParameters(); }, () => fi.Compiled, isInstrument: true,
                     instrumentHost: () => fi);
+            }
+        }
+
+        /// <summary>Playback surface for a user Field instrument with a custom UI.</summary>
+        public FieldSurfaceViewModel? FieldSurface
+        {
+            get
+            {
+                if (Instrument is not FieldInstrument fi || !fi.HasCustomSurface) return null;
+                return _fieldSurface ??= new FieldSurfaceViewModel(fi.Graph, fi.Surface,
+                    () => { fi.SetSurface(_fieldSurface!.Surface); RebuildParameters(); });
             }
         }
 
@@ -538,6 +619,45 @@ namespace Ongenet.App.ViewModels.Instruments
 
         public bool IsGranular => Instrument is GranularInstrument;
         public GrainMonitor? GrainMonitor => (Instrument as GranularInstrument)?.Monitor;
+
+        // --- Organ drawbar panel ---
+
+        private OrganInstrument? OrganInst => Instrument as OrganInstrument;
+        public bool IsOrgan => OrganInst is not null;
+
+        public IReadOnlyList<ParameterViewModel> OrganDrawbars =>
+            IsOrgan
+                ? Parameters.Where(p => p.Group == "Drawbars").ToList()
+                : Array.Empty<ParameterViewModel>();
+
+        public ObservableCollection<ParameterGroupViewModel> NonDrawbarParameterGroups { get; } = new();
+
+        // --- Phase-4 operator macro panel ---
+
+        private Phase4Instrument? Phase4Inst => Instrument as Phase4Instrument;
+        public bool IsPhase4 => Phase4Inst is not null;
+
+        public IReadOnlyList<ParameterViewModel> Phase4Op1Params => Phase4GroupParams("Op 1");
+        public IReadOnlyList<ParameterViewModel> Phase4Op2Params => Phase4GroupParams("Op 2");
+        public IReadOnlyList<ParameterViewModel> Phase4Op3Params => Phase4GroupParams("Op 3");
+        public IReadOnlyList<ParameterViewModel> Phase4Op4Params => Phase4GroupParams("Op 4");
+
+        public ObservableCollection<ParameterGroupViewModel> Phase4TailParameterGroups { get; } = new();
+
+        // --- FM Synth four-operator panel ---
+
+        private FmSynthInstrument? FmInst => Instrument as FmSynthInstrument;
+        public bool IsFmSynth => FmInst is not null;
+
+        public IReadOnlyList<ParameterViewModel> FmOp1Params => FmGroupParams("Op 1");
+        public IReadOnlyList<ParameterViewModel> FmOp2Params => FmGroupParams("Op 2");
+        public IReadOnlyList<ParameterViewModel> FmOp3Params => FmGroupParams("Op 3");
+        public IReadOnlyList<ParameterViewModel> FmOp4Params => FmGroupParams("Op 4");
+
+        public ObservableCollection<ParameterGroupViewModel> FmTailParameterGroups { get; } = new();
+
+        private IReadOnlyList<ParameterViewModel> FmGroupParams(string group)
+            => IsFmSynth ? Parameters.Where(p => p.Group == group).ToList() : Array.Empty<ParameterViewModel>();
 
         // --- Waveform preview (any IPreviewRenderer instrument) ---
 
@@ -647,8 +767,70 @@ namespace Ongenet.App.ViewModels.Instruments
             }
 
             foreach (var key in order)
+            {
+                if (IsOrgan && key == "Drawbars") continue;
+                if (IsPhase4 && key is "Op 1" or "Op 2" or "Op 3" or "Op 4") continue;
+                if (IsFmSynth && key is "Op 1" or "Op 2" or "Op 3" or "Op 4") continue;
                 ParameterGroups.Add(new ParameterGroupViewModel(key, byGroup[key]));
+            }
+
+            RebuildSpecializedParameterGroups(byGroup, order);
+            NotifySpecializedInstrumentPanels();
         }
+
+        private void NotifySpecializedInstrumentPanels()
+        {
+            OnPropertyChanged(nameof(IsOrgan));
+            OnPropertyChanged(nameof(IsPhase4));
+            OnPropertyChanged(nameof(IsFmSynth));
+            OnPropertyChanged(nameof(OrganDrawbars));
+            OnPropertyChanged(nameof(Phase4Op1Params));
+            OnPropertyChanged(nameof(Phase4Op2Params));
+            OnPropertyChanged(nameof(Phase4Op3Params));
+            OnPropertyChanged(nameof(Phase4Op4Params));
+            OnPropertyChanged(nameof(FmOp1Params));
+            OnPropertyChanged(nameof(FmOp2Params));
+            OnPropertyChanged(nameof(FmOp3Params));
+            OnPropertyChanged(nameof(FmOp4Params));
+        }
+
+        private void RebuildSpecializedParameterGroups(Dictionary<string, List<ParameterViewModel>> byGroup,
+            List<string> order)
+        {
+            NonDrawbarParameterGroups.Clear();
+            Phase4TailParameterGroups.Clear();
+            FmTailParameterGroups.Clear();
+
+            if (IsOrgan)
+            {
+                foreach (var key in order)
+                {
+                    if (key == "Drawbars") continue;
+                    NonDrawbarParameterGroups.Add(new ParameterGroupViewModel(key, byGroup[key]));
+                }
+            }
+
+            if (IsPhase4)
+            {
+                foreach (var key in order)
+                {
+                    if (key is "Op 1" or "Op 2" or "Op 3" or "Op 4") continue;
+                    Phase4TailParameterGroups.Add(new ParameterGroupViewModel(key, byGroup[key]));
+                }
+            }
+
+            if (IsFmSynth)
+            {
+                foreach (var key in order)
+                {
+                    if (key is "Op 1" or "Op 2" or "Op 3" or "Op 4") continue;
+                    FmTailParameterGroups.Add(new ParameterGroupViewModel(key, byGroup[key]));
+                }
+            }
+        }
+
+        private IReadOnlyList<ParameterViewModel> Phase4GroupParams(string group)
+            => IsPhase4 ? Parameters.Where(p => p.Group == group).ToList() : Array.Empty<ParameterViewModel>();
 
         private void OnParameterChanged(object? sender, PropertyChangedEventArgs e) => SchedulePreview();
     }

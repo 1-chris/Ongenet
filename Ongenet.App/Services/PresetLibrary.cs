@@ -3,16 +3,18 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Ongenet.Core.Audio.Containers;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Field.Patches;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Modulation;
 using Ongenet.Core.Persistence;
 
 namespace Ongenet.App.Services;
 
 /// <summary>One preset file on disk.</summary>
-public sealed record PresetItem(string Name, string FullPath, string TypeId);
+public sealed record PresetItem(string Name, string FullPath, string TypeId, IReadOnlyList<string> Tags);
 
 /// <summary>A named group of presets (one per instrument/effect type).</summary>
 public sealed record PresetGroup(string Name, IReadOnlyList<PresetItem> Items);
@@ -22,6 +24,7 @@ public interface IPresetLibrary
     IReadOnlyList<PresetGroup> InstrumentPresets { get; }
     IReadOnlyList<PresetGroup> EffectPresets { get; }
     IReadOnlyList<PresetGroup> ChainPresets { get; }
+    IReadOnlyList<PresetGroup> ModulatorPresets { get; }
     event Action? Changed;
     void Rescan();
 
@@ -64,6 +67,7 @@ public sealed class PresetLibrary : IPresetLibrary
     public IReadOnlyList<PresetGroup> InstrumentPresets { get; private set; } = Array.Empty<PresetGroup>();
     public IReadOnlyList<PresetGroup> EffectPresets { get; private set; } = Array.Empty<PresetGroup>();
     public IReadOnlyList<PresetGroup> ChainPresets { get; private set; } = Array.Empty<PresetGroup>();
+    public IReadOnlyList<PresetGroup> ModulatorPresets { get; private set; } = Array.Empty<PresetGroup>();
 
     public event Action? Changed;
 
@@ -72,6 +76,7 @@ public sealed class PresetLibrary : IPresetLibrary
         var instr = new List<(string Group, PresetItem Item)>();
         var fx = new List<(string Group, PresetItem Item)>();
         var chains = new List<PresetItem>();
+        var modulators = new List<PresetItem>();
 
         var root = AppPaths.PresetsDirectory();
         foreach (var file in SafeEnumerate(root))
@@ -82,12 +87,13 @@ public sealed class PresetLibrary : IPresetLibrary
             if (meta is null) continue;
 
             var name = meta.DisplayName.Length > 0 ? meta.DisplayName : Path.GetFileNameWithoutExtension(file);
-            var item = new PresetItem(name, file, meta.TypeId);
+            var item = new PresetItem(name, file, meta.TypeId, meta.Tags);
             switch (meta.Kind)
             {
                 case PresetKind.Instrument: instr.Add((DisplayNameFor(meta), item)); break;
                 case PresetKind.FieldPatch: instr.Add(("Field Patches", item)); break;
                 case PresetKind.EffectChain: chains.Add(item); break;
+                case PresetKind.ModulatorChain: modulators.Add(item); break;
                 default: fx.Add((DisplayNameFor(meta), item)); break;
             }
         }
@@ -96,6 +102,9 @@ public sealed class PresetLibrary : IPresetLibrary
         EffectPresets = Group(fx);
         ChainPresets = chains.Count > 0
             ? new[] { new PresetGroup("FX Chains", chains.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList()) }
+            : Array.Empty<PresetGroup>();
+        ModulatorPresets = modulators.Count > 0
+            ? new[] { new PresetGroup("Modulator Chains", modulators.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList()) }
             : Array.Empty<PresetGroup>();
         Changed?.Invoke();
     }
@@ -180,6 +189,8 @@ public sealed class PresetLibrary : IPresetLibrary
         MaterializeInstrumentDefinitions(factoryDir, force: rewrite);
         MaterializeEffectDefinitions(factoryDir, force: rewrite);
         MaterializeChainDefinitions(factoryDir, force: rewrite);
+        MaterializeContainerDefinitions(factoryDir, force: rewrite);
+        MaterializeModulatorDefinitions(factoryDir, force: rewrite);
         MaterializeFieldInstrumentPatches(factoryDir, force: rewrite);
         MaterializeFieldEffectPatches(factoryDir, force: rewrite);
 
@@ -233,7 +244,8 @@ public sealed class PresetLibrary : IPresetLibrary
                     Directory.CreateDirectory(dir);
                     provider.LoadPreset(i);
                     using var fs = File.Create(path);
-                    PresetFile.SaveInstrument(instrument, presetName, "Factory", fs);
+                    var tags = FactoryPresetTags.For(info.DisplayName, presetName);
+                    PresetFile.SaveInstrument(instrument, presetName, "Factory", fs, tags);
                 }
                 catch
                 {
@@ -254,7 +266,8 @@ public sealed class PresetLibrary : IPresetLibrary
             {
                 Directory.CreateDirectory(dir);
                 using var fs = File.Create(path);
-                PresetFile.SaveInstrument(def.Create(), def.PresetName, "Factory", fs);
+                PresetFile.SaveInstrument(def.Create(), def.PresetName, "Factory", fs,
+                    FactoryPresetTags.For(def.InstrumentDisplayName, def.PresetName, def.Tags));
             }
             catch { /* skip */ }
         }
@@ -271,7 +284,8 @@ public sealed class PresetLibrary : IPresetLibrary
             {
                 Directory.CreateDirectory(dir);
                 using var fs = File.Create(path);
-                PresetFile.SaveEffect(def.Create(), def.PresetName, "Factory", fs);
+                PresetFile.SaveEffect(def.Create(), def.PresetName, "Factory", fs,
+                    FactoryPresetTags.For(def.EffectDisplayName, def.PresetName, def.Tags));
             }
             catch { /* skip */ }
         }
@@ -288,7 +302,8 @@ public sealed class PresetLibrary : IPresetLibrary
             {
                 Directory.CreateDirectory(dir);
                 using var fs = File.Create(path);
-                PresetFile.SaveChain(def.Create(), def.PresetName, "Factory", fs);
+                PresetFile.SaveChain(def.Create(), def.PresetName, "Factory", fs,
+                    FactoryPresetTags.For("FX Chains", def.PresetName, def.Tags));
             }
             catch { /* skip */ }
         }
@@ -298,6 +313,40 @@ public sealed class PresetLibrary : IPresetLibrary
     /// Materializes designed Field instrument patches (not the type-clone wrappers) as FieldPatch presets.
     /// Full Field instrument presets already land via <see cref="IPresetProvider"/> under the Field group.
     /// </summary>
+    private static void MaterializeContainerDefinitions(string factoryDir, bool force)
+    {
+        foreach (var def in FactoryContainerPresets.Definitions)
+        {
+            var dir = Path.Combine(factoryDir, Sanitize(def.EffectDisplayName));
+            var path = Path.Combine(dir, Sanitize(def.PresetName) + ".ongenpreset");
+            if (!force && File.Exists(path)) continue;
+            try
+            {
+                Directory.CreateDirectory(dir);
+                using var fs = File.Create(path);
+                PresetFile.SaveEffect(def.Create(), def.PresetName, "Factory", fs, def.Tags);
+            }
+            catch { /* skip */ }
+        }
+    }
+
+    private static void MaterializeModulatorDefinitions(string factoryDir, bool force)
+    {
+        var dir = Path.Combine(factoryDir, "Modulator Chains");
+        foreach (var def in FactoryModulatorPresets.Definitions)
+        {
+            var path = Path.Combine(dir, Sanitize(def.PresetName) + ".ongenpreset");
+            if (!force && File.Exists(path)) continue;
+            try
+            {
+                Directory.CreateDirectory(dir);
+                using var fs = File.Create(path);
+                PresetFile.SaveModulatorChain(def.Create(), def.PresetName, "Factory", fs, def.Tags);
+            }
+            catch { /* skip */ }
+        }
+    }
+
     private void MaterializeFieldInstrumentPatches(string factoryDir, bool force)
     {
         IInstrument field;

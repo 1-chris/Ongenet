@@ -47,10 +47,14 @@
                        Foreground="{StaticResource CatppuccinText}"/>
         </Border>
 
-        <!-- Right-aligned controls: save-preset / move up / down / remove -->
+        <!-- Right-aligned controls: save-preset / field toggle / move up / down / remove -->
         <Button DockPanel.Dock="Right" Content="{DynamicResource EffectHeader_Text}" Padding="6,2" Background="Transparent"
                 Foreground="{StaticResource CatppuccinRed}"
                 Command="{Binding RemoveCommand}" ToolTip.Tip="{DynamicResource EffectHeader_Remove_effect_Tip}" VerticalAlignment="Center"/>
+        <Button DockPanel.Dock="Right" Content="{Binding FieldEditorToggleText}" Classes="ord" Margin="0,0,4,0"
+                Command="{Binding ToggleFieldEditorCommand}"
+                IsVisible="{Binding HasCustomFieldSurface}"
+                ToolTip.Tip="Switch between the custom interface and the Field graph editor"/>
         <Button DockPanel.Dock="Right" Name="SaveEffectPresetButton" Content="{DynamicResource EffectHeader_Text_2}" Classes="ord" Margin="0,0,4,0"
                 ToolTip.Tip="{DynamicResource EffectHeader_Save_this_effects_settings_as_a_preset_Tip}">
             <Button.Flyout>

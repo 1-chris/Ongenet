@@ -11,6 +11,7 @@ using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.Midi;
+using Ongenet.Core.Audio.MidiFx;
 using Ongenet.Core.Audio.Parameters;
 using Ongenet.Core.Audio.Scheduling;
 using Ongenet.Core.Models.Audio;
@@ -30,7 +31,7 @@ public static class ProjectFile
 {
     /// <summary>Bumped whenever the on-disk layout changes. Newer files opened in an older app degrade gracefully.</summary>
     /// <remarks>v2: instrument rack. v3: track routing. v4: patterns, session, warp, takes, multi-out, MPE/groove/drum. v5: pattern tracks, pattern row metadata. v6: ARA pitch offset. v7: poly pitch segments.</remarks>
-    public const int FormatVersion = 22;
+    public const int FormatVersion = 23;
 
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("ONGENPRJ"); // 8 bytes
     private const string ManifestEntry = "ongen.manifest";
@@ -481,14 +482,14 @@ public static class ProjectFile
                 var inst = slot.Instrument;
                 ComponentSerializer.WriteComponent(c, inst.TypeId, inst, inst.Parameters, store, slot.Enabled, inst as ISampleHost);
                 c.WriteInt(slot.Effects.Count);
-                foreach (var e in slot.Effects) ComponentSerializer.WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
+                foreach (var e in slot.Effects) ComponentSerializer.WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, e as ISampleHost);
                 // v4 slot routing (trailing per slot when fileVersion >= 4 handled at read; always write for v4+)
                 c.WriteInt(slot.OutputBusIndex);
                 c.WriteNullableGuid(slot.OutputTrackId);
             }
 
             c.WriteInt(t.Effects.Count);
-            foreach (var e in t.Effects) ComponentSerializer.WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, null);
+            foreach (var e in t.Effects) ComponentSerializer.WriteComponent(c, e.TypeId, e, e.Parameters, store, e.Enabled, e as ISampleHost);
 
             c.WriteInt(t.AutoLanes.Count);
             foreach (var lane in t.AutoLanes) WriteAutoLane(c, lane);
@@ -542,7 +543,33 @@ public static class ProjectFile
 
             // v21 per-track row height
             c.WriteDouble(t.LaneHeight);
+
+            // v23 MIDI FX chain + instrument rack settings
+            c.WriteInt(t.MidiEffects.Count);
+            foreach (var mfx in t.MidiEffects)
+                MidiEffectSerializer.Write(c, mfx);
+            WriteRackSettings(c, t.Rack);
         });
+    }
+
+    private static void WriteRackSettings(OngenWriter c, InstrumentRackSettings rack)
+    {
+        c.WriteInt((int)rack.Kind);
+        c.WriteInt(rack.Macros.Count);
+        foreach (var m in rack.Macros)
+        {
+            c.WriteString(m.Label);
+            c.WriteString(m.TargetParameterId);
+            c.WriteDouble(m.Value);
+        }
+        c.WriteInt(rack.DrumPads.Count);
+        foreach (var p in rack.DrumPads)
+        {
+            c.WriteInt(p.PadIndex);
+            c.WriteInt(p.MidiNote);
+            c.WriteInt(p.InstrumentSlotIndex);
+            c.WriteString(p.Label);
+        }
     }
 
     private static void WriteModulator(OngenWriter c, TrackModulator mod)
@@ -638,8 +665,10 @@ public static class ProjectFile
 
     // ----------------------------------------------------------------- Load
 
-    public static LoadResult Load(Stream input, IInstrumentRegistry instruments, IEffectRegistry effects)
+    public static LoadResult Load(Stream input, IInstrumentRegistry instruments, IEffectRegistry effects,
+        IMidiEffectRegistry? midiEffects = null)
     {
+        midiEffects ??= new MidiEffectRegistry();
         using var zip = new ZipArchive(input, ZipArchiveMode.Read, leaveOpen: true);
         var warnings = new List<string>();
 
@@ -692,7 +721,7 @@ public static class ProjectFile
 
             var trackCount = r.ReadInt();
             for (var i = 0; i < trackCount; i++)
-                project.Tracks.Add(ReadTrack(r, instruments, effects, samples, warnings, fileVersion, project));
+                project.Tracks.Add(ReadTrack(r, instruments, effects, midiEffects, samples, warnings, fileVersion, project));
 
             // Optional trailing MIDI-mappings chunk (absent in files saved before this feature).
             if (r.HasMore) r.ReadChunk(c => ReadMidiMappings(c, project));
@@ -704,7 +733,7 @@ public static class ProjectFile
     }
 
     private static Track ReadTrack(OngenReader r, IInstrumentRegistry instruments, IEffectRegistry effects,
-        SampleLoader samples, List<string> warnings, int fileVersion, Project project)
+        IMidiEffectRegistry midiEffects, SampleLoader samples, List<string> warnings, int fileVersion, Project project)
     {
         Track track = null!;
         r.ReadChunk(c =>
@@ -725,7 +754,7 @@ public static class ProjectFile
             // count-prefixed list of slots, each an instrument followed by its own effect chain.
             if (fileVersion < 2)
             {
-                if (c.ReadBool() && ComponentSerializer.ReadInstrument(c, instruments, samples.Get, warnings).Instrument is { } legacy)
+                if (c.ReadBool() && ComponentSerializer.ReadInstrument(c, instruments, effects, midiEffects, samples.Get, warnings).Instrument is { } legacy)
                     track.Instruments.Add(new InstrumentSlot(legacy) { Enabled = true });
             }
             else
@@ -733,11 +762,11 @@ public static class ProjectFile
                 var slotCount = c.ReadInt();
                 for (var i = 0; i < slotCount; i++)
                 {
-                    var (inst, enabled) = ComponentSerializer.ReadInstrument(c, instruments, samples.Get, warnings);
+                    var (inst, enabled) = ComponentSerializer.ReadInstrument(c, instruments, effects, midiEffects, samples.Get, warnings);
                     var fxCountSlot = c.ReadInt();
                     var slotFx = new List<IAudioEffect>();
                     for (var j = 0; j < fxCountSlot; j++)
-                        if (ComponentSerializer.ReadEffect(c, effects, warnings) is { } sfx) slotFx.Add(sfx);
+                        if (ComponentSerializer.ReadEffect(c, instruments, effects, midiEffects, samples.Get, warnings) is { } sfx) slotFx.Add(sfx);
 
                     if (inst is null) continue; // instrument type unavailable; its effects are dropped
                     var slot = new InstrumentSlot(inst) { Enabled = enabled };
@@ -756,7 +785,7 @@ public static class ProjectFile
             var fxCount = c.ReadInt();
             for (var i = 0; i < fxCount; i++)
             {
-                var fx = ComponentSerializer.ReadEffect(c, effects, warnings);
+                var fx = ComponentSerializer.ReadEffect(c, instruments, effects, midiEffects, samples.Get, warnings);
                 if (fx is not null) track.Effects.Add(fx);
             }
 
@@ -844,14 +873,52 @@ public static class ProjectFile
             }
             if (fileVersion >= 21 && c.ChunkHasMore)
                 track.LaneHeight = c.ReadDouble();
+            if (fileVersion >= 23 && c.ChunkHasMore)
+            {
+                var mfxCount = c.ReadInt();
+                for (var i = 0; i < mfxCount; i++)
+                    if (MidiEffectSerializer.Read(c, midiEffects, warnings) is { } mfx)
+                        track.MidiEffects.Add(mfx);
+                if (c.ChunkHasMore)
+                    ReadRackSettings(c, track.Rack);
+            }
         });
 
         // Populate the audio-thread snapshots the engine reads.
         track.CommitInstruments();
         track.CommitEffects();
+        track.CommitMidiEffects();
         track.CommitAutoLanes();
         track.CommitModulators();
         return track;
+    }
+
+    private static void ReadRackSettings(OngenReader c, InstrumentRackSettings rack)
+    {
+        rack.Kind = (RackKind)c.ReadInt();
+        rack.Macros.Clear();
+        var macroCount = c.ReadInt();
+        for (var i = 0; i < macroCount; i++)
+        {
+            rack.Macros.Add(new RackMacroKnob
+            {
+                Label = c.ReadString(),
+                TargetParameterId = c.ReadString(),
+                Value = c.ReadDouble()
+            });
+        }
+        rack.DrumPads.Clear();
+        var padCount = c.ReadInt();
+        for (var i = 0; i < padCount; i++)
+        {
+            rack.DrumPads.Add(new DrumPadSlot
+            {
+                PadIndex = c.ReadInt(),
+                MidiNote = c.ReadInt(),
+                InstrumentSlotIndex = c.ReadInt(),
+                Label = c.ReadString()
+            });
+        }
     }
 
     private static TrackModulator ReadModulator(OngenReader c)

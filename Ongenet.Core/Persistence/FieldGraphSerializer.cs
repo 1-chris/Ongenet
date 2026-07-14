@@ -94,9 +94,16 @@ public static class FieldGraphSerializer
     }
 
     public static void Read(OngenReader r, FieldGraph graph, IFieldNodeRegistry registry)
+        => Read(r, graph, registry, alreadyReadVersion: null);
+
+    /// <summary>
+    /// Reads a graph. When <paramref name="alreadyReadVersion"/> is set, the caller already consumed the
+    /// leading version int (used by <see cref="FieldHostState"/> when branching legacy vs enveloped state).
+    /// </summary>
+    public static void Read(OngenReader r, FieldGraph graph, IFieldNodeRegistry registry, int? alreadyReadVersion)
     {
         graph.Clear();
-        var version = r.ReadInt();
+        var version = alreadyReadVersion ?? r.ReadInt();
 
         var nodeCount = r.ReadInt();
         for (var i = 0; i < nodeCount; i++)

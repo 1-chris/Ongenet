@@ -24,6 +24,12 @@
     <system:String x:Key="AudioEditor_OpenClips">Open clips</system:String>
     <system:String x:Key="AudioEditor_SelectClipPrompt">Select a clip from the list or open one from the timeline.</system:String>
     <system:String x:Key="AudioEditor_RemoveLane">Remove lane</system:String>
+    <system:String x:Key="AudioEditor_SliceToGrid">Slice to Grid</system:String>
+    <system:String x:Key="AudioEditor_ApplyBeatWarp">Apply Beat Warp</system:String>
+    <system:String x:Key="AudioEditor_ExportToSampler">Export to Sampler</system:String>
+    <system:String x:Key="AudioEditor_TransientSafe">Transient-safe warp</system:String>
+    <system:String x:Key="AudioEditor_MoveSliceUp">Move up</system:String>
+    <system:String x:Key="AudioEditor_MoveSliceDown">Move down</system:String>
     <system:String x:Key="AudioToMidi_Audio_to_MIDI">Audio to MIDI</system:String>
     <system:String x:Key="AudioToMidi_Audio_to_MIDI_Title">Audio to MIDI</system:String>
     <system:String x:Key="AudioToMidi_Cancel">Cancel</system:String>
@@ -282,6 +288,7 @@
     <system:String x:Key="LibraryList_Collapse_recursively">Collapse recursively</system:String>
     <system:String x:Key="LibraryList_Expand_recursively">Expand recursively</system:String>
     <system:String x:Key="LibraryList_Search">Search…</system:String>
+    <system:String x:Key="LibraryList_TagFilter">Filter tags…</system:String>
     <system:String x:Key="LibraryList_Search_Placeholder">Search…</system:String>
     <system:String x:Key="LibraryOrg_Favourites">Favourites</system:String>
     <system:String x:Key="LibraryOrg_Favourite_Tip">Toggle favourite</system:String>
@@ -343,6 +350,7 @@
     <system:String x:Key="Main_Export_video">Export video…</system:String>
     <system:String x:Key="Main_Expression_Maps">Expression Maps</system:String>
     <system:String x:Key="Main_FX_Chains">FX Chains</system:String>
+    <system:String x:Key="Main_Mod_Presets">Mod Presets</system:String>
     <system:String x:Key="Main_FX_Presets">FX Presets</system:String>
     <system:String x:Key="Main_Files">Files</system:String>
     <system:String x:Key="Main_Guide">Guide</system:String>
@@ -523,7 +531,7 @@
     <system:String x:Key="PatternInspector_PATTERN_TRACK">PATTERN TRACK</system:String>
     <system:String x:Key="PatternInspector_Pattern_name">Pattern name</system:String>
     <system:String x:Key="PatternInspector_Pattern_rows">Pattern rows</system:String>
-    <system:String x:Key="PatternInspector_Pattern_tracks_hold_step_sequencer_style_pattern_Tip">Pattern tracks hold step-sequencer-style patterns (like FL Studio channel racks) — each row triggers an instrument or sample when steps are active in the pattern editor.</system:String>
+    <system:String x:Key="PatternInspector_Pattern_tracks_hold_step_sequencer_style_pattern_Tip">Pattern tracks hold step-sequencer-style patterns (like classic channel racks) — each row triggers an instrument or sample when steps are active in the pattern editor.</system:String>
     <system:String x:Key="PatternInspector_Pick_an_audio_clip_from_the_project_library_to_f_Tip">Pick an audio clip from the project library to fire when steps on this row are enabled.</system:String>
     <system:String x:Key="PatternInspector_Rename_the_pattern_Changing_the_name_updates_it__Tip">Rename the pattern. Changing the name updates it everywhere this pattern is referenced in the project.</system:String>
     <system:String x:Key="PatternInspector_Row_label_shown_in_the_pattern_editor_and_channe_Tip">Row label shown in the pattern editor and channel rack — rename to organize drums, bass, etc.</system:String>
@@ -1318,7 +1326,7 @@
     <system:String x:Key="Guide_Production_Body">Practical habits that keep mixes clean and sessions fast.&#10;&#10;• Gain staging — keep faders near unity; trim hot recordings or clips before heavy plugin chains.&#10;• Aux sends — route to reverb/delay returns instead of inserting the same effect on every track.&#10;• Freeze / render — right-click clips or freeze CPU-heavy instrument tracks.&#10;• Groove — apply swing templates in Groove settings for humanized timing.&#10;• MIDI FX — arp, chord, and scale processors on instrument tracks before the synth.&#10;• Comping — loop-record take lanes, pick regions, flatten the best performance.&#10;• Reference mix — export stems and A/B against commercial tracks at matched loudness.&#10;• Surround — use surround pan in the Track Inspector when bouncing 5.1/7.1 for film and immersive work.</system:String>
     <system:String x:Key="Guide_Timeline_Body">The arrange view is the center of the window.&#10;&#10;• Add tracks from the track header menu; arm for recording, mute/solo from the header or mixer.&#10;• Drag audio from the Library onto a track; enable Auto-stretch in Settings if you want tempo sync on import.&#10;• MIDI clips open in the piano roll (bottom panel). Audio clips show warp markers and fades on the timeline.&#10;• Right-click clips for render, freeze, linked copies, stem separation, and audio-to-MIDI conversion.&#10;• Comping: loop-record into take lanes, then pick the best regions and flatten.&#10;• Ripple edit: Ctrl+Shift+I inserts a bar at the playhead; Ctrl+Shift+Backspace deletes a bar and closes the gap.</system:String>
     <system:String x:Key="Guide_Session_Body">Hybrid workflows combine timeline arrangement with launcher-style playback.&#10;&#10;• Session tab — clip slots per track/scene; launch clips while the transport runs.&#10;• Channel Rack + Pattern editor — FL-style step grids; change pattern length and step count in the pattern toolbar.&#10;• Pattern clips on the timeline expand into MIDI at playback via the pattern scheduler.&#10;• Section Playlist (View menu) — play arrangement markers in order for song-structure previews.</system:String>
-    <system:String x:Key="Guide_Field_Body">Field is Ongenet's node-graph instrument and effect (similar in spirit to Bitwig Grid).&#10;&#10;• Add a Field instrument or effect from the built-in list or open the Field editor from an instrument slot.&#10;• Patch oscillators, envelopes, filters, and math nodes; use Scale Quantize / Key Root for theory-aware patches.&#10;• Factory Field patches ship in the instrument/FX preset library — editable graphs, not black boxes.&#10;• Module nodes wrap any built-in or hosted plugin as a patchable block inside Field.</system:String>
+    <system:String x:Key="Guide_Field_Body">Field is Ongenet's node-graph instrument and effect (modular grid patching).&#10;&#10;• Add a Field instrument or effect from the built-in list or open the Field editor from an instrument slot.&#10;• Patch oscillators, envelopes, filters, and math nodes; use Scale Quantize / Key Root for theory-aware patches.&#10;• Factory Field patches ship in the instrument/FX preset library — editable graphs, not black boxes.&#10;• Module nodes wrap any built-in or hosted plugin as a patchable block inside Field.</system:String>
     <system:String x:Key="Guide_Mixer_Body">• Mixer tab — per-track volume, pan, sends, input monitor, and routing matrix. Surround pan is in the Track Inspector.&#10;• Export (title bar) — master mix, stems, regions, surround offline; timeline XML for post handoff (not binary AAF).&#10;• Transport bar Export button mirrors the dialog; MIDI export is available from the transport area.&#10;• Collaboration folder sync (Export menu) copies the project + manifest for folder-based sharing.</system:String>
     <system:String x:Key="Guide_Shortcuts_Body">Global (when not typing in a text field):&#10;&#10;Ctrl+N  New          Ctrl+O  Open         Ctrl+S  Save&#10;Ctrl+Shift+S  Save As    Ctrl+Z  Undo    Ctrl+Y / Ctrl+Shift+Z  Redo&#10;Space   Play/stop    Ctrl+Alt+T  Tempo map    Ctrl+Alt+L  Section playlist&#10;Ctrl+Shift+I  Ripple insert bar    Ctrl+Shift+Backspace  Ripple delete bar&#10;Shift+[ / Shift+]  Set loop in/out to start marker    F8  Renderer diagnostics&#10;&#10;Timeline (focus timeline first): Delete — remove clip; Ctrl+D — duplicate.&#10;Piano roll (focus piano roll): Delete — remove selected notes.&#10;&#10;Typing keyboard: Z-row and Q-row play notes on instrument tracks (FL-style map).&#10;Customize ripple/tempo/playlist shortcuts in Settings → MIDI → Keyboard shortcuts.</system:String>
     <system:String x:Key="Guide_AudioEditor_Title">Audio Editor</system:String>

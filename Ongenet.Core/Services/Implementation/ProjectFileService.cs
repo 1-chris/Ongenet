@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.MidiFx;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Persistence;
@@ -22,19 +23,22 @@ public sealed class ProjectFileService : IProjectFileService
     private readonly ITransportService _transport;
     private readonly IInstrumentRegistry _instruments;
     private readonly IEffectRegistry _effects;
+    private readonly IMidiEffectRegistry _midiEffects;
     private readonly ISelectionService _selection;
 
     private bool _suppressDirty;
     private string? _displayNameOverride;
 
     public ProjectFileService(IProjectService project, ITransportService transport,
-        IInstrumentRegistry instruments, IEffectRegistry effects, ISelectionService selection,
+        IInstrumentRegistry instruments, IEffectRegistry effects, IMidiEffectRegistry midiEffects,
+        ISelectionService selection,
         IEventAggregator events)
     {
         _project = project;
         _transport = transport;
         _instruments = instruments;
         _effects = effects;
+        _midiEffects = midiEffects;
         _selection = selection;
 
         // Anything that mutates the project marks it dirty.
@@ -115,7 +119,7 @@ public sealed class ProjectFileService : IProjectFileService
             result = await Task.Run(() =>
             {
                 using var fs = File.OpenRead(path);
-                return ProjectFile.Load(fs, _instruments, _effects);
+                return ProjectFile.Load(fs, _instruments, _effects, _midiEffects);
             });
         }
         finally
@@ -186,7 +190,7 @@ public sealed class ProjectFileService : IProjectFileService
             result = await Task.Run(() =>
             {
                 using var ms = new MemoryStream(bytes, writable: false);
-                return ProjectFile.Load(ms, _instruments, _effects);
+                return ProjectFile.Load(ms, _instruments, _effects, _midiEffects);
             });
         }
         finally

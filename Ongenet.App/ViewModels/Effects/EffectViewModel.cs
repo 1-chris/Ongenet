@@ -111,5 +111,16 @@ namespace Ongenet.App.ViewModels.Effects
             OnPropertyChanged(nameof(IsEditorOpen));
             OnPropertyChanged(nameof(EditorButtonText));
         }
+
+        // --- Field custom-surface toggle (overridden by FieldEffectViewModel) ---
+
+        /// <summary>True when this card can switch between a custom interface and the Field graph editor.</summary>
+        public virtual bool HasCustomFieldSurface => false;
+
+        /// <summary>Label for the interface/graph toggle next to Save preset.</summary>
+        public virtual string FieldEditorToggleText => "Edit graph";
+
+        /// <summary>Command that flips between the custom surface and the Field graph editor.</summary>
+        public virtual RelayCommand? ToggleFieldEditorCommand => null;
     }
 }

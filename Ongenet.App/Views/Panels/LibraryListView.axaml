@@ -12,6 +12,10 @@
         <DockPanel>
             <TextBox Classes="search" DockPanel.Dock="Top" Text="{Binding SearchText, Mode=TwoWay}"
                      PlaceholderText="{DynamicResource LibraryList_Search}" Margin="6,6,6,2"/>
+            <TextBox Classes="search" DockPanel.Dock="Top" Text="{Binding TagFilterText, Mode=TwoWay}"
+                     PlaceholderText="{DynamicResource LibraryList_TagFilter}"
+                     Margin="6,0,6,2"
+                     IsVisible="{Binding HasTagFilter}"/>
 
             <Panel>
                 <TextBlock Text="{Binding EmptyHint}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"

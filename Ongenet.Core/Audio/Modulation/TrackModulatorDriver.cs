@@ -8,8 +8,8 @@ using Ongenet.Core.Persistence;
 namespace Ongenet.Core.Audio.Modulation;
 
 /// <summary>
-/// Evaluates <see cref="TrackModulator"/> sources at schedule time and writes into their bound
-/// targets. Called after automation each block so modulators layer on top of automated values.
+/// Evaluates track modulators at schedule time and writes into their bound targets.
+/// Supports legacy <see cref="TrackModulator"/> entries and registry-backed <see cref="ModulatorSlot"/>s.
 /// </summary>
 public static class TrackModulatorDriver
 {
@@ -17,18 +17,46 @@ public static class TrackModulatorDriver
 
     public static void ApplyTrack(Track track, double beat, double bpm, Project? project = null)
     {
-        var mods = track.ActiveModulators;
-        if (mods.Length == 0) return;
-
         var timeSec = beat * 60.0 / (bpm > 0 ? bpm : 120.0);
-        foreach (var mod in mods)
+
+        foreach (var mod in track.ActiveModulators)
         {
             if (!mod.Enabled) continue;
-            ApplyModulator(track, mod, timeSec, beat, bpm, project);
+            ApplyLegacyModulator(track, mod, timeSec, beat, bpm, project);
+        }
+
+        foreach (var slot in track.ActiveModulatorSlots)
+        {
+            if (!slot.Enabled || !slot.Source.Enabled) continue;
+            ApplyRegistrySlot(track, slot, timeSec, beat, bpm, project);
         }
     }
 
-    private static void ApplyModulator(Track track, TrackModulator mod, double timeSec, double beat, double bpm,
+    private static void ApplyRegistrySlot(Track track, ModulatorSlot slot, double timeSec, double beat,
+        double bpm, Project? project)
+    {
+        var target = ProjectFile.BuildTarget(track, (int)slot.Target.Kind,
+            slot.Target.EffectIndex, slot.Target.ParamIndex, project);
+        if (target is null) return;
+
+        var ctx = new ModulatorContext
+        {
+            Track = track,
+            TimeSec = timeSec,
+            Beat = beat,
+            Bpm = bpm,
+            Project = project,
+            SlotId = slot.Id
+        };
+
+        var uni = Math.Clamp(slot.Source.Evaluate(ctx), 0, 1);
+        var depth = Math.Clamp(slot.Depth, 0, 1);
+        var current = target.Read();
+        var modulated = Blend(current, uni, depth, slot.Target.Kind, target.Minimum, target.Maximum);
+        target.Write(modulated);
+    }
+
+    private static void ApplyLegacyModulator(Track track, TrackModulator mod, double timeSec, double beat, double bpm,
         Project? project)
     {
         var target = ProjectFile.BuildTarget(track, (int)mod.Target.Kind,
@@ -37,50 +65,42 @@ public static class TrackModulatorDriver
 
         var current = target.Read();
         var depth = Math.Clamp(mod.Depth, 0, 1);
-        double modulated;
+        double uni;
 
         switch (mod.Kind)
         {
             case TrackModulatorKind.EnvelopeFollower:
-            {
-                var level = _envLevel.GetValueOrDefault(track.Id);
-                var input = Math.Clamp(track.MeterLevel, 0f, 1f);
-                var atk = Math.Max(1e-4, mod.AttackSeconds);
-                var rel = Math.Max(1e-4, mod.ReleaseSeconds);
-                var blockSec = 512.0 / 48000.0;
-                var coeff = input > level
-                    ? 1.0 - Math.Exp(-blockSec / atk)
-                    : 1.0 - Math.Exp(-blockSec / rel);
-                level = (float)(level + (input - level) * coeff);
-                _envLevel[track.Id] = level;
-                modulated = Math.Clamp(current * (1.0 - depth + depth * level), target.Minimum, target.Maximum);
+                uni = ModulatorEval.EnvelopeFollower(track, mod.Id, mod.AttackSeconds, mod.ReleaseSeconds, _envLevel);
                 break;
-            }
             default:
             {
                 var rateHz = mod.RateHz;
                 if (mod.TempoSync && bpm > 0)
                     rateHz = bpm / 60.0 * Math.Max(1e-6, mod.RateHz);
-
                 var phase = rateHz > 0 ? timeSec * rateHz : 0;
                 phase -= Math.Floor(phase);
-                var lfo = Lfo.Evaluate(mod.Wave, phase);
-                var uni = (lfo + 1.0) * 0.5;
-                modulated = mod.Target.Kind switch
-                {
-                    AutomationTargetKind.TrackVolume =>
-                        Math.Clamp(current * (1.0 - depth + depth * uni), target.Minimum, target.Maximum),
-                    AutomationTargetKind.TrackPan =>
-                        Math.Clamp(current + (lfo * depth * 0.5), target.Minimum, target.Maximum),
-                    AutomationTargetKind.TrackSendLevel =>
-                        Math.Clamp(current * (1.0 - depth + depth * uni), target.Minimum, target.Maximum),
-                    _ => Math.Clamp(current + (lfo * depth * (target.Maximum - target.Minimum) * 0.25),
-                        target.Minimum, target.Maximum)
-                };
+                uni = ModulatorEval.LfoUnipolar(mod.Wave, phase);
                 break;
             }
         }
 
+        var modulated = Blend(current, uni, depth, mod.Target.Kind, target.Minimum, target.Maximum);
         target.Write(modulated);
+    }
+
+    private static double Blend(double current, double uni, double depth, AutomationTargetKind kind,
+        double min, double max)
+    {
+        var lfo = uni * 2.0 - 1.0;
+        return kind switch
+        {
+            AutomationTargetKind.TrackVolume =>
+                Math.Clamp(current * (1.0 - depth + depth * uni), min, max),
+            AutomationTargetKind.TrackPan =>
+                Math.Clamp(current + (lfo * depth * 0.5), min, max),
+            AutomationTargetKind.TrackSendLevel =>
+                Math.Clamp(current * (1.0 - depth + depth * uni), min, max),
+            _ => Math.Clamp(current + (lfo * depth * (max - min) * 0.25), min, max)
+        };
     }
 }

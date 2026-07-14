@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Instruments.Drums;
 using Ongenet.Core.Audio.Parameters;
 
 namespace Ongenet.Core.Audio.Instruments;
@@ -319,14 +320,8 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
     }
 
     /// <summary>One percussion hit: noise (+ tone layer) → colour LP → resonant filter → drive → width.</summary>
-    private sealed class PercVoice : Voice
+    private sealed class PercVoice : DrumVoice
     {
-        private const float VoiceGain = 0.9f;
-        private const int MaxTaps = 4;
-
-        // TR-808-style inharmonic ratios for the metallic (square bank) tone layer.
-        private static readonly double[] MetalRatios = { 1.0, 1.5, 2.08, 2.72, 3.4, 4.1 };
-
         private readonly PercaInstrument _inst;
         private readonly WaveOscillator _noiseA = new();
         private readonly WaveOscillator _noiseB = new();
@@ -336,14 +331,11 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
         private readonly OnePole _colorB = new();
         private Biquad _filtA;
         private Biquad _filtB;
-        private static uint _seed = 1;
 
         private readonly CurveEnvelope[] _tapEnvs = new CurveEnvelope[MaxTaps];
         private int _taps;
         private CurveEnvelope _toneEnv;
         private double _pitchRatio;
-        private long _elapsed, _totalSamples;
-        private float _velocity;
 
         public PercVoice(PercaInstrument inst)
         {
@@ -354,9 +346,9 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
         public override void Start(int midiNote, float velocity, AudioFormat format)
         {
             base.Start(midiNote, velocity, format);
-            _velocity = velocity;
+            Velocity = velocity;
             var sr = format.SampleRate;
-            var seed = _seed++ * 2654435761u + (uint)midiNote;
+            var seed = NextSeed(midiNote);
 
             // Playing away from the reference note shifts the whole patch (filter + tone) in semitones.
             _pitchRatio = MusicalMath.SemitonesToRatio(midiNote - ReferenceNote);
@@ -397,12 +389,8 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
 
             var total = _tapEnvs[_taps - 1].TotalSeconds;
             if (_inst.ToneLevel > 0) total = Math.Max(total, _toneEnv.TotalSeconds);
-            _totalSamples = (long)((total + 0.02) * sr) + 1;
-            _elapsed = 0;
+            BeginTimeline(total, sr);
         }
-
-        // Percussion hits are one-shots: NoteOff is ignored; the voice ends on its own timeline.
-        public override void Release() { }
 
         public override void Render(Span<float> buffer)
         {
@@ -414,7 +402,7 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
             var metal = _inst.ToneType == 1;
             var drive = (float)_inst.Drive;
             var width = (float)_inst.Width;
-            var amp = _velocity * (float)_inst.Gain * VoiceGain;
+            var amp = Velocity * (float)_inst.Gain * VoiceGain;
             var stereo = channels >= 2 && width > 0.001f;
 
             var mode = _inst.FilterType switch
@@ -429,7 +417,7 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
 
             for (var frame = 0; frame < frames; frame++)
             {
-                var t = _elapsed / (double)sr;
+                var t = Elapsed / (double)sr;
 
                 // Envelope = the loudest active tap (retrigger semantics, like a real clap).
                 var env = 0.0;
@@ -471,19 +459,14 @@ public sealed class PercaInstrument : PolyphonicInstrument, IPresetProvider, IPr
                     var mid = 0.5f * (a + b);
                     var l = (mid + width * (a - mid)) * amp;
                     var r = (mid + width * (b - mid)) * amp;
-                    var bi = frame * channels;
-                    buffer[bi] += l;
-                    buffer[bi + 1] += r;
-                    for (var c = 2; c < channels; c++) buffer[bi + c] += 0.5f * (l + r);
+                    WriteStereo(buffer, frame, channels, l, r);
                 }
                 else
                 {
-                    var s = a * amp;
-                    var bi = frame * channels;
-                    for (var c = 0; c < channels; c++) buffer[bi + c] += s;
+                    WriteMono(buffer, frame, channels, a * amp);
                 }
 
-                if (++_elapsed >= _totalSamples) { IsActive = false; return; }
+                if (AdvanceTimeline()) return;
             }
         }
     }

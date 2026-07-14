@@ -106,6 +106,21 @@ public sealed class SamplerInstrument : IInstrument, IInstrumentVoiceState, IPro
         }
     }
 
+    /// <summary>Appends exported slice zones without replacing existing regions.</summary>
+    public void AppendRegions(IReadOnlyList<SamplerRegion> regions)
+    {
+        if (regions.Count == 0) return;
+        lock (_lock)
+        {
+            var merged = new List<SamplerRegion>(_regions);
+            merged.AddRange(regions);
+            foreach (var v in _voices) v.Stop();
+            _roundRobin.Reset();
+            _regions = merged.ToArray();
+            ConfigureArticulation();
+        }
+    }
+
     /// <summary>Path of the first layer (legacy). Empty when unloaded.</summary>
     public string SourcePath
     {

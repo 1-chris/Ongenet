@@ -24,6 +24,12 @@
     <system:String x:Key="AudioEditor_OpenClips">クリップを開く</system:String>
     <system:String x:Key="AudioEditor_SelectClipPrompt">リストからクリップを選択するか、タイムラインから開いてください。</system:String>
     <system:String x:Key="AudioEditor_RemoveLane">レーンを削除</system:String>
+    <system:String x:Key="AudioEditor_SliceToGrid">グリッドにスライス</system:String>
+    <system:String x:Key="AudioEditor_ApplyBeatWarp">ビートワープを適用</system:String>
+    <system:String x:Key="AudioEditor_ExportToSampler">サンプラーへエクスポート</system:String>
+    <system:String x:Key="AudioEditor_TransientSafe">トランジェント安全ワープ</system:String>
+    <system:String x:Key="AudioEditor_MoveSliceUp">上へ</system:String>
+    <system:String x:Key="AudioEditor_MoveSliceDown">下へ</system:String>
     <system:String x:Key="AudioToMidi_Audio_to_MIDI">オーディオを MIDI に変換</system:String>
     <system:String x:Key="AudioToMidi_Audio_to_MIDI_Title">オーディオを MIDI に変換</system:String>
     <system:String x:Key="AudioToMidi_Cancel">キャンセル</system:String>
@@ -282,6 +288,7 @@
     <system:String x:Key="LibraryList_Collapse_recursively">再帰的に折りたたむ</system:String>
     <system:String x:Key="LibraryList_Expand_recursively">再帰的に展開</system:String>
     <system:String x:Key="LibraryList_Search">検索…</system:String>
+    <system:String x:Key="LibraryList_TagFilter">タグで絞り込み…</system:String>
     <system:String x:Key="LibraryList_Search_Placeholder">検索…</system:String>
     <system:String x:Key="LibraryOrg_Favourites">お気に入り</system:String>
     <system:String x:Key="LibraryOrg_Favourite_Tip">お気に入りを切り替え</system:String>
@@ -343,6 +350,7 @@
     <system:String x:Key="Main_Export_video">ビデオをエクスポート…</system:String>
     <system:String x:Key="Main_Expression_Maps">エクスプレッションマップ</system:String>
     <system:String x:Key="Main_FX_Chains">FX チェイン</system:String>
+    <system:String x:Key="Main_Mod_Presets">モジュレータ</system:String>
     <system:String x:Key="Main_FX_Presets">FX プリセット</system:String>
     <system:String x:Key="Main_Files">ファイル</system:String>
     <system:String x:Key="Main_Guide">ガイド</system:String>
@@ -523,7 +531,7 @@
     <system:String x:Key="PatternInspector_PATTERN_TRACK">PATTERN TRACK</system:String>
     <system:String x:Key="PatternInspector_Pattern_name">パターン名</system:String>
     <system:String x:Key="PatternInspector_Pattern_rows">パターン行</system:String>
-    <system:String x:Key="PatternInspector_Pattern_tracks_hold_step_sequencer_style_pattern_Tip">パターントラックはステップシーケンサー形式のパターンを保持（FL Studio チャンネルラック風）— パターンエディターでステップがアクティブ時に各行がインストゥルメントまたはサンプルをトリガー。</system:String>
+    <system:String x:Key="PatternInspector_Pattern_tracks_hold_step_sequencer_style_pattern_Tip">パターントラックはステップシーケンサー形式のパターンを保持（クラシックなチャンネルラック風）— パターンエディターでステップがアクティブ時に各行がインストゥルメントまたはサンプルをトリガー。</system:String>
     <system:String x:Key="PatternInspector_Pick_an_audio_clip_from_the_project_library_to_f_Tip">この行のステップが有効なときに発火するオーディオクリップをプロジェクトライブラリから選択。</system:String>
     <system:String x:Key="PatternInspector_Rename_the_pattern_Changing_the_name_updates_it__Tip">パターンの名前を変更。名前変更はプロジェクト内のすべての参照箇所に反映。</system:String>
     <system:String x:Key="PatternInspector_Row_label_shown_in_the_pattern_editor_and_channe_Tip">パターンエディターとチャンネルラックに表示される行ラベル — ドラム、ベースなど整理のため名前変更。</system:String>
@@ -1318,7 +1326,7 @@
     <system:String x:Key="Guide_Production_Body">ミックスをクリーンにセッションを高速に保つ実践的習慣。&amp;#10;&amp;#10;• ゲインステージング — フェーダーをユニティ付近に、重いプラグインチェイン前にホットな録音やクリップをトリム。&amp;#10;• AUX センド — すべてのトラックに同じエフェクトを挿入する代わりにリバーブ/ディレイリターンへルーティング。&amp;#10;• フリーズ / レンダー — クリップを右クリックまたは CPU 負荷の高いインストゥルメントトラックをフリーズ。&amp;#10;• グルーヴ — グルーヴ設定でスウィングテンプレートを適用してヒューマナイズタイミング。&amp;#10;• MIDI FX — シンセ前のインストゥルメントトラックにアルペジオ、コード、スケールプロセッサー。&amp;#10;• コンピング — テイクレーンにループ録音、リージョンを選び、最良パフォーマンスをフラット化。&amp;#10;• リファレンスミックス — ステムをエクスポートし、同等ラウドネスの商業曲と A/B。&amp;#10;• サラウンド — 映画やイマーシブ作業で 5.1/7.1 バウンス時にトラックインスペクターのサラウンドパンを使用。</system:String>
     <system:String x:Key="Guide_Timeline_Body">アレンジビューはウィンドウの中心。&amp;#10;&amp;#10;• トラックヘッダーメニューからトラックを追加、録音用にアーム、ヘッダーまたはミキサーからミュート/ソロ。&amp;#10;• ライブラリからオーディオをトラックにドラッグ、インポート時のテンポ同期には設定で自動ストレッチを有効化。&amp;#10;• MIDI クリップはピアノロール（下部パネル）で開く。オーディオクリップはタイムラインにワープマーカーとフェードを表示。&amp;#10;• クリップを右クリックでレンダー、フリーズ、リンクコピー、ステム分離、オーディオ→MIDI 変換。&amp;#10;• コンピング: テイクレーンにループ録音し、最良リージョンを選んでフラット化。&amp;#10;• リップル編集: Ctrl+Shift+I で再生ヘッドに 1 小節挿入、Ctrl+Shift+Backspace で 1 小節削除してギャップを閉じる。</system:String>
     <system:String x:Key="Guide_Session_Body">ハイブリッドワークフローはタイムラインアレンジメントとランチャー形式再生を組み合わせ。&amp;#10;&amp;#10;• セッションタブ — トラック/シーンごとのクリップスロット、トランスポート稼働中にクリップを起動。&amp;#10;• チャンネルラック + パターンエディター — FL 形式ステップグリッド、パターンツールバーでパターン長とステップ数を変更。&amp;#10;• タイムラインのパターンクリップはパターンスケジューラー経由で再生時に MIDI に展開。&amp;#10;• セクションプレイリスト（表示メニュー）— 曲構成プレビュー用にアレンジメントマーカーを順に再生。</system:String>
-    <system:String x:Key="Guide_Field_Body">Field は Ongenet のノードグラフ型インストゥルメントとエフェクト（Bitwig Grid に近い思想）。&amp;#10;&amp;#10;• ビルトインリストから Field インストゥルメントまたはエフェクトを追加、またはインストゥルメントスロットから Field エディターを開く。&amp;#10;• オシレーター、エンベロープ、フィルター、数学ノードをパッチ、理論対応パッチに Scale Quantize / Key Root を使用。&amp;#10;• ファクトリー Field パッチはインストゥルメント/FX プリセットライブラリに同梱 — 編集可能グラフ、ブラックボックスではない。&amp;#10;• モジュールノードは任意のビルトインまたはホストプラグインを Field 内のパッチ可能ブロックとしてラップ。</system:String>
+    <system:String x:Key="Guide_Field_Body">Field は Ongenet のノードグラフ型インストゥルメントとエフェクト（モジュラーグリッド型パッチング）。&amp;#10;&amp;#10;• ビルトインリストから Field インストゥルメントまたはエフェクトを追加、またはインストゥルメントスロットから Field エディターを開く。&amp;#10;• オシレーター、エンベロープ、フィルター、数学ノードをパッチ、理論対応パッチに Scale Quantize / Key Root を使用。&amp;#10;• ファクトリー Field パッチはインストゥルメント/FX プリセットライブラリに同梱 — 編集可能グラフ、ブラックボックスではない。&amp;#10;• モジュールノードは任意のビルトインまたはホストプラグインを Field 内のパッチ可能ブロックとしてラップ。</system:String>
     <system:String x:Key="Guide_Mixer_Body">• ミキサータブ — トラックごとの音量、パン、センド、入力モニター、ルーティングマトリクス。サラウンドパンはトラックインスペクターに。&amp;#10;• エクスポート（タイトルバー）— マスターミックス、ステム、リージョン、サラウンドオフライン、ポスト連携用タイムライン XML（バイナリ AAF ではない）。&amp;#10;• トランスポートバーのエクスポートボタンはダイアログと同じ、MIDI エクスポートはトランスポートエリアから利用可能。&amp;#10;• コラボレーションフォルダ同期（エクスポートメニュー）はフォルダベース共有用にプロジェクト + マニフェストをコピー。</system:String>
     <system:String x:Key="Guide_Shortcuts_Body">グローバル（テキストフィールド入力中以外）:&amp;#10;&amp;#10;Ctrl+N  新規          Ctrl+O  開く         Ctrl+S  保存&amp;#10;Ctrl+Shift+S  名前を付けて保存    Ctrl+Z  元に戻す    Ctrl+Y / Ctrl+Shift+Z  やり直し&amp;#10;Space   再生/停止    Ctrl+Alt+T  テンポマップ    Ctrl+Alt+L  セクションプレイリスト&amp;#10;Ctrl+Shift+I  リップル挿入（1 小節）    Ctrl+Shift+Backspace  リップル削除（1 小節）&amp;#10;Shift+[ / Shift+]  ループ入/出を開始マーカーに設定    F8  レンダラーダイアグノスティクス&amp;#10;&amp;#10;タイムライン（先にタイムラインにフォーカス）: Delete — クリップ削除、Ctrl+D — 複製。&amp;#10;ピアノロール（先にピアノロールにフォーカス）: Delete — 選択ノート削除。&amp;#10;&amp;#10;タイピングキーボード: Z 行と Q 行でインストゥルメントトラックのノートを演奏（FL 形式マップ）。&amp;#10;設定 → MIDI → キーボードショートカットでリップル/テンポ/プレイリストショートカットをカスタマイズ。</system:String>
     <system:String x:Key="Guide_AudioEditor_Title">オーディオエディター</system:String>

@@ -26,6 +26,7 @@ public sealed class ChorusEffect : IAudioEffect
     public double Depth { get; set; } = 0.6;
     public double Mix { get; set; } = 0.5;
     public double Spread { get; set; } = 0.7;
+    public bool Enhanced { get; set; }
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
@@ -41,7 +42,8 @@ public sealed class ChorusEffect : IAudioEffect
         new FloatParameter("Rate", 0.05, 5.0, () => RateHz, v => RateHz = v, "0.##", "Hz", 2.0),
         new FloatParameter("Depth", 0.0, 1.0, () => Depth, v => Depth = v),
         new FloatParameter("Spread", 0.0, 1.0, () => Spread, v => Spread = v),
-        new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v)
+        new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v),
+        new BoolParameter("Enhanced", () => Enhanced, v => Enhanced = v)
     };
 
     public void Prepare(AudioFormat format)
@@ -57,7 +59,7 @@ public sealed class ChorusEffect : IAudioEffect
 
     public IAudioEffect Clone() => new ChorusEffect
     {
-        Enabled = Enabled, RateHz = RateHz, Depth = Depth, Mix = Mix, Spread = Spread
+        Enabled = Enabled, RateHz = RateHz, Depth = Depth, Mix = Mix, Spread = Spread, Enhanced = Enhanced
     };
 
     public void Process(Span<float> buffer)
@@ -66,8 +68,9 @@ public sealed class ChorusEffect : IAudioEffect
         if (lines.Length == 0) return;
         var channels = Math.Min(_channels, lines.Length);
         var mix = (float)Math.Clamp(Mix, 0, 1);
-        var depth = Math.Clamp(Depth, 0, 1);
+        var depth = Math.Clamp(Depth, 0, 1) * (Enhanced ? 1.25 : 1.0);
         var spread = Math.Clamp(Spread, 0, 1);
+        var voices = Enhanced ? 5 : Voices;
         _lfo.SetRate(RateHz, _sampleRate);
 
         var frames = buffer.Length / channels;
@@ -78,14 +81,14 @@ public sealed class ChorusEffect : IAudioEffect
             {
                 var chanOffset = c == 1 ? spread * 0.5 : 0.0; // stereo de-correlation
                 double wet = 0;
-                for (var v = 0; v < Voices; v++)
+                for (var v = 0; v < voices; v++)
                 {
-                    var lfo = _lfo.Value(chanOffset + (double)v / Voices);
+                    var lfo = _lfo.Value(chanOffset + (double)v / voices);
                     var delayMs = BaseMs + SweepMs * depth * (0.5 + 0.5 * lfo);
                     wet += lines[c].ReadFrac(delayMs / 1000.0 * _sampleRate);
                 }
 
-                wet /= Voices;
+                wet /= voices;
                 var dry = buffer[i + c];
                 buffer[i + c] = (float)(dry * (1 - mix) + wet * mix);
                 lines[c].Write(dry);

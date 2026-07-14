@@ -66,6 +66,15 @@ public sealed class StutterGesture
     /// <summary>Per-slice amplitude shape (the "stutter shape"). Empty = full, square gate.</summary>
     public ModulationCurve Gate { get; set; } = new(new[] { new Automation.AutomationPoint(0, 1) });
 
+    /// <summary>Per-slice volume shape (multiplied with <see cref="Gate"/>). Empty = full level.</summary>
+    public ModulationCurve Volume { get; set; } = new(new[] { new Automation.AutomationPoint(0, 1) });
+
+    /// <summary>Playback rate through the captured slice (0.25 = quarter speed, 4 = four times faster).</summary>
+    public double TapeSpeed { get; set; } = 1.0;
+
+    /// <summary>When true, each slice reads backward through the buffer.</summary>
+    public bool ReverseBuffer { get; set; }
+
     /// <summary>Stutter-rate sweep across the gesture; null = fixed <see cref="RateIndex"/>.</summary>
     public ModulationCurve? Rate { get; set; }
 
@@ -88,6 +97,9 @@ public sealed class StutterGesture
             BufferLengthBeats = BufferLengthBeats,
             TailMs = TailMs,
             Gate = Gate.Clone(),
+            Volume = Volume.Clone(),
+            TapeSpeed = TapeSpeed,
+            ReverseBuffer = ReverseBuffer,
             Rate = Rate?.Clone(),
             Cutoff = Cutoff?.Clone()
         };

@@ -15,6 +15,7 @@ public static class LibraryItemKeys
     public const string SoundFont = "soundfont";
     public const string Preset = "preset";
     public const string EffectChain = "chain";
+    public const string ModulatorChain = "modchain";
     public const string Project = "project";
 
     public static string Make(string kind, string payload) => kind + ":" + payload;
@@ -26,6 +27,7 @@ public static class LibraryItemKeys
     public static string SoundFontKey(string path) => Make(SoundFont, NormalizePath(path));
     public static string PresetKey(string path) => Make(Preset, NormalizePath(path));
     public static string EffectChainKey(string path) => Make(EffectChain, NormalizePath(path));
+    public static string ModulatorChainKey(string path) => Make(ModulatorChain, NormalizePath(path));
     public static string ProjectKey(string path) => Make(Project, NormalizePath(path));
 
     /// <summary>Named non-filesystem group, e.g. instrument category "Synth" → <c>folder:instruments:Synth</c>.</summary>

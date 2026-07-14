@@ -46,6 +46,7 @@ namespace Ongenet.App.ViewModels
             Library.InstrumentPresetLibraryViewModel instrumentPresets,
             Library.EffectPresetLibraryViewModel effectPresets,
             Library.EffectChainPresetLibraryViewModel chainPresets,
+            Library.ModulatorPresetLibraryViewModel modulatorPresets,
             Library.ProjectsLibraryViewModel projectsLibrary,
             ProjectClipsViewModel projectClips,
             Panels.MixerViewModel mixer,
@@ -74,6 +75,7 @@ namespace Ongenet.App.ViewModels
             InstrumentPresets = instrumentPresets;
             EffectPresets = effectPresets;
             EffectChainPresets = chainPresets;
+            ModulatorPresets = modulatorPresets;
             ProjectsLibrary = projectsLibrary;
             ProjectClips = projectClips;
             Mixer = mixer;
@@ -162,6 +164,7 @@ namespace Ongenet.App.ViewModels
         public Library.InstrumentPresetLibraryViewModel InstrumentPresets { get; }
         public Library.EffectPresetLibraryViewModel EffectPresets { get; }
         public Library.EffectChainPresetLibraryViewModel EffectChainPresets { get; }
+        public Library.ModulatorPresetLibraryViewModel ModulatorPresets { get; }
         public Library.ProjectsLibraryViewModel ProjectsLibrary { get; }
 
         /// <summary>Left sidebar's Project Clips tab (unique clips across the project).</summary>

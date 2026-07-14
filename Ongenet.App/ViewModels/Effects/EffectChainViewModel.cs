@@ -246,6 +246,9 @@ namespace Ongenet.App.ViewModels.Effects
                     StutteroEffect st => new StutteroEffectViewModel(st, RemoveEffect, MoveUp, MoveDown),
                     VocoderEffect vc => new VocoderEffectViewModel(vc, RemoveEffect, MoveUp, MoveDown),
                     WaveformVisualizerEffect wv => new WaveformVisualizerEffectViewModel(wv, RemoveEffect, MoveUp, MoveDown),
+                    SpectrumEffect sp => new SpectrumEffectViewModel(sp, RemoveEffect, MoveUp, MoveDown),
+                    TunerEffect tu => new TunerEffectViewModel(tu, RemoveEffect, MoveUp, MoveDown),
+                    ConvolutionEffect cv => new ConvolutionEffectViewModel(cv, RemoveEffect, MoveUp, MoveDown),
                     _ => new EffectViewModel(effect, RemoveEffect, MoveUp, MoveDown)
                 });
             }

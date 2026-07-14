@@ -4,6 +4,8 @@ using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Field;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.MidiFx;
+using Ongenet.Core.Audio.Modulation;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Implementation;
 using Ongenet.Core.Services.Interfaces;
@@ -30,6 +32,8 @@ public static class ServiceCollectionExtensions
         // and one selection shared across the whole application.
         services.AddSingleton<IInstrumentRegistry, InstrumentRegistry>();
         services.AddSingleton<IEffectRegistry, EffectRegistry>();
+        services.AddSingleton<IMidiEffectRegistry, MidiEffectRegistry>();
+        services.AddSingleton<IModulatorRegistry, ModulatorRegistry>();
 
         // The Field modular instrument/effect: its node catalogue, plus (via FieldBootstrap.Initialize,
         // called by the app after the provider is built) the "field" instrument/effect entries and the

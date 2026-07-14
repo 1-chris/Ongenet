@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Parameters;
 
@@ -18,9 +19,15 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
 
     private volatile AudioSampleBuffer? _sample;
 
+    public int VoiceMode { get; set; }
     public double AttackSeconds { get; set; } = 0.001;
     public double ReleaseSeconds { get; set; } = 0.08;
     public double Gain { get; set; } = 0.9;
+    public double Damping { get; set; } = 0.5;
+    public double PickPosition { get; set; } = 0.5;
+    public double Brightness { get; set; } = 0.5;
+
+    private static readonly string[] VoiceModeNames = { "Sample", "Karplus" };
 
     public string? SampleName { get; private set; }
 
@@ -39,6 +46,10 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
 
     public override IReadOnlyList<Parameter> Parameters => _parameters ??= new Parameter[]
     {
+        new ChoiceParameter("Voice", VoiceModeNames, () => VoiceMode, v => VoiceMode = v) { Group = "Voice" },
+        new FloatParameter("Damping", 0, 1, () => Damping, v => Damping = v, "0.00") { Group = "Voice" },
+        new FloatParameter("Pick", 0, 1, () => PickPosition, v => PickPosition = v, "0.00") { Group = "Voice" },
+        new FloatParameter("Bright", 0, 1, () => Brightness, v => Brightness = v, "0.00") { Group = "Voice" },
         new FloatParameter("Attack", 0.0, 1.0, () => AttackSeconds, v => AttackSeconds = v, "0.000", "s") { Group = "Amp Envelope" },
         new FloatParameter("Release", 0.001, 2.0, () => ReleaseSeconds, v => ReleaseSeconds = v, "0.000", "s") { Group = "Amp Envelope" },
         new FloatParameter("Gain", 0.0, 1.0, () => Gain, v => Gain = v) { Group = "Output" }
@@ -48,9 +59,13 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
     {
         var copy = new BasicSamplerInstrument
         {
+            VoiceMode = VoiceMode,
             AttackSeconds = AttackSeconds,
             ReleaseSeconds = ReleaseSeconds,
-            Gain = Gain
+            Gain = Gain,
+            Damping = Damping,
+            PickPosition = PickPosition,
+            Brightness = Brightness
         };
         if (_sample is { } s && SampleName is { } n) copy.LoadSample(s, n);
         return copy;
@@ -62,10 +77,12 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
     {
         private readonly BasicSamplerInstrument _instrument;
         private readonly AdsrEnvelope _envelope = new();
+        private readonly KarplusStrongDsp _karplus = new();
         private AudioSampleBuffer? _sample;
         private double _position;       // read position, in file frames
         private double _rate;           // file frames advanced per output frame
         private float _velocity;
+        private bool _useKarplus;
 
         public SampleVoice(BasicSamplerInstrument instrument) => _instrument = instrument;
 
@@ -75,8 +92,18 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
             _velocity = velocity;
             _sample = _instrument.Sample;
             _position = 0;
+            _useKarplus = _instrument.VoiceMode == 1;
 
-            if (_sample is not null)
+            if (_useKarplus)
+            {
+                _karplus.Prepare(format.SampleRate);
+                _karplus.Damping = _instrument.Damping;
+                _karplus.PickPosition = _instrument.PickPosition;
+                _karplus.Brightness = _instrument.Brightness;
+                _karplus.SetFrequency(MusicalMath.NoteToFrequency(midiNote));
+                _karplus.Pluck(velocity);
+            }
+            else if (_sample is not null)
             {
                 var pitch = Math.Pow(2.0, (midiNote - RootNote) / 12.0);
                 _rate = (double)_sample.SampleRate / format.SampleRate * pitch;
@@ -89,13 +116,19 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
             _envelope.ReleaseSeconds = _instrument.ReleaseSeconds;
             _envelope.Gate();
 
-            if (_sample is null) IsActive = false; // nothing loaded
+            if (!_useKarplus && _sample is null) IsActive = false;
         }
 
         public override void Release() => _envelope.Release();
 
         public override void Render(Span<float> buffer)
         {
+            if (_useKarplus)
+            {
+                RenderKarplus(buffer);
+                return;
+            }
+
             var sample = _sample;
             if (sample is null) { IsActive = false; return; }
 
@@ -125,6 +158,27 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
                 _position += _rate;
 
                 if (!_envelope.IsActive) { IsActive = false; return; }
+            }
+        }
+
+        private void RenderKarplus(Span<float> buffer)
+        {
+            var channels = Format.Channels < 1 ? 1 : Format.Channels;
+            var frames = buffer.Length / channels;
+            var gain = (float)_instrument.Gain;
+
+            for (var frame = 0; frame < frames; frame++)
+            {
+                var env = _envelope.Process();
+                var s = _karplus.Process() * env * _velocity * gain;
+                var baseIndex = frame * channels;
+                for (var c = 0; c < channels; c++) buffer[baseIndex + c] += s;
+
+                if (!_envelope.IsActive && _karplus.IsSilent())
+                {
+                    IsActive = false;
+                    return;
+                }
             }
         }
     }

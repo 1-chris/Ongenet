@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:inst="using:Ongenet.App.ViewModels.Instruments"
+             xmlns:panels="using:Ongenet.App.Views.Panels"
+             xmlns:controls="using:Ongenet.App.Controls"
+             x:Class="Ongenet.App.Views.Panels.ContainerInstrumentView"
+             x:DataType="inst:ContainerInstrumentViewModel">
+
+    <StackPanel Spacing="8" Margin="0,4,0,0">
+        <DockPanel IsVisible="{Binding !IsXy}">
+            <Button DockPanel.Dock="Right" Content="{Binding ChildrenHeader, StringFormat='Add {0}'}"
+                    Command="{Binding AddLayerCommand}" IsVisible="{Binding CanAddChild}"
+                    Padding="8,4" Margin="4,0,0,0"/>
+            <TextBlock Text="{Binding ChildrenHeader}" FontWeight="Bold" FontSize="11"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+        </DockPanel>
+
+        <!-- XY Instrument: pad + compact corner list (only this container device uses the morph pad). -->
+        <Border Padding="10" CornerRadius="6"
+                IsVisible="{Binding IsXy}"
+                Background="{StaticResource CatppuccinCrust}"
+                BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <StackPanel Grid.Column="0" Spacing="6">
+                    <TextBlock Text="XY morph" FontWeight="SemiBold" FontSize="11"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock Text="Drag to crossfade the four corner instruments."
+                               FontSize="10" TextWrapping="Wrap" MaxWidth="168"
+                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    <controls:XyMorphControl X="{Binding XyX, Mode=TwoWay}" Y="{Binding XyY, Mode=TwoWay}"
+                                             DragStarted="OnXyDragStarted"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="Corners" FontWeight="Bold" FontSize="11" Margin="0,0,0,4"
+                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    <ItemsControl ItemsSource="{Binding Children}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="inst:ContainerChildSlotViewModel">
+                                <panels:ContainerChildSlotView DataContext="{Binding}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Other containers: full child cards below the header. -->
+        <ItemsControl ItemsSource="{Binding Children}" IsVisible="{Binding !IsXy}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="inst:ContainerChildSlotViewModel">
+                    <panels:ContainerChildSlotView DataContext="{Binding}"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Expander Header="Post FX (chain)" IsVisible="{Binding ShowPostEffects}" IsExpanded="True">
+            <panels:EffectChainView DataContext="{Binding PostEffects}" Margin="0,6,0,0"/>
+        </Expander>
+    </StackPanel>
+</UserControl>

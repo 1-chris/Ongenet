@@ -35,6 +35,7 @@ namespace Ongenet.App.Views.Panels
             NodeTree.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
             NodeTree.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel);
             NodeTree.AddHandler(DoubleTappedEvent, OnDoubleTapped);
+            NodeTree.SelectionChanged += OnSelectionChanged;
             NodeTree.AddHandler(TreeViewItem.ExpandedEvent, OnItemExpanded, RoutingStrategies.Bubble);
         }
 
@@ -72,7 +73,25 @@ namespace Ongenet.App.Views.Panels
         }
 
         private void OnDoubleTapped(object? sender, TappedEventArgs e)
-            => NodeOf(e.Source)?.Activate?.Invoke();
+        {
+            var node = NodeOf(e.Source);
+            if (node is null) return;
+            if (DataContext is InstrumentPresetLibraryViewModel instPresets &&
+                node.DragFormat == DragFormats.Preset && node.DragPayload is { Length: > 0 } path)
+            {
+                instPresets.LoadSelectedPreset(path);
+                return;
+            }
+
+            node.Activate?.Invoke();
+        }
+
+        private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (DataContext is not LibraryListViewModel { PreviewOnSelect: true } vm) return;
+            if (NodeTree.SelectedItem is not LibraryNode { IsFolder: false } node) return;
+            node.Activate?.Invoke();
+        }
 
         private void OnItemExpanded(object? sender, RoutedEventArgs e)
             => TreeBrowseHelper.ScrollExpandedIntoView(NodeTree, e.Source as Control);

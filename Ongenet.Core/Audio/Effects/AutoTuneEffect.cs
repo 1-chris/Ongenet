@@ -7,11 +7,7 @@ using Ongenet.Core.Music;
 namespace Ongenet.Core.Audio.Effects;
 
 /// <summary>
-/// Pitch-correction (auto-tune). Detects the incoming signal's fundamental (<see cref="PitchDetector"/>),
-/// finds the nearest note in the chosen key/scale (the same scales as the MIDI generator, via
-/// <see cref="MusicTheory"/>), and retunes the audio toward it with a delay-line
-/// <see cref="PitchShifter"/>. All controls are generic parameters, so the UI and project save/load are
-/// automatic.
+/// Pitch-correction (auto-tune) with optional harmony voices via additional <see cref="PitchShifter"/>s.
 /// </summary>
 public sealed class AutoTuneEffect : IAudioEffect
 {
@@ -23,41 +19,33 @@ public sealed class AutoTuneEffect : IAudioEffect
     public string Name => "Auto-Tune";
     public bool Enabled { get; set; } = true;
 
-    /// <summary>Key tonic pitch class (0 = C), index into <see cref="MusicTheory.NoteNames"/>.</summary>
     public int KeyIndex { get; set; }
-
-    /// <summary>Scale index into <see cref="ScaleType"/>.</summary>
     public int ScaleIndex { get; set; }
-
-    /// <summary>Correction strength: 0 = no shift, 1 = fully snapped to the target note.</summary>
     public double Amount { get; set; } = 1.0;
-
-    /// <summary>Retune speed (ms): low = the hard "classic" snap, higher = a natural glide to pitch.</summary>
     public double RetuneMs { get; set; } = 4.0;
-
-    /// <summary>Dry/wet blend.</summary>
     public double Mix { get; set; } = 1.0;
-
-    /// <summary>Reference pitch for A4 (Hz).</summary>
     public double ReferenceHz { get; set; } = 440.0;
+    public int HarmonyVoices { get; set; }
+    public double HarmonyInterval1 { get; set; } = 7.0;
+    public double HarmonyInterval2 { get; set; } = 12.0;
+    public double HarmonyInterval3 { get; set; } = -12.0;
+    public double HarmonyMix { get; set; } = 0.35;
 
-    // Detection runs at most every this many samples (bounds CPU for small engine blocks and keeps
-    // the analysis hop stable regardless of block size).
     private const int DetectHop = 256;
+    private const int MaxHarmonyVoices = 3;
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
     private readonly PitchDetector _detector = new();
     private PitchShifter[] _shifters = Array.Empty<PitchShifter>();
+    private PitchShifter[][] _harmony = Array.Empty<PitchShifter[]>();
     private readonly OnePole _ratioSmooth = new();
-    private double _lastPeriod;     // last voiced period (samples)
-    private double _lastF0;         // last voiced f0 (Hz), for octave-guarding the next detection
-    private double _lastRatio = 1.0;// last correction ratio, held through unvoiced gaps so it stays pinned
-    private int _sinceDetect;       // samples processed since the last detection
-    private int _currentNote = -1;  // the scale note we're currently pinned to (MIDI; -1 = none yet)
+    private double _lastPeriod;
+    private double _lastF0;
+    private double _lastRatio = 1.0;
+    private int _sinceDetect;
+    private int _currentNote = -1;
 
-    // Stay pinned to the current note until the input pitch moves more than this far (semitones)
-    // from it. Wider than 0.5 so vibrato / drift near a note boundary doesn't flutter between notes.
     private const double NoteHoldSemitones = 0.7;
 
     private IReadOnlyList<Parameter>? _parameters;
@@ -69,7 +57,12 @@ public sealed class AutoTuneEffect : IAudioEffect
         new FloatParameter("Amount", 0.0, 1.0, () => Amount, v => Amount = v, "0%", "", 1.0),
         new FloatParameter("Retune", 0.0, 200.0, () => RetuneMs, v => RetuneMs = v, "0", "ms", 1.0),
         new FloatParameter("Mix", 0.0, 1.0, () => Mix, v => Mix = v, "0%", "", 1.0),
-        new FloatParameter("Ref", 415.0, 465.0, () => ReferenceHz, v => ReferenceHz = v, "0", "Hz", 1.0)
+        new FloatParameter("Ref", 415.0, 465.0, () => ReferenceHz, v => ReferenceHz = v, "0", "Hz", 1.0),
+        new ChoiceParameter("Harmony Voices", new[] { "0", "1", "2", "3" }, () => HarmonyVoices, v => HarmonyVoices = v),
+        new FloatParameter("Interval 1", -24.0, 24.0, () => HarmonyInterval1, v => HarmonyInterval1 = v, "0", "st"),
+        new FloatParameter("Interval 2", -24.0, 24.0, () => HarmonyInterval2, v => HarmonyInterval2 = v, "0", "st"),
+        new FloatParameter("Interval 3", -24.0, 24.0, () => HarmonyInterval3, v => HarmonyInterval3 = v, "0", "st"),
+        new FloatParameter("Harmony Mix", 0.0, 1.0, () => HarmonyMix, v => HarmonyMix = v)
     };
 
     public void Prepare(AudioFormat format)
@@ -79,12 +72,20 @@ public sealed class AutoTuneEffect : IAudioEffect
 
         _detector.Configure(_sampleRate, 70.0, 1000.0);
         var shifters = new PitchShifter[_channels];
+        var harmony = new PitchShifter[_channels][];
         for (var ch = 0; ch < _channels; ch++)
         {
             shifters[ch] = new PitchShifter();
             shifters[ch].Configure(_sampleRate);
+            harmony[ch] = new PitchShifter[MaxHarmonyVoices];
+            for (var h = 0; h < MaxHarmonyVoices; h++)
+            {
+                harmony[ch][h] = new PitchShifter();
+                harmony[ch][h].Configure(_sampleRate);
+            }
         }
         _shifters = shifters;
+        _harmony = harmony;
 
         _ratioSmooth.SetSmoothTime(RetuneMs, _sampleRate);
         _ratioSmooth.Reset(1.0);
@@ -98,13 +99,11 @@ public sealed class AutoTuneEffect : IAudioEffect
     public void Process(Span<float> buffer)
     {
         var shifters = _shifters;
+        var harmony = _harmony;
         var channels = Math.Min(_channels < 1 ? 1 : _channels, shifters.Length);
         if (channels <= 0) return;
         var frames = buffer.Length / channels;
 
-        // Re-detect the pitch and recompute the target correction periodically (every DetectHop
-        // samples). Between detections — and through unvoiced gaps (consonants/breath) — the last
-        // ratio/period are held so the voice stays pinned instead of drifting back to no-shift.
         _sinceDetect += frames;
         if (_sinceDetect >= DetectHop)
         {
@@ -112,15 +111,23 @@ public sealed class AutoTuneEffect : IAudioEffect
             UpdateCorrection();
         }
 
-        for (var ch = 0; ch < channels; ch++) shifters[ch].SetPeriod(_lastPeriod);
+        for (var ch = 0; ch < channels; ch++)
+        {
+            shifters[ch].SetPeriod(_lastPeriod);
+            for (var h = 0; h < MaxHarmonyVoices; h++)
+                harmony[ch][h].SetPeriod(_lastPeriod);
+        }
+
         _ratioSmooth.SetSmoothTime(RetuneMs, _sampleRate);
         var mix = AudioMath.Clamp(Mix, 0.0, 1.0);
+        var harmonyMix = (float)Math.Clamp(HarmonyMix, 0, 1);
+        var voiceCount = Math.Clamp(HarmonyVoices, 0, MaxHarmonyVoices);
+        var intervals = new[] { HarmonyInterval1, HarmonyInterval2, HarmonyInterval3 };
 
         for (var f = 0; f < frames; f++)
         {
             var ratio = _ratioSmooth.ProcessLP(_lastRatio);
 
-            // Feed a mono mix to the detector for subsequent detections.
             var mono = 0f;
             for (var ch = 0; ch < channels; ch++) mono += buffer[f * channels + ch];
             _detector.Push(mono / channels);
@@ -130,23 +137,32 @@ public sealed class AutoTuneEffect : IAudioEffect
                 var i = f * channels + ch;
                 var dry = buffer[i];
                 var shifter = shifters[ch];
-                if (shifter is null) continue;
                 shifter.SetRatio(ratio);
                 var wet = shifter.Process(dry);
+
+                if (voiceCount > 0 && harmonyMix > 1e-6f)
+                {
+                    var harmSum = 0f;
+                    for (var h = 0; h < voiceCount; h++)
+                    {
+                        var harmRatio = ratio * Math.Pow(2.0, intervals[h] / 12.0);
+                        var hs = harmony[ch][h];
+                        hs.SetRatio(harmRatio);
+                        harmSum += hs.Process(dry);
+                    }
+                    wet += harmSum / voiceCount * harmonyMix;
+                }
+
                 buffer[i] = (float)(dry * (1.0 - mix) + wet * mix);
             }
         }
     }
 
-    // Detects f0 and updates the target correction ratio. On an unvoiced/uncertain frame it leaves
-    // the previous correction in place (held), so brief gaps don't un-tune the note.
     private void UpdateCorrection()
     {
         var f0 = _detector.Detect();
-        if (f0 <= 0) return; // unvoiced → hold the last correction
+        if (f0 <= 0) return;
 
-        // Octave-guard against the previous pitch: YIN occasionally reports a half/double octave,
-        // which would make the output leap. Fold the new pitch into the octave of the last one.
         if (_lastF0 > 0)
         {
             while (f0 > _lastF0 * 1.5) f0 *= 0.5;
@@ -154,21 +170,16 @@ public sealed class AutoTuneEffect : IAudioEffect
         }
 
         _lastF0 = f0;
-        _lastPeriod = _sampleRate / f0; // lock the shifter grains to the input period
+        _lastPeriod = _sampleRate / f0;
 
         var refHz = ReferenceHz <= 0 ? 440.0 : ReferenceHz;
         var midiFloat = 69.0 + 12.0 * Math.Log2(f0 / refHz);
         var scale = (ScaleType)Math.Clamp(ScaleIndex, 0, ScaleNames.Length - 1);
 
-        // Note hysteresis: hold the current scale note until the input clearly moves off it, so the
-        // output pins solidly instead of flickering between neighbouring notes near a boundary.
         if (_currentNote < 0 || Math.Abs(midiFloat - _currentNote) > NoteHoldSemitones)
             _currentNote = MusicTheory.SnapToScale(midiFloat, KeyIndex, scale);
 
         var targetHz = refHz * Math.Pow(2.0, (_currentNote - 69.0) / 12.0);
-
-        // Pull toward the target by Amount, in the semitone (log) domain. Amount 1 = output lands
-        // exactly on the scale note (the hard, pinned auto-tune sound).
         var semis = 12.0 * Math.Log2(targetHz / f0) * AudioMath.Clamp(Amount, 0.0, 1.0);
         _lastRatio = AudioMath.Clamp(Math.Pow(2.0, semis / 12.0), 0.5, 2.0);
     }
@@ -181,6 +192,11 @@ public sealed class AutoTuneEffect : IAudioEffect
         Amount = Amount,
         RetuneMs = RetuneMs,
         Mix = Mix,
-        ReferenceHz = ReferenceHz
+        ReferenceHz = ReferenceHz,
+        HarmonyVoices = HarmonyVoices,
+        HarmonyInterval1 = HarmonyInterval1,
+        HarmonyInterval2 = HarmonyInterval2,
+        HarmonyInterval3 = HarmonyInterval3,
+        HarmonyMix = HarmonyMix
     };
 }

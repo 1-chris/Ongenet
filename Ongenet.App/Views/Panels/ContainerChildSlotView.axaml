@@ -1,0 +1,209 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:inst="using:Ongenet.App.ViewModels.Instruments"
+             xmlns:instc="using:Ongenet.Core.Audio.Instruments"
+             xmlns:panels="using:Ongenet.App.Views.Panels"
+             xmlns:vm="using:Ongenet.App.ViewModels"
+             xmlns:services="using:Ongenet.App.Services"
+             x:Class="Ongenet.App.Views.Panels.ContainerChildSlotView"
+             x:DataType="inst:ContainerChildSlotViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.fxdot">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+    <!-- Compact row used inside XY Instrument corner list -->
+    <Border Margin="0,0,0,2" Padding="6,4" CornerRadius="4"
+            IsVisible="{Binding IsCompact}"
+            Background="{StaticResource CatppuccinMantle}"
+            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+        <DockPanel>
+            <Button DockPanel.Dock="Left" Classes="fxdot" Margin="0,0,6,0"
+                    Command="{Binding ToggleEnabledCommand}"
+                    ToolTip.Tip="Enable / disable this corner">
+                <Panel>
+                    <Ellipse Width="10" Height="10" IsVisible="{Binding IsEnabled}"
+                             Fill="{StaticResource CatppuccinGreen}"/>
+                    <Ellipse Width="10" Height="10" IsVisible="{Binding !IsEnabled}"
+                             Fill="{StaticResource CatppuccinRed}"/>
+                </Panel>
+            </Button>
+
+            <Button DockPanel.Dock="Right" Content="Replace" Padding="6,2" FontSize="10" Margin="2,0,0,0">
+                <Button.Flyout>
+                    <Flyout>
+                        <ScrollViewer MaxHeight="360">
+                            <ItemsControl ItemsSource="{Binding ReplaceCategories}" Width="180">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:InstrumentCategoryViewModel">
+                                        <StackPanel Margin="0,0,0,6">
+                                            <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="Bold"
+                                                       Margin="2,4,2,2"
+                                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                            <ItemsControl ItemsSource="{Binding Instruments}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="instc:InstrumentInfo">
+                                                        <Button Content="{Binding DisplayName}"
+                                                                Click="OnReplaceInstrument"
+                                                                HorizontalAlignment="Stretch" Margin="0,1"
+                                                                HorizontalContentAlignment="Left"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <Button DockPanel.Dock="Right" Content="Edit" Padding="6,2" FontSize="10" Margin="2,0,0,0"
+                    ToolTip.Tip="Presets, parameters, and FX for this corner">
+                <Button.Flyout>
+                    <Flyout>
+                        <ScrollViewer MaxHeight="440" MaxWidth="360">
+                            <StackPanel Spacing="8" Margin="4">
+                                <TextBlock Text="{Binding InstrumentName}" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{StaticResource CatppuccinMauve}"/>
+
+                                <StackPanel Spacing="4" IsVisible="{Binding IsPresetProvider}">
+                                    <TextBlock Text="Built-in preset" FontSize="10"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox Classes="stretch" MinWidth="240"
+                                              ItemsSource="{Binding PresetNames}"
+                                              SelectedIndex="{Binding SelectedPreset, Mode=TwoWay}"
+                                              PlaceholderText="Choose preset"/>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4" IsVisible="{Binding HasLibraryPresets}">
+                                    <TextBlock Text="Library preset" FontSize="10"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox Classes="stretch" MinWidth="240"
+                                              ItemsSource="{Binding LibraryPresets}"
+                                              SelectedItem="{Binding SelectedLibraryPreset, Mode=TwoWay}"
+                                              PlaceholderText="Choose preset">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="services:PresetItem">
+                                                <TextBlock Text="{Binding Name}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsSampler}">
+                                    <Button Content="Load sample" Click="OnLoadSample"/>
+                                    <TextBlock Text="{Binding SampleName}" VerticalAlignment="Center" FontSize="11"
+                                               Foreground="{StaticResource CatppuccinSubtext0}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4" IsVisible="{Binding HasParameters}">
+                                    <TextBlock Text="Parameters" FontSize="10" FontWeight="SemiBold"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <panels:GroupedParametersView DataContext="{Binding ParameterGroups}"/>
+                                </StackPanel>
+
+                                <Expander Header="Layer FX (pre)" IsExpanded="False">
+                                    <panels:EffectChainView DataContext="{Binding Effects}" Margin="0,4,0,0"/>
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Label}" FontSize="10"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <TextBlock Text="{Binding InstrumentName}" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{StaticResource CatppuccinMauve}"/>
+            </StackPanel>
+        </DockPanel>
+    </Border>
+
+    <!-- Full card for layers, drum pads, chain voice, etc. -->
+    <Border Margin="0,0,0,6" Padding="8" CornerRadius="4"
+            IsVisible="{Binding !IsCompact}"
+            Background="{StaticResource CatppuccinCrust}"
+            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+        <StackPanel Spacing="6">
+            <DockPanel>
+                <Button DockPanel.Dock="Left" Classes="fxdot" Margin="0,0,8,0"
+                        Command="{Binding ToggleEnabledCommand}"
+                        ToolTip.Tip="Enable / disable this layer">
+                    <Panel>
+                        <Ellipse Width="12" Height="12" IsVisible="{Binding IsEnabled}"
+                                 Fill="{StaticResource CatppuccinGreen}"/>
+                        <Ellipse Width="12" Height="12" IsVisible="{Binding !IsEnabled}"
+                                 Fill="{StaticResource CatppuccinRed}"/>
+                    </Panel>
+                </Button>
+
+                <Button DockPanel.Dock="Right" Content="×" Command="{Binding RemoveCommand}"
+                        IsVisible="{Binding CanRemove}" Padding="6,0" Margin="2,0,0,0"
+                        ToolTip.Tip="Remove layer"/>
+
+                <Button DockPanel.Dock="Right" Content="Replace" Padding="6,2" Margin="2,0,0,0">
+                    <Button.Flyout>
+                        <Flyout>
+                            <ScrollViewer MaxHeight="360">
+                                <ItemsControl ItemsSource="{Binding ReplaceCategories}" Width="180">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:InstrumentCategoryViewModel">
+                                            <StackPanel Margin="0,0,0,6">
+                                                <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="Bold"
+                                                           Margin="2,4,2,2"
+                                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                                <ItemsControl ItemsSource="{Binding Instruments}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="instc:InstrumentInfo">
+                                                            <Button Content="{Binding DisplayName}"
+                                                                    Click="OnReplaceInstrument"
+                                                                    HorizontalAlignment="Stretch" Margin="0,1"
+                                                                    HorizontalContentAlignment="Left"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="11"
+                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock Text="{Binding InstrumentName}" FontSize="11"
+                               Foreground="{StaticResource CatppuccinMauve}"/>
+                </StackPanel>
+            </DockPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsSampler}">
+                <Button Content="Load sample" Click="OnLoadSample"/>
+                <TextBlock Text="{Binding SampleName}" VerticalAlignment="Center" FontSize="11"
+                           Foreground="{StaticResource CatppuccinSubtext0}" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+
+            <Expander Header="Parameters" IsExpanded="False">
+                <panels:GroupedParametersView DataContext="{Binding ParameterGroups}" Margin="0,4,0,0"/>
+            </Expander>
+
+            <Expander Header="Layer FX (pre)" IsExpanded="False">
+                <panels:EffectChainView DataContext="{Binding Effects}" Margin="0,4,0,0"/>
+            </Expander>
+        </StackPanel>
+    </Border>
+    </Panel>
+</UserControl>

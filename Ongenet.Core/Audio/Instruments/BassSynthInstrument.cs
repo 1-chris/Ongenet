@@ -7,9 +7,8 @@ using Ongenet.Core.Audio.Parameters;
 namespace Ongenet.Core.Audio.Instruments;
 
 /// <summary>
-/// A compact subtractive bass synth: unison-capable <see cref="WaveOscillator"/> tone plus a sine
-/// sub, resonant low-pass with its own ADSR, soft drive via <see cref="WaveShaper"/>, and an amp
-/// envelope. Low polyphony keeps stacked notes from muddying the low end.
+/// A compact subtractive bass synth with classic and acid-303 voice modes. Acid mode adds accent,
+/// slide, tie, and an optional internal 16-step sequencer clocked from host tempo.
 /// </summary>
 public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
 {
@@ -20,16 +19,26 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
     protected override string GetTypeId() => TypeId;
 
     private Parameter[]? _parameters;
+    private readonly BassStepSequencer _sequencer = new();
+    private double _hostTempo = 120.0;
+    private bool _sequencerRunning;
 
     public BassSynthInstrument() : base(polyphony: 4) => Reset();
 
     public override string Name => "Bass Synth";
 
+    /// <summary>0 = Classic, 1 = Acid 303.</summary>
+    public int VoiceMode { get; set; }
     public int Wave { get; set; }
     public double SubLevel { get; set; }
     public double Cutoff { get; set; }
     public double Resonance { get; set; }
     public double FilterEnvAmount { get; set; }
+    public double AccentAmount { get; set; } = 0.35;
+    public double SlideMs { get; set; } = 60.0;
+
+    public bool SequencerEnabled { get; set; }
+    public int SequencerRate { get; set; }
 
     public double AttackSeconds { get; set; }
     public double DecaySeconds { get; set; }
@@ -45,10 +54,15 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
     public double Gain { get; set; }
     public int Unison { get; set; }
 
+    public BassStepSequencer Sequencer => _sequencer;
+
     private static readonly string[] WaveNames = { "Sine", "Triangle", "Saw", "Square" };
+    private static readonly string[] ModeNames = { "Classic", "Acid 303" };
+    private static readonly string[] SeqRateNames = { "1/16", "1/8", "1/4" };
 
     public override IReadOnlyList<Parameter> Parameters => _parameters ??= new Parameter[]
     {
+        new ChoiceParameter("Voice", ModeNames, () => VoiceMode, i => VoiceMode = i) { Group = "Voice" },
         new ChoiceParameter("Wave", WaveNames, () => Wave, i => Wave = i) { Group = "Oscillator" },
         new FloatParameter("Sub", 0, 1, () => SubLevel, v => SubLevel = v, "0.00") { Group = "Oscillator" },
         new FloatParameter("Unison", 1, MaxUnison, () => Unison, v => Unison = (int)Math.Round(v), "0") { Group = "Oscillator" },
@@ -56,6 +70,8 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
         new FloatParameter("Cutoff", 20, 12000, () => Cutoff, v => Cutoff = v, "0", "Hz", skew: 3.0) { Group = "Filter" },
         new FloatParameter("Reso", 0.5, 16, () => Resonance, v => Resonance = v, "0.0", "Q", skew: 2.0) { Group = "Filter" },
         new FloatParameter("Env Amt", -1, 1, () => FilterEnvAmount, v => FilterEnvAmount = v, "0.00") { Group = "Filter" },
+        new FloatParameter("Accent", 0, 1, () => AccentAmount, v => AccentAmount = v, "0.00") { Group = "Filter" },
+        new FloatParameter("Slide", 1, 500, () => SlideMs, v => SlideMs = v, "0", "ms") { Group = "Filter" },
 
         new FloatParameter("Attack", 0.001, 2, () => FAttackSeconds, v => FAttackSeconds = v, "0.000", "s", skew: 2.0) { Group = "Filter Envelope" },
         new FloatParameter("Decay", 0.001, 2, () => FDecaySeconds, v => FDecaySeconds = v, "0.000", "s", skew: 2.0) { Group = "Filter Envelope" },
@@ -67,9 +83,84 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
         new FloatParameter("Sustain", 0, 1, () => SustainLevel, v => SustainLevel = v, "0.00") { Group = "Amp Envelope" },
         new FloatParameter("Release", 0.001, 3, () => ReleaseSeconds, v => ReleaseSeconds = v, "0.000", "s", skew: 2.0) { Group = "Amp Envelope" },
 
+        new BoolParameter("Seq On", () => SequencerEnabled, v => SequencerEnabled = v) { Group = "Sequencer" },
+        new ChoiceParameter("Seq Rate", SeqRateNames, () => SequencerRate, v => SequencerRate = v) { Group = "Sequencer" },
+
         new FloatParameter("Drive", 0, 1, () => Drive, v => Drive = v, "0.00") { Group = "Output" },
         new FloatParameter("Gain", 0, 1, () => Gain, v => Gain = v, "0.00") { Group = "Output" }
     };
+
+    public override void Prepare(AudioFormat format)
+    {
+        base.Prepare(format);
+        _sequencer.SetSampleRate(format.SampleRate);
+    }
+
+    public void SetHostTempo(double bpm)
+    {
+        _hostTempo = bpm > 0 ? bpm : 120.0;
+        _sequencer.TempoBpm = _hostTempo;
+    }
+
+    public override void NoteOn(int midiNote, float velocity)
+    {
+        if (SequencerEnabled)
+        {
+            _sequencer.Enabled = true;
+            _sequencer.RateIndex = SequencerRate;
+            _sequencer.Start();
+            _sequencerRunning = true;
+            return;
+        }
+        base.NoteOn(midiNote, velocity);
+    }
+
+    public override void NoteOff(int midiNote)
+    {
+        if (SequencerEnabled)
+        {
+            _sequencer.Stop();
+            _sequencerRunning = false;
+            AllNotesOff();
+            return;
+        }
+        base.NoteOff(midiNote);
+    }
+
+    public override void AllNotesOff()
+    {
+        _sequencer.Stop();
+        _sequencerRunning = false;
+        base.AllNotesOff();
+    }
+
+    public override void Render(Span<float> buffer)
+    {
+        if (SequencerEnabled && _sequencerRunning)
+        {
+            var channels = Format.Channels < 1 ? 1 : Format.Channels;
+            var frames = buffer.Length / channels;
+            _sequencer.Enabled = true;
+            _sequencer.RateIndex = SequencerRate;
+            _sequencer.TempoBpm = _hostTempo;
+            if (_sequencer.TryAdvance(frames, out var trig))
+                TriggerSequencerStep(trig);
+        }
+        base.Render(buffer);
+    }
+
+    private void TriggerSequencerStep(BassStepTrigger trig)
+    {
+        var active = FirstActiveVoice() as BassVoice;
+        if (active is null)
+        {
+            var idx = PickVoiceIndex();
+            StartVoiceAt(idx, trig.Note, trig.Velocity);
+            (VoiceAt(idx) as BassVoice)?.Retrigger(trig.Note, trig.Velocity, trig.Accent, trig.Slide, trig.Tie);
+        }
+        else
+            active.Retrigger(trig.Note, trig.Velocity, trig.Accent, trig.Slide, trig.Tie);
+    }
 
     protected override Voice CreateVoice() => new BassVoice(this);
 
@@ -82,11 +173,16 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
 
     private void CopyStateTo(BassSynthInstrument c)
     {
+        c.VoiceMode = VoiceMode;
         c.Wave = Wave;
         c.SubLevel = SubLevel;
         c.Cutoff = Cutoff;
         c.Resonance = Resonance;
         c.FilterEnvAmount = FilterEnvAmount;
+        c.AccentAmount = AccentAmount;
+        c.SlideMs = SlideMs;
+        c.SequencerEnabled = SequencerEnabled;
+        c.SequencerRate = SequencerRate;
         c.AttackSeconds = AttackSeconds;
         c.DecaySeconds = DecaySeconds;
         c.SustainLevel = SustainLevel;
@@ -98,12 +194,23 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
         c.Drive = Drive;
         c.Gain = Gain;
         c.Unison = Unison;
+        for (var i = 0; i < BassStepSequencer.StepCount; i++)
+        {
+            var s = _sequencer.Steps[i];
+            var d = c._sequencer.Steps[i];
+            d.Active = s.Active;
+            d.Note = s.Note;
+            d.Velocity = s.Velocity;
+            d.Accent = s.Accent;
+            d.Slide = s.Slide;
+            d.Tie = s.Tie;
+        }
     }
 
     private static readonly string[] PresetNamesList =
     {
         "Init", "Deep Sub", "Reese", "Acid Pulse", "Warm Square",
-        "Plucky Bass", "Growl Drive", "Soft Sine", "Funky Slap"
+        "Plucky Bass", "Growl Drive", "Soft Sine", "Funky Slap", "303 Sequence"
     };
 
     public IReadOnlyList<string> PresetNames => PresetNamesList;
@@ -120,17 +227,23 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
             case 6: GrowlDrive(); break;
             case 7: SoftSine(); break;
             case 8: FunkySlap(); break;
+            case 9: Sequence303(); break;
             default: Reset(); break;
         }
     }
 
     private void Reset()
     {
+        VoiceMode = 0;
         Wave = (int)OscWave.Saw;
         SubLevel = 0.45;
         Cutoff = 600;
         Resonance = 1.2;
         FilterEnvAmount = 0.45;
+        AccentAmount = 0.35;
+        SlideMs = 60;
+        SequencerEnabled = false;
+        SequencerRate = 0;
         AttackSeconds = 0.005;
         DecaySeconds = 0.18;
         SustainLevel = 0.65;
@@ -142,6 +255,25 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
         Drive = 0.15;
         Gain = 0.8;
         Unison = 1;
+    }
+
+    private void Sequence303()
+    {
+        AcidPulse();
+        VoiceMode = 1;
+        SequencerEnabled = true;
+        SequencerRate = 0;
+        var notes = new[] { 36, 36, 39, 36, 43, 36, 39, 41, 36, 38, 36, 41, 43, 36, 39, 36 };
+        for (var i = 0; i < BassStepSequencer.StepCount; i++)
+        {
+            var s = _sequencer.Steps[i];
+            s.Active = true;
+            s.Note = notes[i];
+            s.Velocity = 0.85f;
+            s.Accent = i % 4 == 0;
+            s.Slide = i is 2 or 6 or 10;
+            s.Tie = false;
+        }
     }
 
     private void DeepSub()
@@ -187,6 +319,7 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
     private void AcidPulse()
     {
         Reset();
+        VoiceMode = 1;
         Wave = (int)OscWave.Square;
         SubLevel = 0.2;
         Cutoff = 700;
@@ -317,24 +450,52 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
         private readonly WaveOscillator _sub = new() { Wave = OscWave.Sine };
         private readonly AdsrEnvelope _amp = new();
         private readonly AdsrEnvelope _filt = new();
+        private readonly AcidVoiceDsp _acid = new();
         private Biquad _filter;
         private float _velocity;
+        private bool _useAcid;
         private static uint _seed = 1;
 
         public BassVoice(BassSynthInstrument inst) => _inst = inst;
+
+        public void Retrigger(int midiNote, float velocity, bool accent, bool slide, bool tie)
+        {
+            _useAcid = _inst.VoiceMode == 1;
+            SyncAcidParams();
+            if (_useAcid)
+            {
+                _acid.Trigger(midiNote, velocity, accent || velocity > 0.85f, slide, tie);
+                _velocity = velocity;
+                Note = midiNote;
+                IsActive = true;
+                return;
+            }
+            Start(midiNote, velocity, Format);
+        }
 
         public override void Start(int midiNote, float velocity, AudioFormat format)
         {
             base.Start(midiNote, velocity, format);
             _velocity = velocity;
+            _useAcid = _inst.VoiceMode == 1;
             var sr = format.SampleRate;
             var freq = MusicalMath.NoteToFrequency(midiNote);
+
+            if (_useAcid)
+            {
+                SyncAcidParams();
+                _acid.SetSampleRate(sr);
+                _acid.ConfigureEnvelopes(
+                    _inst.AttackSeconds, _inst.DecaySeconds, _inst.SustainLevel, _inst.ReleaseSeconds,
+                    _inst.FAttackSeconds, _inst.FDecaySeconds, _inst.FSustainLevel, _inst.FReleaseSeconds);
+                _acid.Trigger(midiNote, velocity, velocity > 0.85f, false, false);
+                return;
+            }
 
             _unison.SetSampleRate(sr);
             _unison.Seed(_seed++ * 2654435761u + (uint)midiNote);
             _unison.Wave = (OscWave)Math.Clamp(_inst.Wave, 0, 3);
             var voices = Math.Clamp(_inst.Unison, 1, MaxUnison);
-            // Keep bass mostly centred — width grows gently with unison count.
             var width = voices <= 1 ? 0.0 : 0.25;
             _unison.Configure(voices, DetuneCents, width, blend: 0.7);
             _unison.SetBaseFrequency(freq);
@@ -360,14 +521,35 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
             _filter.Reset();
         }
 
+        private void SyncAcidParams()
+        {
+            _acid.Cutoff = _inst.Cutoff;
+            _acid.Resonance = _inst.Resonance;
+            _acid.SubLevel = _inst.SubLevel;
+            _acid.Drive = 1.0 + _inst.Drive * 7.0;
+            _acid.OutputGain = _inst.Gain * VoiceGain;
+            _acid.AccentAmount = _inst.AccentAmount;
+            _acid.SlideMs = _inst.SlideMs;
+        }
+
         public override void Release()
         {
-            _amp.Release();
-            _filt.Release();
+            if (_useAcid) _acid.Release();
+            else
+            {
+                _amp.Release();
+                _filt.Release();
+            }
         }
 
         public override void Render(Span<float> buffer)
         {
+            if (_useAcid)
+            {
+                RenderAcid(buffer);
+                return;
+            }
+
             var channels = Format.Channels < 1 ? 1 : Format.Channels;
             var frames = buffer.Length / channels;
             var sr = Format.SampleRate;
@@ -407,6 +589,25 @@ public sealed class BassSynthInstrument : PolyphonicInstrument, IPresetProvider
                     buffer[baseIndex + c] += sample;
 
                 if (!_amp.IsActive)
+                {
+                    IsActive = false;
+                    return;
+                }
+            }
+        }
+
+        private void RenderAcid(Span<float> buffer)
+        {
+            var channels = Format.Channels < 1 ? 1 : Format.Channels;
+            var frames = buffer.Length / channels;
+            SyncAcidParams();
+            for (var frame = 0; frame < frames; frame++)
+            {
+                var sample = _acid.Process();
+                var baseIndex = frame * channels;
+                for (var c = 0; c < channels; c++)
+                    buffer[baseIndex + c] += sample;
+                if (!_acid.IsActive)
                 {
                     IsActive = false;
                     return;

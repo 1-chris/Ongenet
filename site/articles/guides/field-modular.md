@@ -9,7 +9,7 @@
 
 ## Details
 
-Field is Ongenet's node-graph instrument and effect (similar in spirit to Bitwig Grid):
+Field is Ongenet's node-graph instrument and effect (modular grid patching):
 
 - **Colour-coded wires** — audio, CV, and note signals
 - **Navigation** — middle-drag to pan, scroll to zoom

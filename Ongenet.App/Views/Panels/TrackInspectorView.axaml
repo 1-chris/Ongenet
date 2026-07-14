@@ -7,6 +7,7 @@
              xmlns:views="using:Ongenet.App.Views.Panels"
              xmlns:audio="using:Ongenet.Core.Models.Audio"
              mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="600"
+             DragDrop.AllowDrop="True"
              x:Class="Ongenet.App.Views.Panels.TrackInspectorView"
              x:DataType="vm:TrackInspectorViewModel">
 

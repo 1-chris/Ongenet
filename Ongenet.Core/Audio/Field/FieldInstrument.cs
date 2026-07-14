@@ -13,7 +13,8 @@ namespace Ongenet.Core.Audio.Field;
 /// The Field modular instrument: hosts an editable <see cref="FieldGraph"/> and runs a compiled snapshot of
 /// it as a polyphonic <see cref="IInstrument"/>. Note events are queued and applied on the audio thread; the
 /// graph is (re)compiled off the audio path and swapped in via a volatile reference, so editing is safe
-/// while playing. The whole graph is persisted through <see cref="IProjectStatefulComponent"/>.
+/// while playing. The whole graph (plus optional custom surface) is persisted through
+/// <see cref="IProjectStatefulComponent"/>.
 /// </summary>
 public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProjectStatefulComponent, IPresetProvider
 {
@@ -38,6 +39,12 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
     private readonly object _compileLock = new();
     private readonly NoteEventQueue<NoteEvent> _events = new();
 
+    private string _typeId = Id;
+    private string _displayName = "Field";
+    private Guid? _definitionId;
+    private FieldSurfaceDefinition _surface = new();
+    private List<Parameter> _parameters = new();
+
     private volatile CompiledGraph? _compiled;
     private volatile int _compiledRevision = -1;
     private AudioFormat _format = AudioFormat.Default;
@@ -49,9 +56,24 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
         if (buildDefault) FieldPatches.BuildBeginnerInstrument(_graph);
     }
 
-    public string Name => "Field";
-    public string TypeId => Id;
-    public IReadOnlyList<Parameter> Parameters => Array.Empty<Parameter>();
+    /// <summary>Creates an empty host with the given type id for project/preset fallback loading.</summary>
+    public static FieldInstrument CreateShell(IFieldNodeRegistry registry, string typeId, string? displayName = null)
+    {
+        var inst = new FieldInstrument(registry, buildDefault: false);
+        inst._typeId = typeId;
+        inst._displayName = string.IsNullOrWhiteSpace(displayName) ? "Field Instrument" : displayName!;
+        inst._definitionId = FieldGraphDefinition.TryParseDefinitionId(typeId);
+        return inst;
+    }
+
+    public string Name => _displayName;
+    public string TypeId => _typeId;
+    public IReadOnlyList<Parameter> Parameters => _parameters;
+    public Guid? DefinitionId => _definitionId;
+    public FieldSurfaceDefinition Surface => _surface;
+    public bool HasCustomSurface => _surface.Widgets.Count > 0;
+    public bool IsUserDefinition => FieldGraphDefinition.IsUserInstrumentType(_typeId);
+
     public bool HasActiveVoices
     {
         get
@@ -66,6 +88,43 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
 
     /// <summary>The current compiled snapshot (for the UI to read scope taps etc.). May be null before Prepare.</summary>
     public CompiledGraph? Compiled => _compiled;
+
+    public IFieldNodeRegistry Registry => _registry;
+
+    /// <summary>Applies a library definition snapshot into this host (graph + surface + identity).</summary>
+    public void ApplyDefinition(FieldGraphDefinition definition, FieldGraph graph)
+    {
+        AdoptLibraryIdentity(definition);
+        CopyGraph(graph, _graph);
+        RebuildExposedParameters();
+        Recompile(_maxBlock);
+    }
+
+    /// <summary>Marks this live host as a saved library definition without replacing the graph.</summary>
+    public void AdoptLibraryIdentity(FieldGraphDefinition definition)
+    {
+        _typeId = definition.TypeId;
+        _displayName = definition.DisplayName;
+        _definitionId = definition.DefinitionId;
+        _surface = definition.Surface.Clone();
+        RebuildExposedParameters();
+    }
+
+    /// <summary>Updates display name / surface from the editor without changing identity.</summary>
+    public void SetSurface(FieldSurfaceDefinition surface)
+    {
+        _surface = surface.Clone();
+        RebuildExposedParameters();
+    }
+
+    public void SetDisplayName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        _displayName = name.Trim();
+    }
+
+    public void RebuildExposedParameters()
+        => _parameters = FieldExposedParameters.Build(_graph, _surface.ExposedControls);
 
     public void Prepare(AudioFormat format)
     {
@@ -105,7 +164,7 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
     public void Render(Span<float> buffer)
     {
         var compiled = _compiled;
-        if (compiled is null) return; // prepared by the engine before the first render
+        if (compiled is null) return;
 
         var pending = _events.Drain();
         if (pending.Length > 0)
@@ -127,8 +186,6 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
             return;
         }
 
-        // Process in chunks no larger than the compiled block size (handles any host buffer length without
-        // recompiling on the audio thread — recompilation happens only via Prepare / UI edits).
         var channels = _format.Channels < 1 ? 1 : _format.Channels;
         var frames = buffer.Length / channels;
         var max = compiled.MaxBlock;
@@ -152,26 +209,44 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
     {
         var copy = new FieldInstrument(_registry, buildDefault: false);
         using var ms = new MemoryStream();
-        using (var w = new OngenWriter(ms)) FieldGraphSerializer.Write(w, _graph);
+        using (var w = new OngenWriter(ms)) WriteProjectState(w);
         ms.Position = 0;
-        using (var r = new OngenReader(ms)) FieldGraphSerializer.Read(r, copy._graph, _registry);
+        using (var r = new OngenReader(ms)) copy.ReadProjectState(r);
         return copy;
     }
 
-    // Built-in decomposition patches, one per built-in instrument (Oscillator, 3x Osc, FM, ...).
-    public IReadOnlyList<string> PresetNames => FieldBuiltInPatches.InstrumentPatchNames;
+    public IReadOnlyList<string> PresetNames
+        => IsUserDefinition ? Array.Empty<string>() : FieldBuiltInPatches.InstrumentPatchNames;
 
     public void LoadPreset(int index)
     {
+        if (IsUserDefinition) return;
         FieldBuiltInPatches.BuildInstrument(index, _graph, _registry);
+        _surface = FieldBuiltInSurfaces.BuildInstrument(index, _graph);
+        RebuildExposedParameters();
         Recompile(_maxBlock);
     }
 
-    public void WriteProjectState(OngenWriter writer) => FieldGraphSerializer.Write(writer, _graph);
+    public void WriteProjectState(OngenWriter writer)
+        => FieldHostState.WriteInstrument(writer, _typeId, _displayName, _definitionId, _surface, _graph);
 
     public void ReadProjectState(OngenReader reader)
     {
-        FieldGraphSerializer.Read(reader, _graph, _registry);
+        FieldHostState.ReadInstrument(reader, out var typeId, out var displayName, out var definitionId,
+            out var surface, _graph, _registry);
+        _typeId = string.IsNullOrEmpty(typeId) ? Id : typeId;
+        _displayName = string.IsNullOrEmpty(displayName) ? "Field" : displayName;
+        _definitionId = definitionId;
+        _surface = surface;
+        RebuildExposedParameters();
         Recompile(_maxBlock);
+    }
+
+    private void CopyGraph(FieldGraph source, FieldGraph dest)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new OngenWriter(ms)) FieldGraphSerializer.Write(w, source);
+        ms.Position = 0;
+        using (var r = new OngenReader(ms)) FieldGraphSerializer.Read(r, dest, _registry);
     }
 }

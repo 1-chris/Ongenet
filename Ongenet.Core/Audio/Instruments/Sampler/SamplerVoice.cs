@@ -328,9 +328,9 @@ public sealed class SamplerVoice
         var baseRate = _rate * bendMul;
 
         bool active;
-        if (!rt.ModActive)
+        if (!RequiresModLoop(rt))
         {
-            active = RenderRange(buffer, 0, frames, channels, baseRate, 1f, useFilter: false, useEq: false);
+            active = RenderRange(buffer, 0, frames, channels, baseRate, 1f, _useFilter, _eqBandCount > 0);
         }
         else
         {
@@ -478,6 +478,11 @@ public sealed class SamplerVoice
             }
         }
     }
+
+    private static bool RequiresModLoop(SamplerRegion rt)
+        => rt.HasFilEg || rt.HasFilLfo || rt.HasAmpLfo || rt.HasPitchLfo || rt.HasPitchEg
+           || rt.ModRoutes.Count > 0 || rt.FlexEgs.Count > 0 || rt.FlexLfos.Count > 0
+           || (rt.Xfade?.IsActive ?? false);
 
     // Renders `count` frames from `startFrame`, advancing the read position; returns false when the
     // voice has finished (sample end or envelope done).

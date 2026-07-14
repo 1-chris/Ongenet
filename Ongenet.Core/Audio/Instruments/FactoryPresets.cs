@@ -14,28 +14,37 @@ namespace Ongenet.Core.Audio.Instruments;
 /// </summary>
 public static class FactoryPresets
 {
-    /// <summary>One materializable factory preset: which library group it lands in, its name, and its builder.</summary>
-    public sealed record Definition(string InstrumentDisplayName, string PresetName, Func<IInstrument> Create);
+    /// <summary>One materializable factory preset: which library group it lands in, its name, builder, and FLEX-style tags.</summary>
+    public sealed record Definition(string InstrumentDisplayName, string PresetName, Func<IInstrument> Create, string[]? tags = null)
+    {
+        public string[] Tags { get; } = tags ?? Array.Empty<string>();
+    }
 
     /// <summary>One materializable factory FX chain: a named, ready-to-drop insert chain.</summary>
-    public sealed record ChainDefinition(string PresetName, Func<IAudioEffect[]> Create);
+    public sealed record ChainDefinition(string PresetName, Func<IAudioEffect[]> Create, string[]? tags = null)
+    {
+        public string[] Tags { get; } = tags ?? Array.Empty<string>();
+    }
 
     /// <summary>One materializable single-effect factory preset for the FX Presets library tab.</summary>
-    public sealed record EffectDefinition(string EffectDisplayName, string PresetName, Func<IAudioEffect> Create);
+    public sealed record EffectDefinition(string EffectDisplayName, string PresetName, Func<IAudioEffect> Create, string[]? tags = null)
+    {
+        public string[] Tags { get; } = tags ?? Array.Empty<string>();
+    }
 
     public static IReadOnlyList<Definition> Definitions { get; } = new Definition[]
     {
         // 3x Osc
-        new("3x Osc", "Deep Sub Bass", DeepSubBass),
-        new("3x Osc", "White Riser", WhiteRiser),
-        new("3x Osc", "Trance Bass", TranceBass),
+        new("3x Osc", "Deep Sub Bass", DeepSubBass, ["bass", "sub", "synth"]),
+        new("3x Osc", "White Riser", WhiteRiser, ["fx", "riser", "synth"]),
+        new("3x Osc", "Trance Bass", TranceBass, ["bass", "trance", "synth"]),
         new("3x Osc", "Reverse Cymbal", ReverseCymbal),
         new("3x Osc", "Pluck Stack", PluckStack),
-        new("3x Osc", "Super Saw Lead", SuperSawLead),
-        new("3x Osc", "Reese Growl", ReeseGrowl),
-        new("3x Osc", "Acid Square", AcidSquare),
-        new("3x Osc", "Soft Keys", SoftKeys),
-        new("3x Osc", "Detuned Pad", DetunedPad),
+        new("3x Osc", "Super Saw Lead", SuperSawLead, ["lead", "trance", "synth"]),
+        new("3x Osc", "Reese Growl", ReeseGrowl, ["bass", "reese", "synth"]),
+        new("3x Osc", "Acid Square", AcidSquare, ["bass", "acid", "synth"]),
+        new("3x Osc", "Soft Keys", SoftKeys, ["keys", "synth"]),
+        new("3x Osc", "Detuned Pad", DetunedPad, ["pad", "synth"]),
         new("3x Osc", "Hoover Stab", HooverStab),
         new("3x Osc", "Organ Drawbar", OrganDrawbar),
 
@@ -98,6 +107,52 @@ public static class FactoryPresets
         new("Basic Sampler", "Punch Hit", SamplerPunch),
         new("Basic Sampler", "Ambient Bloom", SamplerAmbient),
         new("Basic Sampler", "Transient Snap", SamplerSnap),
+        new("Basic Sampler", "Plucked String", SamplerPluckedString),
+
+        // Organ
+        new("Organ", "Classic 888", OrganClassic888),
+        new("Organ", "Jazz Drawbars", OrganJazzDrawbars),
+        new("Organ", "Gospel Full", OrganGospelFull),
+        new("Organ", "Rock B3", OrganRockB3),
+        new("Organ", "Soft Cathedral", OrganSoftCathedral),
+        new("Organ", "Percussive Stab", OrganPercussiveStab),
+        new("Organ", "Vibrato Warm", OrganVibratoWarm),
+        new("Organ", "Minimal Sub", OrganMinimalSub),
+
+        // Phase-4
+        new("Phase-4", "FM Bell", Phase4FmBell),
+        new("Phase-4", "Digital Pad", Phase4DigitalPad),
+        new("Phase-4", "Reso Lead", Phase4ResoLead),
+        new("Phase-4", "Harsh Bass", Phase4HarshBass),
+        new("Phase-4", "Glass Pluck", Phase4GlassPluck),
+        new("Phase-4", "Warm Stack", Phase4WarmStack),
+        new("Phase-4", "Metallic Keys", Phase4MetallicKeys),
+        new("Phase-4", "CZ Brass", Phase4CzBrass),
+
+        // Polysynth
+        new("Polysynth", "Init", PolysynthInit),
+        new("Polysynth", "Bright Lead", PolysynthBrightLead),
+        new("Polysynth", "Warm Pad", PolysynthWarmPad),
+        new("Polysynth", "Acid Bass", PolysynthAcidBass),
+        new("Polysynth", "Pluck", PolysynthPluck),
+        new("Polysynth", "Noise Sweep", PolysynthNoiseSweep),
+
+        // Polymer
+        new("Polymer", "Init", PolymerInit),
+        new("Polymer", "Glass Pad", PolymerGlassPad),
+        new("Polymer", "Detuned Stack", PolymerDetunedStack),
+        new("Polymer", "Soft Keys", PolymerSoftKeys),
+        new("Polymer", "Filter Wobble", PolymerFilterWobble),
+
+        // Drum Model
+        new("Drum Model", "808 Kick", Drum808Kick),
+        new("Drum Model", "909 Snare", Drum909Snare),
+        new("Drum Model", "Tight Hat", DrumTightHat),
+        new("Drum Model", "Room Clap", DrumRoomClap),
+        new("Drum Model", "Techno Zap", DrumTechnoZap),
+        new("Drum Model", "Lo-Fi Tom", DrumLoFiTom),
+        new("Drum Model", "Vintage Cymbal", DrumVintageCymbal),
+        new("Drum Model", "Punch Rim", DrumPunchRim),
     };
 
     public static IReadOnlyList<EffectDefinition> EffectDefinitions { get; } =
@@ -139,6 +194,18 @@ public static class FactoryPresets
         new("Sidechain", "Classic Pump", ClassicPumpSidechain),
         new("Tremolo", "Slow Pulse", SlowPulseTremolo),
         new("Clipper", "Transient Soft", TransientSoftClip),
+        new("Convolution", "Small Room", ConvolutionSmallRoom),
+        new("Convolution", "Hall Wash", ConvolutionHallWash),
+        new("Convolution", "Plate Bright", ConvolutionPlateBright),
+        new("Rotary", "Slow Leslie", RotarySlowLeslie),
+        new("Rotary", "Fast Spin", RotaryFastSpin),
+        new("Rotary", "Drive Warm", RotaryDriveWarm),
+        new("Dynamics", "Vocal Comp", DynamicsVocalComp),
+        new("Dynamics", "Drum Punch", DynamicsDrumPunch),
+        new("Dynamics", "Expand Gate", DynamicsExpandGate),
+        new("Delay+", "Dub Echo", DelayPlusDubEcho),
+        new("Delay+", "Modulated Ping", DelayPlusModulatedPing),
+        new("Delay+", "Filtered Slap", DelayPlusFilteredSlap),
     ];
 
     public static IReadOnlyList<ChainDefinition> ChainDefinitions { get; } =
@@ -373,11 +440,61 @@ public static class FactoryPresets
         Gain = 0.75
     };
 
-    public static FmSynthInstrument GlassBells() => new()
+    public static FmSynthInstrument GlassBells()
     {
-        ModRatio = 2.0, ModIndex = 1.5,
-        AttackSeconds = 0.003, DecaySeconds = 1.1, SustainLevel = 0.0, ReleaseSeconds = 1.6
-    };
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(1);
+        return fm;
+    }
+
+    public static FmSynthInstrument WarmPad()
+    {
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(2);
+        return fm;
+    }
+
+    public static FmSynthInstrument ElectricPiano()
+    {
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(3);
+        return fm;
+    }
+
+    public static FmSynthInstrument MetallicHit()
+    {
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(4);
+        return fm;
+    }
+
+    public static FmSynthInstrument BassGrowlFm()
+    {
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(5);
+        return fm;
+    }
+
+    public static FmSynthInstrument CrystalPluckFm()
+    {
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(6);
+        return fm;
+    }
+
+    public static FmSynthInstrument SoftClarinet()
+    {
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(7);
+        return fm;
+    }
+
+    public static FmSynthInstrument BrightStabFm()
+    {
+        var fm = new FmSynthInstrument();
+        fm.LoadPreset(8);
+        return fm;
+    }
 
     public static TripleOscInstrument WhiteRiser() => new()
     {
@@ -387,12 +504,6 @@ public static class FactoryPresets
         FilterTypeIndex = 1, Cutoff = 800, Resonance = 2.0,
         AttackSeconds = 2.5, DecaySeconds = 1.0, SustainLevel = 1.0, ReleaseSeconds = 0.4,
         Gain = 0.7
-    };
-
-    public static FmSynthInstrument WarmPad() => new()
-    {
-        ModRatio = 1.0, ModIndex = 0.6,
-        AttackSeconds = 0.4, DecaySeconds = 0.6, SustainLevel = 0.65, ReleaseSeconds = 2.4
     };
 
     public static TripleOscInstrument PluckStack() => new()
@@ -471,42 +582,6 @@ public static class FactoryPresets
         FilterTypeIndex = 1, Cutoff = 8000, Resonance = 0.5,
         AttackSeconds = 0.01, DecaySeconds = 0.1, SustainLevel = 0.9, ReleaseSeconds = 0.15,
         Gain = 0.7
-    };
-
-    public static FmSynthInstrument ElectricPiano() => new()
-    {
-        ModRatio = 1.0, ModIndex = 2.2,
-        AttackSeconds = 0.002, DecaySeconds = 1.4, SustainLevel = 0.15, ReleaseSeconds = 0.6
-    };
-
-    public static FmSynthInstrument MetallicHit() => new()
-    {
-        ModRatio = 3.5, ModIndex = 4.0,
-        AttackSeconds = 0.001, DecaySeconds = 0.35, SustainLevel = 0.0, ReleaseSeconds = 0.4
-    };
-
-    public static FmSynthInstrument BassGrowlFm() => new()
-    {
-        ModRatio = 1.0, ModIndex = 3.5,
-        AttackSeconds = 0.005, DecaySeconds = 0.3, SustainLevel = 0.4, ReleaseSeconds = 0.15
-    };
-
-    public static FmSynthInstrument CrystalPluckFm() => new()
-    {
-        ModRatio = 2.0, ModIndex = 2.8,
-        AttackSeconds = 0.001, DecaySeconds = 0.4, SustainLevel = 0.0, ReleaseSeconds = 0.35
-    };
-
-    public static FmSynthInstrument SoftClarinet() => new()
-    {
-        ModRatio = 2.0, ModIndex = 0.8,
-        AttackSeconds = 0.08, DecaySeconds = 0.2, SustainLevel = 0.75, ReleaseSeconds = 0.25
-    };
-
-    public static FmSynthInstrument BrightStabFm() => new()
-    {
-        ModRatio = 3.0, ModIndex = 2.0,
-        AttackSeconds = 0.001, DecaySeconds = 0.18, SustainLevel = 0.1, ReleaseSeconds = 0.12
     };
 
     private static OscillatorInstrument OscClassicSaw() => new()
@@ -684,6 +759,17 @@ public static class FactoryPresets
     private static BasicSamplerInstrument SamplerSnap() => new()
         { AttackSeconds = 0.001, ReleaseSeconds = 0.03, Gain = 0.92 };
 
+    private static BasicSamplerInstrument SamplerPluckedString() => new()
+    {
+        VoiceMode = 1,
+        Damping = 0.55,
+        PickPosition = 0.35,
+        Brightness = 0.6,
+        AttackSeconds = 0.001,
+        ReleaseSeconds = 0.4,
+        Gain = 0.85
+    };
+
     private static BassSynthInstrument BassFromPreset(int index)
     {
         var inst = new BassSynthInstrument();
@@ -699,4 +785,306 @@ public static class FactoryPresets
     public static BassSynthInstrument BassGrowlDrive() => BassFromPreset(6);
     public static BassSynthInstrument BassSoftSine() => BassFromPreset(7);
     public static BassSynthInstrument BassFunkySlap() => BassFromPreset(8);
+
+    // ---- Organ ----
+
+    private static OrganInstrument OrganClassic888()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[0] = 8; o.Drawbars[1] = 0; o.Drawbars[2] = 8; o.Drawbars[3] = 8; o.Drawbars[4] = 0;
+        o.Drawbars[5] = 8; o.Drawbars[6] = 0; o.Drawbars[7] = 0; o.Drawbars[8] = 8;
+        return o;
+    }
+
+    private static OrganInstrument OrganJazzDrawbars()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[0] = 4; o.Drawbars[1] = 0; o.Drawbars[2] = 6; o.Drawbars[3] = 5; o.Drawbars[4] = 3;
+        o.Drawbars[5] = 4; o.Drawbars[6] = 0; o.Drawbars[7] = 2; o.Drawbars[8] = 3;
+        o.VibratoOn = true; o.VibratoRate = 4.5; o.VibratoDepth = 22;
+        return o;
+    }
+
+    private static OrganInstrument OrganGospelFull()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[0] = 6; o.Drawbars[1] = 4; o.Drawbars[2] = 8; o.Drawbars[3] = 7; o.Drawbars[4] = 5;
+        o.Drawbars[5] = 6; o.Drawbars[6] = 4; o.Drawbars[7] = 3; o.Drawbars[8] = 5;
+        o.PercussionOn = true; o.PercussionLevel = 0.7;
+        return o;
+    }
+
+    private static OrganInstrument OrganRockB3()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[0] = 8; o.Drawbars[1] = 6; o.Drawbars[2] = 8; o.Drawbars[3] = 6; o.Drawbars[4] = 0;
+        o.Drawbars[5] = 8; o.Drawbars[6] = 0; o.Drawbars[7] = 0; o.Drawbars[8] = 6;
+        o.PercussionOn = true; o.PercussionLevel = 0.85; o.PercussionDecayMs = 60;
+        o.VibratoOn = false;
+        return o;
+    }
+
+    private static OrganInstrument OrganSoftCathedral()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[0] = 8; o.Drawbars[1] = 6; o.Drawbars[2] = 6; o.Drawbars[3] = 4; o.Drawbars[4] = 0;
+        o.Drawbars[5] = 3; o.Drawbars[6] = 0; o.Drawbars[7] = 2; o.Drawbars[8] = 2;
+        o.ReleaseSeconds = 0.25;
+        return o;
+    }
+
+    private static OrganInstrument OrganPercussiveStab()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[2] = 8; o.Drawbars[3] = 6; o.Drawbars[5] = 4;
+        o.PercussionOn = true; o.PercussionLevel = 0.95; o.PercussionDecayMs = 45;
+        o.AttackSeconds = 0.001; o.ReleaseSeconds = 0.05;
+        return o;
+    }
+
+    private static OrganInstrument OrganVibratoWarm()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[0] = 5; o.Drawbars[2] = 7; o.Drawbars[3] = 5; o.Drawbars[5] = 4;
+        o.VibratoOn = true; o.VibratoRate = 5.0; o.VibratoDepth = 40;
+        return o;
+    }
+
+    private static OrganInstrument OrganMinimalSub()
+    {
+        var o = new OrganInstrument();
+        o.Drawbars[0] = 8; o.Drawbars[2] = 3;
+        o.VibratoOn = false; o.PercussionOn = false;
+        return o;
+    }
+
+    // ---- Phase-4 ----
+
+    private static Phase4Instrument Phase4FmBell() => new()
+    {
+        Ratio1 = 1, Amount1 = 0.15, Ratio2 = 3.5, Amount2 = 0.7, Ratio3 = 5, Amount3 = 0.35, Ratio4 = 7, Amount4 = 0.2,
+        FilterOn = true, Cutoff = 12000, AttackSeconds = 0.002, DecaySeconds = 1.2, SustainLevel = 0.1, ReleaseSeconds = 0.8
+    };
+
+    private static Phase4Instrument Phase4DigitalPad() => new()
+    {
+        Ratio1 = 1, Amount1 = 0.35, Ratio2 = 2, Amount2 = 0.5, Ratio3 = 3, Amount3 = 0.4, Ratio4 = 4, Amount4 = 0.25,
+        FilterOn = true, Cutoff = 4500, AttackSeconds = 0.15, DecaySeconds = 0.6, SustainLevel = 0.75, ReleaseSeconds = 1.0
+    };
+
+    private static Phase4Instrument Phase4ResoLead() => new()
+    {
+        Ratio1 = 1, Amount1 = 0.55, Ratio2 = 2, Amount2 = 0.65, Ratio3 = 3, Amount3 = 0.45, Ratio4 = 4, Amount4 = 0.3,
+        FilterOn = true, Cutoff = 3200, Resonance = 4.5,
+        AttackSeconds = 0.004, DecaySeconds = 0.18, SustainLevel = 0.55, ReleaseSeconds = 0.2
+    };
+
+    private static Phase4Instrument Phase4HarshBass() => new()
+    {
+        Ratio1 = 0.5, Amount1 = 0.8, Ratio2 = 1, Amount2 = 0.7, Ratio3 = 2, Amount3 = 0.5, Ratio4 = 3, Amount4 = 0.35,
+        FilterOn = true, Cutoff = 900, Resonance = 2.0,
+        AttackSeconds = 0.003, DecaySeconds = 0.25, SustainLevel = 0.7, ReleaseSeconds = 0.12
+    };
+
+    private static Phase4Instrument Phase4GlassPluck() => new()
+    {
+        Ratio1 = 1, Amount1 = 0.25, Ratio2 = 2.5, Amount2 = 0.75, Ratio3 = 4, Amount3 = 0.55, Ratio4 = 6, Amount4 = 0.3,
+        FilterOn = true, Cutoff = 7000,
+        AttackSeconds = 0.001, DecaySeconds = 0.35, SustainLevel = 0.0, ReleaseSeconds = 0.3
+    };
+
+    private static Phase4Instrument Phase4WarmStack() => new()
+    {
+        Ratio1 = 1, Amount1 = 0.4, Ratio2 = 1.5, Amount2 = 0.55, Ratio3 = 2, Amount3 = 0.5, Ratio4 = 2.5, Amount4 = 0.4,
+        FilterOn = true, Cutoff = 5500, Resonance = 1.2,
+        AttackSeconds = 0.01, DecaySeconds = 0.4, SustainLevel = 0.65, ReleaseSeconds = 0.35
+    };
+
+    private static Phase4Instrument Phase4MetallicKeys() => new()
+    {
+        Ratio1 = 1, Amount1 = 0.3, Ratio2 = 2.75, Amount2 = 0.85, Ratio3 = 4.5, Amount3 = 0.6, Ratio4 = 6, Amount4 = 0.4,
+        FilterOn = false,
+        AttackSeconds = 0.001, DecaySeconds = 0.5, SustainLevel = 0.15, ReleaseSeconds = 0.4
+    };
+
+    private static Phase4Instrument Phase4CzBrass() => new()
+    {
+        Ratio1 = 1, Amount1 = 0.5, Ratio2 = 2, Amount2 = 0.8, Ratio3 = 3, Amount3 = 0.55, Ratio4 = 4, Amount4 = 0.35,
+        FilterOn = true, Cutoff = 2800, Resonance = 3.0,
+        AttackSeconds = 0.008, DecaySeconds = 0.22, SustainLevel = 0.6, ReleaseSeconds = 0.18
+    };
+
+    // ---- Drum Model ----
+
+    private static DrumModelInstrument Drum808Kick()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(26); // v9 Kick
+        d.Pitch = 0.35; d.Decay = 0.72; d.Tone = 0.4; d.Drive = 0.55; d.Gain = 0.9;
+        return d;
+    }
+
+    private static DrumModelInstrument Drum909Snare()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(29); // v9 Snare
+        d.Pitch = 0.55; d.Decay = 0.45; d.Noise = 0.7; d.Drive = 0.4; d.Gain = 0.88;
+        return d;
+    }
+
+    private static DrumModelInstrument DrumTightHat()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(24); // v9 Hat Closed
+        d.Decay = 0.25; d.Tone = 0.65; d.Noise = 0.8; d.Gain = 0.82;
+        return d;
+    }
+
+    private static DrumModelInstrument DrumRoomClap()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(22); // v9 Clap
+        d.Decay = 0.6; d.Noise = 0.75; d.Drive = 0.35; d.Gain = 0.85;
+        return d;
+    }
+
+    private static DrumModelInstrument DrumTechnoZap()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(5); // v0 Zap Kick
+        d.Pitch = 0.8; d.Decay = 0.35; d.Drive = 0.75; d.Gain = 0.92;
+        return d;
+    }
+
+    private static DrumModelInstrument DrumLoFiTom()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(30); // v9 Tom
+        d.Pitch = 0.4; d.Decay = 0.55; d.Tone = 0.35; d.Drive = 0.5; d.Gain = 0.8;
+        return d;
+    }
+
+    private static DrumModelInstrument DrumVintageCymbal()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(0);
+        d.Decay = 0.85; d.Tone = 0.7; d.Noise = 0.65; d.Gain = 0.75;
+        return d;
+    }
+
+    private static DrumModelInstrument DrumPunchRim()
+    {
+        var d = new DrumModelInstrument();
+        d.ApplyModel(28); // v9 Rimshot
+        d.Pitch = 0.6; d.Decay = 0.3; d.Tone = 0.8; d.Drive = 0.45; d.Gain = 0.9;
+        return d;
+    }
+
+    // ---- Polysynth ----
+
+    private static PolysynthInstrument PolysynthInit() => new();
+
+    private static PolysynthInstrument PolysynthBrightLead() => new()
+    {
+        BlendOp = 0, OscMix = 0.35, Cutoff = 6200, Resonance = 1.8, FilterEnvAmt = 0.45,
+        Attack = 0.002, Decay = 0.08, Sustain = 0.45, Release = 0.15,
+        FAttack = 0.001, FDecay = 0.12, FSustain = 0.1, FRelease = 0.12
+    };
+
+    private static PolysynthInstrument PolysynthWarmPad() => new()
+    {
+        BlendOp = 0, OscMix = 0.55, Noise = 0.08, Cutoff = 1800, Resonance = 0.9, FilterEnvAmt = 0.25,
+        Attack = 0.04, Decay = 0.35, Sustain = 0.82, Release = 0.6,
+        FAttack = 0.02, FDecay = 0.5, FSustain = 0.35, FRelease = 0.45
+    };
+
+    private static PolysynthInstrument PolysynthAcidBass() => new()
+    {
+        BlendOp = 4, OscMix = 0.6, FilterMode = 0, Cutoff = 900, Resonance = 3.5, FilterEnvAmt = 0.7,
+        Attack = 0.001, Decay = 0.05, Sustain = 0.2, Release = 0.08,
+        FAttack = 0.001, FDecay = 0.08, FSustain = 0, FRelease = 0.06
+    };
+
+    private static PolysynthInstrument PolysynthPluck() => new()
+    {
+        BlendOp = 2, OscMix = 0.5, Cutoff = 4200, Resonance = 1.4, FilterEnvAmt = 0.55,
+        Attack = 0.001, Decay = 0.18, Sustain = 0, Release = 0.12,
+        FAttack = 0.001, FDecay = 0.22, FSustain = 0, FRelease = 0.15
+    };
+
+    private static PolysynthInstrument PolysynthNoiseSweep() => new()
+    {
+        BlendOp = 1, OscMix = 0.45, Noise = 0.35, FilterFm = 0.4, Cutoff = 2800, Resonance = 2.2,
+        Attack = 0.01, Decay = 0.4, Sustain = 0.5, Release = 0.35
+    };
+
+    // ---- Polymer ----
+
+    private static PolymerInstrument PolymerInit() => new();
+
+    private static PolymerInstrument PolymerGlassPad() => new()
+    {
+        WaveA = 1, WaveB = 2, FineB = 7, LevelA = 0.55, LevelB = 0.45,
+        Cutoff = 1400, Resonance = 0.8, LfoRate = 0.18, LfoDepth = 0.15,
+        Attack = 0.03, Decay = 0.4, Sustain = 0.85, Release = 0.7
+    };
+
+    private static PolymerInstrument PolymerDetunedStack() => new()
+    {
+        WaveA = 2, WaveB = 2, FineB = 14, LevelA = 0.6, LevelB = 0.6,
+        Cutoff = 3200, Resonance = 1.1, FilterEnvAmt = 0.2, LfoRate = 0.5, LfoDepth = 0.35,
+        Attack = 0.008, Decay = 0.25, Sustain = 0.7, Release = 0.3
+    };
+
+    private static PolymerInstrument PolymerSoftKeys() => new()
+    {
+        WaveA = 0, WaveB = 1, FineB = -5, LevelA = 0.7, LevelB = 0.35,
+        Cutoff = 4500, Resonance = 0.6, FilterEnvAmt = 0.08,
+        Attack = 0.003, Decay = 0.15, Sustain = 0.55, Release = 0.2
+    };
+
+    private static PolymerInstrument PolymerFilterWobble() => new()
+    {
+        WaveA = 2, WaveB = 3, FineB = -12, Cutoff = 900, Resonance = 2.4, FilterEnvAmt = 0.35,
+        LfoRate = 2.5, LfoDepth = 0.65,
+        Attack = 0.002, Decay = 0.12, Sustain = 0.6, Release = 0.18
+    };
+
+    // ---- New FX ----
+
+    private static ConvolutionEffect ConvolutionSmallRoom() => new()
+        { DecaySeconds = 0.45, Mix = 0.22, Size = 0.35 };
+
+    private static ConvolutionEffect ConvolutionHallWash() => new()
+        { DecaySeconds = 2.2, Mix = 0.38, Size = 0.85 };
+
+    private static ConvolutionEffect ConvolutionPlateBright() => new()
+        { DecaySeconds = 1.1, Mix = 0.3, Size = 0.55 };
+
+    private static RotaryEffect RotarySlowLeslie() => new()
+        { SpeedIndex = 0, SpeedHz = 0.8, DriveDb = 3, Mix = 0.85 };
+
+    private static RotaryEffect RotaryFastSpin() => new()
+        { SpeedIndex = 1, SpeedHz = 6.5, DriveDb = 6, Mix = 1.0 };
+
+    private static RotaryEffect RotaryDriveWarm() => new()
+        { SpeedIndex = 0, SpeedHz = 1.2, DriveDb = 12, Mix = 0.75 };
+
+    private static DynamicsEffect DynamicsVocalComp() => new()
+        { ThresholdDb = -20, Ratio = 3.5, AttackMs = 12, ReleaseMs = 100, MakeupDb = 3 };
+
+    private static DynamicsEffect DynamicsDrumPunch() => new()
+        { ThresholdDb = -16, Ratio = 5.0, AttackMs = 6, ReleaseMs = 80, MakeupDb = 4 };
+
+    private static DynamicsEffect DynamicsExpandGate() => new()
+        { ThresholdDb = -32, Ratio = 2.5, AttackMs = 5, ReleaseMs = 200, MakeupDb = 2 };
+
+    private static DelayPlusEffect DelayPlusDubEcho() => new()
+        { TimeMs = 480, Feedback = 0.55, Mix = 0.42, ModRateHz = 0.25, ModDepthMs = 6, FilterHz = 3200 };
+
+    private static DelayPlusEffect DelayPlusModulatedPing() => new()
+        { TimeMs = 320, Feedback = 0.38, Mix = 0.35, ModRateHz = 1.2, ModDepthMs = 10, FilterHz = 6000 };
+
+    private static DelayPlusEffect DelayPlusFilteredSlap() => new()
+        { TimeMs = 120, Feedback = 0.22, Mix = 0.28, ModRateHz = 0.5, ModDepthMs = 2, FilterHz = 4500 };
 }

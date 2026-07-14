@@ -27,6 +27,13 @@ namespace Ongenet.App.Views.Panels
             AddHandler(DragDrop.DropEvent, OnCardDrop);
             AddHandler(DragDrop.DragLeaveEvent, OnCardDragLeave);
             DataContextChanged += (_, _) => WireSamplerWarnings();
+            AddHandler(PointerPressedEvent, OnCardPointerPressed, RoutingStrategies.Tunnel);
+        }
+
+        private void OnCardPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (e.Source is Control c && c.Classes.Contains("fxdot")) return;
+            if (DataContext is InstrumentSlotViewModel vm) vm.RequestSelect();
         }
 
         private InstrumentSlotViewModel? _wiredVm;

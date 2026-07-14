@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Ongenet.Core.Audio.MidiFx;
@@ -6,6 +7,7 @@ using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Services;
+using Ongenet.App.ViewModels;
 
 namespace Ongenet.App.ViewModels.Panels
 {
@@ -15,26 +17,28 @@ namespace Ongenet.App.ViewModels.Panels
         private readonly ISelectionService _selection;
         private readonly IEventAggregator _events;
         private readonly IHistoryService _history;
+        private readonly IMidiEffectRegistry _registry;
 
-        public MidiFxViewModel(ISelectionService selection, IEventAggregator events, IHistoryService history)
+        public MidiFxViewModel(
+            ISelectionService selection,
+            IEventAggregator events,
+            IHistoryService history,
+            IMidiEffectRegistry registry)
         {
             _selection = selection;
             _events = events;
             _history = history;
+            _registry = registry;
             _selection.SelectionChanged += OnSelectionChanged;
+            _registry.Changed += RebuildAvailable;
 
-            AddScaleCommand = new RelayCommand(() => AddEffect(new ScaleMidiEffect()), () => HasTrack);
-            AddChordCommand = new RelayCommand(() => AddEffect(new ChordMidiEffect()), () => HasTrack);
-            AddArpCommand = new RelayCommand(() => AddEffect(new ArpMidiEffect()), () => HasTrack);
-            AddEchoCommand = new RelayCommand(() => AddEffect(new NoteEchoMidiEffect()), () => HasTrack);
-            AddRandomCommand = new RelayCommand(() => AddEffect(new RandomMidiEffect()), () => HasTrack);
+            Available = new ObservableCollection<AvailableMidiEffectViewModel>();
+            RebuildAvailable();
         }
 
-        public RelayCommand AddScaleCommand { get; }
-        public RelayCommand AddChordCommand { get; }
-        public RelayCommand AddArpCommand { get; }
-        public RelayCommand AddEchoCommand { get; }
-        public RelayCommand AddRandomCommand { get; }
+        public ObservableCollection<AvailableMidiEffectViewModel> Available { get; }
+
+        public ObservableCollection<MidiEffectSlotViewModel> Effects { get; } = new();
 
         private Track? Track => _selection.SelectedTrack;
 
@@ -42,13 +46,18 @@ namespace Ongenet.App.ViewModels.Panels
 
         public string TrackName => Track?.Name ?? string.Empty;
 
-        public ObservableCollection<MidiEffectSlotViewModel> Effects { get; } = new();
+        private void RebuildAvailable()
+        {
+            Available.Clear();
+            foreach (var info in _registry.Available.OrderBy(i => i.Category).ThenBy(i => i.DisplayName))
+                Available.Add(new AvailableMidiEffectViewModel(info, AddById));
+        }
 
-        private void AddEffect(IMidiEffect effect)
+        private void AddById(string id)
         {
             if (Track is null) return;
             _history.Capture("Add MIDI effect");
-            Track.MidiEffects.Add(effect);
+            Track.MidiEffects.Add(_registry.Create(id));
             Track.CommitMidiEffects();
             Rebuild();
             _events.Publish(new TrackChangedEvent(Track));
@@ -59,18 +68,8 @@ namespace Ongenet.App.ViewModels.Panels
             Effects.Clear();
             if (Track is null) return;
             foreach (var fx in Track.MidiEffects)
-                Effects.Add(CreateSlot(fx));
+                Effects.Add(new MidiEffectSlotViewModel(fx, RemoveEffect, ToggleEffect, Commit));
         }
-
-        private MidiEffectSlotViewModel CreateSlot(IMidiEffect fx) => fx switch
-        {
-            ScaleMidiEffect scale => new ScaleMidiEffectSlotViewModel(scale, RemoveEffect, ToggleEffect, Commit),
-            ChordMidiEffect chord => new ChordMidiEffectSlotViewModel(chord, RemoveEffect, ToggleEffect, Commit),
-            ArpMidiEffect arp => new ArpMidiEffectSlotViewModel(arp, RemoveEffect, ToggleEffect, Commit),
-            NoteEchoMidiEffect echo => new NoteEchoMidiEffectSlotViewModel(echo, RemoveEffect, ToggleEffect, Commit),
-            RandomMidiEffect random => new RandomMidiEffectSlotViewModel(random, RemoveEffect, ToggleEffect, Commit),
-            _ => new MidiEffectSlotViewModel(fx, RemoveEffect, ToggleEffect)
-        };
 
         private void Commit()
         {
@@ -94,178 +93,101 @@ namespace Ongenet.App.ViewModels.Panels
             if (Track is null) return;
             slot.Effect.Enabled = !slot.Effect.Enabled;
             Track.CommitMidiEffects();
-            slot.Refresh();
+            slot.RaiseStatusChanged();
             _events.Publish(new TrackChangedEvent(Track));
         }
 
         private void OnSelectionChanged()
         {
-            Rebuild();
             OnPropertyChanged(nameof(HasTrack));
             OnPropertyChanged(nameof(TrackName));
-            AddScaleCommand.RaiseCanExecuteChanged();
-            AddChordCommand.RaiseCanExecuteChanged();
-            AddArpCommand.RaiseCanExecuteChanged();
-            AddEchoCommand.RaiseCanExecuteChanged();
-            AddRandomCommand.RaiseCanExecuteChanged();
+            Rebuild();
         }
     }
 
-    public class MidiEffectSlotViewModel : ViewModelBase
+    public sealed class AvailableMidiEffectViewModel
+    {
+        private readonly Action<string> _add;
+        public AvailableMidiEffectViewModel(MidiEffectInfo info, Action<string> add)
+        {
+            Info = info;
+            _add = add;
+            AddCommand = new RelayCommand(() => _add(info.Id));
+        }
+
+        public MidiEffectInfo Info { get; }
+        public string DisplayName => Info.DisplayName;
+        public string Category => Info.Category;
+        public RelayCommand AddCommand { get; }
+    }
+
+    public sealed class MidiEffectSlotViewModel : ViewModelBase
     {
         private readonly Action<MidiEffectSlotViewModel> _remove;
         private readonly Action<MidiEffectSlotViewModel> _toggle;
+        private readonly Action? _commit;
 
         public MidiEffectSlotViewModel(IMidiEffect effect,
             Action<MidiEffectSlotViewModel> remove,
-            Action<MidiEffectSlotViewModel> toggle)
+            Action<MidiEffectSlotViewModel> toggle,
+            Action? commit = null)
         {
             Effect = effect;
             _remove = remove;
             _toggle = toggle;
+            _commit = commit;
             RemoveCommand = new RelayCommand(() => _remove(this));
             ToggleCommand = new RelayCommand(() => _toggle(this));
+
+            var parameters = new List<ParameterViewModel>();
+            foreach (var p in effect.Parameters)
+            {
+                var vm = ParameterViewModel.Create(p);
+                if (vm is FloatParameterViewModel fp && commit is not null)
+                    WrapFloatCommit(fp);
+                else if (vm is BoolParameterViewModel bp && commit is not null)
+                    WrapBoolCommit(bp);
+                else if (vm is ChoiceParameterViewModel cp && commit is not null)
+                    WrapChoiceCommit(cp);
+                parameters.Add(vm);
+            }
+            Parameters = parameters;
         }
 
         public IMidiEffect Effect { get; }
-
+        public string Name => Effect.Name;
+        public string Status => Effect.Enabled ? "On" : "Off";
+        public bool HasParameters => Parameters.Count > 0;
+        public IReadOnlyList<ParameterViewModel> Parameters { get; }
         public RelayCommand RemoveCommand { get; }
         public RelayCommand ToggleCommand { get; }
+        public void RaiseStatusChanged() => OnPropertyChanged(nameof(Status));
 
-        public string Name => Effect.Name;
-        public bool Enabled => Effect.Enabled;
-        public string Status => Enabled ? "On" : "Off";
-
-        public virtual void Refresh()
+        private void WrapFloatCommit(FloatParameterViewModel vm)
         {
-            OnPropertyChanged(nameof(Enabled));
-            OnPropertyChanged(nameof(Status));
-        }
-    }
-
-    public sealed class ScaleMidiEffectSlotViewModel : MidiEffectSlotViewModel
-    {
-        private readonly ScaleMidiEffect _fx;
-        private readonly Action _commit;
-
-        public ScaleMidiEffectSlotViewModel(ScaleMidiEffect fx,
-            Action<MidiEffectSlotViewModel> remove, Action<MidiEffectSlotViewModel> toggle, Action commit)
-            : base(fx, remove, toggle)
-        {
-            _fx = fx;
-            _commit = commit;
-        }
-
-        public int Root
-        {
-            get => _fx.Root;
-            set { if (_fx.Root == value) return; _fx.Root = value; OnPropertyChanged(); _commit(); }
-        }
-
-        public bool Minor
-        {
-            get => _fx.Minor;
-            set { if (_fx.Minor == value) return; _fx.Minor = value; OnPropertyChanged(); _commit(); }
-        }
-    }
-
-    public sealed class ChordMidiEffectSlotViewModel : MidiEffectSlotViewModel
-    {
-        private readonly ChordMidiEffect _fx;
-        private readonly Action _commit;
-
-        public ChordMidiEffectSlotViewModel(ChordMidiEffect fx,
-            Action<MidiEffectSlotViewModel> remove, Action<MidiEffectSlotViewModel> toggle, Action commit)
-            : base(fx, remove, toggle)
-        {
-            _fx = fx;
-            _commit = commit;
-        }
-
-        public string IntervalsText
-        {
-            get => string.Join(",", _fx.Intervals);
-            set
+            vm.PropertyChanged += (_, e) =>
             {
-                var parts = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                var ints = parts.Select(p => int.TryParse(p, out var n) ? n : 0).Where(n => n != 0 || parts.Length == 1).ToArray();
-                if (ints.Length == 0) ints = new[] { 0, 4, 7 };
-                _fx.Intervals = ints;
-                OnPropertyChanged();
-                _commit();
-            }
-        }
-    }
-
-    public sealed class ArpMidiEffectSlotViewModel : MidiEffectSlotViewModel
-    {
-        private readonly ArpMidiEffect _fx;
-        private readonly Action _commit;
-
-        public ArpMidiEffectSlotViewModel(ArpMidiEffect fx,
-            Action<MidiEffectSlotViewModel> remove, Action<MidiEffectSlotViewModel> toggle, Action commit)
-            : base(fx, remove, toggle)
-        {
-            _fx = fx;
-            _commit = commit;
+                if (e.PropertyName == nameof(FloatParameterViewModel.Value))
+                    _commit?.Invoke();
+            };
         }
 
-        public double RateBeats
+        private void WrapBoolCommit(BoolParameterViewModel vm)
         {
-            get => _fx.RateBeats;
-            set { if (Math.Abs(_fx.RateBeats - value) < 1e-9) return; _fx.RateBeats = value; OnPropertyChanged(); _commit(); }
-        }
-    }
-
-    public sealed class NoteEchoMidiEffectSlotViewModel : MidiEffectSlotViewModel
-    {
-        private readonly NoteEchoMidiEffect _fx;
-        private readonly Action _commit;
-
-        public NoteEchoMidiEffectSlotViewModel(NoteEchoMidiEffect fx,
-            Action<MidiEffectSlotViewModel> remove, Action<MidiEffectSlotViewModel> toggle, Action commit)
-            : base(fx, remove, toggle)
-        {
-            _fx = fx;
-            _commit = commit;
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(BoolParameterViewModel.Value))
+                    _commit?.Invoke();
+            };
         }
 
-        public double DelayBeats
+        private void WrapChoiceCommit(ChoiceParameterViewModel vm)
         {
-            get => _fx.DelayBeats;
-            set { if (Math.Abs(_fx.DelayBeats - value) < 1e-9) return; _fx.DelayBeats = value; OnPropertyChanged(); _commit(); }
-        }
-
-        public float Feedback
-        {
-            get => _fx.Feedback;
-            set { if (Math.Abs(_fx.Feedback - value) < 1e-6f) return; _fx.Feedback = value; OnPropertyChanged(); _commit(); }
-        }
-
-        public int MaxEchoes
-        {
-            get => _fx.MaxEchoes;
-            set { if (_fx.MaxEchoes == value) return; _fx.MaxEchoes = value; OnPropertyChanged(); _commit(); }
-        }
-    }
-
-    public sealed class RandomMidiEffectSlotViewModel : MidiEffectSlotViewModel
-    {
-        private readonly RandomMidiEffect _fx;
-        private readonly Action _commit;
-
-        public RandomMidiEffectSlotViewModel(RandomMidiEffect fx,
-            Action<MidiEffectSlotViewModel> remove, Action<MidiEffectSlotViewModel> toggle, Action commit)
-            : base(fx, remove, toggle)
-        {
-            _fx = fx;
-            _commit = commit;
-        }
-
-        public float Probability
-        {
-            get => _fx.Probability;
-            set { if (Math.Abs(_fx.Probability - value) < 1e-6f) return; _fx.Probability = value; OnPropertyChanged(); _commit(); }
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ChoiceParameterViewModel.SelectedIndex))
+                    _commit?.Invoke();
+            };
         }
     }
 }

@@ -344,6 +344,7 @@
                                 <ListBoxItem Name="TabInstPresets"><controls:VerticalTabLabel Text="{DynamicResource Main_Inst_Presets}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabFxPresets"><controls:VerticalTabLabel Text="{DynamicResource Main_FX_Presets}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                                 <ListBoxItem Name="TabFxChains"><controls:VerticalTabLabel Text="{DynamicResource Main_FX_Chains}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
+                                <ListBoxItem Name="TabModPresets"><controls:VerticalTabLabel Text="{DynamicResource Main_Mod_Presets}" Foreground="{Binding $parent[ListBoxItem].Foreground}"/></ListBoxItem>
                             </ListBox>
                         </DockPanel>
 
@@ -356,6 +357,7 @@
                                         <Binding ElementName="TabEverything" Path="IsSelected"/>
                                         <Binding ElementName="TabFiles" Path="IsSelected"/>
                                         <Binding ElementName="TabSamples" Path="IsSelected"/>
+                                        <Binding ElementName="TabInstPresets" Path="IsSelected"/>
                                     </MultiBinding>
                                 </views:LibraryOptionsView.IsVisible>
                             </views:LibraryOptionsView>
@@ -371,6 +373,7 @@
                                 <views:LibraryListView IsVisible="{Binding #TabInstPresets.IsSelected}" DataContext="{Binding InstrumentPresets}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabFxPresets.IsSelected}" DataContext="{Binding EffectPresets}"/>
                                 <views:LibraryListView IsVisible="{Binding #TabFxChains.IsSelected}" DataContext="{Binding EffectChainPresets}"/>
+                                <views:LibraryListView IsVisible="{Binding #TabModPresets.IsSelected}" DataContext="{Binding ModulatorPresets}"/>
                             </Grid>
                         </DockPanel>
                     </Grid>

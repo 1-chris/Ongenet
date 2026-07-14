@@ -31,6 +31,9 @@ public sealed class LibraryNode : ViewModelBase
     /// <summary>Stable key for favourites/categories (<see cref="LibraryItemKeys"/>). Empty = not organisable.</summary>
     public string ItemKey { get; init; } = string.Empty;
 
+    /// <summary>Leaf-only tags used by FLEX-style preset filtering.</summary>
+    public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
+
     // Leaf-only: how this row drags and what double-clicking it does. Null on folders.
     public DataFormat<string>? DragFormat { get; init; }
     public string? DragPayload { get; init; }
@@ -79,6 +82,7 @@ public abstract class LibraryListViewModel : ViewModelBase
     private List<LibraryNode> _contentRoots = new();
     private List<LibraryNode> _allRoots = new();
     private string _searchText = string.Empty;
+    private string _tagFilterText = string.Empty;
     private DispatcherTimer? _debounce;
     private ILibraryOrganizationService? _org;
     private HashSet<string>? _orgKinds;
@@ -93,6 +97,19 @@ public abstract class LibraryListViewModel : ViewModelBase
 
     /// <summary>Organization service (favourites / categories), when attached.</summary>
     public ILibraryOrganizationService? Organization => _org;
+
+    /// <summary>When true, selecting a leaf previews it (single click) instead of only double-click.</summary>
+    public virtual bool PreviewOnSelect => false;
+
+    /// <summary>When true, the shared library view shows a tag filter row.</summary>
+    public virtual bool HasTagFilter => false;
+
+    /// <summary>Instant tag filter; presets match when any tag contains this text.</summary>
+    public string TagFilterText
+    {
+        get => _tagFilterText;
+        set { if (SetField(ref _tagFilterText, value)) ScheduleFilter(); }
+    }
 
     /// <summary>Instant filter text; setting it re-applies the filter (debounced) to <see cref="Roots"/>.</summary>
     public string SearchText
@@ -188,7 +205,8 @@ public abstract class LibraryListViewModel : ViewModelBase
 
     /// <summary>Builds a draggable leaf node.</summary>
     protected static LibraryNode Leaf(string title, DataFormat<string> format, string payload,
-        Action? activate = null, string subtitle = "", string icon = "", string itemKey = "")
+        Action? activate = null, string subtitle = "", string icon = "", string itemKey = "",
+        IReadOnlyList<string>? tags = null)
         => new()
         {
             Title = title,
@@ -197,7 +215,8 @@ public abstract class LibraryListViewModel : ViewModelBase
             DragFormat = format,
             DragPayload = payload,
             Activate = activate,
-            ItemKey = itemKey
+            ItemKey = itemKey,
+            Tags = tags ?? Array.Empty<string>()
         };
 
     private void WireOrganization(IEnumerable<LibraryNode> roots)
@@ -308,9 +327,10 @@ public abstract class LibraryListViewModel : ViewModelBase
     private void ApplyFilter()
     {
         var query = _searchText.Trim();
+        var tagQuery = _tagFilterText.Trim();
         Roots.Clear();
 
-        if (query.Length == 0)
+        if (query.Length == 0 && tagQuery.Length == 0)
         {
             foreach (var root in _allRoots)
                 Roots.Add(LeafCap > 0 && !IsOrgPinFolder(root) ? CapClone(root, LeafCap) : root);
@@ -321,7 +341,7 @@ public abstract class LibraryListViewModel : ViewModelBase
             budget[0] = SearchCap;
             foreach (var root in _allRoots)
             {
-                var f = SearchClone(root, query, budget);
+                var f = SearchClone(root, query, tagQuery, budget);
                 if (f is not null) Roots.Add(f);
             }
             if (budget[1] > 0 && Roots.Count > 0) Roots.Add(MoreNode(budget[1]));
@@ -349,11 +369,12 @@ public abstract class LibraryListViewModel : ViewModelBase
         return CloneFolder(node, kept, ShouldAutoExpand(kept.Count));
     }
 
-    private static LibraryNode? SearchClone(LibraryNode node, string query, int[] budget)
+    private static LibraryNode? SearchClone(LibraryNode node, string query, string tagQuery, int[] budget)
     {
         if (!node.IsFolder)
         {
-            if (!node.Title.Contains(query, StringComparison.OrdinalIgnoreCase)) return null;
+            if (query.Length > 0 && !node.Title.Contains(query, StringComparison.OrdinalIgnoreCase)) return null;
+            if (tagQuery.Length > 0 && !MatchesTagFilter(node, tagQuery)) return null;
             if (budget[0] <= 0) { budget[1]++; return null; }
             budget[0]--;
             return CloneLeaf(node);
@@ -362,10 +383,18 @@ public abstract class LibraryListViewModel : ViewModelBase
         var kept = new List<LibraryNode>();
         foreach (var child in node.Children)
         {
-            var f = SearchClone(child, query, budget);
+            var f = SearchClone(child, query, tagQuery, budget);
             if (f is not null) kept.Add(f);
         }
         return kept.Count == 0 ? null : CloneFolder(node, kept, expanded: true);
+    }
+
+    private static bool MatchesTagFilter(LibraryNode node, string tagQuery)
+    {
+        foreach (var tag in node.Tags)
+            if (tag.Contains(tagQuery, StringComparison.OrdinalIgnoreCase)) return true;
+        if (node.Subtitle.Contains(tagQuery, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 
     private static LibraryNode DeepClone(LibraryNode src)
@@ -385,6 +414,7 @@ public abstract class LibraryListViewModel : ViewModelBase
         DragFormat = l.DragFormat,
         DragPayload = l.DragPayload,
         Activate = l.Activate,
+        Tags = l.Tags,
         ToggleFavouriteAction = l.ToggleFavouriteAction,
         IsFavourite = l.IsFavourite
     };

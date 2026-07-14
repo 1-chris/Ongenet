@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using Ongenet.Core.Audio.Automation;
+using Ongenet.Core.Audio.Containers;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
@@ -185,11 +186,11 @@ public sealed class AudioEngine : IAudioEngine
         {
             foreach (var slot in track.ActiveInstruments)
             {
-                slot.Instrument.Prepare(_output.Format);
-                foreach (var fx in slot.ActiveEffects) fx.Prepare(_output.Format);
+                ContainerRenderer.PrepareInstrument(slot.Instrument, _output.Format);
+                foreach (var fx in slot.ActiveEffects) ContainerRenderer.PrepareEffect(fx, _output.Format);
             }
 
-            foreach (var effect in track.ActiveEffects) effect.Prepare(_output.Format);
+            foreach (var effect in track.ActiveEffects) ContainerRenderer.PrepareEffect(effect, _output.Format);
         }
 
         _tracks = tracks;
@@ -367,8 +368,9 @@ public sealed class AudioEngine : IAudioEngine
         foreach (var n in schedule.Notes)
         {
             var track = _tracks.FirstOrDefault(t => t.Id == n.TrackId);
-            notes.Add(new ScheduledNote(n.TrackId, n.OnBeat, n.OffBeat, n.Slots, n.MidiEffects, n.Note, n.Velocity, n.Gain,
-                n.Pan, track?.RouteToExternalMidi ?? false, track?.ExternalMidiChannel ?? 1));
+            notes.Add(new ScheduledNote(n.TrackId, n.OnBeat + n.TimingOffsetBeats, n.OffBeat, n.Slots, n.MidiEffects,
+                n.Note, n.Velocity, n.Gain, n.Pan, track?.RouteToExternalMidi ?? false, track?.ExternalMidiChannel ?? 1,
+                n.PitchBend14));
         }
 
         var ccEvents = new List<ScheduledControlChange>(schedule.ControlChanges.Length);
@@ -512,7 +514,7 @@ public sealed class AudioEngine : IAudioEngine
         // Live tempo: re-evaluate the effective BPM at the start of this block and advance the playhead at
         // that rate. The effective tempo is the master track's Tempo automation curve when present, else the
         // manual transport tempo — so an automated tempo ramp (or a manual tempo nudge) takes effect
-        // immediately and continuously while playing, exactly like Bitwig. Tempo-synced clips and the MIDI
+        // immediately and continuously while playing. Tempo-synced clips and the MIDI
         // sequencer follow automatically because they're positioned by beat, which now advances at the live rate.
         var sampleRate = _output.Format.SampleRate;
         var transportBpm = _transport.Tempo.BeatsPerMinute;
@@ -959,7 +961,7 @@ public sealed class AudioEngine : IAudioEngine
 
     private bool InstrumentNeedsRender(IInstrument instrument, Guid trackId)
     {
-        if (instrument is IInstrumentVoiceState vs && vs.HasActiveVoices) return true;
+        if (ContainerRenderer.HasActiveVoices(instrument)) return true;
         return _trackActivity.HasActivity(trackId, _blkCurBeat, _blkCurBeat + _blkLookaheadBeats);
     }
 
@@ -968,7 +970,7 @@ public sealed class AudioEngine : IAudioEngine
         foreach (var slot in track.ActiveInstruments)
         {
             if (!slot.Enabled) continue;
-            if (slot.Instrument is IInstrumentVoiceState vs && vs.HasActiveVoices) return true;
+            if (ContainerRenderer.HasActiveVoices(slot.Instrument)) return true;
         }
 
         return false;
@@ -1286,7 +1288,7 @@ public sealed class AudioEngine : IAudioEngine
     {
         foreach (var track in _tracks)
         {
-            foreach (var slot in track.ActiveInstruments) slot.Instrument.AllNotesOff();
+            foreach (var slot in track.ActiveInstruments) ContainerRenderer.AllNotesOffInstrument(slot.Instrument);
             foreach (var fx in track.ActiveEffects)
                 if (fx is IMidiAwareEffect m) m.AllNotesOff();
         }
@@ -1337,7 +1339,7 @@ public sealed class AudioEngine : IAudioEngine
     // snapshots, captured when playback began (slot.Enabled is read live so toggles take effect).
     private readonly record struct ScheduledNote(Guid TrackId, double OnBeat, double OffBeat, InstrumentSlot[]? Slots,
         IMidiAwareEffect[] MidiEffects, int Note, float Velocity, float Gain = 1f, float Pan = 0f,
-        bool ExternalMidi = false, int ExternalChannel = 1)
+        bool ExternalMidi = false, int ExternalChannel = 1, int? PitchBend14 = null)
     {
         public void Fire(bool on, IMidiOutputService? midiOut)
         {
@@ -1346,6 +1348,9 @@ public sealed class AudioEngine : IAudioEngine
                 var cc10 = (int)Math.Clamp((Pan + 1f) * 0.5f * 127f, 0f, 127f);
                 SendControlChange(10, cc10, midiOut);
             }
+
+            if (on && PitchBend14 is int bend)
+                SendPitchBend(bend, midiOut);
 
             var vel = Velocity * Gain;
             if (Slots is not null)
@@ -1380,6 +1385,24 @@ public sealed class AudioEngine : IAudioEngine
 
             if (ExternalMidi && midiOut is not null && midiOut.IsAvailable)
                 midiOut.SendControlChange(ExternalChannel, controller, value);
+        }
+
+        private void SendPitchBend(int value14, IMidiOutputService? midiOut)
+        {
+            if (Slots is not null)
+            {
+                foreach (var slot in Slots)
+                {
+                    if (!slot.Enabled) continue;
+                    slot.Instrument.PitchBend(value14);
+                }
+            }
+
+            if (ExternalMidi && midiOut is not null && midiOut.IsAvailable)
+            {
+                var status = (byte)(0xE0 | Math.Clamp(ExternalChannel - 1, 0, 15));
+                midiOut.SendRaw(status, (byte)(value14 & 0x7F), (byte)((value14 >> 7) & 0x7F));
+            }
         }
     }
 

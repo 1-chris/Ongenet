@@ -61,6 +61,18 @@ namespace Ongenet.App.ViewModels.Effects
             set { Gesture.TailMs = Math.Max(0, value); OnPropertyChanged(); }
         }
 
+        public double TapeSpeed
+        {
+            get => Gesture.TapeSpeed;
+            set { Gesture.TapeSpeed = Math.Clamp(value, 0.25, 4.0); OnPropertyChanged(); }
+        }
+
+        public bool ReverseBuffer
+        {
+            get => Gesture.ReverseBuffer;
+            set { Gesture.ReverseBuffer = value; OnPropertyChanged(); }
+        }
+
         /// <summary>MIDI note that triggers this gesture (-1 = unmapped). One key per gesture in v1.</summary>
         public int TriggerKey
         {

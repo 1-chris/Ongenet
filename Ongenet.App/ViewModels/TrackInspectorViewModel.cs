@@ -1,12 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Automation;
 using Ongenet.Core.Audio.Dsp;
+using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.Modulation;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
+using Ongenet.Core.Persistence;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Services;
@@ -26,11 +31,15 @@ namespace Ongenet.App.ViewModels
         private readonly ITransportService _transport;
         private readonly IHistoryService _history;
         private readonly IAudioEngine _engine;
+        private readonly IInstrumentRegistry _instruments;
+        private readonly IEffectRegistry _effects;
+        private readonly IModulatorRegistry _modulators;
 
         public TrackInspectorViewModel(ISelectionService selection, IProjectService project,
             IEventAggregator events, ITransportService transport, IPlaybackClock clock, IHistoryService history,
-            IAudioEngine engine, Panels.GrooveSettingsViewModel groove, Panels.PatternTrackInspectorViewModel patternTrackInspector,
-            Panels.InstrumentRackViewModel instrumentRack)
+            IAudioEngine engine, IInstrumentRegistry instruments, IEffectRegistry effects,
+            IModulatorRegistry modulators, Panels.GrooveSettingsViewModel groove,
+            Panels.PatternTrackInspectorViewModel patternTrackInspector, Panels.InstrumentRackViewModel instrumentRack)
         {
             _selection = selection;
             _project = project;
@@ -38,6 +47,9 @@ namespace Ongenet.App.ViewModels
             _transport = transport;
             _history = history;
             _engine = engine;
+            _instruments = instruments;
+            _effects = effects;
+            _modulators = modulators;
             Groove = groove;
             PatternTrackInspector = patternTrackInspector;
             InstrumentRack = instrumentRack;
@@ -559,6 +571,33 @@ namespace Ongenet.App.ViewModels
             RemoveVolumeLfoCommand.RaiseCanExecuteChanged();
             AddPanLfoCommand.RaiseCanExecuteChanged();
             RemovePanLfoCommand.RaiseCanExecuteChanged();
+        }
+
+        /// <summary>Appends modulator slots from a factory/user modulator-chain preset onto the selected track.</summary>
+        public void ApplyModulatorChainPreset(string presetPath)
+        {
+            if (Track is not { } track) return;
+            try
+            {
+                using var fs = File.OpenRead(presetPath);
+                var loaded = PresetFile.Load(fs, _instruments, _effects, _modulators);
+                if (loaded?.ModulatorSlots is not { Count: > 0 } slots) return;
+                _history.Capture("Load modulator chain");
+                foreach (var slot in slots)
+                {
+                    track.ModulatorSlots.Add(new ModulatorSlot
+                    {
+                        Enabled = slot.Enabled,
+                        Depth = slot.Depth,
+                        Source = ModulatorCloner.Clone(slot.Source, _modulators),
+                        Target = slot.Target
+                    });
+                }
+
+                track.CommitModulatorSlots();
+                _events.Publish(new TrackChangedEvent(track));
+            }
+            catch { /* ignore invalid preset */ }
         }
 
         private void OnSelectionChanged()

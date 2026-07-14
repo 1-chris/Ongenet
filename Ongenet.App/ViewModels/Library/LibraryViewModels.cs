@@ -12,13 +12,34 @@ namespace Ongenet.App.ViewModels.Library;
 /// <summary>Effects library: every registered effect, grouped by category, dragged by type id.</summary>
 public sealed class EffectsLibraryViewModel : LibraryListViewModel
 {
+    private static readonly string[] CategoryOrder =
+    {
+        "User Effects", "Dynamics", "EQ & Filter", "Modulation", "Delay & Reverb", "Distortion",
+        "Pitch", "Utility", "Visualizer", "Field"
+    };
+
+    private readonly IEffectRegistry _effects;
+
     public EffectsLibraryViewModel(IEffectRegistry effects, ILibraryOrganizationService org)
     {
+        _effects = effects;
         EmptyHint = "No effects available.";
         AttachOrganization(org, LibraryItemKeys.Effect, LibraryItemKeys.Folder);
-        SetRoots(effects.Available
+        _effects.Changed += () => Dispatcher.UIThread.Post(Refresh);
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        int Rank(string category)
+        {
+            var i = Array.IndexOf(CategoryOrder, category);
+            return i < 0 ? CategoryOrder.Length : i;
+        }
+
+        SetRoots(_effects.Available
             .GroupBy(e => e.Category)
-            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => Rank(g.Key)).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
             .Select(g => Folder(g.Key, g
                 .OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .Select(e => Leaf(e.DisplayName, DragFormats.Effect, e.Id,
@@ -138,7 +159,10 @@ public sealed class SoundFontLibraryViewModel : LibraryListViewModel
 /// category, dragged onto the timeline or an instrument track by type id.</summary>
 public sealed class InstrumentLibraryViewModel : LibraryListViewModel
 {
-    private static readonly string[] CategoryOrder = { "Synth", "Sampler", "Drum", "CLAP", "LV2", "VST2", "VST3", "AU" };
+    private static readonly string[] CategoryOrder =
+    {
+        "User Instruments", "Synth", "Sampler", "Drum", "CLAP", "LV2", "VST2", "VST3", "AU"
+    };
 
     private readonly IInstrumentRegistry _registry;
 
@@ -174,20 +198,37 @@ public sealed class InstrumentLibraryViewModel : LibraryListViewModel
 public sealed class InstrumentPresetLibraryViewModel : LibraryListViewModel
 {
     private readonly IPresetLibrary _presets;
+    private readonly AudioPreviewViewModel _preview;
+    private readonly InstrumentInspectorViewModel _inspector;
 
-    public InstrumentPresetLibraryViewModel(IPresetLibrary presets, ILibraryOrganizationService org)
+    public InstrumentPresetLibraryViewModel(IPresetLibrary presets, AudioPreviewViewModel preview,
+        InstrumentInspectorViewModel inspector, ILibraryOrganizationService org)
     {
         _presets = presets;
+        _preview = preview;
+        _inspector = inspector;
         EmptyHint = "Save an instrument as a preset to see it here.";
         AttachOrganization(org, LibraryItemKeys.Preset, LibraryItemKeys.Folder);
         _presets.Changed += () => Dispatcher.UIThread.Post(Refresh);
         Refresh();
     }
 
+    public override bool PreviewOnSelect => true;
+    public override bool HasTagFilter => true;
+
     private void Refresh() => SetRoots(_presets.InstrumentPresets.Select(g => Folder(g.Name, g.Items
         .Select(p => Leaf(p.Name, DragFormats.Preset, p.FullPath,
-            itemKey: LibraryItemKeys.PresetKey(p.FullPath))),
+            activate: () => _preview.SelectInstrumentPreset(p.FullPath),
+            subtitle: FormatTags(p.Tags),
+            itemKey: LibraryItemKeys.PresetKey(p.FullPath),
+            tags: p.Tags)),
         itemKey: LibraryItemKeys.NamedFolderKey("inst-presets", g.Name))));
+
+    /// <summary>Loads the preset onto the selected instrument slot, or adds it when none is selected.</summary>
+    public void LoadSelectedPreset(string presetPath) => _inspector.LoadInstrumentPresetOnSelectedSlot(presetPath);
+
+    private static string FormatTags(IReadOnlyList<string> tags)
+        => tags.Count == 0 ? string.Empty : string.Join(" · ", tags);
 }
 
 /// <summary>Effect presets (user), grouped by effect, dragged by file path.</summary>
@@ -208,6 +249,28 @@ public sealed class EffectPresetLibraryViewModel : LibraryListViewModel
         .Select(p => Leaf(p.Name, DragFormats.Preset, p.FullPath,
             itemKey: LibraryItemKeys.PresetKey(p.FullPath))),
         itemKey: LibraryItemKeys.NamedFolderKey("fx-presets", g.Name))));
+}
+
+/// <summary>Modulator slot-chain presets (factory + user), dragged onto a track inspector.</summary>
+public sealed class ModulatorPresetLibraryViewModel : LibraryListViewModel
+{
+    private readonly IPresetLibrary _presets;
+
+    public ModulatorPresetLibraryViewModel(IPresetLibrary presets, ILibraryOrganizationService org)
+    {
+        _presets = presets;
+        EmptyHint = "Factory modulator chains appear here after startup.";
+        AttachOrganization(org, LibraryItemKeys.ModulatorChain, LibraryItemKeys.Folder);
+        _presets.Changed += () => Dispatcher.UIThread.Post(Refresh);
+        Refresh();
+    }
+
+    private void Refresh() => SetRoots(_presets.ModulatorPresets.Select(g => Folder(g.Name, g.Items
+        .Select(p => Leaf(p.Name, DragFormats.ModulatorChain, p.FullPath,
+            subtitle: p.Tags.Count == 0 ? string.Empty : string.Join(" · ", p.Tags),
+            itemKey: LibraryItemKeys.ModulatorChainKey(p.FullPath),
+            tags: p.Tags)),
+        itemKey: LibraryItemKeys.NamedFolderKey("mod-presets", g.Name))));
 }
 
 /// <summary>FX-chain presets (whole effect chains saved by the user), dragged onto a chain to append.</summary>

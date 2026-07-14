@@ -6,6 +6,7 @@
              xmlns:controls="using:Ongenet.App.Controls"
              xmlns:panels="using:Ongenet.App.Views.Panels"
              xmlns:field="using:Ongenet.App.Views.Field"
+             xmlns:fieldControls="using:Ongenet.App.Controls.Field"
              mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="200"
              x:Class="Ongenet.App.Views.Panels.EffectChainView"
              x:DataType="fx:EffectChainViewModel">
@@ -82,14 +83,25 @@
                     </Border>
                 </DataTemplate>
 
-                <!-- Field: the full modular node-graph editor embedded in the effect card. -->
+                <!-- Field: custom surface and/or modular node-graph editor. -->
                 <DataTemplate DataType="fx:FieldEffectViewModel">
                     <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
                             Background="{StaticResource CatppuccinSurface0}"
                             BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                         <StackPanel Spacing="6">
                             <panels:EffectHeaderView/>
-                            <Border CornerRadius="4" ClipToBounds="True" Height="380"
+                            <!-- Hide generic params when the custom surface already shows them. -->
+                            <panels:ParametersView DataContext="{Binding Parameters}"
+                                                   IsVisible="{Binding !HasCustomFieldSurface}"/>
+                            <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding ShowFieldSurface}"
+                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1"
+                                    HorizontalAlignment="Left">
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Auto" MaxHeight="280">
+                                    <fieldControls:FieldSurfaceCanvas DataContext="{Binding FieldSurface}"/>
+                                </ScrollViewer>
+                            </Border>
+                            <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding ShowFieldEditor}" Height="380"
                                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                                 <field:FieldEditorView DataContext="{Binding FieldEditor}"/>
                             </Border>
@@ -377,6 +389,72 @@
                             </Border>
                             <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
                                        Text="{DynamicResource EffectChain_Pass_through_scope_drag_to_orbit_scroll_to_zoom_}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Spectrum: live analyser graph (pass-through). -->
+                <DataTemplate DataType="fx:SpectrumEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <Border CornerRadius="4" ClipToBounds="True"
+                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                <controls:WaveCandyPanelControl Height="220"
+                                    SpectrumSource="{Binding Source}"
+                                    WaveformSource="{Binding Waveform}"
+                                    AnalyzerSource="{Binding Analyzer}"/>
+                            </Border>
+                            <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       Text="Pass-through analyser — audio is unchanged."/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Tuner: large note readout (pass-through). -->
+                <DataTemplate DataType="fx:TunerEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <Border CornerRadius="4" Padding="16" MinHeight="96"
+                                    Background="{StaticResource CatppuccinCrust}"
+                                    BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Text="{Binding DetectedNote}" FontSize="36" FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{StaticResource CatppuccinMauve}"/>
+                                    <TextBlock Text="{Binding DetectedHzText}" FontSize="14"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       Text="Monophonic pitch detection on the incoming signal."/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Convolution: IR loader + decay/size/mix knobs. -->
+                <DataTemplate DataType="fx:ConvolutionEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Load impulse" Click="OnLoadImpulse"
+                                        Background="{StaticResource CatppuccinSurface1}"/>
+                                <TextBlock Text="{Binding ImpulseName}" VerticalAlignment="Center"
+                                           MaxWidth="280" FontSize="11" TextTrimming="CharacterEllipsis"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            </StackPanel>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
+                                       Text="Load a mono WAV impulse, or use Decay/Size for a synthetic IR."/>
                         </StackPanel>
                     </Border>
                 </DataTemplate>

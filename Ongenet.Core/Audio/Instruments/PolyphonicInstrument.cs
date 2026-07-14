@@ -50,7 +50,7 @@ public abstract class PolyphonicInstrument : IInstrument, IInstrumentVoiceState
 
     bool IInstrumentVoiceState.HasActiveVoices => AnyVoiceActive;
 
-    public void NoteOn(int midiNote, float velocity)
+    public virtual void NoteOn(int midiNote, float velocity)
     {
         lock (_lock)
         {
@@ -61,7 +61,7 @@ public abstract class PolyphonicInstrument : IInstrument, IInstrumentVoiceState
         }
     }
 
-    public void NoteOff(int midiNote)
+    public virtual void NoteOff(int midiNote)
     {
         lock (_lock)
         {
@@ -75,7 +75,7 @@ public abstract class PolyphonicInstrument : IInstrument, IInstrumentVoiceState
         }
     }
 
-    public void AllNotesOff()
+    public virtual void AllNotesOff()
     {
         lock (_lock)
         {
@@ -127,6 +127,35 @@ public abstract class PolyphonicInstrument : IInstrument, IInstrumentVoiceState
         }
 
         return false;
+    }
+
+    /// <summary>Picks a free voice index, or the oldest active voice if the pool is full.</summary>
+    protected int PickVoiceIndex()
+    {
+        var index = FindFreeVoice();
+        return index >= 0 ? index : FindOldestVoice();
+    }
+
+    /// <summary>Starts a voice at a specific pool index (for legato/sequencer paths).</summary>
+    protected void StartVoiceAt(int index, int midiNote, float velocity)
+    {
+        lock (_lock)
+        {
+            index = Math.Clamp(index, 0, _voices.Length - 1);
+            _voices[index].Start(midiNote, velocity, _format);
+            _startOrder[index] = _counter++;
+        }
+    }
+
+    /// <summary>Returns the voice at <paramref name="index"/>.</summary>
+    protected Voice VoiceAt(int index) => _voices[Math.Clamp(index, 0, _voices.Length - 1)];
+
+    /// <summary>Returns the first active voice, or null.</summary>
+    protected Voice? FirstActiveVoice()
+    {
+        foreach (var voice in _voices)
+            if (voice.IsActive) return voice;
+        return null;
     }
 
     private int FindFreeVoice()

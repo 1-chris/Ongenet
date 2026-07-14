@@ -8,5 +8,5 @@ namespace Ongenet.Core.Audio.Instruments;
 public static class FactoryContentVersion
 {
     /// <summary>Bump whenever factory instrument/effect/chain definitions change.</summary>
-    public const int Current = 3;
+    public const int Current = 7;
 }

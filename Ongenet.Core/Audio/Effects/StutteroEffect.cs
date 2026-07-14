@@ -58,7 +58,7 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
     private int _activeGesture;
     private long _gestureStartClock;
     private int _sliceLen = 1;
-    private int _slicePos;
+    private double _sliceReadPos;
     private long _segStartAbs;                     // slide mode: absolute start of the grabbed slice
     private int _segOffset;                        // frozen modes: offset within the snapshot
     private int _frozenLen;
@@ -156,15 +156,17 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
 
             if (active)
             {
-                if (_slicePos >= _sliceLen) Retrigger(gesture!, spb);
+                var tapeSpeed = Math.Clamp(gesture!.TapeSpeed, 0.25, 4.0);
+                _sliceReadPos += tapeSpeed;
+                if (_sliceReadPos >= _sliceLen) Retrigger(gesture, spb);
 
-                var p = _sliceLen > 0 ? _slicePos / (double)_sliceLen : 0.0;
-                var amp = (float)gesture!.Gate.Evaluate(p) * FadeWindow(_slicePos, _sliceLen, tailSamples) * _releaseRamp;
+                var p = _sliceLen > 0 ? Math.Clamp(_sliceReadPos / _sliceLen, 0, 1) : 0.0;
+                var amp = (float)(gesture.Gate.Evaluate(p) * gesture.Volume.Evaluate(p))
+                    * FadeWindow((int)_sliceReadPos, _sliceLen, tailSamples) * _releaseRamp;
 
+                var readPos = gesture.ReverseBuffer ? _sliceLen - 1 - _sliceReadPos : _sliceReadPos;
                 for (var c = 0; c < channels; c++)
-                    _wet[bi + c] = ReadSlice(gesture!, c) * amp;
-
-                _slicePos++;
+                    _wet[bi + c] = ReadSlice(gesture, c, readPos) * amp;
 
                 if (_state == State.Releasing)
                 {
@@ -250,7 +252,7 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
         var g = Gestures[index];
         _activeGesture = index;
         _gestureStartClock = _clock;
-        _slicePos = _sliceLen; // force a retrigger on the first processed sample
+        _sliceReadPos = _sliceLen; // force a retrigger on the first processed sample
         _releaseRamp = 1f;
         _state = State.Active;
         _heldNote = ModeIndex == 1 ? FindKeyFor(index) : -1;
@@ -273,7 +275,7 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
         var gp = GesturePhase(g, spb);
         var rateBeats = RateBeats(g, gp);
         _sliceLen = Math.Max(1, (int)Math.Round(rateBeats * spb));
-        _slicePos = 0;
+        _sliceReadPos = 0;
 
         switch (g.Buffer)
         {
@@ -317,15 +319,21 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
         return peak > 1e-4f;
     }
 
-    private float ReadSlice(StutterGesture g, int channel)
+    private float ReadSlice(StutterGesture g, int channel, double readPos)
     {
         if (g.Buffer == BufferMode.Slide)
-            return _ring[channel].ReadAbs(_segStartAbs + _slicePos);
+            return _ring[channel].ReadAbs(_segStartAbs + readPos);
 
-        var idx = _segOffset + _slicePos;
-        if (idx >= _frozenLen) idx = _frozenLen - 1;
-        if (idx < 0) idx = 0;
-        return _frozen[channel][idx];
+        var idx = _segOffset + readPos;
+        if (idx >= _frozenLen - 1)
+            return _frozen[channel][Math.Max(0, _frozenLen - 1)];
+        if (idx < 0) return _frozen[channel][0];
+
+        var i0 = (int)Math.Floor(idx);
+        var frac = (float)(idx - i0);
+        var a = _frozen[channel][i0];
+        var b = _frozen[channel][Math.Min(i0 + 1, _frozenLen - 1)];
+        return a * (1f - frac) + b * frac;
     }
 
     // --- Modulation -----------------------------------------------------------------------------
@@ -500,6 +508,9 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
         w.WriteDouble(g.BufferLengthBeats);
         w.WriteDouble(g.TailMs);
         WriteCurve(w, g.Gate);
+        WriteCurve(w, g.Volume);
+        w.WriteDouble(g.TapeSpeed);
+        w.WriteBool(g.ReverseBuffer);
         WriteOptionalCurve(w, g.Rate);
         WriteOptionalCurve(w, g.Cutoff);
         w.WriteInt(g.ModuleCurves.Count);
@@ -520,6 +531,9 @@ public sealed class StutteroEffect : IAudioEffect, IContextualEffect, IMidiAware
             TailMs = r.ReadDouble()
         };
         g.Gate = ReadCurve(r);
+        g.Volume = ReadCurve(r);
+        g.TapeSpeed = r.ReadDouble();
+        g.ReverseBuffer = r.ReadBool();
         g.Rate = ReadOptionalCurve(r);
         g.Cutoff = ReadOptionalCurve(r);
         var mc = r.ReadInt();

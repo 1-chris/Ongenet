@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Ongenet.Core.Audio.Containers;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Audio.MidiFx;
 using Ongenet.Core.Audio.Parameters;
 
 namespace Ongenet.Core.Persistence;
@@ -40,7 +42,11 @@ public static class ComponentSerializer
             if (component is IProjectStatefulComponent stateful)
             {
                 c.WriteBool(true);
-                c.WriteChunk(stateful.WriteProjectState);
+                c.WriteChunk(w2 =>
+                {
+                    using (ContainerWriteContext.Scope(new ContainerWriteContext { Store = store }))
+                        stateful.WriteProjectState(w2);
+                });
             }
             else
             {
@@ -114,7 +120,8 @@ public static class ComponentSerializer
     /// Returns a null instrument (with the persisted enabled flag) if the type is unavailable.
     /// </summary>
     public static (IInstrument? Instrument, bool Enabled) ReadInstrument(OngenReader r,
-        IInstrumentRegistry instruments, Func<string, AudioSampleBuffer?> sampleLookup, List<string> warnings)
+        IInstrumentRegistry instruments, IEffectRegistry effects,
+        IMidiEffectRegistry? midiEffects, Func<string, AudioSampleBuffer?> sampleLookup, List<string> warnings)
     {
         IInstrument? inst = null;
         var enabled = true;
@@ -134,22 +141,32 @@ public static class ComponentSerializer
             if (inst is ISampleHost host && sampleRef.Length > 0 && sampleLookup(sampleRef) is { } buf)
                 host.LoadSample(buf, sampleName);
 
-            ReadCustomState(c, inst);
+            using (ContainerReadContext.Scope(new ContainerReadContext
+            {
+                Instruments = instruments,
+                Effects = effects,
+                MidiEffects = midiEffects,
+                SampleLookup = sampleLookup,
+                Warnings = warnings
+            }))
+                ReadCustomState(c, inst);
         });
         return (inst, enabled);
     }
 
     /// <summary>Reads one effect component chunk, creating it via <paramref name="effects"/> and restoring
-    /// its enabled flag, parameters and custom state. Returns null if the type is unavailable.</summary>
-    public static IAudioEffect? ReadEffect(OngenReader r, IEffectRegistry effects, List<string> warnings)
+    /// its enabled flag, parameters, hosted impulse/sample and custom state. Returns null if the type is unavailable.</summary>
+    public static IAudioEffect? ReadEffect(OngenReader r, IInstrumentRegistry instruments,
+        IEffectRegistry effects, IMidiEffectRegistry? midiEffects,
+        Func<string, AudioSampleBuffer?> sampleLookup, List<string> warnings)
     {
         IAudioEffect? fx = null;
         r.ReadChunk(c =>
         {
             var typeId = c.ReadString();
             var enabled = c.ReadBool();
-            c.ReadString(); // sampleRef (effects don't host samples today)
-            c.ReadString(); // sampleName
+            var sampleRef = c.ReadString();
+            var sampleName = c.ReadString();
 
             try { fx = effects.Create(typeId); }
             catch { warnings.Add($"Effect '{typeId}' is unavailable; it was skipped."); fx = null; }
@@ -161,7 +178,18 @@ public static class ComponentSerializer
                 ApplyParameters(fx.Parameters, persisted);
             }
 
-            ReadCustomState(c, fx);
+            if (fx is ISampleHost host && sampleRef.Length > 0 && sampleLookup(sampleRef) is { } buf)
+                host.LoadSample(buf, sampleName);
+
+            using (ContainerReadContext.Scope(new ContainerReadContext
+            {
+                Instruments = instruments,
+                Effects = effects,
+                MidiEffects = midiEffects,
+                SampleLookup = sampleLookup,
+                Warnings = warnings
+            }))
+                ReadCustomState(c, fx);
         });
         return fx;
     }

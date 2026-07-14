@@ -40,28 +40,8 @@ public sealed class ArrangementScheduler : IPlaybackScheduler
                 {
                     if (!clip.IsMidi) continue;
                     EmitControlChanges(controlChanges, clip, track, null, startBeat, groove);
-                    foreach (var note in clip.Notes)
-                    {
-                        var onBeat = GrooveMath.Apply(clip.StartBeat + note.StartBeat, groove);
-                        var offBeat = onBeat + note.LengthBeats;
-                        if (offBeat <= startBeat) continue;
-                        var (mappedNote, mappedVel) = DrumMapProcessor.Apply(context.Project, track, note.Note, note.Velocity);
-
-                        if (midiFxChain.IsEmpty)
-                        {
-                            notes.Add(new ScheduledNoteEvent(track.Id, onBeat, offBeat, null, midiAwareFx,
-                                mappedNote, mappedVel));
-                        }
-                        else
-                        {
-                            foreach (var expanded in midiFxChain.ExpandNote(onBeat, offBeat, mappedNote, mappedVel))
-                            {
-                                if (expanded.OffBeat <= startBeat) continue;
-                                notes.Add(new ScheduledNoteEvent(track.Id, expanded.OnBeat, expanded.OffBeat, null,
-                                    midiAwareFx, expanded.Note, expanded.Velocity));
-                            }
-                        }
-                    }
+                    MidiFxScheduleHelper.EmitClipNotes(notes, track, clip.Notes, clip.StartBeat, groove, startBeat,
+                        null, midiAwareFx, midiFxChain, context.Bpm, context.Project);
                 }
             }
 
@@ -99,7 +79,7 @@ public sealed class ArrangementScheduler : IPlaybackScheduler
             }
         }
 
-        notes.Sort((a, b) => a.OnBeat.CompareTo(b.OnBeat));
+        notes.Sort((a, b) => EffectiveOnBeat(a).CompareTo(EffectiveOnBeat(b)));
         controlChanges.Sort((a, b) => a.Beat.CompareTo(b.Beat));
 
         var beatsPerBar = Math.Max(1, context.Project.TimeSignature.Numerator);
@@ -131,28 +111,9 @@ public sealed class ArrangementScheduler : IPlaybackScheduler
         {
             if (!clip.IsMidi) continue;
             EmitControlChanges(controlChanges, clip, track, slots, startBeat, groove);
-            foreach (var note in clip.Notes)
-            {
-                var onBeat = GrooveMath.Apply(clip.StartBeat + note.StartBeat, groove);
-                var offBeat = onBeat + note.LengthBeats;
-                if (offBeat <= startBeat) continue;
-                var (mappedNote, mappedVel) = DrumMapProcessor.Apply(context.Project, track, note.Note, note.Velocity);
-
-                if (midiFxChain.IsEmpty)
-                {
-                    notes.Add(new ScheduledNoteEvent(track.Id, onBeat, offBeat, slots, midiAwareFx,
-                        mappedNote, mappedVel));
-                }
-                else
-                {
-                    foreach (var expanded in midiFxChain.ExpandNote(onBeat, offBeat, mappedNote, mappedVel))
-                    {
-                        if (expanded.OffBeat <= startBeat) continue;
-                        notes.Add(new ScheduledNoteEvent(track.Id, expanded.OnBeat, expanded.OffBeat, slots,
-                            midiAwareFx, expanded.Note, expanded.Velocity));
-                    }
-                }
-            }
+            MidiFxScheduleHelper.EmitClipNotes(notes, track, clip.Notes, clip.StartBeat, groove, startBeat,
+                slots, midiAwareFx, midiFxChain, context.Bpm, context.Project,
+                (t, s, note) => InstrumentRackRouting.ResolveSlots(t, s, note));
         }
     }
 
@@ -172,6 +133,8 @@ public sealed class ArrangementScheduler : IPlaybackScheduler
                 track.Id, beat, slots, cc.Controller, cc.Value));
         }
     }
+
+    private static double EffectiveOnBeat(ScheduledNoteEvent n) => n.OnBeat + n.TimingOffsetBeats;
 
     private static IMidiAwareEffect[] MidiAwareEffectsOf(Track track)
     {

@@ -19,6 +19,23 @@ namespace Ongenet.App.Views.Panels
         {
             InitializeComponent();
             AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
+            AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            AddHandler(DragDrop.DropEvent, OnDrop);
+        }
+
+        private void OnDragOver(object? sender, DragEventArgs e)
+        {
+            e.Handled = true;
+            e.DragEffects = e.DataTransfer.Contains(DragFormats.ModulatorChain)
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+        }
+
+        private void OnDrop(object? sender, DragEventArgs e)
+        {
+            if (DataContext is not ViewModels.TrackInspectorViewModel vm) return;
+            if (e.DataTransfer.TryGetValue(DragFormats.ModulatorChain) is { } path)
+                vm.ApplyModulatorChainPreset(path);
         }
 
         // Right-click the Volume/Pan sliders → "Create automation track"; left-press snapshots for undo.

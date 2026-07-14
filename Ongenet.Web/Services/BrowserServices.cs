@@ -61,6 +61,7 @@ public sealed class BrowserPresetLibrary : IPresetLibrary
     public IReadOnlyList<PresetGroup> InstrumentPresets { get; } = Array.Empty<PresetGroup>();
     public IReadOnlyList<PresetGroup> EffectPresets { get; } = Array.Empty<PresetGroup>();
     public IReadOnlyList<PresetGroup> ChainPresets { get; } = Array.Empty<PresetGroup>();
+    public IReadOnlyList<PresetGroup> ModulatorPresets { get; } = Array.Empty<PresetGroup>();
     public event Action? Changed;
     public void Rescan() => Changed?.Invoke();
     public string SaveInstrument(IInstrument instrument, string name) => string.Empty;

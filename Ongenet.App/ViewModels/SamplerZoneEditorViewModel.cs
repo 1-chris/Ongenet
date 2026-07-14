@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using Microsoft.Extensions.DependencyInjection;
 using Ongenet.App.ViewModels.Instruments;
+using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments.Sampler;
 
 namespace Ongenet.App.ViewModels;
@@ -304,8 +305,10 @@ public sealed class SamplerLayerColorChip
 
 public sealed class SamplerZoneRowViewModel : ViewModelBase
 {
+    public static readonly string[] FilterModeNames = { "LP", "BP", "HP", "Notch" };
+
     private readonly SamplerRegion _source;
-    private int _loKey, _hiKey, _loVel, _hiVel, _rootKey, _seqLength, _seqPosition;
+    private int _loKey, _hiKey, _loVel, _hiVel, _rootKey, _seqLength, _seqPosition, _roundRobinKey;
     private double _gain;
 
     public SamplerZoneRowViewModel(SamplerRegion region)
@@ -319,10 +322,12 @@ public sealed class SamplerZoneRowViewModel : ViewModelBase
         _gain = region.Gain;
         _seqLength = region.SeqLength;
         _seqPosition = region.SeqPosition;
+        _roundRobinKey = region.RoundRobinKey;
         _ampEg = region.AmpEg;
         _filEg = region.FilEg;
         _pitchEg = region.PitchEg;
         _hasFilter = region.HasFilter;
+        _filterMode = region.FilterMode;
         _cutoff = region.Cutoff > 0 ? region.Cutoff : 1000;
         _filterQ = region.FilterQ > 0 ? region.FilterQ : 0.707;
         _pan = region.Pan;
@@ -383,6 +388,14 @@ public sealed class SamplerZoneRowViewModel : ViewModelBase
         set => SetField(ref _seqPosition, Math.Max(1, value));
     }
 
+    public int RoundRobinKey
+    {
+        get => _roundRobinKey;
+        set => SetField(ref _roundRobinKey, value);
+    }
+
+    public IReadOnlyList<string> FilterModeOptions => FilterModeNames;
+
     public SamplerEgSpec AmpEg => _ampEg;
     public SamplerEgSpec FilEg => _filEg;
     public SamplerEgSpec PitchEg => _pitchEg;
@@ -429,6 +442,31 @@ public sealed class SamplerZoneRowViewModel : ViewModelBase
         set => SetField(ref _filterQ, Math.Max(0.05, value));
     }
 
+    public int FilterModeIndex
+    {
+        get => _filterMode switch
+        {
+            FilterMode.BandPass => 1,
+            FilterMode.HighPass => 2,
+            FilterMode.Notch => 3,
+            _ => 0
+        };
+        set
+        {
+            var mode = value switch
+            {
+                1 => FilterMode.BandPass,
+                2 => FilterMode.HighPass,
+                3 => FilterMode.Notch,
+                _ => FilterMode.LowPass
+            };
+            if (_filterMode == mode) return;
+            _filterMode = mode;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(FilterModeIndex));
+        }
+    }
+
     public double Pan
     {
         get => _pan;
@@ -437,6 +475,7 @@ public sealed class SamplerZoneRowViewModel : ViewModelBase
 
     private SamplerEgSpec _ampEg, _filEg, _pitchEg;
     private bool _hasFilter;
+    private FilterMode _filterMode;
     private double _cutoff, _filterQ, _pan;
 
     public SamplerRegion ToRegion() => _source.Copy(
@@ -449,10 +488,12 @@ public sealed class SamplerZoneRowViewModel : ViewModelBase
         pan: Pan,
         seqLength: SeqLength,
         seqPosition: SeqPosition,
+        roundRobinKey: RoundRobinKey,
         ampEg: AmpEg,
         filEg: FilEg,
         pitchEg: PitchEg,
         hasFilter: HasFilter,
+        filterMode: _filterMode,
         cutoff: Cutoff,
         filterQ: FilterQ);
 }

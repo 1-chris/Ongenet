@@ -3,129 +3,10 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.App.ViewModels.Panels"
-             xmlns:views="using:Ongenet.App.Views.Panels"
+             xmlns:panels="using:Ongenet.App.Views.Panels"
              mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="200"
              x:Class="Ongenet.App.Views.Panels.MidiFxView"
              x:DataType="vm:MidiFxViewModel">
-
-    <UserControl.Resources>
-        <DataTemplate x:Key="ScaleFxTemplate" x:DataType="vm:ScaleMidiEffectSlotViewModel">
-            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" Background="{StaticResource CatppuccinSurface0}">
-                <StackPanel Spacing="8">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
-                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
-                    </DockPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <StackPanel Spacing="2" Width="100">
-                            <TextBlock Text="{DynamicResource MidiFx_Root}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                            <NumericUpDown Value="{Binding Root}" Minimum="0" Maximum="11" FormatString="0"/>
-                        </StackPanel>
-                        <CheckBox Content="{DynamicResource MidiFx_Minor_scale}" IsChecked="{Binding Minor}" VerticalAlignment="Bottom"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="ChordFxTemplate" x:DataType="vm:ChordMidiEffectSlotViewModel">
-            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" Background="{StaticResource CatppuccinSurface0}">
-                <StackPanel Spacing="8">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
-                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
-                    </DockPanel>
-                    <TextBlock Text="{DynamicResource MidiFx_Semitone_intervals_comma_separated}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <TextBox Text="{Binding IntervalsText}"/>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="ArpFxTemplate" x:DataType="vm:ArpMidiEffectSlotViewModel">
-            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" Background="{StaticResource CatppuccinSurface0}">
-                <StackPanel Spacing="8">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
-                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
-                    </DockPanel>
-                    <TextBlock Text="{DynamicResource MidiFx_Rate_beats}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <NumericUpDown Value="{Binding RateBeats}" Minimum="0.0625" Maximum="4" Increment="0.0625" FormatString="0.###"/>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="EchoFxTemplate" x:DataType="vm:NoteEchoMidiEffectSlotViewModel">
-            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" Background="{StaticResource CatppuccinSurface0}">
-                <StackPanel Spacing="8">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
-                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
-                    </DockPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <StackPanel Spacing="2" Width="120">
-                            <TextBlock Text="{DynamicResource MidiFx_Delay_beats}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                            <NumericUpDown Value="{Binding DelayBeats}" Minimum="0.0625" Maximum="8" Increment="0.25" FormatString="0.##"/>
-                        </StackPanel>
-                        <StackPanel Spacing="2" Width="100">
-                            <TextBlock Text="{DynamicResource MidiFx_Feedback}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                            <NumericUpDown Value="{Binding Feedback}" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.##"/>
-                        </StackPanel>
-                        <StackPanel Spacing="2" Width="80">
-                            <TextBlock Text="{DynamicResource MidiFx_Max_echoes}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                            <NumericUpDown Value="{Binding MaxEchoes}" Minimum="1" Maximum="16" FormatString="0"/>
-                        </StackPanel>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="RandomFxTemplate" x:DataType="vm:RandomMidiEffectSlotViewModel">
-            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" Background="{StaticResource CatppuccinSurface0}">
-                <StackPanel Spacing="8">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
-                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
-                    </DockPanel>
-                    <TextBlock Text="{DynamicResource MidiFx_Pass_probability}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <Slider Minimum="0" Maximum="1" Value="{Binding Probability}" Width="200"/>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="DefaultFxTemplate" x:DataType="vm:MidiEffectSlotViewModel">
-            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" Background="{StaticResource CatppuccinSurface0}">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                        <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
-                        <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource CatppuccinText}"/>
-                </DockPanel>
-            </Border>
-        </DataTemplate>
-
-        <views:MidiFxTemplateSelector x:Key="FxTemplateSelector"
-                                   ScaleTemplate="{StaticResource ScaleFxTemplate}"
-                                   ChordTemplate="{StaticResource ChordFxTemplate}"
-                                   ArpTemplate="{StaticResource ArpFxTemplate}"
-                                   EchoTemplate="{StaticResource EchoFxTemplate}"
-                                   RandomTemplate="{StaticResource RandomFxTemplate}"
-                                   DefaultTemplate="{StaticResource DefaultFxTemplate}"/>
-    </UserControl.Resources>
 
     <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
         <Grid>
@@ -136,15 +17,43 @@
                 <TextBlock Text="{Binding TrackName, StringFormat='{}{0} — MIDI FX chain'}"
                            Foreground="{StaticResource CatppuccinSubtext0}"/>
 
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Button Classes="compact" Content="{DynamicResource MidiFx_Scale}" Command="{Binding AddScaleCommand}"/>
-                    <Button Classes="compact" Content="{DynamicResource MidiFx_Chord}" Command="{Binding AddChordCommand}"/>
-                    <Button Classes="compact" Content="{DynamicResource MidiFx_Arp}" Command="{Binding AddArpCommand}"/>
-                    <Button Classes="compact" Content="{DynamicResource MidiFx_Echo}" Command="{Binding AddEchoCommand}"/>
-                    <Button Classes="compact" Content="{DynamicResource MidiFx_Random}" Command="{Binding AddRandomCommand}"/>
-                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Available}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AvailableMidiEffectViewModel">
+                            <Button Classes="compact" Margin="0,0,6,6"
+                                    Content="{Binding DisplayName}"
+                                    Command="{Binding AddCommand}"
+                                    ToolTip.Tip="{Binding Category}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                <ItemsControl ItemsSource="{Binding Effects}" ItemTemplate="{StaticResource FxTemplateSelector}"/>
+                <ItemsControl ItemsSource="{Binding Effects}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MidiEffectSlotViewModel">
+                            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4"
+                                    Background="{StaticResource CatppuccinSurface0}">
+                                <StackPanel Spacing="8">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                                            <Button Classes="compact" Content="{Binding Status}" Command="{Binding ToggleCommand}"/>
+                                            <Button Classes="compact" Content="{DynamicResource MidiFx_Text}" Command="{Binding RemoveCommand}"/>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource CatppuccinText}"/>
+                                    </DockPanel>
+                                    <panels:ParametersView DataContext="{Binding Parameters}"
+                                                           IsVisible="{Binding HasParameters}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </Grid>
     </Border>

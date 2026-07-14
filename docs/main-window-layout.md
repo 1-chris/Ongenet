@@ -250,7 +250,7 @@ standard rack and drum grid from the rack kind dropdown.
 ### Hybrid tracks
 
 **Add Hybrid Track** (timeline context menu) creates a lane that accepts **both** audio and MIDI
-clips — Ableton/Bitwig-style hybrid workflows without duplicating tracks.
+clips — session/arrangement hybrid workflows without duplicating tracks.
 
 ### Specialist windows (View menu)
 

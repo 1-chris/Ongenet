@@ -32,6 +32,9 @@ public sealed class FieldEditorViewModel : ViewModelBase
     private FieldNode? _selectedNode;
     private Guid? _navigationGroupId;
     private string _patchName = string.Empty;
+    private string _saveDefinitionName = string.Empty;
+    private string _editorMode = "Graph";
+    private string _statusMessage = string.Empty;
 
     public FieldEditorViewModel(FieldGraph graph, IFieldNodeRegistry registry, Action recompile,
         IReadOnlyList<string> presetNames, Action<int> loadPreset, Func<CompiledGraph?> compiled, bool isInstrument,
@@ -48,12 +51,58 @@ public sealed class FieldEditorViewModel : ViewModelBase
         _instrumentHost = instrumentHost;
         _effectHost = effectHost;
         BuildPalette();
+
+        var surface = InstrumentHost?.Surface.Clone()
+                      ?? EffectHost?.Surface.Clone()
+                      ?? new FieldSurfaceDefinition();
+        Surface = new FieldSurfaceViewModel(graph, surface, PushSurfaceToHost);
+        SaveDefinitionName = InstrumentHost?.Name ?? EffectHost?.Name ?? (isInstrument ? "My Instrument" : "My Effect");
     }
 
     public FieldGraph Graph { get; }
     public IFieldNodeRegistry Registry { get; }
     public Func<CompiledGraph?> CompiledAccessor { get; }
     public bool IsInstrument { get; }
+    public FieldSurfaceViewModel Surface { get; }
+
+    public FieldInstrument? InstrumentHost => _instrumentHost?.Invoke() as FieldInstrument;
+    public FieldEffect? EffectHost => _effectHost?.Invoke();
+
+    /// <summary>"Graph" or "Interface".</summary>
+    public string EditorMode
+    {
+        get => _editorMode;
+        set
+        {
+            if (!SetField(ref _editorMode, value)) return;
+            var design = string.Equals(value, "Interface", StringComparison.OrdinalIgnoreCase);
+            Surface.IsDesignMode = design;
+            OnPropertyChanged(nameof(IsGraphMode));
+            OnPropertyChanged(nameof(IsInterfaceMode));
+        }
+    }
+
+    public bool IsGraphMode => !string.Equals(_editorMode, "Interface", StringComparison.OrdinalIgnoreCase);
+    public bool IsInterfaceMode => string.Equals(_editorMode, "Interface", StringComparison.OrdinalIgnoreCase);
+
+    public string SaveDefinitionName
+    {
+        get => _saveDefinitionName;
+        set => SetField(ref _saveDefinitionName, value);
+    }
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        private set => SetField(ref _statusMessage, value);
+    }
+
+    public bool HasUserDefinition => InstrumentHost?.IsUserDefinition == true || EffectHost?.IsUserDefinition == true;
+
+    public string SaveDefinitionButtonText
+        => IsInstrument
+            ? (HasUserDefinition ? "Update Instrument" : "Save as Instrument")
+            : (HasUserDefinition ? "Update Effect" : "Save as Effect");
 
     /// <summary>Raised when the graph's structure changes so the canvas repaints.</summary>
     public event Action? StructureChanged;
@@ -109,10 +158,25 @@ public sealed class FieldEditorViewModel : ViewModelBase
             {
                 CaptureHistory("Load built-in Field patch");
                 _loadPreset(value);
+                ReloadSurfaceFromHost();
                 SelectedNode = null;
                 RaiseStructureChanged();
             }
         }
+    }
+
+    /// <summary>
+    /// Replaces the designer document from the live host. Used after a built-in patch changes both
+    /// the graph and its supplied editable interface.
+    /// </summary>
+    public void ReloadSurfaceFromHost()
+    {
+        var surface = InstrumentHost?.Surface.Clone()
+                      ?? EffectHost?.Surface.Clone()
+                      ?? new FieldSurfaceDefinition();
+        Surface.ReplaceSurface(surface);
+        OnPropertyChanged(nameof(HasUserDefinition));
+        OnPropertyChanged(nameof(SaveDefinitionButtonText));
     }
 
     public FieldNode? SelectedNode
@@ -280,6 +344,81 @@ public sealed class FieldEditorViewModel : ViewModelBase
         }
 
         return null;
+    }
+
+    /// <summary>Promotes the current graph + surface to a Library instrument or effect definition.</summary>
+    public bool SaveAsDefinition()
+    {
+        PushSurfaceToHost();
+        var lib = App.ServiceProvider?.GetService<IFieldDefinitionLibrary>();
+        if (lib is null)
+        {
+            StatusMessage = "Definition library unavailable.";
+            return false;
+        }
+
+        var name = string.IsNullOrWhiteSpace(SaveDefinitionName)
+            ? (IsInstrument ? "My Instrument" : "My Effect")
+            : SaveDefinitionName.Trim();
+
+        FieldDefinitionValidation.Result result;
+        if (IsInstrument && InstrumentHost is { } inst)
+        {
+            CaptureHistory(inst.IsUserDefinition ? "Update Field instrument" : "Save Field instrument");
+            result = lib.SaveFromInstrument(inst, name, existingDefinitionId: inst.DefinitionId);
+            if (result.Ok)
+            {
+                // Reload identity from library so subsequent updates overwrite the same definition.
+                var path = lib.PathFor(inst.TypeId);
+                _ = path;
+                StatusMessage = inst.IsUserDefinition ? $"Updated '{name}'." : $"Saved instrument '{name}'.";
+            }
+        }
+        else if (!IsInstrument && EffectHost is { } fx)
+        {
+            CaptureHistory(fx.IsUserDefinition ? "Update Field effect" : "Save Field effect");
+            result = lib.SaveFromEffect(fx, name, existingDefinitionId: fx.DefinitionId);
+            StatusMessage = result.Ok
+                ? (fx.IsUserDefinition ? $"Updated '{name}'." : $"Saved effect '{name}'.")
+                : string.Join(" ", result.Errors);
+        }
+        else
+        {
+            StatusMessage = "No Field host available.";
+            return false;
+        }
+
+        if (!result.Ok)
+        {
+            StatusMessage = string.Join(" ", result.Errors);
+            return false;
+        }
+
+        if (result.Warnings.Count > 0)
+            StatusMessage += " " + string.Join(" ", result.Warnings);
+
+        OnPropertyChanged(nameof(HasUserDefinition));
+        OnPropertyChanged(nameof(SaveDefinitionButtonText));
+        return true;
+    }
+
+    public void ShowGraphMode() => EditorMode = "Graph";
+    public void ShowInterfaceMode() => EditorMode = "Interface";
+
+    private void PushSurfaceToHost()
+    {
+        if (InstrumentHost is { } inst)
+        {
+            inst.SetSurface(Surface.Surface);
+            if (!string.IsNullOrWhiteSpace(SaveDefinitionName))
+                inst.SetDisplayName(SaveDefinitionName);
+        }
+        else if (EffectHost is { } fx)
+        {
+            fx.SetSurface(Surface.Surface);
+            if (!string.IsNullOrWhiteSpace(SaveDefinitionName))
+                fx.SetDisplayName(SaveDefinitionName);
+        }
     }
 
     /// <summary>Replaces the live graph from a saved Field patch file.</summary>

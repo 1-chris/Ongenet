@@ -24,6 +24,7 @@ public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceT
     public double AttackMs { get; set; } = 10.0;
     public double ReleaseMs { get; set; } = 120.0;
     public double MakeupDb { get; set; }
+    public bool Enhanced { get; set; }
 
     /// <summary>Source track whose output drives the detector; null = use this track's input.</summary>
     public Guid? SidechainSourceTrackId { get; set; }
@@ -49,7 +50,8 @@ public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceT
         new FloatParameter("Ratio", 1.0, 20.0, () => Ratio, v => Ratio = v, "0.#", ":1"),
         new FloatParameter("Attack", 0.1, 200.0, () => AttackMs, v => AttackMs = v, "0.#", "ms", 2.0),
         new FloatParameter("Release", 5.0, 1000.0, () => ReleaseMs, v => ReleaseMs = v, "0", "ms", 2.0),
-        new FloatParameter("Makeup", 0.0, 24.0, () => MakeupDb, v => MakeupDb = v, "0.#", "dB")
+        new FloatParameter("Makeup", 0.0, 24.0, () => MakeupDb, v => MakeupDb = v, "0.#", "dB"),
+        new BoolParameter("Enhanced", () => Enhanced, v => Enhanced = v)
     };
 
     public void SetContext(EffectContext context) => _ctx = context;
@@ -65,7 +67,7 @@ public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceT
     {
         Enabled = Enabled, ThresholdDb = ThresholdDb, Ratio = Ratio,
         AttackMs = AttackMs, ReleaseMs = ReleaseMs, MakeupDb = MakeupDb,
-        SidechainSourceTrackId = SidechainSourceTrackId
+        Enhanced = Enhanced, SidechainSourceTrackId = SidechainSourceTrackId
     };
 
     public void Process(Span<float> buffer)
@@ -113,8 +115,13 @@ public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceT
             }
 
             var env = _follower.Process(detect);
-            var over = AudioMath.Lin2Db(env) - threshold;
-            var grDb = over > 0 ? over * slope : 0;
+            var levelDb = AudioMath.Lin2Db(env);
+            var over = levelDb - threshold;
+            double grDb;
+            if (Enhanced && over > -6.0 && over < 0)
+                grDb = over * over / 12.0 * slope; // soft 6 dB knee
+            else
+                grDb = over > 0 ? over * slope : 0;
             var gain = (float)(makeup * AudioMath.Db2Lin(-grDb));
 
             for (var c = 0; c < channels; c++) buffer[i + c] *= gain;

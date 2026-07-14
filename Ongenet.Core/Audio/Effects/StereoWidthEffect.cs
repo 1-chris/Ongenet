@@ -5,8 +5,7 @@ using Ongenet.Core.Audio.Parameters;
 namespace Ongenet.Core.Audio.Effects;
 
 /// <summary>
-/// Mid/side stereo width + balance. Width 0 = mono, 1 = unchanged, 2 = extra wide. Pan biases the
-/// stereo balance (constant power). Mono tracks are unaffected by width.
+/// Mid/side stereo width + balance with per-channel M/S matrix gains.
 /// </summary>
 public sealed class StereoWidthEffect : IAudioEffect
 {
@@ -18,6 +17,10 @@ public sealed class StereoWidthEffect : IAudioEffect
 
     public double Width { get; set; } = 1.0;
     public double Pan { get; set; }
+    public double MidGain { get; set; } = 1.0;
+    public double SideGain { get; set; } = 1.0;
+    public double LeftGain { get; set; } = 1.0;
+    public double RightGain { get; set; } = 1.0;
 
     private int _channels = 2;
 
@@ -28,21 +31,33 @@ public sealed class StereoWidthEffect : IAudioEffect
     public IReadOnlyList<Parameter> Parameters => _parameters ??= new Parameter[]
     {
         new FloatParameter("Width", 0.0, 2.0, () => Width, v => Width = v, "0.##"),
-        new FloatParameter("Pan", -1.0, 1.0, () => Pan, v => Pan = v, "0.##")
+        new FloatParameter("Pan", -1.0, 1.0, () => Pan, v => Pan = v, "0.##"),
+        new FloatParameter("Mid Gain", 0.0, 2.0, () => MidGain, v => MidGain = v, "0.##"),
+        new FloatParameter("Side Gain", 0.0, 2.0, () => SideGain, v => SideGain = v, "0.##"),
+        new FloatParameter("Left Gain", 0.0, 2.0, () => LeftGain, v => LeftGain = v, "0.##"),
+        new FloatParameter("Right Gain", 0.0, 2.0, () => RightGain, v => RightGain = v, "0.##")
     };
 
     public void Prepare(AudioFormat format) => _channels = format.Channels < 1 ? 1 : format.Channels;
 
-    public IAudioEffect Clone() => new StereoWidthEffect { Enabled = Enabled, Width = Width, Pan = Pan };
+    public IAudioEffect Clone() => new StereoWidthEffect
+    {
+        Enabled = Enabled, Width = Width, Pan = Pan,
+        MidGain = MidGain, SideGain = SideGain, LeftGain = LeftGain, RightGain = RightGain
+    };
 
     public void Process(Span<float> buffer)
     {
         var channels = _channels;
-        if (channels < 2) return; // width/balance only meaningful in stereo
+        if (channels < 2) return;
 
         var width = (float)Math.Clamp(Width, 0, 2);
+        var midGain = (float)Math.Clamp(MidGain, 0, 2);
+        var sideGain = (float)Math.Clamp(SideGain, 0, 2);
+        var leftGain = (float)Math.Clamp(LeftGain, 0, 2);
+        var rightGain = (float)Math.Clamp(RightGain, 0, 2);
         var (gl, gr) = Mixing.StripGains(1.0, Math.Clamp(Pan, -1, 1));
-        const float center = 1.41421356f; // √2 so centred pan is unity
+        const float center = 1.41421356f;
         gl *= center; gr *= center;
 
         var frames = buffer.Length / channels;
@@ -51,10 +66,10 @@ public sealed class StereoWidthEffect : IAudioEffect
             var i = frame * channels;
             var l = buffer[i];
             var r = buffer[i + 1];
-            var mid = (l + r) * 0.5f;
-            var side = (l - r) * 0.5f * width;
-            buffer[i] = (mid + side) * gl;
-            buffer[i + 1] = (mid - side) * gr;
+            var mid = (l + r) * 0.5f * midGain;
+            var side = (l - r) * 0.5f * sideGain * width;
+            buffer[i] = (mid + side) * leftGain * gl;
+            buffer[i + 1] = (mid - side) * rightGain * gr;
         }
     }
 }

@@ -72,6 +72,11 @@ namespace Ongenet.App.ViewModels
         /// <summary>The instrument cards for the selected track, in rack order.</summary>
         public ObservableCollection<InstrumentSlotViewModel> Slots { get; } = new();
 
+        /// <summary>The instrument slot targeted by Inst Presets browser loads.</summary>
+        public InstrumentSlotViewModel? SelectedSlot { get; private set; }
+
+        public bool HasSelectedSlot => SelectedSlot is not null;
+
         /// <summary>The "Add instrument" menu, grouped by category.</summary>
         public IReadOnlyList<InstrumentCategoryViewModel> AddableCategories { get; private set; } =
             new List<InstrumentCategoryViewModel>();
@@ -104,6 +109,23 @@ namespace Ongenet.App.ViewModels
         public void AddInstrumentPreset(string presetPath)
         {
             if (LoadInstrumentPreset(presetPath) is { } instrument) AddSlot(instrument, "Add preset");
+        }
+
+        /// <summary>Loads a preset onto <see cref="SelectedSlot"/>, or appends when none is selected.</summary>
+        public void LoadInstrumentPresetOnSelectedSlot(string presetPath)
+        {
+            if (SelectedSlot is { } slot) ReplacePresetForSlot(slot, presetPath);
+            else AddInstrumentPreset(presetPath);
+        }
+
+        public void SelectSlot(InstrumentSlotViewModel? slot)
+        {
+            if (ReferenceEquals(SelectedSlot, slot)) return;
+            if (SelectedSlot is { } prev) prev.IsSelected = false;
+            SelectedSlot = slot;
+            if (slot is not null) slot.IsSelected = true;
+            OnPropertyChanged(nameof(SelectedSlot));
+            OnPropertyChanged(nameof(HasSelectedSlot));
         }
 
         /// <summary>Loads a dropped sound font (.sf2/.sfz) into a new Sampler instrument at the end of the rack.</summary>
@@ -286,14 +308,21 @@ namespace Ongenet.App.ViewModels
 
         private void Rebuild()
         {
+            var selected = SelectedSlot?.Slot;
             Slots.Clear();
+            SelectedSlot = null;
             if (Track is { } track)
             {
                 foreach (var slot in track.Instruments)
-                    Slots.Add(new InstrumentSlotViewModel(slot, track.Id, _project, _audioFiles, _transport, _history, _effects,
-                        _clock, () => _events.Publish(new TracksChangedEvent()), RemoveSlot, MoveSlot,
+                {
+                    var vm = new InstrumentSlotViewModel(slot, track.Id, _project, _audioFiles, _transport, _history, _effects,
+                        _instruments, _clock, () => _events.Publish(new TracksChangedEvent()), RemoveSlot, MoveSlot,
                         InsertRelativeToSlot, ReplaceSlotWith, InsertPresetRelativeToSlot, ReplacePresetForSlot,
-                        InsertSoundFontRelativeToSlot, ReplaceSoundFontForSlot));
+                        InsertSoundFontRelativeToSlot, ReplaceSoundFontForSlot);
+                    vm.SelectRequested += () => SelectSlot(vm);
+                    Slots.Add(vm);
+                    if (selected is not null && ReferenceEquals(slot, selected)) SelectSlot(vm);
+                }
             }
 
             for (var i = 0; i < Slots.Count; i++)

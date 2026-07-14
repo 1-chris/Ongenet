@@ -4,7 +4,7 @@ using Avalonia.Input;
 namespace Ongenet.App.Input
 {
     /// <summary>
-    /// Maps the typing keyboard to piano notes using FL Studio's layout: the lower letter rows are
+    /// Maps the typing keyboard to piano notes using a two-row chromatic layout: the lower letter rows are
     /// the lower octave (Z=C, S=C#, X=D, …) and the upper letter/number rows are one octave above
     /// (Q=C, 2=C#, W=D, …), giving the two overlapping octaves FL provides.
     /// </summary>

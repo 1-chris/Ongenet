@@ -8,7 +8,7 @@ using Ongenet.Core.Audio.Parameters;
 namespace Ongenet.Core.Audio.Instruments;
 
 /// <summary>
-/// A triple-oscillator subtractive synth in the spirit of FL Studio's 3x Osc. Three
+/// A triple-oscillator subtractive synth modeled after classic three-oscillator designs. Three
 /// <see cref="WaveOscillator"/>s (each with its own waveform, coarse/fine tuning, phase offset and
 /// invert) are mixed, optionally amplitude-modulated by OSC 3, then shaped by a filter and an amp
 /// envelope. OSC 1 is locked at full level; OSC 2/3 mix relative to it. A loaded sample becomes the

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Ongenet.Core.Audio.Files;
 
@@ -31,6 +32,9 @@ public sealed class AudioSampleBuffer
     public int Channels { get; }
 
     public int SampleRate { get; }
+
+    /// <summary>Beat-slice regions for the Audio Editor (SliceX workflow).</summary>
+    public List<AudioSliceRegion> SliceRegions { get; } = new();
 
     /// <summary>Number of frames (samples per channel).</summary>
     public long FrameCount => Samples.Length / Channels;

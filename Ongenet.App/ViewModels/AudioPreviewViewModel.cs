@@ -3,7 +3,10 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using Ongenet.Core.Audio;
+using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Files;
+using Ongenet.Core.Audio.Instruments;
+using Ongenet.Core.Persistence;
 using Ongenet.Core.Services.Interfaces;
 using Ongenet.App.Services;
 
@@ -20,17 +23,22 @@ public sealed class AudioPreviewViewModel : ViewModelBase
     private readonly IAudioFileService _audioFiles;
     private readonly IAuditionPlayer _audition;
     private readonly IAppSettingsService _settings;
+    private readonly IInstrumentRegistry _instruments;
+    private readonly IEffectRegistry _effects;
 
     private string? _path;
     private AudioSampleBuffer? _buffer;
     private bool _isPlaying;
 
     public AudioPreviewViewModel(IAudioFileService audioFiles, IAuditionPlayer audition,
-        IAppSettingsService settings, IPlaybackClock clock)
+        IAppSettingsService settings, IPlaybackClock clock, IInstrumentRegistry instruments,
+        IEffectRegistry effects)
     {
         _audioFiles = audioFiles;
         _audition = audition;
         _settings = settings;
+        _instruments = instruments;
+        _effects = effects;
 
         PlayCommand = new RelayCommand(PlayCurrent);
         StopCommand = new RelayCommand(() => _audition.Stop());
@@ -82,6 +90,59 @@ public sealed class AudioPreviewViewModel : ViewModelBase
         OnPropertyChanged(nameof(FileName));
         SetStats("…", "…", "…");
         _ = LoadAsync(path);
+    }
+
+    /// <summary>Offline-renders an instrument preset and auditions it through the shared preview panel.</summary>
+    public void SelectInstrumentPreset(string presetPath)
+    {
+        if (string.IsNullOrEmpty(presetPath) || string.Equals(presetPath, _path, StringComparison.Ordinal)) return;
+
+        _path = presetPath;
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(FileName));
+        SetStats("…", "…", "…");
+        _ = LoadPresetAsync(presetPath);
+    }
+
+    private async Task LoadPresetAsync(string presetPath)
+    {
+        AudioSampleBuffer? buffer = null;
+        string tags = "—";
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var fs = File.OpenRead(presetPath);
+                var meta = PresetFile.ReadMeta(fs);
+                if (meta?.Tags is { Count: > 0 }) tags = string.Join(", ", meta.Tags);
+                fs.Position = 0;
+                var loaded = PresetFile.Load(fs, _instruments, _effects);
+                if (loaded?.Instrument is { } inst)
+                    buffer = InstrumentPresetPreviewRenderer.Render(inst);
+            });
+        }
+        catch { /* ignore */ }
+
+        if (!string.Equals(presetPath, _path, StringComparison.Ordinal)) return;
+
+        if (buffer is null)
+        {
+            _buffer = null;
+            Waveform = null; WaveRevision++;
+            OnPropertyChanged(nameof(Waveform)); OnPropertyChanged(nameof(WaveRevision));
+            SetStats("—", "—", "—");
+            return;
+        }
+
+        _buffer = buffer;
+        Waveform = AudioWaveform.Build(buffer, (int)Math.Max(8, buffer.FrameCount / 1000));
+        WaveRevision++;
+        OnPropertyChanged(nameof(Waveform));
+        OnPropertyChanged(nameof(WaveRevision));
+
+        var seconds = buffer.SampleRate > 0 ? buffer.FrameCount / (double)buffer.SampleRate : 0;
+        SetStats("—", FormatLength(seconds), tags);
+        if (AutoPlay) _audition.Play(buffer);
     }
 
     private async Task LoadAsync(string path)

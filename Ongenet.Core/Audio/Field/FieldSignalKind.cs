@@ -3,7 +3,7 @@ namespace Ongenet.Core.Audio.Field;
 /// <summary>
 /// The semantic kind of a Field wire. All kinds are carried on the same underlying representation —
 /// a mono block of <see cref="float"/> samples — so any output can be patched into any input
-/// (exactly like Bitwig's Grid). The kind only drives wire colouring and default routing hints.
+/// (exactly like Field's modular graph). The kind only drives wire colouring and default routing hints.
 /// </summary>
 public enum FieldSignalKind
 {

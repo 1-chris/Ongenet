@@ -43,7 +43,11 @@ public sealed record ScheduledNoteEvent(
     int Note,
     float Velocity,
     float Gain = 1f,
-    float Pan = 0f);
+    float Pan = 0f,
+    /// <summary>Additional onset offset in beats (humanize FX + per-note PPQ jitter).</summary>
+    double TimingOffsetBeats = 0,
+    /// <summary>Optional 14-bit pitch-bend (centre 8192) fired at note-on from Bend/Micro-pitch FX.</summary>
+    int? PitchBend14 = null);
 
 /// <summary>A MIDI CC event scheduled on the timeline.</summary>
 public sealed record ScheduledControlChangeEvent(
