@@ -37,7 +37,7 @@ public sealed class ProjectFileV10Tests
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
 
-        Assert.Equal(21, ProjectFile.FormatVersion);
+        Assert.Equal(22, ProjectFile.FormatVersion);
         Assert.Single(loaded.VideoLayers);
         Assert.Equal(2, loaded.VideoLayers[0].Items.Count);
         Assert.Single(loaded.VideoVisibilityRegions);

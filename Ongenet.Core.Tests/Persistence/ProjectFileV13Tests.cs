@@ -41,7 +41,7 @@ public sealed class ProjectFileV13Tests
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
 
-        Assert.Equal(21, ProjectFile.FormatVersion);
+        Assert.Equal(22, ProjectFile.FormatVersion);
         var viz = loaded.VideoLayers[0];
         Assert.Equal(VideoWaveformStyle.Spectrum, viz.WaveformStyle);
         Assert.Equal(VideoVisualiserColorMode.Gradient, viz.VisualiserColorMode);

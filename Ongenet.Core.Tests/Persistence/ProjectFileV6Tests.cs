@@ -37,6 +37,6 @@ public sealed class ProjectFileV6Tests
     [Fact]
     public void FormatVersion_IsSix()
     {
-        Assert.Equal(21, ProjectFile.FormatVersion);
+        Assert.Equal(22, ProjectFile.FormatVersion);
     }
 }

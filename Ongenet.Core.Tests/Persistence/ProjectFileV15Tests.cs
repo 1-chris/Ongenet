@@ -20,7 +20,7 @@ public sealed class ProjectFileV15Tests
         ProjectFile.Save(project, ms, "test", 0, 8, 0);
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
-        Assert.Equal(21, ProjectFile.FormatVersion);
+        Assert.Equal(22, ProjectFile.FormatVersion);
         Assert.Equal(60, loaded.VideoExportFps, 0);
     }
 }
@@ -139,7 +139,7 @@ public sealed class ProjectFileV19Tests
         ProjectFile.Save(project, ms, "test", 0, 8, 0);
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
-        Assert.Equal(21, ProjectFile.FormatVersion);
+        Assert.Equal(22, ProjectFile.FormatVersion);
         Assert.Equal(VideoWaveformStyle.Scope3D, loaded.VideoLayers[0].WaveformStyle);
         Assert.Equal(12, loaded.VideoLayers[0].Scope3DTrailCount);
         Assert.False(loaded.VideoLayers[0].Scope3DTransparentBackground);
@@ -148,5 +148,35 @@ public sealed class ProjectFileV19Tests
         Assert.Equal(0xFF40A02Bu, loaded.VideoLayers[1].Engine3DParticleColorArgb);
         Assert.Equal(VideoEngine3DParticleShape.Quad, loaded.VideoLayers[1].Engine3DParticleShape);
         Assert.Equal(trackId, loaded.VideoLayers[1].Engine3DAudioSourceTrackId);
+    }
+}
+
+public sealed class ProjectFileV22Tests
+{
+    [Fact]
+    public void ProjectClipsSortAndCategories_RoundTrip()
+    {
+        var catId = Guid.NewGuid();
+        var project = new Project
+        {
+            Name = "V22 Test",
+            ProjectClipsSortMode = ProjectClipsSortMode.ByColour
+        };
+        var cat = new ProjectClipCategory { Id = catId, Name = "Fills" };
+        cat.ClipKeys.Add("audio:hash-a");
+        cat.ClipKeys.Add("midi:sig-b");
+        project.ProjectClipCategories.Add(cat);
+
+        using var ms = new MemoryStream();
+        ProjectFile.Save(project, ms, "test", 0, 8, 0);
+        ms.Position = 0;
+        var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
+
+        Assert.Equal(22, ProjectFile.FormatVersion);
+        Assert.Equal(ProjectClipsSortMode.ByColour, loaded.ProjectClipsSortMode);
+        Assert.Single(loaded.ProjectClipCategories);
+        Assert.Equal(catId, loaded.ProjectClipCategories[0].Id);
+        Assert.Equal("Fills", loaded.ProjectClipCategories[0].Name);
+        Assert.Equal(new[] { "audio:hash-a", "midi:sig-b" }, loaded.ProjectClipCategories[0].ClipKeys);
     }
 }
