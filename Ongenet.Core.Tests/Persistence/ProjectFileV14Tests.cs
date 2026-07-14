@@ -34,7 +34,7 @@ public sealed class ProjectFileV14Tests
         ms.Position = 0;
         var loaded = ProjectFile.Load(ms, new InstrumentRegistry(), new EffectRegistry()).Project;
 
-        Assert.Equal(22, ProjectFile.FormatVersion);
+        Assert.Equal(23, ProjectFile.FormatVersion);
         var item = loaded.VideoLayers[0].Items[0];
         Assert.Equal(VideoElementKind.Text, item.Kind);
         Assert.Equal("Hello Ongenet", item.TextContent);

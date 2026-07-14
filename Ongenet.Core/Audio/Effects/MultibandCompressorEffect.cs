@@ -50,7 +50,7 @@ public sealed class MultibandCompressorEffect : IAudioEffect
     private Biquad[] _lpState = Array.Empty<Biquad>();
     private Biquad[] _hpState = Array.Empty<Biquad>();
     private EnvelopeFollower[,] _env = new EnvelopeFollower[0, 0];
-    private int _lastPresetIndex = -1;
+    private int _lastPresetIndex;
 
     public string Name => "Multiband (OTT)";
 
@@ -96,10 +96,15 @@ public sealed class MultibandCompressorEffect : IAudioEffect
         _env = env;
     }
 
-    public IAudioEffect Clone() => new MultibandCompressorEffect
+    public IAudioEffect Clone()
     {
-        Enabled = Enabled, Depth = Depth, HighBoostDb = HighBoostDb, MasteringPresetIndex = MasteringPresetIndex
-    };
+        var c = new MultibandCompressorEffect
+        {
+            Enabled = Enabled, Depth = Depth, HighBoostDb = HighBoostDb, MasteringPresetIndex = MasteringPresetIndex
+        };
+        c._lastPresetIndex = MasteringPresetIndex;
+        return c;
+    }
 
     public void Process(Span<float> buffer)
     {

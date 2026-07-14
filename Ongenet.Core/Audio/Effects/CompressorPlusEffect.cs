@@ -52,18 +52,28 @@ public sealed class CompressorPlusEffect : IAudioEffect, IGainReductionSource
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _lpC = BiquadCoefficients.Compute(FilterMode.LowPass, LowCrossHz, 0.707, _sampleRate);
-        _hpC = BiquadCoefficients.Compute(FilterMode.HighPass, HighCrossHz, 0.707, _sampleRate);
-        _lp = new Biquad[_channels];
-        _hp = new Biquad[_channels];
-        _bandFollowers = new EnvelopeFollower[_channels * 3];
-        for (var i = 0; i < _bandFollowers.Length; i++)
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var lpC = BiquadCoefficients.Compute(FilterMode.LowPass, LowCrossHz, 0.707, sampleRate);
+        var hpC = BiquadCoefficients.Compute(FilterMode.HighPass, HighCrossHz, 0.707, sampleRate);
+        var lp = new Biquad[channels];
+        var hp = new Biquad[channels];
+        var bandFollowers = new EnvelopeFollower[channels * 3];
+        for (var i = 0; i < bandFollowers.Length; i++)
         {
-            _bandFollowers[i] = new EnvelopeFollower();
-            _bandFollowers[i].SetTimes(AttackMs, ReleaseMs, _sampleRate);
+            bandFollowers[i] = new EnvelopeFollower();
+            bandFollowers[i].SetTimes(AttackMs, ReleaseMs, sampleRate);
         }
+
+        // Publish fully-built state with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _lpC = lpC;
+        _hpC = hpC;
+        _lp = lp;
+        _hp = hp;
+        _bandFollowers = bandFollowers;
         _follower.Reset();
     }
 
@@ -78,6 +88,10 @@ public sealed class CompressorPlusEffect : IAudioEffect, IGainReductionSource
     {
         if (!Enabled) return;
         var ch = _channels < 1 ? 1 : _channels;
+        var lp = _lp;
+        var hp = _hp;
+        var bandFollowers = _bandFollowers;
+        if (lp.Length < ch || hp.Length < ch || bandFollowers.Length < ch * 3) return;
         var frames = buffer.Length / ch;
         var ratio = RatioForCharacter();
         var makeup = (float)AudioMath.Db2Lin(MakeupDb);
@@ -90,7 +104,7 @@ public sealed class CompressorPlusEffect : IAudioEffect, IGainReductionSource
                 var i = f * ch + c;
                 var x = buffer[i];
                 var gain = Multiband
-                    ? ProcessMultiband(c, x, ratio, ref grPeak)
+                    ? ProcessMultiband(c, x, ratio, ref grPeak, lp, hp, bandFollowers)
                     : ProcessSingle(x, ratio, ref grPeak);
                 buffer[i] = x * gain * makeup;
             }
@@ -109,18 +123,21 @@ public sealed class CompressorPlusEffect : IAudioEffect, IGainReductionSource
         return (float)AudioMath.Db2Lin(gr);
     }
 
-    private float ProcessMultiband(int ch, float x, double ratio, ref double grPeak)
+    private float ProcessMultiband(int ch, float x, double ratio, ref double grPeak,
+        Biquad[] lp, Biquad[] hp, EnvelopeFollower[] bandFollowers)
     {
-        var low = (float)_lp[ch].Process(_lpC, x);
-        var high = (float)_hp[ch].Process(_hpC, x);
+        var low = (float)lp[ch].Process(_lpC, x);
+        var high = (float)hp[ch].Process(_hpC, x);
         var mid = x - low - high;
         var g = 0f;
         for (var b = 0; b < 3; b++)
         {
             var band = b switch { 0 => low, 1 => mid, _ => high };
             var idx = ch * 3 + b;
-            _bandFollowers[idx].SetTimes(AttackMs, ReleaseMs, _sampleRate);
-            var env = _bandFollowers[idx].Process(Math.Abs(band));
+            var follower = bandFollowers[idx];
+            if (follower is null) return 1f;
+            follower.SetTimes(AttackMs, ReleaseMs, _sampleRate);
+            var env = follower.Process(Math.Abs(band));
             var db = AudioMath.Lin2Db(env + 1e-9);
             var gr = db <= ThresholdDb ? 0.0 : (ThresholdDb - db) * (1.0 - 1.0 / ratio);
             if (gr < grPeak) grPeak = gr;

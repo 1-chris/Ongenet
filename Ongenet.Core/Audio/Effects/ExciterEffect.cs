@@ -49,15 +49,22 @@ public sealed class ExciterEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _hp = new Biquad[_channels];
-        _bass = new BassHarmonicEnhancerDsp[_channels];
-        for (var c = 0; c < _channels; c++)
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var hp = new Biquad[channels];
+        var bass = new BassHarmonicEnhancerDsp[channels];
+        for (var c = 0; c < channels; c++)
         {
-            _bass[c] = new BassHarmonicEnhancerDsp();
-            _bass[c].Prepare(_sampleRate);
+            bass[c] = new BassHarmonicEnhancerDsp();
+            bass[c].Prepare(sampleRate);
         }
+
+        // Publish fully-built arrays with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _hp = hp;
+        _bass = bass;
         _lastTone = double.NaN;
     }
 
@@ -92,6 +99,7 @@ public sealed class ExciterEffect : IAudioEffect
         var type = (ShaperType)Math.Clamp(Mode, 0, 3);
         var hp = _hp;
         var bass = _bass;
+        if (hp.Length < channels || bass.Length < channels) return;
 
         var frames = buffer.Length / channels;
         for (var frame = 0; frame < frames; frame++)
@@ -101,6 +109,7 @@ public sealed class ExciterEffect : IAudioEffect
             {
                 var dry = buffer[i + c];
                 var bassDsp = bass[c];
+                if (bassDsp is null) return;
                 bassDsp.Amount = bassAmt;
                 var withBass = bassDsp.Process(dry);
                 var bright = (float)hp[c].Process(coeffs, withBass);

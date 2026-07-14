@@ -48,15 +48,22 @@ public sealed class AmpEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _tone = new Biquad[_channels];
-        _cab = new CabinetSimDsp[_channels];
-        for (var c = 0; c < _channels; c++)
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var tone = new Biquad[channels];
+        var cab = new CabinetSimDsp[channels];
+        for (var c = 0; c < channels; c++)
         {
-            _cab[c] = new CabinetSimDsp();
-            _cab[c].Prepare(_sampleRate);
+            cab[c] = new CabinetSimDsp();
+            cab[c].Prepare(sampleRate);
         }
+
+        // Publish fully-built arrays with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _tone = tone;
+        _cab = cab;
         _lastTone = double.NaN;
     }
 
@@ -88,6 +95,7 @@ public sealed class AmpEffect : IAudioEffect
         var cabChar = Math.Clamp(CabCharacter, 0, CabNames.Length - 1);
         var bq = _tone;
         var cab = _cab;
+        if (bq.Length < channels || cab.Length < channels) return;
 
         var frames = buffer.Length / channels;
         for (var frame = 0; frame < frames; frame++)
@@ -99,6 +107,7 @@ public sealed class AmpEffect : IAudioEffect
                 var shaped = WaveShaper.Shape(dry, ShaperType.Tanh, drive);
                 var toned = (float)bq[c].Process(coeffs, shaped);
                 var cabDsp = cab[c];
+                if (cabDsp is null) return;
                 cabDsp.CharacterIndex = cabChar;
                 cabDsp.Mix = cabMix;
                 var wet = cabDsp.Process(toned);

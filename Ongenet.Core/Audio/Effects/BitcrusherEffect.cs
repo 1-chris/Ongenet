@@ -44,13 +44,18 @@ public sealed class BitcrusherEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _dsp = new BitcrusherDsp[_channels];
-        for (var c = 0; c < _channels; c++)
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var dsp = new BitcrusherDsp[channels];
+        for (var c = 0; c < channels; c++)
         {
-            _dsp[c] = new BitcrusherDsp();
-            _dsp[c].Reset();
+            dsp[c] = new BitcrusherDsp();
+            dsp[c].Reset();
         }
+
+        // Publish fully-built arrays with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _channels = channels;
+        _dsp = dsp;
     }
 
     public IAudioEffect Clone() => new BitcrusherEffect
@@ -67,15 +72,19 @@ public sealed class BitcrusherEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        if (!Enabled || _dsp.Length == 0) return;
+        if (!Enabled) return;
 
-        var channels = Math.Min(_channels, _dsp.Length);
+        var dsp = _dsp;
+        if (dsp.Length == 0) return;
+
+        var channels = Math.Min(_channels, dsp.Length);
         var frames = buffer.Length / channels;
         for (var frame = 0; frame < frames; frame++)
         {
             for (var c = 0; c < channels; c++)
             {
-                var d = _dsp[c];
+                var d = dsp[c];
+                if (d is null) return;
                 d.Bits = Bits;
                 d.Downsample = Downsample;
                 d.Gate = Gate;

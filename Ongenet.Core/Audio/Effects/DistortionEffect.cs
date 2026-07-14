@@ -47,14 +47,20 @@ public sealed class DistortionEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _cab = new CabinetSimDsp[_channels];
-        for (var c = 0; c < _channels; c++)
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var cab = new CabinetSimDsp[channels];
+        for (var c = 0; c < channels; c++)
         {
-            _cab[c] = new CabinetSimDsp();
-            _cab[c].Prepare(_sampleRate);
+            cab[c] = new CabinetSimDsp();
+            cab[c].Prepare(sampleRate);
         }
+
+        // Publish fully-built arrays with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _cab = cab;
     }
 
     public IAudioEffect Clone() => new DistortionEffect
@@ -65,7 +71,9 @@ public sealed class DistortionEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        var channels = Math.Min(_channels < 1 ? 1 : _channels, _cab.Length);
+        var cab = _cab;
+        var channels = Math.Min(_channels < 1 ? 1 : _channels, cab.Length);
+        if (channels <= 0) return;
         var drive = (float)AudioMath.Db2Lin(DriveDb);
         var output = (float)AudioMath.Db2Lin(OutputDb);
         var mix = (float)Math.Clamp(Mix, 0, 1);
@@ -85,10 +93,11 @@ public sealed class DistortionEffect : IAudioEffect
                 var shaped = Shape(dry * drive, mode);
                 if (useCab)
                 {
-                    var cab = _cab[c];
-                    cab.CharacterIndex = cabChar - 1;
-                    cab.Mix = cabMix;
-                    shaped = cab.Process(shaped);
+                    var cabDsp = cab[c];
+                    if (cabDsp is null) return;
+                    cabDsp.CharacterIndex = cabChar - 1;
+                    cabDsp.Mix = cabMix;
+                    shaped = cabDsp.Process(shaped);
                 }
                 buffer[idx] = (dry * (1 - mix) + shaped * mix) * output;
             }

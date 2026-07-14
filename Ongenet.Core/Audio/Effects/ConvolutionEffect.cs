@@ -27,7 +27,7 @@ public sealed class ConvolutionEffect : IAudioEffect, IImpulseHost, ISampleHost
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
-    private readonly ConvolutionReverb _reverb = new();
+    private ConvolutionReverb _reverb = new();
     private float[] _scratch = Array.Empty<float>();
     private bool _hasUserImpulse;
     private double _lastDecay = double.NaN, _lastSize = double.NaN, _lastSr = double.NaN;
@@ -62,15 +62,24 @@ public sealed class ConvolutionEffect : IAudioEffect, IImpulseHost, ISampleHost
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _scratch = new float[4096 * 2];
-        _lastDecay = double.NaN;
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var scratch = new float[4096 * 2];
+        var reverb = new ConvolutionReverb();
         if (_hasUserImpulse && CurrentImpulse is { } buf)
-            _reverb.LoadImpulse(ExtractMonoIr(buf));
+            reverb.LoadImpulse(ExtractMonoIr(buf));
         else
-            ConfigureSynthetic();
-        _reverb.Reset();
+            ConfigureSynthetic(reverb, sampleRate);
+
+        reverb.Reset();
+
+        // Publish fully-built state with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _scratch = scratch;
+        _reverb = reverb;
+        _lastDecay = double.NaN;
     }
 
     public void LoadImpulse(AudioSampleBuffer impulse, string name)
@@ -96,17 +105,21 @@ public sealed class ConvolutionEffect : IAudioEffect, IImpulseHost, ISampleHost
 
     public void Process(Span<float> buffer)
     {
+        var reverb = _reverb;
+        var scratch = _scratch;
+        if (scratch.Length == 0) return;
+
         if (!_hasUserImpulse &&
             (DecaySeconds != _lastDecay || Size != _lastSize || _sampleRate != _lastSr || FactoryIrIndex != _lastIr))
         {
-            ConfigureSynthetic();
+            ConfigureSynthetic(reverb, _sampleRate);
             _lastDecay = DecaySeconds;
             _lastSize = Size;
             _lastSr = _sampleRate;
             _lastIr = FactoryIrIndex;
         }
 
-        _reverb.Mix = (float)Math.Clamp(Mix, 0, 1);
+        reverb.Mix = (float)Math.Clamp(Mix, 0, 1);
 
         var channels = _channels < 1 ? 1 : _channels;
         var frames = buffer.Length / channels;
@@ -117,19 +130,19 @@ public sealed class ConvolutionEffect : IAudioEffect, IImpulseHost, ISampleHost
             for (var frame = 0; frame < frames; frame++)
             {
                 var i = frame * channels;
-                _scratch[frame * 2] = buffer[i];
-                _scratch[frame * 2 + 1] = buffer[i + 1];
+                scratch[frame * 2] = buffer[i];
+                scratch[frame * 2 + 1] = buffer[i + 1];
             }
 
-            _reverb.Process(_scratch, frames);
+            reverb.Process(scratch, frames);
 
             for (var frame = 0; frame < frames; frame++)
             {
                 var i = frame * channels;
                 var si = frame * 2;
-                buffer[i] = _scratch[si];
-                buffer[i + 1] = _scratch[si + 1];
-                for (var c = 2; c < channels; c++) buffer[i + c] = 0.5f * (_scratch[si] + _scratch[si + 1]);
+                buffer[i] = scratch[si];
+                buffer[i + 1] = scratch[si + 1];
+                for (var c = 2; c < channels; c++) buffer[i + c] = 0.5f * (scratch[si] + scratch[si + 1]);
             }
         }
         else
@@ -137,31 +150,33 @@ public sealed class ConvolutionEffect : IAudioEffect, IImpulseHost, ISampleHost
             for (var frame = 0; frame < frames; frame++)
             {
                 var sample = buffer[frame];
-                _scratch[frame * 2] = sample;
-                _scratch[frame * 2 + 1] = sample;
+                scratch[frame * 2] = sample;
+                scratch[frame * 2 + 1] = sample;
             }
 
-            _reverb.Process(_scratch, frames);
+            reverb.Process(scratch, frames);
 
             for (var frame = 0; frame < frames; frame++)
-                buffer[frame] = _scratch[frame * 2];
+                buffer[frame] = scratch[frame * 2];
         }
     }
 
-    private void ConfigureSynthetic()
+    private void ConfigureSynthetic(ConvolutionReverb reverb, double sampleRate)
     {
         if (FactoryIrIndex > 0 && !_hasUserImpulse)
         {
-            var ir = ConvolutionIrBank.BuildSyntheticIr(_sampleRate, FactoryIrIndex - 1, DecaySeconds, Size);
-            _reverb.LoadImpulse(ir);
+            var ir = ConvolutionIrBank.BuildSyntheticIr(sampleRate, FactoryIrIndex - 1, DecaySeconds, Size);
+            reverb.LoadImpulse(ir);
             return;
         }
 
         var decay = Math.Clamp(DecaySeconds, 0.1, 4.0);
         var size = Math.Clamp(Size, 0.0, 1.0);
         var length = decay * (0.35 + 0.65 * size);
-        _reverb.Configure((int)_sampleRate, length);
+        reverb.Configure((int)sampleRate, length);
     }
+
+    private void ConfigureSynthetic() => ConfigureSynthetic(_reverb, _sampleRate);
 
     private static float[] ExtractMonoIr(AudioSampleBuffer buffer)
     {

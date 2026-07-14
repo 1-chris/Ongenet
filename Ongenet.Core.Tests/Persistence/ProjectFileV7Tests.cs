@@ -13,7 +13,7 @@ public sealed class ProjectFileV7Tests
     [Fact]
     public void FormatVersion_IsSeven()
     {
-        Assert.Equal(22, ProjectFile.FormatVersion);
+        Assert.Equal(23, ProjectFile.FormatVersion);
     }
 
     [Fact]
