@@ -29,7 +29,9 @@ export function startAudio(ch) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         ctx = new AudioCtx();
 
-        const bufferSize = 2048; // frames per callback (~43ms @ 48kHz) — generous to limit glitches
+        // 8192 frames (~171ms @ 48kHz, ~6 Hz) — large demo buffer so WASM DSP gets long stretches
+        // between callbacks while Avalonia paints on the same thread.
+        const bufferSize = 8192;
         node = ctx.createScriptProcessor(bufferSize, 0, channels);
         node.onaudioprocess = (e) => {
             const out = e.outputBuffer;
@@ -38,13 +40,25 @@ export function startAudio(ch) {
             const render = globalThis.ongenAudioRender;
             try { data = render ? render(frames, channels) : null; } catch (_) { data = null; }
 
+            if (!data) {
+                for (let c = 0; c < channels; c++) out.getChannelData(c).fill(0);
+                return;
+            }
+
+            // Specialized stereo de-interleave (hot path); general loop for odd channel counts.
+            if (channels === 2) {
+                const L = out.getChannelData(0);
+                const R = out.getChannelData(1);
+                for (let i = 0, s = 0; i < frames; i++, s += 2) {
+                    L[i] = data[s];
+                    R[i] = data[s + 1];
+                }
+                return;
+            }
+
             for (let c = 0; c < channels; c++) {
                 const cd = out.getChannelData(c);
-                if (data) {
-                    for (let i = 0; i < frames; i++) cd[i] = data[i * channels + c];
-                } else {
-                    cd.fill(0);
-                }
+                for (let i = 0; i < frames; i++) cd[i] = data[i * channels + c];
             }
         };
         node.connect(ctx.destination);

@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices.JavaScript;
 using Avalonia;
 using Avalonia.Browser;
+using Avalonia.Media;
 using Ongenet.Web.Audio;
 
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("browser")]
@@ -31,5 +32,18 @@ internal sealed partial class Program
 
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<SharedApp>()
-            .WithInterFont();
+            .WithInterFont()
+            .With(new FontManagerOptions
+            {
+                // Must be the embedded collection URI — bare "Inter" fails on WASM (no system Inter).
+                DefaultFamilyName = "fonts:Inter#Inter",
+                // Emoji is a last-resort glyph fallback only — same as desktop/Android.
+                FontFallbacks =
+                [
+                    new FontFallback
+                    {
+                        FontFamily = "avares://Ongenet.App/Assets/Fonts/NotoColorEmoji.ttf#Noto Color Emoji"
+                    }
+                ]
+            });
 }

@@ -92,7 +92,7 @@ namespace Ongenet.App.Controls
         private IPen _hoverPen = new Pen(Brushes.Gray, 1);
         private IPen _playheadPen = new Pen(Brushes.Gray, 1);
 
-        private static readonly Typeface LabelTypeface = new(new FontFamily("Inter, Noto Sans, sans-serif"));
+        private static readonly Typeface LabelTypeface = new(new FontFamily("fonts:Inter#Inter"));
 
         private enum DragMode { None, TrimStart, TrimEnd, Select, MoveSelection }
 

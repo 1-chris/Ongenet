@@ -483,8 +483,8 @@ namespace Ongenet.App.ViewModels
         private double _lastMasterR = -1;
 
         /// <summary>Refreshes the polled values — called once per render frame via the PlaybackClock.
-        /// Meters (cheap, no text) refresh every call; the sub-second time readout is throttled to ~10Hz
-        /// because re-shaping its text every frame makes the compositor miss vsync (drops to 30fps).</summary>
+        /// Meters (cheap, no text) refresh every call; the sub-second time readout is throttled because
+        /// re-shaping its text every frame makes the compositor miss vsync.</summary>
         public void RefreshMeters()
         {
             var l = MasterLevelLeft;
@@ -501,33 +501,41 @@ namespace Ongenet.App.ViewModels
                 OnPropertyChanged(nameof(MasterLevelRight));
             }
 
-            var now = Environment.TickCount64;
-            if (now - _lastTimeRefreshMs >= 100) // ~10Hz
-            {
-                _lastTimeRefreshMs = now;
-                OnPropertyChanged(nameof(PlayheadTime));
+            RefreshPlayheadTime();
+        }
 
-                // While playing, Tempo / Time-signature automation moves these underlying values on the audio
-                // thread — re-read them so the editors animate (the same way the inspector faders do).
+        /// <summary>
+        /// Cheap playhead time (and tempo editors while playing). Used alone on the browser demo while
+        /// playback freezes the shared <see cref="IPlaybackClock"/> meter fan-out.
+        /// </summary>
+        public void RefreshPlayheadTime()
+        {
+            var now = Environment.TickCount64;
+            var interval = UiPerfProfile.IsConstrained ? 250 : 100;
+            if (now - _lastTimeRefreshMs < interval) return;
+            _lastTimeRefreshMs = now;
+            OnPropertyChanged(nameof(PlayheadTime));
+
+            // While playing, Tempo / Time-signature automation moves these underlying values on the audio
+            // thread — re-read them so the editors animate (the same way the inspector faders do).
+            if (IsPlaying)
+            {
+                OnPropertyChanged(nameof(Bpm));
+                OnPropertyChanged(nameof(TotalTime));
+                OnPropertyChanged(nameof(TimeSigNumerator));
+            }
+
+            if (_link.IsEnabled)
+            {
+                _link.RefreshSessionState();
+                OnPropertyChanged(nameof(LinkPeerText));
+                OnPropertyChanged(nameof(LinkPhaseText));
                 if (IsPlaying)
                 {
-                    OnPropertyChanged(nameof(Bpm));
-                    OnPropertyChanged(nameof(TotalTime));
-                    OnPropertyChanged(nameof(TimeSigNumerator));
-                }
-
-                if (_link.IsEnabled)
-                {
-                    _link.RefreshSessionState();
-                    OnPropertyChanged(nameof(LinkPeerText));
-                    OnPropertyChanged(nameof(LinkPhaseText));
-                    if (IsPlaying)
-                    {
-                        OnPropertyChanged(nameof(LinkSessionBeatText));
-                        var drift = Math.Abs(_transport.PlayheadBeats - _link.SessionBeat);
-                        if (drift > 0.05)
-                            _transport.NotifyPlayhead(_link.SessionBeat);
-                    }
+                    OnPropertyChanged(nameof(LinkSessionBeatText));
+                    var drift = Math.Abs(_transport.PlayheadBeats - _link.SessionBeat);
+                    if (drift > 0.05)
+                        _transport.NotifyPlayhead(_link.SessionBeat);
                 }
             }
         }

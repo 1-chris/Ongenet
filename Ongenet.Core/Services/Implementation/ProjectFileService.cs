@@ -25,6 +25,7 @@ public sealed class ProjectFileService : IProjectFileService
     private readonly ISelectionService _selection;
 
     private bool _suppressDirty;
+    private string? _displayNameOverride;
 
     public ProjectFileService(IProjectService project, ITransportService transport,
         IInstrumentRegistry instruments, IEffectRegistry effects, ISelectionService selection,
@@ -58,7 +59,9 @@ public sealed class ProjectFileService : IProjectFileService
     public bool OpenedFromNewerVersion { get; private set; }
 
     public string DisplayName =>
-        CurrentPath is { } p ? Path.GetFileNameWithoutExtension(p) : "Untitled";
+        CurrentPath is { } p
+            ? Path.GetFileNameWithoutExtension(p)
+            : (_displayNameOverride ?? "Untitled");
 
     public event Action? Changed;
 
@@ -96,6 +99,7 @@ public sealed class ProjectFileService : IProjectFileService
         }
 
         CurrentPath = path;
+        _displayNameOverride = null;
         OpenedFromNewerVersion = false;
         SetDirty(false);
         Changed?.Invoke();
@@ -119,23 +123,80 @@ public sealed class ProjectFileService : IProjectFileService
             ClearBusy();
         }
 
-        _suppressDirty = true;
+        ApplyLoadedProject(result);
+        CurrentPath = path;
+        _displayNameOverride = null;
+        OpenedFromNewerVersion = result.FromNewerVersion;
+        SetDirty(false);
+        Changed?.Invoke();
+        return result;
+    }
+
+    public async Task SaveAsync(Stream stream, string? displayName = null)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        var project = _project.Current;
+        var appVersion = AppVersion();
+        var loopStart = _transport.LoopStart;
+        var loopEnd = _transport.LoopEnd;
+        var startBeat = _transport.StartBeat;
+
+        SetBusy("Saving…");
         try
         {
-            _transport.Stop();
-            _selection.SelectTrack(null); // drop any selection pointing at the old project
-            _project.SetCurrentProject(result.Project);
-            _transport.Tempo = result.Project.Tempo;
-            _transport.StartBeat = result.StartBeat;
-            _transport.LoopStart = result.LoopStart;
-            _transport.LoopEnd = result.LoopEnd;
+            // Buffer on a worker so ProjectFile.Save can seek; then copy to the caller stream
+            // (browser StorageProvider streams are often write-only / non-seekable).
+            await Task.Run(() =>
+            {
+                using var ms = new MemoryStream();
+                ProjectFile.Save(project, ms, appVersion, loopStart, loopEnd, startBeat);
+                ms.Position = 0;
+                ms.CopyTo(stream);
+            });
+            await stream.FlushAsync();
         }
         finally
         {
-            _suppressDirty = false;
+            ClearBusy();
         }
 
-        CurrentPath = path;
+        // No durable path in the sandbox — keep CurrentPath null so the next Save prompts again.
+        CurrentPath = null;
+        _displayNameOverride = SanitizeDisplayName(displayName);
+        OpenedFromNewerVersion = false;
+        SetDirty(false);
+        Changed?.Invoke();
+    }
+
+    public async Task<ProjectFile.LoadResult> LoadAsync(Stream stream, string? displayName = null)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        SetBusy("Loading…");
+        ProjectFile.LoadResult result;
+        try
+        {
+            // Copy first so Load can seek freely even if the upload stream can't.
+            var bytes = await Task.Run(() =>
+            {
+                using var ms = new MemoryStream();
+                stream.CopyTo(ms);
+                return ms.ToArray();
+            });
+            result = await Task.Run(() =>
+            {
+                using var ms = new MemoryStream(bytes, writable: false);
+                return ProjectFile.Load(ms, _instruments, _effects);
+            });
+        }
+        finally
+        {
+            ClearBusy();
+        }
+
+        ApplyLoadedProject(result);
+        CurrentPath = null;
+        _displayNameOverride = SanitizeDisplayName(displayName);
         OpenedFromNewerVersion = result.FromNewerVersion;
         SetDirty(false);
         Changed?.Invoke();
@@ -159,6 +220,7 @@ public sealed class ProjectFileService : IProjectFileService
         }
 
         CurrentPath = null;
+        _displayNameOverride = null;
         OpenedFromNewerVersion = false;
         SetDirty(false);
         Changed?.Invoke();
@@ -183,9 +245,35 @@ public sealed class ProjectFileService : IProjectFileService
         }
 
         CurrentPath = null;
+        _displayNameOverride = null;
         OpenedFromNewerVersion = false;
         SetDirty(false);
         Changed?.Invoke();
+    }
+
+    private void ApplyLoadedProject(ProjectFile.LoadResult result)
+    {
+        _suppressDirty = true;
+        try
+        {
+            _transport.Stop();
+            _selection.SelectTrack(null); // drop any selection pointing at the old project
+            _project.SetCurrentProject(result.Project);
+            _transport.Tempo = result.Project.Tempo;
+            _transport.StartBeat = result.StartBeat;
+            _transport.LoopStart = result.LoopStart;
+            _transport.LoopEnd = result.LoopEnd;
+        }
+        finally
+        {
+            _suppressDirty = false;
+        }
+    }
+
+    private static string? SanitizeDisplayName(string? displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName)) return null;
+        return Path.GetFileNameWithoutExtension(displayName.Trim());
     }
 
     private void MarkDirty()

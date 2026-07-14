@@ -189,6 +189,11 @@ namespace Ongenet.App.Views.Panels
             // Overlays only move during playback — static markers are updated from property handlers.
             if (_vm.IsPlaying)
                 UpdateOverlays();
+
+            // Browser: skip lane meters + PlaybackClock fan-out while playing (main-thread audio).
+            if (Services.UiPerfProfile.SuppressLiveUiWhilePlaying && _vm.IsPlaying)
+                return;
+
             _vm.RefreshMeters();
             (_clock ??= App.ServiceProvider?.GetService<IPlaybackClock>())?.Pump();
         }

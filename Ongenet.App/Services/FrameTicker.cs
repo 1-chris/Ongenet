@@ -30,12 +30,13 @@ namespace Ongenet.App.Services
         internal bool WantsFast => _fast;
         internal Control Host => _host;
 
-        public FrameTicker(Control host, Action onTick, int idleIntervalMs = 100, int fastIntervalMs = 33)
+        public FrameTicker(Control host, Action onTick,
+            int idleIntervalMs = -1, int fastIntervalMs = -1)
         {
             _host = host;
             _onTick = onTick;
-            _idleIntervalMs = idleIntervalMs;
-            _fastIntervalMs = fastIntervalMs;
+            _idleIntervalMs = idleIntervalMs > 0 ? idleIntervalMs : UiPerfProfile.FrameIdleIntervalMs;
+            _fastIntervalMs = fastIntervalMs > 0 ? fastIntervalMs : UiPerfProfile.FrameFastIntervalMs;
 
             _host.AttachedToVisualTree += (_, _) => Attach();
             _host.DetachedFromVisualTree += (_, _) => Detach();

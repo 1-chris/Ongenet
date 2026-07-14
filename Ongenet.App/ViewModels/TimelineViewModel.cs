@@ -163,7 +163,7 @@ namespace Ongenet.App.ViewModels
         public void RefreshMeters()
         {
             var now = Environment.TickCount64;
-            if (now - _lastMeterMs < 33) return;
+            if (now - _lastMeterMs < (UiPerfProfile.IsConstrained ? 200 : 33)) return;
             _lastMeterMs = now;
             foreach (var lane in _trackLanes) lane.RaiseMeter();
         }

@@ -14,7 +14,8 @@
         The shared single-view shell: the in-canvas counterpart of the desktop MainWindow, used by every
         head that runs under a single-view lifetime (the browser and Android heads). It hosts the same
         panel views bound to the same MainViewModel, minus the OS window chrome and the secondary tool
-        windows. It keeps the transport + typing-keyboard shortcuts (handy with a hardware keyboard).
+        windows. Vertical side tabs match the desktop strips; centre tabs expose Arrangement / Mixer /
+        Session / Notation. Project New/Open/Save use StorageProvider streams (browser download/upload).
     -->
 
     <UserControl.Styles>
@@ -34,17 +35,34 @@
     </UserControl.Styles>
 
     <Border Background="{StaticResource CatppuccinBase}">
-        <Grid RowDefinitions="Auto,Auto,*,4,300">
+        <Grid RowDefinitions="Auto,Auto,*">
 
             <!-- Header strip (no OS window chrome under a single-view lifetime) -->
             <Grid Grid.Row="0" Classes="TitleBar" ColumnDefinitions="Auto,*,Auto" Height="32"
                   Background="{StaticResource CatppuccinMantle}">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
-                            Margin="12,0" Spacing="10">
+                            Margin="12,0" Spacing="8">
                     <TextBlock Text="{DynamicResource MainView_Ongenet}" FontSize="12" FontWeight="SemiBold"
                                Foreground="{StaticResource CatppuccinMauve}" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Version}" FontSize="10"
                                Foreground="{StaticResource CatppuccinOverlay1}" VerticalAlignment="Center"/>
+                    <Button Content="New" Click="OnNew_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_New_project_CtrlN_Tip}"/>
+                    <Button Content="{DynamicResource Main_Open}" Click="OnOpen_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_Open_project_CtrlO_Tip}"/>
+                    <Button Content="{DynamicResource Main_Save}" Click="OnSave_Click" FontSize="11" Padding="8,2"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_Save_project_CtrlS_Tip}"/>
+                    <Button Content="↶" Click="OnUndo_Click" FontSize="13" Padding="8,2"
+                            IsEnabled="{Binding CanUndo}"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_Undo_CtrlZ_Tip}"/>
+                    <Button Content="↷" Click="OnRedo_Click" FontSize="13" Padding="8,2"
+                            IsEnabled="{Binding CanRedo}"
+                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                            ToolTip.Tip="{DynamicResource Main_Redo_CtrlY_Tip}"/>
                 </StackPanel>
                 <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="11" Margin="12,0"
                            Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Center"/>
@@ -53,82 +71,209 @@
             <!-- Transport bar -->
             <views:TransportView Grid.Row="1" DataContext="{Binding Transport}"/>
 
-            <!-- Workspace: track inspector | timeline | library -->
-            <Grid Grid.Row="2" ColumnDefinitions="240,4,*,4,300">
-                <!-- Left sidebar: track controls, clip catalog, and project-level pattern/channel rack. -->
-                <TabControl Grid.Column="0" MinWidth="180" Background="{StaticResource CatppuccinMantle}">
-                    <TabItem Header="{DynamicResource MainView_Track_Controls}">
-                        <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
+            <!-- Workspace: vertical side tabs | centre tabs | library -->
+            <Grid Grid.Row="2" Name="WorkspaceGrid">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="240"/>
+                    <ColumnDefinition Width="4"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="4"/>
+                    <ColumnDefinition Width="300"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="300"/>
+                </Grid.RowDefinitions>
+
+                <!-- Left: vertical tabs + [track / clips / channel rack] -->
+                <Grid Grid.Column="0" Grid.Row="0" ColumnDefinitions="*,Auto" Background="{StaticResource CatppuccinMantle}">
+                    <Panel Grid.Column="0" Name="LeftContent" MinWidth="180"
+                           Background="{StaticResource CatppuccinMantle}">
+                        <views:TrackInspectorView IsVisible="{Binding #TabTrackControls.IsSelected}"
+                                                  DataContext="{Binding TrackInspector}"/>
+                        <views:ProjectClipsView IsVisible="{Binding #TabProjectClips.IsSelected}"
+                                                DataContext="{Binding ProjectClips}"/>
+                        <views:ChannelRackView IsVisible="{Binding #TabChannelRack.IsSelected}"
+                                               DataContext="{Binding BottomPanel.ChannelRack}"/>
+                    </Panel>
+
+                    <DockPanel Grid.Column="1" Background="{StaticResource CatppuccinSurface0}">
+                        <Border DockPanel.Dock="Top" Height="26">
+                            <Button Name="LeftToggle" Content="◂" Click="ToggleLeftPanel"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Width="24" Padding="0" FontSize="11"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    Background="Transparent"
+                                    Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
+                        </Border>
+                        <ListBox Name="LeftTabStrip" SelectedIndex="0" FontSize="12"
+                                 Background="Transparent" BorderThickness="0" Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="3,10"/>
+                                    <Setter Property="MinHeight" Value="0"/>
+                                    <Setter Property="CornerRadius" Value="0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                    <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:selected">
+                                    <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+                                </Style>
+                            </ListBox.Styles>
+                            <ListBoxItem Name="TabTrackControls">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Track_Controls}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                            <ListBoxItem Name="TabProjectClips">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Project_Clips}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                            <ListBoxItem Name="TabChannelRack">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Channel_Rack}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                        </ListBox>
+                    </DockPanel>
+                </Grid>
+                <GridSplitter Grid.Column="1" Grid.Row="0" Name="LeftSplitter" ResizeDirection="Columns"
+                              Background="{StaticResource CatppuccinCrust}"/>
+
+                <!-- Centre: Arrangement / Mixer / Session / Notation -->
+                <TabControl Grid.Column="2" Grid.Row="0" Name="CenterTabs" Background="{StaticResource CatppuccinBase}"
+                            SelectedIndex="{Binding SelectedCenterTabIndex, Mode=TwoWay}">
+                    <TabItem Header="{DynamicResource Main_Arrangement}">
+                        <views:TimelineView DataContext="{Binding Timeline}"/>
                     </TabItem>
-                    <TabItem Header="{DynamicResource MainView_Project_Clips}">
-                        <views:ProjectClipsView DataContext="{Binding ProjectClips}"/>
+                    <TabItem Header="{DynamicResource Main_Mixer}">
+                        <views:MixerView DataContext="{Binding Mixer}"/>
                     </TabItem>
-                    <TabItem Header="{DynamicResource MainView_Channel_Rack}">
-                        <views:ChannelRackView DataContext="{Binding BottomPanel.ChannelRack}"/>
+                    <TabItem Header="{DynamicResource Main_Session}">
+                        <views:SessionView DataContext="{Binding Session}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource Main_Notation}">
+                        <views:NotationView DataContext="{Binding Notation}"/>
                     </TabItem>
                 </TabControl>
-                <GridSplitter Grid.Column="1" ResizeDirection="Columns"
+
+                <GridSplitter Grid.Column="3" Grid.Row="0" Grid.RowSpan="3" Name="RightSplitter" ResizeDirection="Columns"
                               Background="{StaticResource CatppuccinCrust}"/>
 
-                <views:TimelineView Grid.Column="2" DataContext="{Binding Timeline}"/>
+                <!-- Right: vertical library tabs (demo-useful tabs only) -->
+                <Grid Grid.Column="4" Grid.Row="0" Grid.RowSpan="3" ColumnDefinitions="Auto,*" Background="{StaticResource CatppuccinMantle}">
+                    <DockPanel Grid.Column="0" Background="{StaticResource CatppuccinSurface0}">
+                        <Border DockPanel.Dock="Top" Height="26">
+                            <Button Name="RightToggle" Content="▸" Click="ToggleRightPanel"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Width="24" Padding="0" FontSize="11"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    Background="Transparent"
+                                    Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Collapse_expand_panel_Tip}"/>
+                        </Border>
+                        <ListBox Name="RightTabStrip" SelectedIndex="0" FontSize="12"
+                                 Background="Transparent" BorderThickness="0" Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="3,10"/>
+                                    <Setter Property="MinHeight" Value="0"/>
+                                    <Setter Property="CornerRadius" Value="0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                    <Setter Property="Foreground" Value="{StaticResource CatppuccinSubtext0}"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:selected">
+                                    <Setter Property="Foreground" Value="{StaticResource CatppuccinText}"/>
+                                </Style>
+                            </ListBox.Styles>
+                            <ListBoxItem Name="TabInstruments">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Instruments}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                            <ListBoxItem Name="TabEffects">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Effects}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                            <ListBoxItem Name="TabEverything">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Everything}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                            <ListBoxItem Name="TabProjects">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Projects}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                            <ListBoxItem Name="TabFiles">
+                                <controls:VerticalTabLabel Text="{DynamicResource MainView_Files}"
+                                                           Foreground="{Binding $parent[ListBoxItem].Foreground}"/>
+                            </ListBoxItem>
+                        </ListBox>
+                    </DockPanel>
 
-                <GridSplitter Grid.Column="3" ResizeDirection="Columns"
+                    <DockPanel Grid.Column="1" Name="RightContent" MinWidth="180"
+                               Background="{StaticResource CatppuccinMantle}">
+                        <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
+                        <Grid>
+                            <views:LibraryListView IsVisible="{Binding #TabInstruments.IsSelected}"
+                                                   DataContext="{Binding InstrumentLibrary}"/>
+                            <views:LibraryListView IsVisible="{Binding #TabEffects.IsSelected}"
+                                                   DataContext="{Binding EffectsLibrary}"/>
+                            <views:LibraryListView IsVisible="{Binding #TabEverything.IsSelected}"
+                                                   DataContext="{Binding Everything}"/>
+                            <views:LibraryListView IsVisible="{Binding #TabProjects.IsSelected}"
+                                                   DataContext="{Binding ProjectsLibrary}"/>
+                            <views:FileBrowserView IsVisible="{Binding #TabFiles.IsSelected}"
+                                                   DataContext="{Binding FileBrowser}"/>
+                        </Grid>
+                    </DockPanel>
+                </Grid>
+
+                <GridSplitter Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Name="BottomSplitter"
+                              ResizeDirection="Rows" HorizontalAlignment="Stretch"
                               Background="{StaticResource CatppuccinCrust}"/>
 
-                <!-- Library: instruments + effects come from the in-process registries; samples/soundfonts/
-                     presets tabs depend on the platform's filesystem services. -->
-                <DockPanel Grid.Column="4" Background="{StaticResource CatppuccinMantle}" MinWidth="220">
-                    <views:PreviewPanelView DockPanel.Dock="Bottom" DataContext="{Binding Preview}"/>
-                    <TabControl Background="{StaticResource CatppuccinMantle}">
-                        <TabItem Header="{DynamicResource MainView_Instruments}">
-                            <views:LibraryListView DataContext="{Binding InstrumentLibrary}"/>
-                        </TabItem>
-                        <TabItem Header="{DynamicResource MainView_Effects}">
-                            <views:LibraryListView DataContext="{Binding EffectsLibrary}"/>
-                        </TabItem>
-                        <TabItem Header="{DynamicResource MainView_Everything}">
-                            <views:LibraryListView DataContext="{Binding Everything}"/>
-                        </TabItem>
-                        <TabItem Header="{DynamicResource MainView_Projects}">
-                            <views:LibraryListView DataContext="{Binding ProjectsLibrary}"/>
-                        </TabItem>
-                        <TabItem Header="{DynamicResource MainView_Files}">
-                            <views:FileBrowserView DataContext="{Binding FileBrowser}"/>
-                        </TabItem>
-                    </TabControl>
-                </DockPanel>
+                <!-- Bottom panel: Instrument / Piano Roll / Effects -->
+                <TabControl Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Name="BottomTabs" MinHeight="0"
+                            DataContext="{Binding BottomPanel}"
+                            SelectedIndex="{Binding SelectedTabIndex}"
+                            Background="{StaticResource CatppuccinMantle}">
+                    <TabItem Header="{Binding FirstTabHeader}" IsVisible="{Binding ShowFirstTab}">
+                        <Panel>
+                            <ContentControl IsVisible="{Binding IsInstrumentMode}">
+                                <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
+                            </ContentControl>
+                            <ContentControl IsVisible="{Binding IsSampleSelected}">
+                                <views:SampleInspectorView DataContext="{Binding Sample}"/>
+                            </ContentControl>
+                        </Panel>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource MainView_Pattern}" IsVisible="{Binding ShowPatternTab}">
+                        <views:PatternEditorView DataContext="{Binding PatternEditor}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource MainView_Piano_Roll}" IsVisible="{Binding ShowPianoRollTab}">
+                        <views:PianoRollView DataContext="{Binding PianoRoll}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource MainView_MIDI_FX}" IsVisible="{Binding ShowMidiFxTab}">
+                        <views:MidiFxView DataContext="{Binding MidiFx}"/>
+                    </TabItem>
+                    <TabItem Header="{DynamicResource MainView_Effects}">
+                        <views:EffectsView DataContext="{Binding Effects}"/>
+                    </TabItem>
+                </TabControl>
             </Grid>
-
-            <GridSplitter Grid.Row="3" Grid.ColumnSpan="5" ResizeDirection="Rows"
-                          HorizontalAlignment="Stretch" Background="{StaticResource CatppuccinCrust}"/>
-
-            <!-- Bottom panel: Instrument / Piano Roll / Effects -->
-            <TabControl Grid.Row="4" MinHeight="0" DataContext="{Binding BottomPanel}"
-                        SelectedIndex="{Binding SelectedTabIndex}"
-                        Background="{StaticResource CatppuccinMantle}">
-                <TabItem Header="{Binding FirstTabHeader}" IsVisible="{Binding ShowFirstTab}">
-                    <Panel>
-                        <ContentControl IsVisible="{Binding IsInstrumentMode}">
-                            <views:InstrumentInspectorView DataContext="{Binding Instrument}"/>
-                        </ContentControl>
-                        <ContentControl IsVisible="{Binding IsSampleSelected}">
-                            <views:SampleInspectorView DataContext="{Binding Sample}"/>
-                        </ContentControl>
-                    </Panel>
-                </TabItem>
-                <TabItem Header="{DynamicResource MainView_Pattern}" IsVisible="{Binding ShowPatternTab}">
-                    <views:PatternEditorView DataContext="{Binding PatternEditor}"/>
-                </TabItem>
-                <TabItem Header="{DynamicResource MainView_Piano_Roll}" IsVisible="{Binding ShowPianoRollTab}">
-                    <views:PianoRollView DataContext="{Binding PianoRoll}"/>
-                </TabItem>
-                <TabItem Header="{DynamicResource MainView_MIDI_FX}" IsVisible="{Binding ShowMidiFxTab}">
-                    <views:MidiFxView DataContext="{Binding MidiFx}"/>
-                </TabItem>
-                <TabItem Header="{DynamicResource MainView_Effects}">
-                    <views:EffectsView DataContext="{Binding Effects}"/>
-                </TabItem>
-            </TabControl>
         </Grid>
     </Border>
 </UserControl>

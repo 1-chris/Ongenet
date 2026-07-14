@@ -77,7 +77,7 @@ public sealed class SurroundPanControl : ThemedControl
         foreach (var (text, nx, ny) in labels)
         {
             var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, new Typeface("Inter"), 9, _label);
+                FlowDirection.LeftToRight, new Typeface("fonts:Inter#Inter"), 9, _label);
             context.DrawText(ft, new Point(nx * rect.Width - ft.Width / 2, ny * rect.Height - ft.Height / 2));
         }
 

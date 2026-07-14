@@ -30,7 +30,7 @@ namespace Ongenet.App.Controls
 
         // Explicit text typeface instead of Typeface.Default, for consistency with the other
         // custom-drawn controls (keeps glyph resolution off the emoji fallback font).
-        private static readonly Typeface LabelTypeface = new(new FontFamily("Inter, Noto Sans, sans-serif"));
+        private static readonly Typeface LabelTypeface = new(new FontFamily("fonts:Inter#Inter"));
 
         static ZoneMapControl()
         {

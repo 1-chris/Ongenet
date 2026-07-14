@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Ongenet.App.Localization;
+using Ongenet.App.Services;
 using Ongenet.App.Theming;
 using Ongenet.App.ViewModels.Field;
 using Ongenet.Core.Audio.Field;
@@ -74,8 +75,15 @@ public sealed class FieldCanvasControl : ThemedControl
     {
         Focusable = true;
         ClipToBounds = true;
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
-        _timer.Tick += (_, _) => { if (HasScope()) InvalidateVisual(); };
+        _timer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(UiPerfProfile.AnalyserIntervalMs)
+        };
+        _timer.Tick += (_, _) =>
+        {
+            if (FrameTicker.IsEffectivelyVisible(this) && HasScope())
+                InvalidateVisual();
+        };
     }
 
     protected override void OnDataContextChanged(EventArgs e)

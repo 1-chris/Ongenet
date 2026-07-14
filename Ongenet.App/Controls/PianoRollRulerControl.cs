@@ -24,7 +24,7 @@ namespace Ongenet.App.Controls
 
         // Explicit text typeface. Typeface.Default resolves to the app default family whose glyph
         // fallback can bind digits to the emoji font on Win/Mac; naming the text chain avoids that.
-        private static readonly Typeface LabelTypeface = new(new FontFamily("Inter, Noto Sans, sans-serif"));
+        private static readonly Typeface LabelTypeface = new(new FontFamily("fonts:Inter#Inter"));
 
         protected override void BuildThemeResources()
         {

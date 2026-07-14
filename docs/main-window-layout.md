@@ -452,8 +452,9 @@ Ctrl+D or Shift+[.
 
 ### On the web build
 
-The [WebAssembly demo](web-demo.md) supports **Space** (play/stop) and the typing keyboard, but not the
-file/undo/loop/delete shortcuts.
+The [WebAssembly demo](web-demo.md) supports **Space** (play/stop), the typing keyboard, and
+**Ctrl/Cmd+N/O/S** plus **Ctrl/Cmd+Z/Y** (new/open/save and undo/redo). Loop/delete and other
+desktop-only shortcuts are still not wired in the single-view shell.
 
 ---
 

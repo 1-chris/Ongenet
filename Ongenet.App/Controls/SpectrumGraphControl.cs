@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.App.Services;
 using Ongenet.App.Theming;
 
 namespace Ongenet.App.Controls
@@ -33,7 +34,7 @@ namespace Ongenet.App.Controls
 
         // Explicit text typeface (frequency labels are digits) — see PianoRollRulerControl for why
         // Typeface.Default is avoided: it lets the emoji font capture digit glyphs on Win/Mac.
-        private static readonly Typeface LabelTypeface = new(new FontFamily("Inter, Noto Sans, sans-serif"));
+        private static readonly Typeface LabelTypeface = new(new FontFamily("fonts:Inter#Inter"));
 
         protected override void BuildThemeResources()
         {
@@ -66,7 +67,10 @@ namespace Ongenet.App.Controls
             for (var i = 0; i < FftSize; i++)
                 _window[i] = (float)(0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (FftSize - 1))); // Hann
             for (var i = 0; i < _mag.Length; i++) _mag[i] = (float)SpecBotDb;
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+            _timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(UiPerfProfile.AnalyserIntervalMs)
+            };
             _timer.Tick += (_, _) => UpdateSpectrum();
         }
 
@@ -89,6 +93,8 @@ namespace Ongenet.App.Controls
 
         private void UpdateSpectrum()
         {
+            if (!FrameTicker.IsEffectivelyVisible(this)) return;
+
             var source = Source;
             if (source is null) { if (_haveSpectrum) { _haveSpectrum = false; InvalidateVisual(); } return; }
 

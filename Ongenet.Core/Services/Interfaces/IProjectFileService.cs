@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Ongenet.Core.Persistence;
 
@@ -36,6 +37,18 @@ public interface IProjectFileService
 
     /// <summary>Loads a project from <paramref name="path"/>, swaps it in, and returns the load result (warnings).</summary>
     Task<ProjectFile.LoadResult> LoadAsync(string path);
+
+    /// <summary>
+    /// Saves the current project to <paramref name="stream"/> (browser download / no local path).
+    /// Optionally updates <see cref="DisplayName"/> from <paramref name="displayName"/>.
+    /// </summary>
+    Task SaveAsync(Stream stream, string? displayName = null);
+
+    /// <summary>
+    /// Loads a project from <paramref name="stream"/> (browser upload). Clears <see cref="CurrentPath"/>
+    /// and optionally sets <see cref="DisplayName"/> from <paramref name="displayName"/>.
+    /// </summary>
+    Task<ProjectFile.LoadResult> LoadAsync(Stream stream, string? displayName = null);
 
     /// <summary>Replaces the project with a fresh blank one and clears the file/dirty state.</summary>
     void NewProject();

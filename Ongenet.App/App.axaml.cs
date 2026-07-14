@@ -242,10 +242,11 @@ namespace Ongenet.App
                 ServiceProvider.GetRequiredService<Core.Audio.Instruments.IInstrumentRegistry>(),
                 ServiceProvider.GetRequiredService<Core.Audio.Effects.IEffectRegistry>());
 
-            // Replace the blank startup project with a built-in song ("Ascension"), so a fresh launch
-            // opens on something that plays. Must run after FieldBootstrap (the leads are Field
-            // patches) and before the shell exists (so nothing marks the project dirty). File > New
-            // still creates a blank project.
+            // Replace the blank startup project with a built-in song so a fresh launch opens on
+            // something that plays. Must run after FieldBootstrap (some songs use Field patches)
+            // and before the shell exists (so nothing marks the project dirty). File > New still
+            // creates a blank project. Desktop gets the full Ascension demo; single-view hosts
+            // (web / Android) get the dry Web Demo sketch for main-thread audio headroom.
             TryLoadPreviewSong();
 
             // Establish the font-size resources used across the app.
@@ -293,14 +294,18 @@ namespace Ongenet.App
         /// <summary>
         /// Builds the startup song and makes it the current project, syncing the transport to its
         /// tempo. Logs (rather than crashing) on failure — the app then simply starts on the usual
-        /// blank project.
+        /// blank project. Desktop opens Ascension; browser/Android open the dry Web Demo (32 bars).
         /// </summary>
-        private static void TryLoadPreviewSong()
+        private void TryLoadPreviewSong()
         {
             try
             {
                 var instruments = ServiceProvider!.GetRequiredService<Core.Audio.Instruments.IInstrumentRegistry>();
-                var song = Core.Music.UpliftingTranceSongFactory.Create(instruments);
+                // Single-view WASM/Android can't afford Ascension on the main-thread audio path; Web Demo
+                // is a short, dry house sketch (no reverb/sidechain) so ScriptProcessor has headroom.
+                var song = ApplicationLifetime is ISingleViewApplicationLifetime
+                    ? Core.Music.WebDemoSongFactory.Create(instruments)
+                    : Core.Music.UpliftingTranceSongFactory.Create(instruments);
 
                 var transport = ServiceProvider!.GetRequiredService<ITransportService>();
                 transport.Tempo = song.Tempo;

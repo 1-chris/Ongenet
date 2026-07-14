@@ -36,7 +36,18 @@ namespace Ongenet.App.Views.Panels
             AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
         }
 
-        private void OnTick() => _clock?.Pump();
+        private void OnTick()
+        {
+            var vm = DataContext as TransportViewModel;
+            // Browser: PlaybackClock freezes fan-out while playing — keep the time readout alive here.
+            if (UiPerfProfile.SuppressLiveUiWhilePlaying && vm?.IsPlaying == true)
+            {
+                vm.RefreshPlayheadTime();
+                return;
+            }
+
+            _clock?.Pump();
+        }
 
         // Right-click the Tempo / Time editors → "Create automation track" on the master track, so tempo
         // and time signature automate through the same lane pipeline as any knob, fader or on/off switch.

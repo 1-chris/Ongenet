@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Ongenet.Core.Audio.Dsp;
 using Ongenet.Core.Audio.Instruments;
+using Ongenet.App.Services;
 using Ongenet.App.Theming;
 
 namespace Ongenet.App.Controls
@@ -12,8 +13,8 @@ namespace Ongenet.App.Controls
     /// <summary>
     /// A little monitor that visualises the granular synth's grain cloud: each spawned grain appears as
     /// a dot (x = position in the source sample, y = stereo pan) that fades in and out over the grain's
-    /// lifetime. Driven by its own ~60fps timer, draining new spawns from the instrument's
-    /// <see cref="GrainMonitor"/> — animation runs on the UI clock, independent of the audio thread.
+    /// lifetime. Driven by its own timer (~60 fps desktop; 10 Hz in the browser demo), draining new
+    /// spawns from the instrument's <see cref="GrainMonitor"/> — animation runs on the UI clock.
     /// </summary>
     public sealed class GrainMonitorControl : ThemedControl
     {
@@ -56,7 +57,10 @@ namespace Ongenet.App.Controls
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnAttachedToVisualTree(e);
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+            _timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(UiPerfProfile.GrainMonitorIntervalMs)
+            };
             _timer.Tick += (_, _) => Tick();
             _timer.Start();
         }
@@ -71,6 +75,8 @@ namespace Ongenet.App.Controls
 
         private void Tick()
         {
+            if (!FrameTicker.IsEffectivelyVisible(this)) return;
+
             var monitor = Monitor;
             var now = Environment.TickCount64;
             if (_lastDrainMs < 0) _lastDrainMs = now;

@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices.JavaScript;
 
 namespace Ongenet.Web.Audio;
@@ -25,6 +26,8 @@ internal static partial class AudioInterop
     [JSImport("stopAudio", "ongen-audio")]
     public static partial void StopAudio();
 
+    private static double[] _silence = Array.Empty<double>();
+
     /// <summary>
     /// Pulled by JS once per audio block (via <c>globalThis.ongenAudioRender</c>). Returns
     /// <paramref name="frames"/> × <paramref name="channels"/> interleaved samples as <c>double[]</c>,
@@ -32,5 +35,15 @@ internal static partial class AudioInterop
     /// </summary>
     [JSExport]
     internal static double[] RenderBlock(int frames, int channels)
-        => WebAudioOutput.Active?.Render(frames, channels) ?? new double[frames * channels];
+    {
+        if (WebAudioOutput.Active is { } active)
+            return active.Render(frames, channels);
+
+        var n = frames * channels;
+        if (_silence.Length < n)
+            _silence = new double[n];
+        else
+            Array.Clear(_silence, 0, n);
+        return _silence;
+    }
 }

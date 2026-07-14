@@ -48,7 +48,7 @@ public sealed class SamplerZoneMapControl : Control
         // Velocity axis label
         context.DrawText(new FormattedText("Velocity →",
             CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-            new Typeface("Inter"), 9, Brush.Parse("#a6adc8")), new Point(44, 2));
+            new Typeface("fonts:Inter#Inter"), 9, Brush.Parse("#a6adc8")), new Point(44, 2));
 
         // Draw white/black key rows (one octave blocks repeated)
         for (var octave = 0; octave < 11; octave++)
@@ -66,7 +66,7 @@ public sealed class SamplerZoneMapControl : Control
             if (y > bounds.Height) break;
             var label = MidiName(n);
             context.DrawText(new FormattedText(label, CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight, new Typeface("Inter"), 8, Brush.Parse("#6c7086")),
+                FlowDirection.LeftToRight, new Typeface("fonts:Inter#Inter"), 8, Brush.Parse("#6c7086")),
                 new Point(2, y));
         }
     }

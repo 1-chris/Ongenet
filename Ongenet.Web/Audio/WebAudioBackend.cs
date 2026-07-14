@@ -40,6 +40,7 @@ public sealed class WebAudioOutput : IAudioOutput
 
     private AudioRenderCallback? _callback;
     private float[] _scratch = Array.Empty<float>();
+    private double[] _interop = Array.Empty<double>();
 
     public AudioFormat Format { get; private set; } = AudioFormat.Default;
     public bool IsRunning { get; private set; }
@@ -70,22 +71,37 @@ public sealed class WebAudioOutput : IAudioOutput
 
     /// <summary>
     /// Pulled by JS once per audio block. Renders <paramref name="frames"/> × <paramref name="channels"/>
-    /// interleaved samples. Returns <c>double[]</c> because that marshals cleanly to a JS number array.
+    /// interleaved samples. Returns a reused <c>double[]</c> (marshals cleanly to a JS number array).
+    /// Grow-only pooling avoids a ~4k-double GC alloc on every ScriptProcessor callback.
     /// </summary>
     internal double[] Render(int frames, int channels)
     {
         var n = frames * channels;
-        var outBuffer = new double[n];
-        if (_callback is null) return outBuffer; // silence until the engine attaches
+        EnsureBuffers(n);
+        if (_callback is null)
+        {
+            Array.Clear(_interop, 0, n);
+            return _interop;
+        }
 
-        if (_scratch.Length < n) _scratch = new float[n];
         var span = _scratch.AsSpan(0, n);
         span.Clear();
         try { _callback(span); }
-        catch { return new double[n]; } // a render fault must not kill the audio thread
+        catch
+        {
+            // A render fault must not kill the audio callback — return silence from the pool.
+            Array.Clear(_interop, 0, n);
+            return _interop;
+        }
 
-        for (var i = 0; i < n; i++) outBuffer[i] = span[i];
-        return outBuffer;
+        for (var i = 0; i < n; i++) _interop[i] = span[i];
+        return _interop;
+    }
+
+    private void EnsureBuffers(int n)
+    {
+        if (_scratch.Length < n) _scratch = new float[n];
+        if (_interop.Length < n) _interop = new double[n];
     }
 
     public void Dispose() => Stop();
