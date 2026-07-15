@@ -507,18 +507,14 @@ The app discovers instruments through the
 `InstrumentInfo(id, displayName, factory, category)`. To make your instrument appear in the library and
 the "add instrument" menu, add one line to the `_builtIn` list:
 
-```19:29:Ongenet.Core/Audio/Instruments/InstrumentRegistry.cs
-    private readonly List<InstrumentInfo> _builtIn = new()
-    {
-        new InstrumentInfo(OscillatorInstrument.TypeId, "Oscillator", () => new OscillatorInstrument(), CatSynth),
-        new InstrumentInfo(TripleOscInstrument.TypeId, "3x Osc", () => new TripleOscInstrument(), CatSynth),
-        new InstrumentInfo(FmSynthInstrument.TypeId, "FM Synth", () => new FmSynthInstrument(), CatSynth),
-        new InstrumentInfo(PaddaInstrument.TypeId, "Padda", () => new PaddaInstrument(), CatSynth),
-        new InstrumentInfo(BasicSamplerInstrument.TypeId, "Basic Sampler", () => new BasicSamplerInstrument(), CatSampler),
-        new InstrumentInfo(Sampler.SamplerInstrument.TypeId, "Sampler", () => new Sampler.SamplerInstrument(), CatSampler),
-        new InstrumentInfo(GranularInstrument.TypeId, "Granular", () => new GranularInstrument(), CatSampler),
-        new InstrumentInfo(KickaInstrument.TypeId, "Kicka", () => new KickaInstrument(), CatDrum)
-    };
+```csharp
+// InstrumentRegistry._builtIn (abbreviated — see the file for the full ~24 entries)
+private readonly List<InstrumentInfo> _builtIn = new()
+{
+    new InstrumentInfo(OscillatorInstrument.TypeId, "Oscillator", () => new OscillatorInstrument(), CatSynth),
+    new InstrumentInfo(TripleOscInstrument.TypeId, "3x Osc", () => new TripleOscInstrument(), CatSynth),
+    // … Wavetable, FM, Bass Synth, Padda, samplers, drums, hardware, containers …
+};
 ```
 
 Your line, e.g.:
@@ -527,10 +523,10 @@ Your line, e.g.:
 new InstrumentInfo(MySynthInstrument.TypeId, "My Synth", () => new MySynthInstrument(), CatSynth),
 ```
 
-The category (`"Synth"`, `"Sampler"`, `"Drum"`) just decides which group it appears under. The registry
-is a singleton registered in
+The category (`CatSynth`, `CatSampler`, `CatDrum`, `CatHardware`, `CatContainers`, …) decides which
+group it appears under. The registry is a singleton registered in
 [`ServiceCollectionExtensions`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.Core/DependencyInjection/ServiceCollectionExtensions.cs), and
-the inspector/library read `registry.Available` — so nothing else needs wiring. (Plugins like CLAP/LV2
+the inspector/library read `registry.Available` — so nothing else needs wiring. (Plugins like CLAP/LV2/VST/AU
 add themselves at runtime via the same `Register` method; you don't need that for a built-in.)
 
 ---

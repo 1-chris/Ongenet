@@ -19,6 +19,7 @@ public sealed class EffectRegistry : IEffectRegistry
     private const string CatPitch = "Pitch";
     private const string CatUtility = "Utility";
     private const string CatVisualizer = "Visualizer";
+    private const string CatMastering = "Mastering";
     private const string CatSpectral = "Spectral";
     private const string CatHardware = "Hardware";
     private const string CatContainers = "Containers";
@@ -31,7 +32,9 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(Eq5Effect.TypeId, "EQ-5", () => new Eq5Effect(), CatEqFilter),
         new EffectInfo(EqPlusEffect.TypeId, "EQ+", () => new EqPlusEffect(), CatEqFilter),
         new EffectInfo(EqDjEffect.TypeId, "EQ-DJ", () => new EqDjEffect(), CatEqFilter),
-        new EffectInfo(MidSideEqEffect.TypeId, "Mid/Side EQ", () => new MidSideEqEffect(), CatEqFilter),
+        new EffectInfo(MidSideEqEffect.TypeId, "Mid/Side EQ", () => new MidSideEqEffect(), CatMastering),
+        new EffectInfo(MatchEqEffect.TypeId, "Match EQ", () => new MatchEqEffect(), CatMastering),
+        new EffectInfo(LinearPhaseEqEffect.TypeId, "Linear-Phase EQ (approx)", () => new LinearPhaseEqEffect(), CatMastering),
         new EffectInfo(TiltEffect.TypeId, "Tilt", () => new TiltEffect(), CatEqFilter),
         new EffectInfo(FilterEffect.TypeId, "Filter", () => new FilterEffect(), CatEqFilter),
         new EffectInfo(FilterPlusEffect.TypeId, "Filter+", () => new FilterPlusEffect(), CatEqFilter),
@@ -46,9 +49,9 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(CompressorEffect.TypeId, "Compressor", () => new CompressorEffect(), CatDynamics),
         new EffectInfo(CompressorPlusEffect.TypeId, "Compressor+", () => new CompressorPlusEffect(), CatDynamics),
         new EffectInfo(DynamicsEffect.TypeId, "Dynamics", () => new DynamicsEffect(), CatDynamics),
-        new EffectInfo(MultibandCompressorEffect.TypeId, "Multiband (OTT)", () => new MultibandCompressorEffect(), CatDynamics),
-        new EffectInfo(LimiterEffect.TypeId, "Limiter", () => new LimiterEffect(), CatDynamics),
-        new EffectInfo(PeakLimiterEffect.TypeId, "Peak Limiter", () => new PeakLimiterEffect(), CatDynamics),
+        new EffectInfo(MultibandCompressorEffect.TypeId, "Multiband (OTT)", () => new MultibandCompressorEffect(), CatMastering),
+        new EffectInfo(LimiterEffect.TypeId, "Limiter (bus)", () => new LimiterEffect(), CatDynamics),
+        new EffectInfo(PeakLimiterEffect.TypeId, "Peak Limiter", () => new PeakLimiterEffect(), CatMastering),
         new EffectInfo(GateEffect.TypeId, "Gate", () => new GateEffect(), CatDynamics),
         new EffectInfo(SidechainEffect.TypeId, "Sidechain", () => new SidechainEffect(), CatDynamics),
         new EffectInfo(DeEsserEffect.TypeId, "De-Esser", () => new DeEsserEffect(), CatDynamics),
@@ -82,7 +85,7 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(AmpEffect.TypeId, "Amp", () => new AmpEffect(), CatDistortion),
         new EffectInfo(OverEffect.TypeId, "Over", () => new OverEffect(), CatDistortion),
         new EffectInfo(ExciterEffect.TypeId, "Exciter", () => new ExciterEffect(), CatDistortion),
-        new EffectInfo(ClipperEffect.TypeId, "Clipper", () => new ClipperEffect(), CatDistortion),
+        new EffectInfo(ClipperEffect.TypeId, "Clipper", () => new ClipperEffect(), CatMastering),
         new EffectInfo(BitcrusherEffect.TypeId, "Bitcrusher", () => new BitcrusherEffect(), CatDistortion),
 
         // Pitch
@@ -95,19 +98,20 @@ public sealed class EffectRegistry : IEffectRegistry
         new EffectInfo(TimeShiftEffect.TypeId, "Time Shift", () => new TimeShiftEffect(), CatPitch),
 
         // Utility
-        new EffectInfo(StereoWidthEffect.TypeId, "Stereo Width", () => new StereoWidthEffect(), CatUtility),
+        new EffectInfo(StereoWidthEffect.TypeId, "Stereo Width", () => new StereoWidthEffect(), CatMastering),
         new EffectInfo(DualPanEffect.TypeId, "Dual Pan", () => new DualPanEffect(), CatUtility),
         new EffectInfo(DcOffsetEffect.TypeId, "DC Offset", () => new DcOffsetEffect(), CatUtility),
         new EffectInfo(LiveDifferenceEffect.TypeId, "Live Difference", () => new LiveDifferenceEffect(), CatUtility),
         new EffectInfo(UtilityEffect.TypeId, "Utility", () => new UtilityEffect(), CatUtility),
-        new EffectInfo(ToolEffect.TypeId, "Tool", () => new ToolEffect(), CatUtility),
+        new EffectInfo(ToolEffect.TypeId, "Tool", () => new ToolEffect(), CatMastering),
         new EffectInfo(TestToneEffect.TypeId, "Test Tone", () => new TestToneEffect(), CatUtility),
         new EffectInfo(TunerEffect.TypeId, "Tuner", () => new TunerEffect(), CatUtility),
 
         // Visualizer
         new EffectInfo(WaveformVisualizerEffect.TypeId, "3D Scope", () => new WaveformVisualizerEffect(), CatVisualizer),
         new EffectInfo(OscilloscopeEffect.TypeId, "Oscilloscope", () => new OscilloscopeEffect(), CatVisualizer),
-        new EffectInfo(SpectrumEffect.TypeId, "Spectrum", () => new SpectrumEffect(), CatVisualizer),
+        new EffectInfo(SpectrumEffect.TypeId, "Spectrum", () => new SpectrumEffect(), CatMastering),
+        new EffectInfo(LoudnessMeterEffect.TypeId, "Loudness Meter", () => new LoudnessMeterEffect(), CatMastering),
 
         // Spectral
         new EffectInfo(FreqSplitEffect.TypeId, "Freq Split", () => new FreqSplitEffect(), CatSpectral),

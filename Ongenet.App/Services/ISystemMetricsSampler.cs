@@ -17,6 +17,17 @@ public interface ISystemMetricsSampler
     /// <summary>Process working-set size in bytes.</summary>
     long MemoryBytes { get; }
 
+    /// <summary>Managed GC heap size in bytes (0 when unavailable).</summary>
+    long ManagedHeapBytes { get; }
+
+    /// <summary>
+    /// Last audio block as a percentage of its deadline (100 = at budget). Null when no blocks yet.
+    /// </summary>
+    double? AudioLoadPercent { get; }
+
+    /// <summary>Cumulative CoreAudio/device underrun count from <see cref="Core.Audio.AudioDiagnostics"/>.</summary>
+    long UnderrunCount { get; }
+
     /// <summary>Raised on the UI thread after each sample.</summary>
     event Action? Updated;
 

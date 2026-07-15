@@ -65,6 +65,9 @@ public sealed class ScriptingPanelViewModel : ViewModelBase
 
         Refresh();
         LoadScripts();
+        if (!_host.IsEnabled)
+            StatusMessage = L("Scripting_Disabled_Platform",
+                "Scripting is desktop-only. ApplyMasteringChain, ExportAudio, MatchAlbumLoudness, and meter tap APIs are not available in Web Demo or Android.");
     }
 
     public event Action? PopOutRequested;

@@ -37,7 +37,7 @@ public class PreviewSongFactoryTests
         Assert.Equal(64, song.BarCount);
         Assert.NotNull(song.Master);
         Assert.Contains(song.Master!.Effects, e => e is WaveformVisualizerEffect); // the 3D scope
-        Assert.Contains(song.Master!.Effects, e => e is LimiterEffect);
+        Assert.Contains(song.Master!.Effects, e => e is PeakLimiterEffect);
     }
 
     [Fact]

@@ -227,12 +227,15 @@ public static class FactoryPresets
             new BitcrusherEffect { Bits = 9, Downsample = 3, Mix = 0.8 },
             new FilterEffect { Mode = FilterMode.LowPass, Frequency = 3800, Resonance = 0.8 }
         ]),
-        new("Master Glue", () =>
-        [
-            new CompressorEffect { ThresholdDb = -14, Ratio = 2.0, AttackMs = 30, ReleaseMs = 200, MakeupDb = 2 },
-            new StereoWidthEffect { Width = 1.1 },
-            new LimiterEffect { CeilingDb = -0.5, ReleaseMs = 110 }
-        ]),
+        new("Master Glue", () => MasteringChains.Create("glue"), ["mastering", "master"]),
+        new("Full Master", MasteringChains.CreateFullMaster, ["mastering", "master", "trance"]),
+        new("Full Master+", MasteringChains.CreateFullMasterPlus, ["mastering", "master", "trance", "ott"]),
+        new("Streaming Master", MasteringChains.CreateStreamingMaster, ["mastering", "streaming"]),
+        new("Pre-Master", MasteringChains.CreatePreMaster, ["mastering", "premaster"]),
+        new("Club Loud", MasteringChains.CreateClubLoud, ["mastering", "club"]),
+        new("Podcast Master", MasteringChains.CreatePodcastMaster, ["mastering", "podcast"]),
+        new("Audiophile Master", MasteringChains.CreateAudiophileMaster, ["mastering", "audiophile", "linear"]),
+        new("Reference Master", MasteringChains.CreateReferenceMaster, ["mastering", "reference", "match eq"]),
         new("Pumping Pad", () =>
         [
             new FilterEffect { Mode = FilterMode.LowPass, Frequency = 2500, Resonance = 0.8 },
@@ -243,7 +246,7 @@ public static class FactoryPresets
         [
             new FilterEffect { Mode = FilterMode.HighPass, Frequency = 55, Resonance = 0.5 },
             new CompressorEffect { ThresholdDb = -18, Ratio = 3.0, AttackMs = 8, ReleaseMs = 120, MakeupDb = 3 },
-            new LimiterEffect { CeilingDb = -1.0, ReleaseMs = 80 }
+            new PeakLimiterEffect { CeilingDb = -1.0, ReleaseMs = 80, MasteringPresetIndex = 1 }
         ]),
         new("Vocal Bus", () =>
         [
@@ -259,20 +262,8 @@ public static class FactoryPresets
             EqEffectBands(new EqBand(EqBandType.Bell, 400, -3, 1.0), new EqBand(EqBandType.HighShelf, 5000, 2, 0.7)),
             new DelayEffect { TimeMs = 380, Feedback = 0.25, Mix = 0.15 }
         ]),
-        new("Techno Master", () =>
-        [
-            new FilterEffect { Mode = FilterMode.HighPass, Frequency = 30, Resonance = 0.4 },
-            new MultibandCompressorEffect(),
-            new StereoWidthEffect { Width = 1.15 },
-            new LimiterEffect { CeilingDb = -0.3, ReleaseMs = 90 }
-        ]),
-        new("Podcast Voice", () =>
-        [
-            new FilterEffect { Mode = FilterMode.HighPass, Frequency = 90, Resonance = 0.5 },
-            VocalClarityEq(),
-            new CompressorEffect { ThresholdDb = -20, Ratio = 4.0, AttackMs = 8, ReleaseMs = 80, MakeupDb = 4 },
-            new LimiterEffect { CeilingDb = -1.0, ReleaseMs = 60 }
-        ]),
+        new("Techno Master", () => MasteringChains.Create("techno"), ["mastering", "techno"]),
+        new("Podcast Voice", () => MasteringChains.CreatePodcastMaster(), ["mastering", "podcast"]),
         new("Bass Tighten", () =>
         [
             new FilterEffect { Mode = FilterMode.LowPass, Frequency = 180, Resonance = 0.6 },
@@ -360,9 +351,46 @@ public static class FactoryPresets
     private static CompressorEffect GlueSoftComp() => new()
         { ThresholdDb = -12, Ratio = 1.8, AttackMs = 40, ReleaseMs = 220, MakeupDb = 1 };
 
-    private static LimiterEffect ClubMasterLimiter() => new() { CeilingDb = -0.3, ReleaseMs = 80 };
-    private static LimiterEffect SafePeakLimiter() => new() { CeilingDb = -1.0, ReleaseMs = 100 };
-    private static LimiterEffect BroadcastHotLimiter() => new() { CeilingDb = -0.1, ReleaseMs = 60 };
+    private static PeakLimiterEffect ClubMasterLimiter()
+    {
+        var lim = MasteringPresetBank.GetLimiter(3); // Master preset — use Peak Limiter, not bus Limiter
+        return new PeakLimiterEffect
+        {
+            MasteringPresetIndex = 3,
+            ThresholdDb = lim.ThresholdDb,
+            CeilingDb = lim.CeilingDb,
+            ReleaseMs = lim.ReleaseMs,
+            SpectralLimiter = lim.Spectral,
+            OversampleIndex = 1
+        };
+    }
+
+    private static PeakLimiterEffect SafePeakLimiter()
+    {
+        var lim = MasteringPresetBank.GetLimiter(1); // Streaming
+        return new PeakLimiterEffect
+        {
+            MasteringPresetIndex = 1,
+            ThresholdDb = lim.ThresholdDb,
+            CeilingDb = lim.CeilingDb,
+            ReleaseMs = lim.ReleaseMs,
+            OversampleIndex = 1
+        };
+    }
+
+    private static PeakLimiterEffect BroadcastHotLimiter()
+    {
+        var lim = MasteringPresetBank.GetLimiter(2); // Loud
+        return new PeakLimiterEffect
+        {
+            MasteringPresetIndex = 2,
+            ThresholdDb = lim.ThresholdDb,
+            CeilingDb = lim.CeilingDb,
+            ReleaseMs = lim.ReleaseMs,
+            SpectralLimiter = lim.Spectral,
+            OversampleIndex = 1
+        };
+    }
 
     private static DistortionEffect TapeWarmthDist() => new() { DriveDb = 6, Mix = 0.35, Mode = 0 };
     private static DistortionEffect AmpCrunchDist() => new() { DriveDb = 16, Mix = 0.7, Mode = 1 };

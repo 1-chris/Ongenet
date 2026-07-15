@@ -29,6 +29,15 @@ public sealed class MidSideEqEffect : IAudioEffect
     /// <summary>Side-channel "air" high-shelf gain (dB) — a gentle 1–1.5 dB widens the top end.</summary>
     public double SideAirDb { get; set; } = 1.2;
 
+    /// <summary>When true, output mid only (side silenced) for audition.</summary>
+    public bool SoloMid { get; set; }
+
+    /// <summary>When true, output side only (mid silenced) for audition.</summary>
+    public bool SoloSide { get; set; }
+
+    public double MidEnergy { get; private set; }
+    public double SideEnergy { get; private set; }
+
     private int _channels = 2;
     private double _sampleRate = 44100.0;
 
@@ -43,7 +52,17 @@ public sealed class MidSideEqEffect : IAudioEffect
     {
         new FloatParameter("Side Low Cut", 20.0, 400.0, () => SideLowCutHz, v => SideLowCutHz = v, "0", "Hz", 2.0),
         new FloatParameter("Air Freq", 2000.0, 16000.0, () => SideAirHz, v => SideAirHz = v, "0", "Hz", 2.0),
-        new FloatParameter("Air Gain", 0.0, 6.0, () => SideAirDb, v => SideAirDb = v, "0.#", "dB")
+        new FloatParameter("Air Gain", 0.0, 6.0, () => SideAirDb, v => SideAirDb = v, "0.#", "dB"),
+        new BoolParameter("Solo Mid", () => SoloMid, v =>
+        {
+            SoloMid = v;
+            if (v) SoloSide = false;
+        }) { Group = "Audition" },
+        new BoolParameter("Solo Side", () => SoloSide, v =>
+        {
+            SoloSide = v;
+            if (v) SoloMid = false;
+        }) { Group = "Audition" }
     };
 
     public void Prepare(AudioFormat format)
@@ -56,12 +75,13 @@ public sealed class MidSideEqEffect : IAudioEffect
 
     public IAudioEffect Clone() => new MidSideEqEffect
     {
-        Enabled = Enabled, SideLowCutHz = SideLowCutHz, SideAirHz = SideAirHz, SideAirDb = SideAirDb
+        Enabled = Enabled, SideLowCutHz = SideLowCutHz, SideAirHz = SideAirHz, SideAirDb = SideAirDb,
+        SoloMid = SoloMid, SoloSide = SoloSide
     };
 
     public void Process(Span<float> buffer)
     {
-        if (_channels < 2) return; // mid/side only makes sense in stereo
+        if (_channels < 2) return;
 
         _sideHp.Frequency = SideLowCutHz;
         _sideAir.Frequency = SideAirHz;
@@ -70,6 +90,7 @@ public sealed class MidSideEqEffect : IAudioEffect
         _sideAir.EnsureCoeffs(_sampleRate);
 
         var frames = buffer.Length / _channels;
+        double midSum = 0, sideSum = 0;
         for (var frame = 0; frame < frames; frame++)
         {
             var i = frame * _channels;
@@ -81,9 +102,17 @@ public sealed class MidSideEqEffect : IAudioEffect
 
             side = _sideHp.Process(0, side);
             side = _sideAir.Process(0, side);
+            midSum += mid * mid;
+            sideSum += side * side;
 
-            buffer[i] = mid + side;
-            buffer[i + 1] = mid - side;
+            if (SoloMid) { buffer[i] = mid; buffer[i + 1] = mid; }
+            else if (SoloSide) { buffer[i] = side; buffer[i + 1] = -side; }
+            else { buffer[i] = mid + side; buffer[i + 1] = mid - side; }
+        }
+        if (frames > 0)
+        {
+            MidEnergy = MidEnergy * 0.75 + Math.Sqrt(midSum / frames) * 0.25;
+            SideEnergy = SideEnergy * 0.75 + Math.Sqrt(sideSum / frames) * 0.25;
         }
     }
 }

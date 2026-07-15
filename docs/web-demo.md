@@ -13,9 +13,9 @@ The UI used to live in the desktop exe. It is now a shared library that both hea
 | --- | --- | --- |
 | `Ongenet.Core` | Engine, DSP, instruments, effects, persistence (portable, no UI) | `net10.0` |
 | `Ongenet.App` | **Shared Avalonia UI library** — `App`, all views/view-models, controls, theming, assets (CLR + XAML namespaces: `Ongenet.App.*`). | `net10.0` |
-| `Ongenet.Desktop` | Desktop **exe head** — OS-native audio, MIDI, CLAP/LV2. Publishes as `Ongenet`. | `net10.0` |
+| `Ongenet.Desktop` | Desktop **exe head** — OS-native audio, MIDI, CLAP/LV2/VST/AU, scripting, PluginHost, Engine3D. Publishes as `Ongenet`. | `net10.0` |
 | `Ongenet.Web` | Browser **exe head** — Web Audio backend, browser-safe service stubs, single-view shell. | `net10.0-browser` |
-| `Ongenet.Audio` / `Ongenet.Clap` / `Ongenet.Lv2` | Native audio + plugin hosting (desktop only). | `net10.0` |
+| `Ongenet.Audio` / `Ongenet.Clap` / `Ongenet.Lv2` / `Ongenet.Vst` / `Ongenet.Au` | Native audio + plugin hosting (desktop only). | `net10.0` |
 
 The heads are named purely by platform (`Ongenet.Desktop`, `Ongenet.Web`, and later `Ongenet.Android` /
 `Ongenet.iOS`); `Ongenet.App` is the shared application they all build on. Each head plugs its platform
@@ -89,7 +89,7 @@ rates and behaviour are unchanged.
 - **Audio Editor window** — desktop-only standalone multitrack sample editor (`NullScriptingHost` pattern;
   use the bottom Sample Inspector for basic waveform view in browser if sample editing is wired).
 - **Polyphonic pitch editor** — desktop-only; requires full audio clip model and offline pitch pipeline.
-- **C# scripting (Tools → Scripts)** — `NullScriptingHost` on web/Android; Roslyn host is desktop-only.
+- **C# scripting (centre Scripting tab)** — `NullScriptingHost` on web/Android; Roslyn host is desktop-only.
 - **Video centre tab / Engine3D** — not registered on the web head.
 - **Plugin crash isolation (`Ongenet.PluginHost`)** — native child process; impossible in WASM.
 
@@ -117,10 +117,11 @@ source to "GitHub Actions"** (Settings → Pages) — the older "Deploy from a b
 the WASM app (GitHub doesn't run dotnet for branch-based Pages), it only serves committed files. The workflow:
 
 1. Installs `wasm-tools`, publishes `Ongenet.Web`.
-2. Assembles `_site/`: the existing homepage and assets from `./docs` (incl. `index.html` and `CNAME`) at the
-   root, the app `AppBundle` at `/app/`, plus a **`.nojekyll`** file (mandatory — Jekyll otherwise strips the
+2. Builds DocFX from `site/`, then runs `scripts/assemble-site.sh` to assemble `_site/`: DocFX output,
+   the marketing homepage from `site/homepage/`, `site/CNAME`, screenshot caps from `docs/caps`, the app
+   `AppBundle` at `/app/`, plus a **`.nojekyll`** file (mandatory — Jekyll otherwise strips the
    `_framework/` directory because of the leading underscore).
 3. Publishes to GitHub Pages, so the homepage stays at `onge.net/` and the app is served at `onge.net/app/`.
 
 The app uses `<base href="./">`, so it works from the `/app/` sub-path with no rebuild. The custom domain is
-carried by `docs/CNAME` (`onge.net`), which the workflow copies to the site root.
+carried by `site/CNAME` (`onge.net`), which assemble copies to the site root.

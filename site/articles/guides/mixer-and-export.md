@@ -29,8 +29,17 @@
 - **Video mux** — when the project has video tracks and **ffmpeg** is installed, enable **Mux master audio with video track (MP4)** to deliver a single `.mp4` with the bounced master
 - **Composited export** — **Export composited video** (or title bar **Export ▾ → Export video…**) bakes all video layers into an MP4; see [Video & composition](video-and-composition.md) for a step-by-step visualiser tutorial.
 
+### Mastering on the Master track
+
+Ongenet masters like a DAW: insert effects on the pinned **Master** track. See **[Mastering](mastering.md)** for the full workflow — chain recipes, meter tap, Compare/A/B/reference, Match EQ, export loudness, and Peak Limiter vs Dynamics **Limiter**.
+
+**Startup & built-ins:** desktop opens **Ascension** (Full Master, OTT on the Leads bus); WASM/Android open **Web Demo** (Streaming Master). Library demos such as **First Light** are not the desktop startup song. Built-in projects pick genre chains automatically — Full Master (Ascension, First Light, House Starter), Club Loud (Undertow, Trap Beat), Streaming Master (Dust & Vinyl, Field Modular, Static Bloom, Web Demo), or Techno Master (Techno Starter).
+
+Export honours the same delivery targets: **Analyse loudness**, **Normalize to platform LUFS**, **Pre-master bounce**, stem **Include master FX**, and **Match album loudness**. Surround export loudness analysis uses every channel with full BS.1770 weighting; the on-screen meter stays stereo-focused for 5.1/7.1 monitoring.
+
 ## Related
 
+- [Mastering](mastering.md)
 - [Timeline & clips](timeline-and-clips.md)
 - [Sidechain & dynamics](sidechain-and-dynamics.md)
 - [Video & composition](video-and-composition.md)

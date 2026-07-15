@@ -113,6 +113,16 @@ The authoritative list is [`IScriptingApi.cs`](https://github.com/1-chris/Ongene
 | `SetInstrumentParameter` / `Bool` / `Choice` | Parameter writes |
 | `LoadInstrumentPreset(track, slot, name)` | Built-in preset by name |
 | `AddEffect`, `RemoveEffect`, `SetEffectEnabled`, `SetEffectParameter`, `LoadEffectPreset` | Insert & pre-FX chains |
+| `ApplyMasteringChain(masterTrackId, chainName)` | Replace Master inserts (`full`, `full+`, `glue`, `techno`, `streaming`, `premaster`, `club`, `podcast`, `audiophile`, `reference`) |
+| `GetMasterMeterTap()` / `SetMasterMeterTap(tap)` | Read/write title-bar master meter tap (`PostFader`, `PreLimiter`, `PostChain`) |
+
+```csharp
+using System.Linq;
+
+var master = api.GetTracks().First(t => t.Kind == ScriptTrackKind.Master);
+api.ApplyMasteringChain(master.Id, "streaming");
+api.SetMasterMeterTap(ScriptMasterMeterTap.PreLimiter);
+```
 
 ### Clips & MIDI
 
@@ -131,33 +141,40 @@ The authoritative list is [`IScriptingApi.cs`](https://github.com/1-chris/Ongene
 | Automation | `GetAutomationLanes`, `AddAutomationLane`, `AddAutomationPoint`, `AddTrackModulator` |
 | Sends / multi-out | `GetSends`, `AddSend`, `GetMultiOutputRoutes`, `AddMultiOutputRoute` |
 | Patterns / session | `GetPatterns`, `AddPatternWithId`, `AddPatternChannel`, `SetPatternSteps`, `Get/AddPatternClip`, `Get/AddSessionClip` |
-| Markers / chord / maps / video tracks | `Get/AddMarker`, `Get/AddSection`, `Get/AddChordRegion`, `Get/AddDrumMap`, `Get/AddExpressionMap`, `Get/AddVideoTrack`, `Get/AddControlRoomProfile` |
+| Markers / chord / maps / video | `Get/AddMarker`, `Get/AddSection`, `Get/AddChordRegion`, `Get/AddDrumMap`, `Get/AddExpressionMap`, `Get/AddVideoLayer`, `Get/AddControlRoomProfile` |
 
 ### Video composition
 
 | Method | Description |
 | --- | --- |
 | `GetVideoEnabled()` / `SetVideoEnabled(enabled)` | Per-project video on/off |
-| `GetVideoElements()` / `AddVideoElement(info)` | Overlay layers (kind, path, bounds, z-order, opacity) |
-| `GetVideoTriggers()` / `AddVideoTrigger(info)` | Clip/MIDI-driven show/hide/fade rules |
+| `GetVideoLayers()` / `AddVideoLayer(info)` | Composited layers (name, z-order, opacity, sync, mute, waveform style) |
+| `GetVideoLayerItems()` / `AddVideoLayerItem(info)` | Per-layer items (kind, path/text, bounds, rotation, opacity) |
+| `GetVideoTriggers()` / `AddVideoTrigger(info)` | Clip/MIDI-driven show/hide/fade rules targeting a layer |
+| `GetVideoVisibilityRegions()` / `AddVideoVisibilityRegion(info)` | Beat ranges when a layer is visible |
+| `GetVideoCanvasSize()` / `SetVideoCanvasSize(info)` | Export/preview canvas size and FPS |
 
-`ScriptVideoElementInfo` fields: `Id`, `Name`, `Kind` (`Image`, `AnimatedGif`, `Video`, `Waveform`), `SourcePath`, `X`, `Y`, `Width`, `Height`, `Rotation`, `ZOrder`, `Opacity`, `DefaultVisible`.
+`ScriptVideoLayerInfo` fields: `Id`, `Name`, `ZOrder`, `Opacity`, `DefaultVisible`, `OffsetSeconds`, `Fps`, `Muted`, `InPointSeconds`, `OutPointSeconds`, `SyncClipId`, `AudioSourceTrackId`, waveform style fields.
 
-`ScriptVideoTriggerInfo` fields: `Id`, `TargetElementId`, `Source` (`ArrangementClip`, `SessionClip`, `MidiNote`), `TrackId`, `ClipId`, `MidiNote`, `Moment` (`ClipStart`, `ClipEnd`, `NoteOn`, `NoteOff`), `Action` (`Show`, `Hide`, `Toggle`, `FadeIn`, `FadeOut`), `FadeDurationSeconds`.
+`ScriptVideoLayerItemInfo` fields: `Id`, `LayerId`, `Kind` (`Image`, `AnimatedGif`, `Video`, `Waveform`, `Text`), `SourcePath`, `X`, `Y`, `Width`, `Height`, `Rotation`, `Opacity`, optional `TextContent` / font fields.
+
+`ScriptVideoTriggerInfo` fields: `Id`, `TargetLayerId`, `Source` (`ArrangementClip`, `SessionClip`, `MidiNote`), `TrackId`, `ClipId`, `MidiNote`, `Moment` (`ClipStart`, `ClipEnd`, `NoteOn`, `NoteOff`), `Action` (`Show`, `Hide`, `Toggle`, `FadeIn`, `FadeOut`), `FadeDurationSeconds`.
 
 Example:
 
 ```csharp
 api.SetVideoEnabled(true);
-var logoId = Guid.NewGuid();
-api.AddVideoElement(new ScriptVideoElementInfo(
-    logoId, "Logo", ScriptVideoElementKind.Image, "/path/logo.png",
-    0.02, 0.02, 0.2, 0.2, 0, 1, 1.0, false));
+var layerId = Guid.NewGuid();
+api.AddVideoLayer(new ScriptVideoLayerInfo(
+    layerId, "Logo", 1, 1.0, false, 0, 30, false));
+api.AddVideoLayerItem(new ScriptVideoLayerItemInfo(
+    Guid.NewGuid(), layerId, ScriptVideoElementKind.Image, "/path/logo.png",
+    0.02, 0.02, 0.2, 0.2, 0, 1.0));
 var clips = api.GetClips();
 if (clips.Count > 0)
 {
     api.AddVideoTrigger(new ScriptVideoTriggerInfo(
-        Guid.NewGuid(), logoId, ScriptVideoTriggerSource.ArrangementClip,
+        Guid.NewGuid(), layerId, ScriptVideoTriggerSource.ArrangementClip,
         null, clips[0].Id, null, ScriptVideoTriggerMoment.ClipStart,
         ScriptVideoTriggerAction.FadeIn, 0.5));
 }
@@ -171,6 +188,25 @@ if (clips.Count > 0)
 | `ExportInstrumentSlotAsScript(track, slot)` | Single instrument slot preset script |
 | `ExportEffectChainAsScript(track, slot?)` | Track inserts or slot pre-FX chain |
 | `ExportPresetAsScript(track, slot?, effectIndex?)` | Convenience wrapper |
+| `ExportAudio(path, …)` | Offline master bounce to a filesystem path (WAV/FLAC/MP3/OGG by extension) |
+| `MatchAlbumLoudness(wavPaths, targetLufs?, targetTp?)` | Two-pass album match of existing WAV files; rewrites them as 24-bit PCM |
+| `GetDeliveryTarget()` / `SetDeliveryTarget(…)` | Read/write the shared delivery platform / LUFS / true-peak targets |
+
+`ExportAudio` accepts the same loudness / delivery options as the Export dialog: `deliveryPlatform` (`Spotify`, `YouTube`, `Apple Music`, `Club`, `Podcast`), `normalizeLoudness`, `applyDither`, `bypassMasterFx`, `analyzeLoudness` (writes `.loudness.txt` / `.loudness.json` sidecars when true), optional `bitDepth` (0 = 24, or 16 when `applyDither` is true), `ditherMode` (`ScriptDitherMode.Tpdf` or `NoiseShaped`), `targetSampleRate` (0 = project rate; e.g. 44100 for CD), and `exportComparisonPair` (writes unmastered vs mastered comparison excerpts). When `deliveryPlatform` is `null`, the bounce uses the shared `IMasteringDeliveryTarget` (the same platform, integrated LUFS, and true-peak ceiling selected on the Master Effects tab and Export dialog). Use `GetDeliveryTarget` / `SetDeliveryTarget` to read or change that shared target from scripts.
+
+```csharp
+api.SetDeliveryTarget("Spotify");
+var (platform, lufs, dbTp) = api.GetDeliveryTarget();
+api.ExportAudio("/tmp/master.wav", deliveryPlatform: "Spotify",
+    normalizeLoudness: true, analyzeLoudness: true);
+api.ExportAudio("/tmp/master-16.wav", bitDepth: 16, applyDither: true,
+    ditherMode: ScriptDitherMode.NoiseShaped, targetSampleRate: 44100);
+api.ExportAudio("/tmp/master.wav", bypassMasterFx: true, exportComparisonPair: true);
+api.ExportAudio("/tmp/master.wav", normalizeLoudness: true); // uses current delivery target
+api.MatchAlbumLoudness(new[] { "/tmp/01.wav", "/tmp/02.wav" }, -14, -1);
+```
+
+Album loudness alignment from scripts uses `MatchAlbumLoudness` (not the internal `ExportService.ComputeAlbumOffsets` helper).
 
 Mutating calls go through [`IHistoryCapture`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.Core/Services/IHistoryCapture.cs) so **Undo** restores script changes.
 
@@ -210,7 +246,7 @@ api.SetTempo(128);
 - **No audio blobs** — re-link `AudioFilePath` or replace clips manually
 - **External plugins** — CLAP/VST `TypeId`s must exist on the target machine
 - **Field graphs / exotic state** — parameters export; complex custom state may need manual follow-up
-- **Desktop only** — `NullScriptingApi` throws on export methods
+- **Desktop only** — `NullScriptingApi` throws on mastering/export **mutations** (`ApplyMasteringChain`, `ExportAudio`, `MatchAlbumLoudness`, `SetMasterMeterTap`, `SetDeliveryTarget`, portable `Export*AsScript`); meter-tap / delivery-target **gets** return stubs. Web Demo and Android show a status hint in the Scripting tab
 
 ## Host contract (`IScriptingHost`)
 
@@ -275,7 +311,7 @@ IScriptingHost  ──desktop──►  RoslynScriptingHost
 ## Security & limits
 
 - Scripts run **in-process** with full project access — only run scripts you trust
-- No file I/O or network API is exposed on `IScriptingApi`
+- Path-based filesystem writes only: `ExportAudio` and `MatchAlbumLoudness` use the paths you pass; there is no general file/network API beyond that
 - Live/audio-thread callbacks are **not** supported — UI-thread handlers only; no per-sample DSP
 - Compile errors surface as squiggles in the editor and in the status line
 

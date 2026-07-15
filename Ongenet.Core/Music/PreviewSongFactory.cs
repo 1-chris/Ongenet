@@ -10,8 +10,9 @@ using static Ongenet.Core.Music.SongBuilder;
 namespace Ongenet.Core.Music;
 
 /// <summary>
-/// Builds "First Light" — the deep progressive house preview song shown when the app opens without a
-/// project (C Major, 128 BPM, 64 bars). Every sound is a factory preset (Kicka "Deep House Kick",
+/// Builds "First Light" — the deep progressive house library demo (C Major, 128 BPM, 64 bars).
+/// Desktop startup opens Ascension (see <see cref="UpliftingTranceSongFactory"/>); this project is
+/// available from Library → Projects. Every sound is a factory preset (Kicka "Deep House Kick",
 /// Perca clap/hats, Padda "Dusk Pads", the Field "Prism Lead" wavetable patch with its 3D scope, and
 /// the 3x Osc bass/riser from <see cref="FactoryPresets"/>), so users can pull the exact same sounds
 /// from the library. The whole arrangement — notes, automation, kick-triggered sidechain — is plain
@@ -62,7 +63,7 @@ public static class PreviewSongFactory
             Volume = 1.0
         };
         // The 3D scope on the master puts the waveform trail on screen the moment the song plays.
-        master.Effects.Add(new LimiterEffect { CeilingDb = -0.5, ReleaseMs = 120 });
+        MasteringChains.AddFullMaster(master.Effects);
         master.Effects.Add(new WaveformVisualizerEffect());
         project.Tracks.Add(master);
 

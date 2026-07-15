@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
@@ -178,4 +179,48 @@ public sealed partial class ScriptingApi
         _history.Capture("Load effect preset");
         provider.LoadPreset(index);
     }
+
+    public void ApplyMasteringChain(Guid masterTrackId, string chainName = "full")
+    {
+        var track = FindTrack(masterTrackId)
+            ?? throw new InvalidOperationException($"Track '{masterTrackId}' was not found.");
+        if (track.Kind != TrackKind.Master)
+            throw new InvalidOperationException("ApplyMasteringChain requires the Master track.");
+        _history.Capture("Apply mastering chain");
+        track.Effects.Clear();
+        foreach (var fx in MasteringChains.Create(chainName))
+            track.Effects.Add(fx);
+        track.CommitEffects();
+        _events.Publish(new TrackChangedEvent(track));
+    }
+
+    /// <inheritdoc cref="IScriptingApi.GetMasterMeterTap"/>
+    public ScriptMasterMeterTap GetMasterMeterTap()
+    {
+        if (_engine is null)
+            return ScriptMasterMeterTap.PostFader;
+        return ToScriptMeterTap(_engine.MasterMeterTap);
+    }
+
+    /// <inheritdoc cref="IScriptingApi.SetMasterMeterTap"/>
+    public void SetMasterMeterTap(ScriptMasterMeterTap tap)
+    {
+        if (_engine is null)
+            throw new InvalidOperationException("Master meter tap is not available without a running audio engine.");
+        _engine.MasterMeterTap = ToEngineMeterTap(tap);
+    }
+
+    private static ScriptMasterMeterTap ToScriptMeterTap(MasterMeterTap tap) => tap switch
+    {
+        MasterMeterTap.PreLimiter => ScriptMasterMeterTap.PreLimiter,
+        MasterMeterTap.PostChain => ScriptMasterMeterTap.PostChain,
+        _ => ScriptMasterMeterTap.PostFader
+    };
+
+    private static MasterMeterTap ToEngineMeterTap(ScriptMasterMeterTap tap) => tap switch
+    {
+        ScriptMasterMeterTap.PreLimiter => MasterMeterTap.PreLimiter,
+        ScriptMasterMeterTap.PostChain => MasterMeterTap.PostChain,
+        _ => MasterMeterTap.PostFader
+    };
 }

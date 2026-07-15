@@ -271,7 +271,8 @@ internal sealed unsafe class MacAudioOutput : IAudioOutput
         if (!string.IsNullOrWhiteSpace(env) &&
             int.TryParse(env, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v))
             return Math.Clamp(v, FillChunkFrames, RingFrames - FillChunkFrames);
-        return DefaultLeadFrames;
+
+        return Math.Clamp(AudioRuntimeOptions.CoreAudioLeadFrames, FillChunkFrames, RingFrames - FillChunkFrames);
     }
 
     private bool TryDeviceId(out uint id)

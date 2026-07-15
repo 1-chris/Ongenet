@@ -72,6 +72,7 @@ internal static class GuideContent
         new(L("Guide_Session_Title"), L("Guide_Session_Body")),
         new(L("Guide_Field_Title"), L("Guide_Field_Body")),
         new(L("Guide_Mixer_Title"), L("Guide_Mixer_Body")),
+        new(L("Guide_Mastering_Title"), L("Guide_Mastering_Body")),
         new(L("Guide_AudioEditor_Title"), L("Guide_AudioEditor_Body")),
         new(L("Guide_PitchEditor_Title"), L("Guide_PitchEditor_Body")),
         new(L("Guide_Scripting_Title"), L("Guide_Scripting_Body")),

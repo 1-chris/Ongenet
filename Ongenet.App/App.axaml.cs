@@ -69,6 +69,7 @@ namespace Ongenet.App
 
             // Core services.
             services.AddOngenetCore();
+            services.AddSingleton<IMasteringDeliveryTarget, MasteringDeliveryTarget>();
 
             // The single switchable audio backend. The engine depends only on the IAudioOutput / IAudioInput
             // / IAudioDeviceService seams; the concrete IAudioBackend(s) are contributed by the platform

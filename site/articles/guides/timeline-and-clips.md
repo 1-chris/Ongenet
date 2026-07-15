@@ -15,7 +15,7 @@ The arrange view is the centre of the window — a scrolling, zoomable grid with
 
 - **Arm** a track, press **Record** on the transport — clips grow live on the timeline.
 - **Edit / Select / Slice** tools, rubber-band multi-select, duplicate, reverse, and slice from the timeline toolbar.
-- **Automation lanes** — right-click a control → **Automate**; lanes appear under the track.
+- **Automation lanes** — right-click a control → **Create automation track**; lanes appear under the track.
 
 ### Comping
 

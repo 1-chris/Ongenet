@@ -7,7 +7,9 @@ using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Music;
 using Ongenet.Core.Services.Interfaces;
+using Ongenet.Core.Services;
 using Ongenet.App.Services;
+using Ongenet.App.Localization;
 using Ongenet.Link;
 
 namespace Ongenet.App.ViewModels
@@ -23,7 +25,7 @@ namespace Ongenet.App.ViewModels
         private readonly IProjectService _project;
         private readonly IEventAggregator _events;
         private readonly IEditModeService _editMode;
-        private readonly OfflineRenderer _renderer;
+        private readonly ExportService _export;
         private readonly IRecordingService _recording;
         private readonly ISystemMetricsSampler _metrics;
         private readonly ILinkSession _link;
@@ -32,23 +34,24 @@ namespace Ongenet.App.ViewModels
         private readonly IMidiInputService _midi;
         private readonly IAppSettingsService _appSettings;
         private readonly ISessionCaptureService _capture;
+        private readonly IMasteringDeliveryTarget _deliveryTarget;
         private bool _isRendering;
         private bool _syncingLinkTempo;
         private readonly Queue<long> _tapTimes = new();
 
         public TransportViewModel(ITransportService transport, IAudioEngine engine,
             IProjectService project, IEventAggregator events, IEditModeService editMode,
-            OfflineRenderer renderer, IRecordingService recording, AudioDevicesViewModel devices,
+            ExportService export, IRecordingService recording, AudioDevicesViewModel devices,
             ISystemMetricsSampler metrics, ILinkSession link, IPlaybackModeService playback,
             TimelineViewModel timeline, IMidiInputService midi, IAppSettingsService appSettings,
-            ISessionCaptureService capture)
+            ISessionCaptureService capture, IMasteringDeliveryTarget deliveryTarget)
         {
             _transport = transport;
             _engine = engine;
             _project = project;
             _events = events;
             _editMode = editMode;
-            _renderer = renderer;
+            _export = export;
             _recording = recording;
             _metrics = metrics;
             _link = link;
@@ -57,6 +60,7 @@ namespace Ongenet.App.ViewModels
             _midi = midi;
             _appSettings = appSettings;
             _capture = capture;
+            _deliveryTarget = deliveryTarget;
             Devices = devices;
 
             _metrics.Updated += OnMetricsUpdated;
@@ -82,12 +86,27 @@ namespace Ongenet.App.ViewModels
             GoToNextMarkerCommand = new RelayCommand(GoToNextMarker, () => _project.Current.Markers.Count > 0);
             GoToPreviousMarkerCommand = new RelayCommand(GoToPreviousMarker, () => _project.Current.Markers.Count > 0);
             CaptureRetrospectiveMidiCommand = new RelayCommand(() => _timeline.CaptureRetrospectiveMidi());
+            ResetMasterLoudnessCommand = new RelayCommand(() =>
+            {
+                _engine.ResetMasterLoudness();
+                OnPropertyChanged(nameof(MasterLoudnessText));
+                OnPropertyChanged(nameof(MasterLoudnessRangeLu));
+                OnPropertyChanged(nameof(MasterTruePeakMaxDbTp));
+                OnPropertyChanged(nameof(MasterTruePeakWarning));
+            });
+            CycleKSystemCommand = new RelayCommand(() =>
+            {
+                _kSystemIndex = (_kSystemIndex + 1) % 4;
+                OnPropertyChanged(nameof(KSystemOffsetDb));
+                OnPropertyChanged(nameof(KSystemLabel));
+            });
 
             _transport.LoopChanged += () => OnPropertyChanged(nameof(IsLooping));
             _transport.PunchChanged += OnPunchChanged;
             _transport.MetronomeChanged += () => OnPropertyChanged(nameof(MetronomeEnabled));
             _playback.ModeChanged += OnPlaybackModeChanged;
             _capture.SessionRecordArmedChanged += OnSessionRecordArmedChanged;
+            _deliveryTarget.Changed += OnDeliveryTargetChanged;
 
             _link.Quantum = Math.Max(1, _project.Current.TimeSignature.Numerator);
         }
@@ -309,37 +328,28 @@ namespace Ongenet.App.ViewModels
             RenderProgress = 0;
             try
             {
-                var format = _engine.Format;
-                var bpm = _transport.Tempo.BeatsPerMinute;
                 var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
-                var encode = ext is ".mp3" or ".flac";
-
-                // Encoding is quick next to the render, so the render owns most of the bar.
-                var renderShare = encode ? 0.9 : 1.0;
-                var progress = new Progress<double>(p => RenderProgress = p * renderShare);
-
-                if (!encode)
+                var options = new ExportOptions
                 {
-                    await System.Threading.Tasks.Task.Run(
-                        () => _renderer.RenderToWav(_project.Current, format, bpm, path, progress));
-                    return;
-                }
-
-                var tempWav = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"ongen-render-{Guid.NewGuid():N}.wav");
-                try
-                {
-                    await System.Threading.Tasks.Task.Run(() =>
+                    Kind = ExportKind.Master,
+                    BitDepth = 16,
+                    ApplyDither = true,
+                    AnalyzeLoudness = true,
+                    DeliveryPlatform = _deliveryTarget.PlatformName,
+                    TargetIntegratedLufs = _deliveryTarget.TargetIntegratedLufs,
+                    TargetTruePeakDbTp = _deliveryTarget.TargetTruePeakDbTp,
+                    AudioFormat = ext switch
                     {
-                        _renderer.RenderToWav(_project.Current, format, bpm, tempWav, progress);
-                        if (ext == ".mp3") Core.Audio.Files.FfmpegEncoder.EncodeMp3(tempWav, path);
-                        else Core.Audio.Files.FfmpegEncoder.EncodeFlac(tempWav, path);
-                    });
-                    RenderProgress = 1.0;
-                }
-                finally
-                {
-                    try { System.IO.File.Delete(tempWav); } catch { /* temp file — best effort */ }
-                }
+                        ".mp3" => ExportAudioFormat.Mp3,
+                        ".flac" => ExportAudioFormat.Flac,
+                        ".ogg" => ExportAudioFormat.Ogg,
+                        _ => ExportAudioFormat.Wav
+                    }
+                };
+                var progress = new Progress<double>(p => RenderProgress = p);
+                await System.Threading.Tasks.Task.Run(() => _export.Export(
+                    _project.Current, _engine.Format, _transport.Tempo.BeatsPerMinute, path, options, progress));
+                RenderProgress = 1;
             }
             finally
             {
@@ -446,6 +456,70 @@ namespace Ongenet.App.ViewModels
         public double MasterLevelLeft => _engine.MasterLevelLeft;
         public double MasterLevelRight => _engine.MasterLevelRight;
 
+        public double MasterTruePeakLeftDbTp => _engine.MasterTruePeakLeftDbTp;
+        public double MasterTruePeakRightDbTp => _engine.MasterTruePeakRightDbTp;
+        public double MasterTruePeakMaxDbTp => _engine.MasterTruePeakMaxDbTp;
+        public double MasterMomentaryLufs => _engine.MasterMomentaryLufs;
+        public double MasterShortTermLufs => _engine.MasterShortTermLufs;
+        public double MasterIntegratedLufs => _engine.MasterIntegratedLufs;
+        public double MasterLoudnessRangeLu => _engine.MasterLoudnessRangeLu;
+        public string MeterTapLabel => _engine.MasterMeterTap switch
+        {
+            MasterMeterTap.PreLimiter => Loc.Get("Mastering_MeterTap_PreLimiter", "Pre Limiter"),
+            MasterMeterTap.PostChain => Loc.Get("Mastering_MeterTap_PostChain", "Post Chain"),
+            _ => Loc.Get("Mastering_MeterTap_PostFader", "Post Fader")
+        };
+        public double TargetTruePeakDbTp => _deliveryTarget.TargetTruePeakDbTp;
+
+        private int _kSystemIndex; // 0=digital, 1=K-12, 2=K-14, 3=K-20
+        public double KSystemOffsetDb => _kSystemIndex switch { 1 => 12, 2 => 14, 3 => 20, _ => 0 };
+        public string KSystemLabel => _kSystemIndex switch
+        {
+            1 => "K-12",
+            2 => "K-14",
+            3 => "K-20",
+            _ => "FS"
+        };
+        public RelayCommand CycleKSystemCommand { get; }
+
+        public string DeliveryTargetText
+        {
+            get
+            {
+                static string N(double value, string format) => value.ToString(format).Replace("-", "−");
+                return $"{_deliveryTarget.PlatformName} {N(_deliveryTarget.TargetIntegratedLufs, "0.#")} LUFS / " +
+                       $"{N(_deliveryTarget.TargetTruePeakDbTp, "0.0")} dBTP";
+            }
+        }
+
+        private void OnDeliveryTargetChanged()
+        {
+            OnPropertyChanged(nameof(TargetTruePeakDbTp));
+            OnPropertyChanged(nameof(DeliveryTargetText));
+            OnPropertyChanged(nameof(MasterTruePeakWarning));
+        }
+
+        public bool MasterTruePeakWarning =>
+            MasterTruePeakMaxDbTp > TargetTruePeakDbTp + 0.05;
+
+        public string MasterLoudnessText
+        {
+            get
+            {
+                var m = MasterMomentaryLufs;
+                var st = MasterShortTermLufs;
+                var integ = MasterIntegratedLufs;
+                var lra = MasterLoudnessRangeLu;
+                var tp = MasterTruePeakMaxDbTp;
+                static string Fmt(double v) =>
+                    float.IsNegativeInfinity((float)v) ? "−∞" : v.ToString("0.0");
+                var lraText = double.IsNaN(lra) ? "—" : lra.ToString("0.0");
+                return $"M {Fmt(m)}  ST {Fmt(st)}  I {Fmt(integ)} LUFS  ·  LRA {lraText} LU  ·  {tp:0.0} dBTP";
+            }
+        }
+
+        public RelayCommand ResetMasterLoudnessCommand { get; }
+
         /// <summary>Standalone metronome click during playback (independent of record count-in).</summary>
         public bool MetronomeEnabled
         {
@@ -475,8 +549,19 @@ namespace Ongenet.App.ViewModels
         /// <summary>Formatted process CPU usage for the transport bar.</summary>
         public string CpuText => _metrics.CpuPercent is { } pct ? $"{pct:0}%" : "—";
 
+        /// <summary>Last audio-block load relative to the render deadline (100% = budget).</summary>
+        public string AudioLoadText =>
+            _metrics.AudioLoadPercent is { } load
+                ? (_metrics.UnderrunCount > 0
+                    ? $"DSP {load:0}% !{_metrics.UnderrunCount}"
+                    : $"DSP {load:0}%")
+                : "DSP —";
+
         /// <summary>Formatted process working-set size for the transport bar.</summary>
         public string RamText => FormatBytes(_metrics.MemoryBytes);
+
+        /// <summary>Formatted managed heap size for the transport bar.</summary>
+        public string HeapText => $"Heap {FormatBytes(_metrics.ManagedHeapBytes)}";
 
         private long _lastTimeRefreshMs;
         private double _lastMasterL = -1;
@@ -500,6 +585,17 @@ namespace Ongenet.App.ViewModels
                 _lastMasterR = r;
                 OnPropertyChanged(nameof(MasterLevelRight));
             }
+
+            OnPropertyChanged(nameof(MasterTruePeakLeftDbTp));
+            OnPropertyChanged(nameof(MasterTruePeakRightDbTp));
+            OnPropertyChanged(nameof(MasterTruePeakMaxDbTp));
+            OnPropertyChanged(nameof(MasterMomentaryLufs));
+            OnPropertyChanged(nameof(MasterShortTermLufs));
+            OnPropertyChanged(nameof(MasterIntegratedLufs));
+            OnPropertyChanged(nameof(MasterLoudnessRangeLu));
+            OnPropertyChanged(nameof(MasterLoudnessText));
+            OnPropertyChanged(nameof(MasterTruePeakWarning));
+            OnPropertyChanged(nameof(MeterTapLabel));
 
             RefreshPlayheadTime();
         }
@@ -588,7 +684,9 @@ namespace Ongenet.App.ViewModels
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 OnPropertyChanged(nameof(CpuText));
+                OnPropertyChanged(nameof(AudioLoadText));
                 OnPropertyChanged(nameof(RamText));
+                OnPropertyChanged(nameof(HeapText));
             });
 
         private void OnTransportStateChanged(TransportState state)

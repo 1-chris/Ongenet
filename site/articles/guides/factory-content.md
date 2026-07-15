@@ -50,7 +50,7 @@ Bass-electric, organ, and xylophone remain under `Soundfonts/ToneJs/` (ogg + SFZ
 | **CC BY 3.0** (ToneJs remaining instruments, 909 SF2) | Allowed; **credit required** |
 | GeneralUser GS | Allowed in software and recordings; credit S. Christian Collins |
 
-In-app credits: **Settings → Legal → Factory content attribution**. On disk: `Content/Core/ATTRIBUTION.md`.
+In-app credits: **Settings → General → Factory content attribution** (Legal subsection). On disk: `Content/Core/ATTRIBUTION.md`.
 
 ## Sources / credits
 

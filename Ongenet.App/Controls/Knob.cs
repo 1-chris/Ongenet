@@ -123,7 +123,8 @@ namespace Ongenet.App.Controls
                 _dragCaptured = true;
             }
             var dy = _dragStartY - e.GetPosition(this).Y; // up = increase
-            Value = ValueFromT(_dragStartT + dy / DragRangePixels);
+            var range = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? DragRangePixels * 8 : DragRangePixels;
+            Value = ValueFromT(_dragStartT + dy / range);
             e.Handled = true;
         }
 

@@ -48,6 +48,8 @@ public partial class ExportDialog : Window
     {
         var dialog = new ExportDialog { DataContext = vm, _vm = vm };
         dialog.Title = Loc.Get(forVideo ? "Export_Video_Title" : "Export_Export_Title");
+        vm.BeginPreview();
+        dialog.Closed += (_, _) => vm.EndPreview();
         return dialog;
     }
 

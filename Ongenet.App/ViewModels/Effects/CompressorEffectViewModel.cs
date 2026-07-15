@@ -14,4 +14,9 @@ public sealed class CompressorEffectViewModel : SourceTrackEffectViewModel
         : base(effect, effect, "Off (internal)", remove, moveUp, moveDown)
     {
     }
+
+    /// <summary>When true (Master track), the sidechain picker is hidden — glue compressors rarely need it.</summary>
+    public bool HideSidechainPicker { get; set; }
+
+    public bool ShowSidechainPicker => !HideSidechainPicker;
 }

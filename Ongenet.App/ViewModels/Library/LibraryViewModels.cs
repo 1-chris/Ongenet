@@ -287,9 +287,15 @@ public sealed class EffectChainPresetLibraryViewModel : LibraryListViewModel
         Refresh();
     }
 
+    public override bool HasTagFilter => true;
+
     private void Refresh() => SetRoots(_presets.ChainPresets.Select(g => Folder(g.Name, g.Items
+        .OrderByDescending(p => p.Tags.Any(t => string.Equals(t, "mastering", StringComparison.OrdinalIgnoreCase)))
+        .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
         .Select(p => Leaf(p.Name, DragFormats.EffectChain, p.FullPath,
-            itemKey: LibraryItemKeys.EffectChainKey(p.FullPath))),
+            subtitle: p.Tags.Count == 0 ? string.Empty : string.Join(" · ", p.Tags),
+            itemKey: LibraryItemKeys.EffectChainKey(p.FullPath),
+            tags: p.Tags)),
         itemKey: LibraryItemKeys.NamedFolderKey("fx-chains", g.Name))));
 }
 
@@ -373,8 +379,12 @@ public sealed class EverythingLibraryViewModel : LibraryListViewModel
             itemKey: LibraryItemKeys.NamedFolderKey("everything", "FX Presets")));
 
         var chains = _presets.ChainPresets.SelectMany(g => g.Items)
+            .OrderByDescending(p => p.Tags.Any(t => string.Equals(t, "mastering", StringComparison.OrdinalIgnoreCase)))
+            .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
             .Select(p => Leaf(p.Name, DragFormats.EffectChain, p.FullPath,
-                itemKey: LibraryItemKeys.EffectChainKey(p.FullPath)))
+                subtitle: p.Tags.Count == 0 ? string.Empty : string.Join(" · ", p.Tags),
+                itemKey: LibraryItemKeys.EffectChainKey(p.FullPath),
+                tags: p.Tags))
             .ToList();
         if (chains.Count > 0) roots.Add(Folder("FX Chains", chains,
             itemKey: LibraryItemKeys.NamedFolderKey("everything", "FX Chains")));

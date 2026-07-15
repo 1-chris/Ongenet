@@ -1,7 +1,6 @@
 namespace Ongenet.Core.Audio.Parameters;
 
-/// <summary>
-/// Base of the shared parameter framework used by instruments and effects to expose their
+/// <summary>Base of the shared parameter framework used by instruments and effects to expose their
 /// editable settings generically. A parameter wraps the owner's live value via delegates, so
 /// there's a single source of truth and the UI can render any parameter list uniformly.
 /// </summary>
@@ -18,4 +17,7 @@ public abstract class Parameter
     /// ungrouped. Purely cosmetic — flat consumers (automation, plugins) ignore it.
     /// </summary>
     public string? Group { get; init; }
+
+    /// <summary>Optional tooltip / help text shown in the parameter UI.</summary>
+    public string? Description { get; init; }
 }

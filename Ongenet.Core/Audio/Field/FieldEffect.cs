@@ -18,7 +18,7 @@ namespace Ongenet.Core.Audio.Field;
 public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEffect, ISourceTrackEffect, IProjectStatefulComponent
 {
     public const string Id = "field";
-    private const int InitialMaxBlock = 2048;
+    private const int InitialMaxBlock = 512;
 
     private readonly IFieldNodeRegistry _registry;
     private readonly FieldGraph _graph = new();
@@ -116,6 +116,16 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
 
     public void Prepare(AudioFormat format)
     {
+        if (_compiled is not null
+            && format.SampleRate == _format.SampleRate
+            && format.Channels == _format.Channels
+            && _compiledRevision == _graph.Revision
+            && _compiled.MaxBlock >= _maxBlock)
+        {
+            _format = format;
+            return;
+        }
+
         _format = format;
         Recompile(_maxBlock);
     }
@@ -127,6 +137,13 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
         lock (_compileLock)
         {
             if (minBlock > _maxBlock) _maxBlock = minBlock;
+            if (_compiled is not null
+                && _compiledRevision == _graph.Revision
+                && _compiled.MaxBlock >= _maxBlock
+                && _compiled.Format.SampleRate == _format.SampleRate
+                && _compiled.Format.Channels == _format.Channels)
+                return;
+
             var compiled = FieldGraphCompiler.Compile(_graph, _format, _maxBlock, isInstrument: false);
             _compiledRevision = _graph.Revision;
             _compiled = compiled;
@@ -202,7 +219,9 @@ public sealed class FieldEffect : IAudioEffect, IContextualEffect, IMidiAwareEff
         _definitionId = definitionId;
         _surface = surface;
         RebuildExposedParameters();
-        Recompile(_maxBlock);
+        // Defer compilation until Prepare — undo snapshots must not retain DSP buffers.
+        _compiled = null;
+        _compiledRevision = -1;
     }
 
     private void CopyGraph(FieldGraph source, FieldGraph dest)

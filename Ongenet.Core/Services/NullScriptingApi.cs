@@ -6,7 +6,11 @@ namespace Ongenet.Core.Services;
 /// <summary>No-op scripting API for non-desktop heads.</summary>
 public sealed class NullScriptingApi : IScriptingApi
 {
-    private static NotSupportedException Disabled() => new("Scripting is not enabled.");
+    private static NotSupportedException Disabled() =>
+        new("Scripting is not enabled on this platform (desktop only).");
+
+    private static NotSupportedException MasteringDisabled() =>
+        new("Mastering and export scripting APIs (ApplyMasteringChain, ExportAudio, MatchAlbumLoudness, delivery target, meter tap) are available on desktop only.");
 
     public IReadOnlyList<string> OutputLines => Array.Empty<string>();
     public event Action? OutputChanged { add { } remove { } }
@@ -83,6 +87,9 @@ public sealed class NullScriptingApi : IScriptingApi
     public void SetEffectBoolParameter(Guid trackId, int effectIndex, string paramName, bool value, int instrumentSlotIndex = -1) => throw Disabled();
     public void SetEffectChoiceParameter(Guid trackId, int effectIndex, string paramName, int choiceIndex, int instrumentSlotIndex = -1) => throw Disabled();
     public void LoadEffectPreset(Guid trackId, int effectIndex, string presetName, int instrumentSlotIndex = -1) => throw Disabled();
+    public void ApplyMasteringChain(Guid masterTrackId, string chainName = "full") => throw MasteringDisabled();
+    public ScriptMasterMeterTap GetMasterMeterTap() => ScriptMasterMeterTap.PostFader;
+    public void SetMasterMeterTap(ScriptMasterMeterTap tap) => throw MasteringDisabled();
     public IReadOnlyList<ScriptClipInfo> GetClips(Guid? trackId = null) => Array.Empty<ScriptClipInfo>();
     public IReadOnlyList<ScriptMidiNote> GetMidiNotes(Guid clipId) => Array.Empty<ScriptMidiNote>();
     public ScriptAudioClipMetadata? GetAudioClipMetadata(Guid clipId) => null;
@@ -156,6 +163,16 @@ public sealed class NullScriptingApi : IScriptingApi
     public string ExportInstrumentSlotAsScript(Guid trackId, int slotIndex, ExportScriptOptions? options = null) => throw Disabled();
     public string ExportEffectChainAsScript(Guid trackId, int instrumentSlotIndex = -1, ExportScriptOptions? options = null) => throw Disabled();
     public string ExportPresetAsScript(Guid trackId, int? slotIndex, int? effectIndex, ExportScriptOptions? options = null) => throw Disabled();
+    public void ExportAudio(string path, string? deliveryPlatform = null, bool normalizeLoudness = false,
+        bool applyDither = false, bool bypassMasterFx = false, bool analyzeLoudness = true,
+        int bitDepth = 0, ScriptDitherMode ditherMode = ScriptDitherMode.Tpdf, int targetSampleRate = 0,
+        bool exportComparisonPair = false) => throw MasteringDisabled();
+    public void MatchAlbumLoudness(string[] wavPaths, double targetLufs = -14, double targetTp = -1) =>
+        throw MasteringDisabled();
+    public (string PlatformName, double TargetLufs, double TargetTruePeakDbTp) GetDeliveryTarget() =>
+        ("Spotify", -14, -1);
+    public void SetDeliveryTarget(string? platformName, double? targetLufs = null, double? targetTruePeakDbTp = null) =>
+        throw MasteringDisabled();
     public IDisposable OnTransportStateChanged(Action<ScriptTransportState> handler) => throw Disabled();
     public IDisposable OnBeat(Action<double> handler, double gridBeats = 1.0) => throw Disabled();
     public IDisposable OnClipChanged(Action<ScriptClipInfo> handler) => throw Disabled();

@@ -51,6 +51,16 @@
                       IsChecked="{Binding WasapiExclusiveMode}"
                       IsVisible="{Binding ShowWasapiExclusive}"
                       ToolTip.Tip="{DynamicResource SettingsAudio_Use_exclusive_WASAPI_output_on_Windows_for_lower_Tip}"/>
+
+            <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowCoreAudioLead}"
+                  ToolTip.Tip="macOS: additional CoreAudio producer buffer (jitter slack). 4096 is safer under heavy mixes; requires restarting audio.">
+                <TextBlock Grid.Column="0" Text="CoreAudio safety buffer" VerticalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinSubtext1}"/>
+                <ComboBox Grid.Column="1" Width="160" HorizontalAlignment="Left"
+                          ItemsSource="{Binding CoreAudioLeadOptions}"
+                          SelectedItem="{Binding CoreAudioLeadFrames}"/>
+            </Grid>
+
             <CheckBox Content="{DynamicResource SettingsAudio_Send_MIDI_clock_24_PPQN}"
                       IsChecked="{Binding MidiClockEnabled}"
                       ToolTip.Tip="{DynamicResource SettingsAudio_Send_MIDI_Start_Stop_and_Clock_to_the_selected_M_Tip}"/>

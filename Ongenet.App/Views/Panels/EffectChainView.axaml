@@ -11,13 +11,39 @@
              x:Class="Ongenet.App.Views.Panels.EffectChainView"
              x:DataType="fx:EffectChainViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="Button.masteringActive.active">
+            <Setter Property="Background" Value="{StaticResource CatppuccinMauve}"/>
+        </Style>
+        <Style Selector="Border.signalStage">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="Background" Value="{StaticResource CatppuccinMantle}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinSurface1}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+        </Style>
+        <Style Selector="Border.signalStage:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Border.signalStage.highlighted">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinMauve}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+        </Style>
+    </UserControl.Styles>
+
     <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
-            <Button Content="{DynamicResource EffectChain_Add_effect}" Background="{StaticResource CatppuccinSurface0}">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+          <WrapPanel Orientation="Horizontal">
+            <Button Content="{DynamicResource EffectChain_Add_effect}" Margin="0,0,8,0" Background="{StaticResource CatppuccinSurface0}">
                 <Button.Flyout>
                     <Flyout>
-                        <ScrollViewer MaxHeight="420">
-                            <ItemsControl ItemsSource="{Binding AddableCategories}" Width="170">
+                        <StackPanel Width="200" Spacing="6">
+                          <TextBox Text="{Binding EffectSearchFilter, Mode=TwoWay}"
+                                   PlaceholderText="Search effects…"/>
+                          <ScrollViewer MaxHeight="420">
+                            <ItemsControl ItemsSource="{Binding AddableCategories}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="fx:EffectCategoryViewModel">
                                         <StackPanel Margin="0,0,0,6">
@@ -37,11 +63,12 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                        </ScrollViewer>
+                          </ScrollViewer>
+                        </StackPanel>
                     </Flyout>
                 </Button.Flyout>
             </Button>
-            <Button Name="SaveChainButton" Content="{DynamicResource EffectChain_Save_chain}" IsVisible="{Binding HasEffects}"
+            <Button Name="SaveChainButton" Content="{DynamicResource EffectChain_Save_chain}" IsVisible="{Binding HasEffects}" Margin="0,0,8,0"
                     Background="{StaticResource CatppuccinSurface0}"
                     ToolTip.Tip="{DynamicResource EffectChain_Save_this_whole_effect_chain_as_a_preset_Tip}">
                 <Button.Flyout>
@@ -56,9 +83,249 @@
                     </Flyout>
                 </Button.Flyout>
             </Button>
+
             <TextBlock Text="{DynamicResource EffectChain_signal_chain_top_first_bottom_last}" VerticalAlignment="Center"
                        FontSize="11" FontStyle="Italic" IsVisible="{Binding HasEffects}"
                        Foreground="{StaticResource CatppuccinOverlay1}"/>
+          </WrapPanel>
+
+          <!-- Mastering tools (Master track only): collapsible sections + always-visible toolbar. -->
+          <StackPanel IsVisible="{Binding ShowMasteringTools}" Spacing="6">
+
+            <Expander Header="Chain" IsExpanded="{Binding SectionChainExpanded, Mode=TwoWay}">
+              <StackPanel Spacing="6" Margin="0,6,0,0">
+                <WrapPanel>
+                  <TextBlock Text="{DynamicResource Mastering_ChainPicker}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                  <ComboBox Width="220" Margin="0,0,8,0" ItemsSource="{Binding MasteringChainOptions}"
+                            SelectedItem="{Binding SelectedMasteringChain, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="fx:MasteringChainOption">
+                        <StackPanel>
+                          <TextBlock Text="{Binding DisplayName}"/>
+                          <TextBlock Text="{Binding DisplayDescription}" FontSize="10" TextWrapping="Wrap"
+                                     Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <CheckBox Content="{DynamicResource Mastering_AppendChain}"
+                            IsChecked="{Binding AppendMasteringChain, Mode=TwoWay}"
+                            VerticalAlignment="Center" Margin="0,0,8,0"/>
+                  <Button Content="{DynamicResource Mastering_ApplyChain}" Command="{Binding ApplySelectedMasteringChainCommand}"
+                          Background="{StaticResource CatppuccinSurface0}"/>
+                </WrapPanel>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                  <ItemsControl ItemsSource="{Binding SignalFlowStages}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="fx:SignalFlowStageItem">
+                        <Border Classes="signalStage" IsEnabled="{Binding Enabled}"
+                                Classes.highlighted="{Binding Highlighted}">
+                          <StackPanel Spacing="2" MinWidth="36">
+                            <TextBlock Text="{Binding Name}" FontSize="10" HorizontalAlignment="Center"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <ProgressBar Minimum="0" Maximum="1" Value="{Binding GrNormalized}" Height="4"
+                                         Foreground="{StaticResource CatppuccinMauve}"
+                                         Background="{StaticResource CatppuccinSurface1}"/>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </StackPanel>
+            </Expander>
+
+            <Expander Header="Metering" IsExpanded="{Binding SectionMeteringExpanded, Mode=TwoWay}">
+              <StackPanel Spacing="6" Margin="0,6,0,0">
+                <TextBlock Text="{Binding MasteringMeterText}" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{StaticResource CatppuccinGreen}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding PeakHoldText}" FontSize="10"
+                           Foreground="{StaticResource CatppuccinSubtext0}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding ComplianceSummaryText}" FontSize="10"
+                           Foreground="{StaticResource CatppuccinPeach}" TextWrapping="Wrap"/>
+                <Canvas Height="40" Width="200" ClipToBounds="True" HorizontalAlignment="Left"
+                        Background="{StaticResource CatppuccinMantle}">
+                  <Line StartPoint="0,0" EndPoint="200,0" Canvas.Top="{Binding LufsTargetLineY}"
+                        Stroke="{StaticResource CatppuccinPeach}" StrokeThickness="1"/>
+                  <Polyline Points="{Binding LufsHistoryPoints}" Stroke="{StaticResource CatppuccinGreen}"
+                            StrokeThickness="1.5"/>
+                </Canvas>
+                <WrapPanel>
+                  <TextBlock Text="History" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11"
+                             Foreground="{StaticResource CatppuccinSubtext0}"/>
+                  <ComboBox Width="80" Margin="0,0,8,0" ItemsSource="{Binding LufsHistoryWindows}"
+                            SelectedItem="{Binding LufsHistoryWindow, Mode=TwoWay}"/>
+                  <Button Content="{DynamicResource Mastering_ResetLoudness}" Command="{Binding ResetLoudnessCommand}"
+                          Margin="0,0,8,0" Background="{StaticResource CatppuccinSurface0}"/>
+                  <Button Content="Preflight analyse" Command="{Binding PreflightAnalyseCommand}"
+                          Background="{StaticResource CatppuccinSurface0}"/>
+                </WrapPanel>
+                <TextBlock Text="{Binding PreflightReportText}" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <WrapPanel>
+                  <Button Content="Suggest LUFS" Command="{Binding SuggestLufsAssistCommand}"
+                          Margin="0,0,8,0" Background="{StaticResource CatppuccinSurface0}"/>
+                  <TextBlock Text="{Binding LufsAssistSuggestionText}" FontSize="10" TextWrapping="Wrap"
+                             VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                </WrapPanel>
+                <WrapPanel>
+                  <TextBlock Text="{DynamicResource Mastering_MeterTap}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                  <ComboBox Width="120" ItemsSource="{Binding MeterTapChoices}"
+                            SelectedItem="{Binding SelectedMeterTapChoice, Mode=TwoWay}"
+                            ToolTip.Tip="{DynamicResource Mastering_MeterTap_Tip}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="fx:MeterTapChoice">
+                        <TextBlock Text="{Binding Label}"/>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </WrapPanel>
+              </StackPanel>
+            </Expander>
+
+            <Expander Header="Delivery" IsExpanded="{Binding SectionDeliveryExpanded, Mode=TwoWay}">
+              <StackPanel Spacing="6" Margin="0,6,0,0">
+                <WrapPanel>
+                  <TextBlock Text="{DynamicResource Mastering_DeliveryTarget}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                  <ComboBox Width="160" ItemsSource="{Binding DeliveryPlatforms}"
+                            SelectedItem="{Binding SelectedDeliveryPlatform, Mode=TwoWay}"
+                            ToolTip.Tip="{DynamicResource Mastering_DeliveryPlatform_Tip}"/>
+                </WrapPanel>
+                <TextBlock Text="{Binding DeliveryTargetText}" FontSize="11"
+                           Foreground="{StaticResource CatppuccinPeach}"/>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsCustomDeliveryPlatform}">
+                  <StackPanel Grid.Column="0">
+                    <TextBlock Text="Target LUFS" FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <NumericUpDown Value="{Binding CustomTargetLufs, Mode=TwoWay}"
+                                   Minimum="-30" Maximum="-5" Increment="0.5" FormatString="0.0"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1">
+                    <TextBlock Text="Target dBTP" FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <NumericUpDown Value="{Binding CustomTargetDbTp, Mode=TwoWay}"
+                                   Minimum="-6" Maximum="0" Increment="0.1" FormatString="0.0"/>
+                  </StackPanel>
+                </Grid>
+                <TextBlock Text="{Binding NormalizePreviewText}" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <WrapPanel>
+                  <CheckBox Content="Auto-sync limiter ceiling"
+                            IsChecked="{Binding AutoSyncLimiterCeiling, Mode=TwoWay}"
+                            VerticalAlignment="Center" Margin="0,0,8,0"/>
+                  <Button Content="Sync ceiling" Command="{Binding SyncLimiterCeilingCommand}"
+                          Background="{StaticResource CatppuccinSurface0}"/>
+                </WrapPanel>
+                <TextBlock Text="{Binding LimiterCeilingMismatchText}" FontSize="10" TextWrapping="Wrap"
+                           IsVisible="{Binding LimiterCeilingMismatch}"
+                           Foreground="{StaticResource CatppuccinRed}"/>
+              </StackPanel>
+            </Expander>
+
+            <WrapPanel>
+              <Button Content="{DynamicResource EffectChain_Bypass_chain}" Command="{Binding BypassAllCommand}"
+                      Margin="0,0,6,0" Classes="masteringActive"
+                      Classes.active="{Binding ChainBypassed}" Background="{StaticResource CatppuccinSurface0}"
+                      ToolTip.Tip="{DynamicResource EffectChain_Bypass_chain_Tip}"/>
+              <Button Content="{DynamicResource EffectChain_Restore_chain}" Command="{Binding RestoreBypassCommand}"
+                      Margin="0,0,6,0" Background="{StaticResource CatppuccinSurface0}"/>
+              <Button Content="{DynamicResource EffectChain_Compare}" Command="{Binding ToggleCompareBypassCommand}"
+                      Margin="0,0,6,0" Classes="masteringActive"
+                      Classes.active="{Binding CompareBypassActive}" Background="{StaticResource CatppuccinSurface0}"
+                      ToolTip.Tip="{DynamicResource EffectChain_Compare_Tip}"/>
+              <CheckBox Content="Full chain bypass" IsChecked="{Binding CompareFullChainBypass, Mode=TwoWay}"
+                        VerticalAlignment="Center" Margin="0,0,6,0"/>
+              <TextBlock Text="{Binding CompareMakeupText}" VerticalAlignment="Center" Margin="0,0,8,0"
+                         FontSize="10" Foreground="{StaticResource CatppuccinMauve}"/>
+              <Button Content="{Binding AbSlotALabel}" Command="{Binding StoreAbACommand}" Margin="0,0,6,0"
+                      Background="{StaticResource CatppuccinSurface0}"
+                      ToolTip.Tip="{Binding AbSlotADetail}"/>
+              <Button Content="{Binding AbSlotBLabel}" Command="{Binding StoreAbBCommand}" Margin="0,0,6,0"
+                      Background="{StaticResource CatppuccinSurface0}"
+                      ToolTip.Tip="{Binding AbSlotBDetail}"/>
+              <Button Content="{Binding AbLabel}" Command="{Binding ToggleAbCommand}" Margin="0,0,6,0"
+                      Background="{StaticResource CatppuccinSurface1}"
+                      ToolTip.Tip="{DynamicResource Mastering_AB_Toggle_Tip}"/>
+              <CheckBox Content="Match loudness" IsChecked="{Binding AbLoudnessMatch, Mode=TwoWay}"
+                        VerticalAlignment="Center" Margin="0,0,6,0"/>
+              <Button Content="{DynamicResource Mastering_MonoAudition}" Command="{Binding ToggleMonoCommand}"
+                      Classes="masteringActive" Classes.active="{Binding MonoAuditionActive}"
+                      Background="{StaticResource CatppuccinSurface0}"/>
+              <TextBlock Text="{Binding CompareInsertsToolHint}" FontSize="10" TextWrapping="Wrap"
+                         IsVisible="{Binding CompareBypassActive}" Margin="0,4,0,0"
+                         Foreground="{StaticResource CatppuccinMauve}"/>
+            </WrapPanel>
+
+            <Expander Header="Reference" IsExpanded="{Binding SectionReferenceExpanded, Mode=TwoWay}">
+              <StackPanel Spacing="6" Margin="0,6,0,0">
+                <WrapPanel>
+                  <Button Content="{DynamicResource Mastering_Reference_Browse}" Click="OnBrowseReference"
+                          Margin="0,0,6,0" Background="{StaticResource CatppuccinSurface1}"/>
+                  <Button Content="{DynamicResource Mastering_Reference_CaptureMatchEq}"
+                          Command="{Binding CaptureReferenceToMatchEqCommand}"
+                          IsVisible="{Binding HasReference}" Margin="0,0,6,0"
+                          Background="{StaticResource CatppuccinSurface1}"
+                          ToolTip.Tip="{DynamicResource Mastering_Reference_CaptureMatchEq_Tip}"/>
+                  <Button Content="{DynamicResource Mastering_Reference_Hold}" IsVisible="{Binding HasReference}"
+                          PointerPressed="OnReferencePressed" PointerReleased="OnReferenceReleased"
+                          Margin="0,0,6,0" Background="{StaticResource CatppuccinMauve}"/>
+                  <Button Content="Latch" Command="{Binding ToggleReferenceLatchCommand}"
+                          IsVisible="{Binding HasReference}" Margin="0,0,6,0" Classes="masteringActive"
+                          Classes.active="{Binding ReferenceLatched}"
+                          Background="{StaticResource CatppuccinSurface0}"/>
+                  <CheckBox Content="{DynamicResource Mastering_Reference_Synced}"
+                            IsChecked="{Binding ReferenceAuditionSynced, Mode=TwoWay}"
+                            VerticalAlignment="Center" Margin="0,0,8,0"/>
+                  <TextBlock Text="Gain dB" VerticalAlignment="Center" Margin="0,0,4,0" FontSize="10"
+                             Foreground="{StaticResource CatppuccinSubtext0}"/>
+                  <NumericUpDown Width="80" Value="{Binding ReferenceGainDb, Mode=TwoWay}"
+                                 Minimum="-24" Maximum="24" Increment="0.5" FormatString="0.0"
+                                 Margin="0,0,8,0"/>
+                  <TextBlock Text="Slot" VerticalAlignment="Center" Margin="0,0,4,0" FontSize="10"
+                             Foreground="{StaticResource CatppuccinSubtext0}"/>
+                  <ComboBox Width="70" SelectedIndex="{Binding ActiveReferenceSlot, Mode=TwoWay}" Margin="0,0,6,0">
+                    <ComboBoxItem Content="A"/>
+                    <ComboBoxItem Content="B"/>
+                  </ComboBox>
+                  <Button Content="Browse B" Click="OnBrowseReferenceB"
+                          Background="{StaticResource CatppuccinSurface1}"/>
+                </WrapPanel>
+                <TextBlock Text="{Binding ActiveReferenceName}" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding ReferenceMatchText}" FontSize="10"
+                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <TextBlock Text="{Binding ReferenceLegendText}" FontSize="10"
+                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <Canvas Height="64" Width="240" ClipToBounds="True" HorizontalAlignment="Left"
+                        Background="{StaticResource CatppuccinMantle}"
+                        IsVisible="{Binding HasReference}">
+                  <Polyline Points="{Binding LiveSpectrumPoints}" Stroke="{StaticResource CatppuccinSapphire}"
+                            StrokeThickness="1"/>
+                  <Polyline Points="{Binding ReferenceSpectrumPoints}" Stroke="{StaticResource CatppuccinPeach}"
+                            StrokeThickness="1"/>
+                </Canvas>
+                <TextBlock Text="{Binding ActiveWorkflowTitle}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding ActiveWorkflowDescription}" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                <ItemsControl ItemsSource="{Binding WorkflowStepItems}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="fx:WorkflowStepItem">
+                      <Button Content="{Binding Label}" CommandParameter="{Binding}"
+                              x:CompileBindings="False"
+                              Command="{Binding $parent[ItemsControl].DataContext.SelectWorkflowStepCommand}"
+                              HorizontalContentAlignment="Left" Background="Transparent"
+                              Padding="2" FontSize="11"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="{DynamicResource Mastering_OpenGuide}" Click="OnOpenMasteringGuide"
+                        HorizontalAlignment="Left" Background="{StaticResource CatppuccinSurface1}"/>
+              </StackPanel>
+            </Expander>
+
+          </StackPanel>
         </StackPanel>
 
         <Panel>
@@ -161,7 +428,7 @@
                             BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                         <StackPanel Spacing="6">
                             <panels:EffectHeaderView/>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowSidechainPicker}">
                                 <TextBlock Text="{DynamicResource EffectChain_Sidechain}" VerticalAlignment="Center" Width="60"
                                            Foreground="{StaticResource CatppuccinSubtext0}"/>
                                 <ComboBox Width="200" ItemsSource="{Binding Sources}"
@@ -408,7 +675,43 @@
                                     AnalyzerSource="{Binding Analyzer}"/>
                             </Border>
                             <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
-                                       Text="Pass-through analyser — audio is unchanged."/>
+                                       Text="{DynamicResource EffectChain_Spectrum_passthrough}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Tool: gain/pan/mono/phase with live peak + correlation meters. -->
+                <DataTemplate DataType="fx:ToolEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <StackPanel Spacing="6" IsVisible="{Binding !IsCollapsed}">
+                                <panels:ParametersView DataContext="{Binding Parameters}"/>
+                                <Border CornerRadius="4" ClipToBounds="True"
+                                        BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                                    <controls:WaveCandyPanelControl Height="56"
+                                        AnalyzerSource="{Binding Analyzer}"/>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Loudness Meter: dedicated BS.1770 analyser insert. -->
+                <DataTemplate DataType="fx:LoudnessMeterEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <StackPanel Spacing="4" IsVisible="{Binding !IsCollapsed}">
+                                <TextBlock Text="{Binding ReadoutText}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{StaticResource CatppuccinGreen}"/>
+                                <TextBlock Text="{Binding Hint}" FontSize="10" TextWrapping="Wrap"
+                                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </DataTemplate>
@@ -420,6 +723,7 @@
                             BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
                         <StackPanel Spacing="6">
                             <panels:EffectHeaderView/>
+                            <StackPanel Spacing="6" IsVisible="{Binding !IsCollapsed}">
                             <Border CornerRadius="4" Padding="16" MinHeight="96"
                                     Background="{StaticResource CatppuccinCrust}"
                                     BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
@@ -434,6 +738,7 @@
                             </Border>
                             <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
                                        Text="Monophonic pitch detection on the incoming signal."/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </DataTemplate>
@@ -455,6 +760,164 @@
                             <panels:ParametersView DataContext="{Binding Parameters}"/>
                             <TextBlock FontSize="10" Foreground="{StaticResource CatppuccinSubtext0}"
                                        Text="Load a mono WAV impulse, or use Decay/Size for a synthetic IR."/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <DataTemplate DataType="fx:MatchEqEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                       Foreground="{StaticResource CatppuccinPeach}"/>
+                            <Canvas Height="48" Width="160" ClipToBounds="True"
+                                    Background="{StaticResource CatppuccinMantle}">
+                                <Line StartPoint="0,24" EndPoint="160,24" Stroke="{StaticResource CatppuccinSurface2}"/>
+                                <Polyline Points="{Binding DeltaCurve}" Stroke="{StaticResource CatppuccinMauve}"
+                                          StrokeThickness="1.5"/>
+                            </Canvas>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <TextBlock Text="{Binding Hint}" FontSize="10" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <DataTemplate DataType="fx:LinearPhaseEqEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <TextBlock Text="{Binding LatencyText}" FontSize="11"
+                                       Foreground="{StaticResource CatppuccinPeach}"/>
+                            <Canvas Height="48" Width="160" ClipToBounds="True"
+                                    Background="{StaticResource CatppuccinMantle}">
+                                <Line StartPoint="0,24" EndPoint="160,24" Stroke="{StaticResource CatppuccinSurface2}"/>
+                                <Polyline Points="{Binding ResponseCurve}" Stroke="{StaticResource CatppuccinSapphire}"
+                                          StrokeThickness="1.5"/>
+                            </Canvas>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <TextBlock Text="{Binding Hint}" FontSize="10" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Mid/Side EQ mastering card -->
+                <DataTemplate DataType="fx:MidSideEqEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ToggleButton Content="{DynamicResource Mastering_SoloMid}" IsChecked="{Binding SoloMid}" Padding="8,2"/>
+                                <ToggleButton Content="{DynamicResource Mastering_SoloSide}" IsChecked="{Binding SoloSide}" Padding="8,2"/>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                                <TextBlock Grid.Column="0" Text="Mid" FontSize="10"/>
+                                <ProgressBar Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding MidEnergy}" Height="8"/>
+                                <TextBlock Grid.Column="2" Text="Side" FontSize="10"/>
+                                <ProgressBar Grid.Column="3" Minimum="0" Maximum="1" Value="{Binding SideEnergy}" Height="8"/>
+                            </Grid>
+                            <Canvas Height="40" Width="160" ClipToBounds="True"
+                                    Background="{StaticResource CatppuccinMantle}">
+                                <Polyline Points="{Binding SideResponseCurve}" Stroke="{StaticResource CatppuccinMauve}"
+                                          StrokeThickness="1.5"/>
+                            </Canvas>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <TextBlock FontSize="10" TextWrapping="Wrap" Text="{Binding Hint}"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <DataTemplate DataType="fx:MultibandCompressorEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <TextBlock Text="{Binding BandInfo}" FontSize="11"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <TextBlock Text="{Binding PresetHint}" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
+                                <StackPanel Grid.Column="0"><TextBlock Text="{DynamicResource Mastering_Band_Low}" HorizontalAlignment="Center"/><ProgressBar Value="{Binding LowEnergy}" Maximum="1" Height="28"/><TextBlock Text="{Binding LowGr}" HorizontalAlignment="Center" FontSize="9"/></StackPanel>
+                                <StackPanel Grid.Column="1"><TextBlock Text="{DynamicResource Mastering_Band_Mid}" HorizontalAlignment="Center"/><ProgressBar Value="{Binding MidEnergy}" Maximum="1" Height="28"/><TextBlock Text="{Binding MidGr}" HorizontalAlignment="Center" FontSize="9"/></StackPanel>
+                                <StackPanel Grid.Column="2"><TextBlock Text="{DynamicResource Mastering_Band_High}" HorizontalAlignment="Center"/><ProgressBar Value="{Binding HighEnergy}" Maximum="1" Height="28"/><TextBlock Text="{Binding HighGr}" HorizontalAlignment="Center" FontSize="9"/></StackPanel>
+                            </Grid>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <DataTemplate DataType="fx:ClipperEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                                <Canvas Grid.Column="0" Height="48" ClipToBounds="True" Background="{StaticResource CatppuccinMantle}">
+                                    <Polyline Points="{Binding TransferCurve}" Stroke="{StaticResource CatppuccinMauve}" StrokeThickness="1.5"/>
+                                </Canvas>
+                                <Canvas Grid.Column="1" Height="40" ClipToBounds="True" Background="{StaticResource CatppuccinMantle}">
+                                    <Polyline Points="{Binding RecentWaveform}" Stroke="{StaticResource CatppuccinGreen}" StrokeThickness="1"/>
+                                    <Line StartPoint="0,0" EndPoint="128,0" Canvas.Top="{Binding CeilingY}"
+                                          Stroke="{StaticResource CatppuccinPeach}" StrokeThickness="1"/>
+                                    <Line StartPoint="0,0" EndPoint="128,0" Canvas.Top="{Binding CeilingBottomY}"
+                                          Stroke="{StaticResource CatppuccinPeach}" StrokeThickness="1"/>
+                                </Canvas>
+                            </Grid>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <TextBlock FontSize="10" TextWrapping="Wrap" Text="{Binding Hint}"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <DataTemplate DataType="fx:StereoWidthEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <ProgressBar Minimum="0" Maximum="1" Height="8" Value="{Binding WidthNormalized}"
+                                         Foreground="{StaticResource CatppuccinMauve}"
+                                         Background="{StaticResource CatppuccinSurface1}"/>
+                            <ProgressBar Minimum="0" Maximum="1" Height="8" Value="{Binding CorrelationNormalized}"
+                                         Foreground="{StaticResource CatppuccinGreen}" Background="{StaticResource CatppuccinRed}"/>
+                            <TextBlock Text="{Binding CorrelationText}" FontSize="10"/>
+                            <TextBlock FontSize="10" TextWrapping="Wrap" Text="{Binding Hint}"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+
+                <DataTemplate DataType="fx:PeakLimiterEffectViewModel">
+                    <Border Margin="0,0,0,8" Padding="10" CornerRadius="4"
+                            Background="{StaticResource CatppuccinSurface0}"
+                            BorderBrush="{StaticResource CatppuccinSurface1}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <panels:EffectHeaderView/>
+                            <TextBlock Text="{Binding PresetHint}" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <panels:ParametersView DataContext="{Binding Parameters}"/>
+                            <Canvas Height="28" ClipToBounds="True" Background="{StaticResource CatppuccinMantle}">
+                                <Polyline Points="{Binding PeakHistory}" Stroke="{StaticResource CatppuccinPeach}" StrokeThickness="1.5"/>
+                                <Line StartPoint="0,3" EndPoint="128,3" Stroke="{StaticResource CatppuccinRed}" StrokeThickness="1"/>
+                                <Line StartPoint="0,0" EndPoint="128,0" Canvas.Top="{Binding DeliveryCeilingY}"
+                                      Stroke="{StaticResource CatppuccinMauve}" StrokeThickness="1"/>
+                            </Canvas>
+                            <ProgressBar Minimum="0" Maximum="1" Value="{Binding OutputLevel}" Height="8"
+                                         Foreground="{StaticResource CatppuccinGreen}"/>
+                            <TextBlock Text="{Binding CeilingLine}" FontSize="10"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
                         </StackPanel>
                     </Border>
                 </DataTemplate>

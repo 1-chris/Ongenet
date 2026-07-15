@@ -11,7 +11,7 @@ namespace Ongenet.Core.Audio.Effects;
 /// the threshold by the given ratio, with attack/release ballistics and makeup gain. Optional
 /// external sidechain input ducks from another track's output.
 /// </summary>
-public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceTrackEffect, IProjectStatefulComponent
+public sealed class CompressorEffect : IAudioEffect, IGainReductionSource, IContextualEffect, ISourceTrackEffect, IProjectStatefulComponent
 {
     public const string TypeId = "compressor";
 
@@ -25,6 +25,8 @@ public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceT
     public double ReleaseMs { get; set; } = 120.0;
     public double MakeupDb { get; set; }
     public bool Enhanced { get; set; }
+
+    public double GainReductionDb { get; private set; }
 
     /// <summary>Source track whose output drives the detector; null = use this track's input.</summary>
     public Guid? SidechainSourceTrackId { get; set; }
@@ -89,6 +91,7 @@ public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceT
         var useSidechain = SidechainSourceTrackId.HasValue;
         var sidechainFrames = sidechainChannels > 0 ? sidechain.Length / sidechainChannels : 0;
         var frames = buffer.Length / channels;
+        var grPeak = 0.0;
         for (var frame = 0; frame < frames; frame++)
         {
             var i = frame * channels;
@@ -122,10 +125,13 @@ public sealed class CompressorEffect : IAudioEffect, IContextualEffect, ISourceT
                 grDb = over * over / 12.0 * slope; // soft 6 dB knee
             else
                 grDb = over > 0 ? over * slope : 0;
+            if (-grDb < grPeak) grPeak = -grDb;
             var gain = (float)(makeup * AudioMath.Db2Lin(-grDb));
 
             for (var c = 0; c < channels; c++) buffer[i + c] *= gain;
         }
+
+        GainReductionDb = grPeak;
     }
 
     public void WriteProjectState(OngenWriter writer)

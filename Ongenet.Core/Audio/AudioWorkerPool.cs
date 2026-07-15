@@ -31,9 +31,11 @@ public sealed class AudioWorkerPool : IDisposable
 
     public AudioWorkerPool(int? workerCount = null)
     {
-        // Leave a core for the OS/audio driver; cap the fan-out — past ~8 render threads the mix
-        // phase dominates and extra threads just add wake-up cost.
-        WorkerCount = Math.Clamp(workerCount ?? Environment.ProcessorCount - 1, 0, 8);
+        // The audio callback participates, so three workers provide four render lanes. On hybrid
+        // Apple Silicon, waking every efficiency core increased Ascension's average block time by
+        // 60–70% and produced long scheduler-tail spikes. Keep the realtime batch on a small bounded
+        // set of high-priority lanes; callers can still request a different count for benchmarks.
+        WorkerCount = Math.Clamp(workerCount ?? Math.Min(Environment.ProcessorCount - 1, 3), 0, 12);
         _workers = new Thread[WorkerCount];
         for (var i = 0; i < WorkerCount; i++)
         {

@@ -35,7 +35,8 @@ public static class TrapBeatSongFactory
             ColorKey = "CatppuccinSubtext0",
             Volume = 1.0
         };
-        master.Effects.Add(new LimiterEffect { CeilingDb = -0.3, ReleaseMs = 60 });
+        MasteringChains.Add(master.Effects, "club");
+        master.Effects.Add(new SpectrumEffect());
         project.Tracks.Add(master);
 
         project.Tracks.Add(BuildKick808());

@@ -29,21 +29,27 @@ public sealed class OfflineRenderer
     public void RenderToWav(Project project, AudioFormat format, double bpm, string path,
         IProgress<double>? progress = null, int bitDepth = 16,
         double? regionStartBeat = null, double? regionEndBeat = null,
-        SurroundFormat surround = SurroundFormat.Stereo)
+        SurroundFormat surround = SurroundFormat.Stereo,
+        bool bypassMasterFx = false, bool applyDither = false,
+        bool skipAnalysers = true, LoudnessAnalyzer? loudness = null,
+        DitherMode ditherMode = DitherMode.Tpdf)
     {
         var session = new RenderSession();
-        session.Build(project, format, bpm, scope: null, regionStartBeat, regionEndBeat, surround);
-        using var writer = new WavWriter(path, session.Channels, session.SampleRate, bitDepth);
-        session.RenderToWriter(writer, progress);
+        session.Build(project, format, bpm, scope: null, regionStartBeat, regionEndBeat, surround,
+            bypassMasterFx, skipAnalysers);
+        using var writer = new WavWriter(path, session.Channels, session.SampleRate, bitDepth, applyDither, ditherMode);
+        if (loudness is not null) loudness.Prepare(new AudioFormat(session.SampleRate, session.Channels));
+        session.RenderToWriter(writer, progress, loudness);
     }
 
-    /// <summary>Renders the master mix to an in-memory buffer (for ADM BWF export).</summary>
+    /// <summary>Renders the master mix to an in-memory buffer (for ADM BWF / normalize export).</summary>
     public AudioSampleBuffer RenderMasterToBuffer(Project project, AudioFormat format, double bpm,
         IProgress<double>? progress = null, double? regionStartBeat = null, double? regionEndBeat = null,
-        SurroundFormat surround = SurroundFormat.Stereo)
+        SurroundFormat surround = SurroundFormat.Stereo, bool bypassMasterFx = false, bool skipAnalysers = true)
     {
         var session = new RenderSession();
-        session.Build(project, format, bpm, scope: null, regionStartBeat, regionEndBeat, surround);
+        session.Build(project, format, bpm, scope: null, regionStartBeat, regionEndBeat, surround,
+            bypassMasterFx, skipAnalysers);
         return session.RenderScopeToBuffer(progress);
     }
 
@@ -88,17 +94,23 @@ public sealed class OfflineRenderer
         private Dictionary<(Guid TrackId, int BusIndex), Guid> _multiOutRoutes = new();
         private Dictionary<Guid, RenderTrack> _renderTrackById = new();
 
+        private bool _bypassMasterFx;
+        private bool _skipAnalysers;
+
         public int Channels => _channels;
         public int SampleRate => _sampleRate;
 
         public void Build(Project project, AudioFormat format, double bpm, ClipRenderScope? scope,
             double? regionStartBeat = null, double? regionEndBeat = null,
-            SurroundFormat surround = SurroundFormat.Stereo)
+            SurroundFormat surround = SurroundFormat.Stereo,
+            bool bypassMasterFx = false, bool skipAnalysers = true)
         {
             _project = project;
             _format = format;
             _fallbackBpm = bpm;
             _scope = scope;
+            _bypassMasterFx = bypassMasterFx;
+            _skipAnalysers = skipAnalysers;
             _surround71 = surround == SurroundFormat.Surround71;
             _surround51 = surround == SurroundFormat.Surround51;
             _processChannels = 2;
@@ -285,10 +297,14 @@ public sealed class OfflineRenderer
             return rt;
         }
 
-        public void RenderToWriter(WavWriter writer, IProgress<double>? progress)
+        public void RenderToWriter(WavWriter writer, IProgress<double>? progress, LoudnessAnalyzer? loudness = null)
         {
             RenderCore(
-                block => writer.Write(block),
+                block =>
+                {
+                    loudness?.Process(block);
+                    writer.Write(block);
+                },
                 progress);
         }
 
@@ -424,7 +440,7 @@ public sealed class OfflineRenderer
 
                             foreach (var fx in slot.Effects)
                             {
-                                if (!fx.Enabled) continue;
+                                if (!ShouldRunEffect(fx)) continue;
                                 if (fx is IContextualEffect cae) cae.SetContext(ctx);
                                 fx.Process(slotSpan);
                             }
@@ -459,7 +475,7 @@ public sealed class OfflineRenderer
                     {
                         foreach (var fx in rt.Effects)
                         {
-                            if (!fx.Enabled) continue;
+                            if (!ShouldRunEffect(fx)) continue;
                             if (fx is IContextualEffect cae) cae.SetContext(ctx);
                             fx.Process(tempSpan);
                         }
@@ -517,11 +533,12 @@ public sealed class OfflineRenderer
                     if (_scope is not null && !_includedTrackIds.Contains(bt.Id)) continue;
 
                     var busSpan = rb.Buffer.AsSpan(0, outputSampleCount);
-                    if (rb.Track.Effects.Length > 0)
+                    if (rb.Track.Effects.Length > 0
+                        && !(_bypassMasterFx && bt.Kind == TrackKind.Master))
                     {
                         foreach (var fx in rb.Track.Effects)
                         {
-                            if (!fx.Enabled) continue;
+                            if (!ShouldRunEffect(fx)) continue;
                             if (fx is IContextualEffect cae) cae.SetContext(ctx);
                             fx.Process(busSpan);
                         }
@@ -642,6 +659,16 @@ public sealed class OfflineRenderer
 
                 rt.PendingRoutes.Clear();
             }
+        }
+
+        private bool ShouldRunEffect(IAudioEffect fx)
+        {
+            if (!fx.Enabled) return false;
+            if (_skipAnalysers && fx is IAnalyserOnlyEffect) return false;
+            // Metering-only Tool (identity audio) is skipped offline — it only affects live meters.
+            // Non-identity Tool (gain/pan/mono/phase) always runs and does affect the bounce.
+            if (_skipAnalysers && fx is ToolEffect { IsMeteringOnly: true }) return false;
+            return true;
         }
 
         private static IMidiAwareEffect[] MidiEffectsOf(IAudioEffect[] effects)

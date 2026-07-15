@@ -43,7 +43,8 @@ public class UpliftingTranceSongFactoryTests
         Assert.Equal(138.0, song.Tempo.BeatsPerMinute);
         Assert.Equal(224, song.BarCount);
         Assert.NotNull(song.Master);
-        Assert.Contains(song.Master!.Effects, e => e is WaveformVisualizerEffect);
+        Assert.Contains(song.Master!.Effects, e => e is SpectrumEffect);
+        Assert.Contains(song.Master.Effects, e => e is PeakLimiterEffect);
 
         // A true trance runtime: 224 bars at 138 BPM ≈ 6:30 (within the 6–7 minute brief).
         var seconds = song.BarCount * 4 * 60.0 / song.Tempo.BeatsPerMinute;
@@ -355,14 +356,16 @@ public class UpliftingTranceSongFactoryTests
         var song = UpliftingTranceSongFactory.Create(Registry());
         var fx = song.Master!.Effects;
 
-        // Corrective EQ → mid/side → glue comp → (width) → soft clip → brickwall limiter → meter.
+        // Corrective EQ → mid/side → glue comp → (width) → soft clip → Peak Limiter → Spectrum.
         var eqAt = fx.ToList().FindIndex(e => e is EqEffect);
         var msAt = fx.ToList().FindIndex(e => e is MidSideEqEffect);
         var compAt = fx.ToList().FindIndex(e => e is CompressorEffect);
         var clipAt = fx.ToList().FindIndex(e => e is ClipperEffect);
-        var limAt = fx.ToList().FindIndex(e => e is LimiterEffect);
+        var limAt = fx.ToList().FindIndex(e => e is PeakLimiterEffect);
+        var specAt = fx.ToList().FindIndex(e => e is SpectrumEffect);
 
-        Assert.True(eqAt >= 0 && msAt > eqAt && compAt > msAt && clipAt > compAt && limAt > clipAt,
+        Assert.True(eqAt >= 0 && msAt > eqAt && compAt > msAt && clipAt > compAt && limAt > clipAt &&
+                    specAt > limAt,
             "the master chain must run in the canonical trance order");
 
         // The corrective EQ mono-folds nothing but strips sub-rumble and hiss.
@@ -379,7 +382,18 @@ public class UpliftingTranceSongFactoryTests
         var comp = (CompressorEffect)fx[compAt];
         Assert.Equal(2.0, comp.Ratio);
         Assert.True(comp.AttackMs >= 25, "slow attack lets transients through");
-        Assert.Equal(-1.0, ((LimiterEffect)fx[limAt]).CeilingDb);
+        Assert.Equal(-1.0, ((PeakLimiterEffect)fx[limAt]).CeilingDb);
+    }
+
+    [Fact]
+    public void FullMasterFactoryChainMatchesTranceMasterOrder()
+    {
+        var factory = MasteringChains.CreateFullMaster();
+        var song = UpliftingTranceSongFactory.Create(Registry()).Master!.Effects;
+
+        Assert.Equal(factory.Length, song.Count);
+        for (var i = 0; i < factory.Length; i++)
+            Assert.Equal(((IAudioEffect)factory[i]).GetType(), song[i].GetType());
     }
 
     [Fact]

@@ -8,18 +8,33 @@
              x:Class="Ongenet.App.Views.Panels.EffectsView"
              x:DataType="vm:EffectsViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="Border.mastering">
+            <Setter Property="BorderBrush" Value="{StaticResource CatppuccinMauve}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+    </UserControl.Styles>
+
     <Border Background="{StaticResource CatppuccinMantle}" Padding="12">
         <Grid>
             <TextBlock Text="{DynamicResource Effects_Select_a_track_to_add_effects}" IsVisible="{Binding !HasTrack}"
                        Foreground="{StaticResource CatppuccinSubtext0}" VerticalAlignment="Top"/>
 
-            <DockPanel IsVisible="{Binding HasTrack}">
-                <TextBlock DockPanel.Dock="Top" Text="{Binding TrackName, StringFormat='{}{0} — effects on the whole rack (post)'}"
-                           Margin="0,0,0,8" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <ScrollViewer>
-                    <panels:EffectChainView DataContext="{Binding Chain}"/>
-                </ScrollViewer>
-            </DockPanel>
+            <Border IsVisible="{Binding HasTrack}" Classes.mastering="{Binding IsMasterTrack}" Padding="6">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="{DynamicResource Mastering_PostRackHeader}"
+                               IsVisible="{Binding IsMasterTrack}"
+                               Margin="0,0,0,8" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="{Binding TrackName, StringFormat='{}{0} — effects on the whole rack (post)'}"
+                               IsVisible="{Binding !IsMasterTrack}"
+                               Margin="0,0,0,8" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                    <ScrollViewer>
+                        <panels:EffectChainView DataContext="{Binding Chain}"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
         </Grid>
     </Border>
 </UserControl>

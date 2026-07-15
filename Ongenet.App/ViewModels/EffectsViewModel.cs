@@ -1,3 +1,4 @@
+using System;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
@@ -39,6 +40,7 @@ namespace Ongenet.App.ViewModels
 
         public bool HasTrack => Track is not null;
         public string TrackName => Track?.Name ?? string.Empty;
+        public bool IsMasterTrack => Track?.Kind == TrackKind.Master;
 
         /// <summary>The selected track's (post) effect chain editor, or null when no track is selected.</summary>
         public EffectChainViewModel? Chain { get; private set; }
@@ -48,9 +50,13 @@ namespace Ongenet.App.ViewModels
 
         private void Rebuild()
         {
+            if (Chain is IDisposable old)
+                old.Dispose();
+
             Chain = Track is { } track
                 ? new EffectChainViewModel(track.Effects, track.CommitEffects,
-                    () => _events.Publish(new TracksChangedEvent()), _registry, _history, _transport, _clock)
+                    () => _events.Publish(new TracksChangedEvent()), _registry, _history, _transport, _clock,
+                    isMasterTrack: track.Kind == TrackKind.Master)
                 : null;
             OnPropertyChanged(nameof(Chain));
         }
@@ -60,6 +66,7 @@ namespace Ongenet.App.ViewModels
             Rebuild();
             OnPropertyChanged(nameof(HasTrack));
             OnPropertyChanged(nameof(TrackName));
+            OnPropertyChanged(nameof(IsMasterTrack));
         }
     }
 }

@@ -1,6 +1,9 @@
 using System;
+using System.IO;
 using System.Linq;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
@@ -23,13 +26,23 @@ public sealed class ScriptingApiTests
     private readonly TransportService _transport;
     private readonly ProjectScriptExporter _projectExporter = new();
     private readonly PresetScriptExporter _presetExporter = new();
+    private readonly ExportService _export = new(new NullVideoCompositor(), new NullVideoMuxer());
     private readonly ScriptingApi _api;
 
     public ScriptingApiTests()
     {
         _project = new ProjectService(_instruments);
         _transport = new TransportService();
-        _api = new ScriptingApi(_project, _transport, _history, _events, _instruments, _effects, _projectExporter, _presetExporter);
+        _api = new ScriptingApi(_project, _transport, _history, _events, _instruments, _effects, _projectExporter, _presetExporter, _export, new FakeAudioEngine());
+    }
+
+    [Fact]
+    public void SetMasterMeterTap_UpdatesEngineTap()
+    {
+        _api.SetMasterMeterTap(ScriptMasterMeterTap.PreLimiter);
+        Assert.Equal(ScriptMasterMeterTap.PreLimiter, _api.GetMasterMeterTap());
+        _api.SetMasterMeterTap(ScriptMasterMeterTap.PostChain);
+        Assert.Equal(ScriptMasterMeterTap.PostChain, _api.GetMasterMeterTap());
     }
 
     [Fact]
@@ -165,9 +178,117 @@ public sealed class ScriptingApiTests
         Assert.Contains(_api.GetMarkers(), m => m.Id == id);
     }
 
+    [Fact]
+    public void ApplyMasteringChain_ReplacesMasterWithNamedTypeOrder()
+    {
+        var master = _project.Current.Tracks.Single(t => t.Kind == TrackKind.Master);
+
+        _api.ApplyMasteringChain(master.Id, "full");
+        Assert.Equal(new[]
+        {
+            EqEffect.TypeId, MidSideEqEffect.TypeId, CompressorEffect.TypeId,
+            StereoWidthEffect.TypeId, ClipperEffect.TypeId, PeakLimiterEffect.TypeId, SpectrumEffect.TypeId
+        }, master.Effects.Select(e => e.TypeId));
+
+        _api.ApplyMasteringChain(master.Id, "techno");
+        Assert.Equal(new[]
+        {
+            FilterEffect.TypeId, MultibandCompressorEffect.TypeId,
+            StereoWidthEffect.TypeId, ExciterEffect.TypeId, PeakLimiterEffect.TypeId
+        }, master.Effects.Select(e => e.TypeId));
+    }
+
+    [Theory]
+    [InlineData("full", EqEffect.TypeId, SpectrumEffect.TypeId)]
+    [InlineData("full+", EqEffect.TypeId, SpectrumEffect.TypeId)]
+    [InlineData("streaming", EqEffect.TypeId, SpectrumEffect.TypeId)]
+    [InlineData("premaster", DcOffsetEffect.TypeId, CompressorEffect.TypeId)]
+    [InlineData("club", MultibandCompressorEffect.TypeId, PeakLimiterEffect.TypeId)]
+    [InlineData("podcast", EqEffect.TypeId, PeakLimiterEffect.TypeId)]
+    [InlineData("glue", CompressorEffect.TypeId, PeakLimiterEffect.TypeId)]
+    [InlineData("techno", FilterEffect.TypeId, PeakLimiterEffect.TypeId)]
+    [InlineData("audiophile", LinearPhaseEqEffect.TypeId, SpectrumEffect.TypeId)]
+    [InlineData("audiophile master", LinearPhaseEqEffect.TypeId, SpectrumEffect.TypeId)]
+    [InlineData("reference", EqEffect.TypeId, SpectrumEffect.TypeId)]
+    [InlineData("reference master", EqEffect.TypeId, SpectrumEffect.TypeId)]
+    public void ApplyMasteringChain_AllNames_ProduceExpectedFirstAndLast(string chainName, string firstTypeId, string lastTypeId)
+    {
+        var master = _project.Current.Tracks.Single(t => t.Kind == TrackKind.Master);
+        _api.ApplyMasteringChain(master.Id, chainName);
+        Assert.NotEmpty(master.Effects);
+        Assert.Equal(firstTypeId, master.Effects[0].TypeId);
+        Assert.Equal(lastTypeId, master.Effects[^1].TypeId);
+    }
+
+    [Fact]
+    public void ApplyMasteringChain_NonMasterTrack_Throws()
+    {
+        var trackId = _api.AddInstrumentTrack("Not Master");
+        Assert.Throws<InvalidOperationException>(() => _api.ApplyMasteringChain(trackId, "full"));
+    }
+
+    [Fact]
+    public void ExportAudio_WritesTempWav()
+    {
+        var format = new AudioFormat(48000, 2);
+        var frames = format.SampleRate;
+        var samples = new float[frames * 2];
+        for (var f = 0; f < frames; f++)
+        {
+            var s = 0.2f * MathF.Sin(2 * MathF.PI * 440f * f / format.SampleRate);
+            samples[f * 2] = s;
+            samples[f * 2 + 1] = s;
+        }
+
+        var trackId = _api.AddInstrumentTrack("Tone");
+        var track = _project.Current.Tracks.First(t => t.Id == trackId);
+        track.Kind = TrackKind.Audio;
+        track.Clips.Add(new Clip
+        {
+            Name = "Tone",
+            IsAudio = true,
+            StartBeat = 0,
+            LengthBeats = 2,
+            Samples = new AudioSampleBuffer(samples, 2, format.SampleRate)
+        });
+
+        var path = Path.Combine(Path.GetTempPath(), "ongenet-script-export-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            _api.ExportAudio(path, analyzeLoudness: false);
+            Assert.True(File.Exists(path));
+            Assert.True(new FileInfo(path).Length > 44);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     private sealed class CaptureHistory : IHistoryCapture
     {
         public System.Collections.Generic.List<string> Labels { get; } = new();
         public void Capture(string label) => Labels.Add(label);
+    }
+
+    private sealed class FakeAudioEngine : IAudioEngine
+    {
+        public bool IsRunning { get; set; }
+        public AudioFormat Format { get; } = new(48000, 2);
+        public float MasterLevelLeft { get; set; }
+        public float MasterLevelRight { get; set; }
+        public float MasterTruePeakLeftDbTp { get; set; }
+        public float MasterTruePeakRightDbTp { get; set; }
+        public float MasterTruePeakMaxDbTp { get; set; }
+        public float MasterMomentaryLufs { get; set; }
+        public float MasterShortTermLufs { get; set; }
+        public float MasterIntegratedLufs { get; set; }
+        public float MasterLoudnessRangeLu { get; set; }
+        public float MasterCorrelation { get; set; }
+        public MasterMeterTap MasterMeterTap { get; set; } = MasterMeterTap.PostFader;
+        public void ResetMasterLoudness() { }
+        public void Start() => IsRunning = true;
+        public void Stop() => IsRunning = false;
+        public void Dispose() { }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Ongenet.Core.Audio.Files;
@@ -13,7 +14,8 @@ public static class FfmpegAudioEncoder
         || extension.Equals(".mp3", StringComparison.OrdinalIgnoreCase)
         || extension.Equals(".ogg", StringComparison.OrdinalIgnoreCase);
 
-    public static void EncodeWav(string wavPath, string outputPath)
+    public static void EncodeWav(string wavPath, string outputPath,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         var ext = Path.GetExtension(outputPath).ToLowerInvariant();
         var codec = ext switch
@@ -37,6 +39,14 @@ public static class FfmpegAudioEncoder
         psi.ArgumentList.Add("-i");
         psi.ArgumentList.Add(wavPath);
         foreach (var arg in codec) psi.ArgumentList.Add(arg);
+        if (metadata is not null)
+        {
+            foreach (var (key, value) in metadata)
+            {
+                psi.ArgumentList.Add("-metadata");
+                psi.ArgumentList.Add($"{key}={value}");
+            }
+        }
         psi.ArgumentList.Add(outputPath);
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("ffmpeg did not start.");
@@ -51,7 +61,8 @@ public static class FfmpegAudioEncoder
     /// <paramref name="finalPath"/>. Return <c>true</c> from the callback when the final file is
     /// already written (e.g. composited MP4) to skip audio-only encoding.
     /// </summary>
-    public static void ExportViaWav(Func<string, bool> renderWav, string finalPath)
+    public static void ExportViaWav(Func<string, bool> renderWav, string finalPath,
+        Func<IReadOnlyDictionary<string, string>?>? metadataProvider = null)
     {
         var temp = Path.Combine(Path.GetTempPath(), $"ongenet-export-{Guid.NewGuid():N}.wav");
         try
@@ -64,7 +75,7 @@ public static class FfmpegAudioEncoder
                 return;
             }
 
-            EncodeWav(temp, finalPath);
+            EncodeWav(temp, finalPath, metadataProvider?.Invoke());
         }
         finally
         {

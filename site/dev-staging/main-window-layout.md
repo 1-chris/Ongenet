@@ -38,8 +38,9 @@ Ongenet uses **custom window chrome** (its own title bar, themed with Catppuccin
 │  (left)      │                                            │  h  (right) │
 │              │                                            │  t          │
 ├──────────────┴──────────────────────────────────────────┤  tabs       │
-│  Bottom panel:  [ Instrument | Piano Roll | Effects ]     │             │
+│  Bottom: [ Instrument/Sample | Pattern | Piano Roll | Clip | MIDI FX | Effects | Video ]
 └───────────────────────────────────────────────────────────────────────┘
+Centre tabs also include Arrangement, Mixer, Session, Notation, Video, and Scripting.
 ```
 
 Each side region can be collapsed:
@@ -83,7 +84,6 @@ The playback control strip ([`Views/Panels/TransportView.axaml`](https://github.
 
 | Control | What it does |
 | --- | --- |
-| **Render** | Export the arrangement to a WAV file (offline render) |
 | **Play** ▶ | Start playback from the start marker |
 | **Stop** ■ | Stop playback; if recording, stop and commit the take |
 | **Record** ● | One-bar metronome count-in, then record into armed tracks |
@@ -92,12 +92,15 @@ The playback control strip ([`Views/Panels/TransportView.axaml`](https://github.
 | **Slice toggle** | Switch the timeline/piano-roll into "slice" (cut) edit mode |
 | **[** / **]** | Set the loop start / loop end to the current start marker |
 | **Loop indicator** | A green dot lights when looping is active |
-| **Tempo** | Project BPM (20–300) |
+| **Tempo** | Project BPM (editor allows 1–999; **Tap** tempo clamps to 20–300) |
+| **Tap** | Set project BPM from your tap rhythm |
 | **Bars** | Arrangement length in bars |
 | **Time signature** | Numerator + denominator (denominators 1/2/4/8/16) |
 | **Master meter + fader** | Live stereo output level meter and master volume slider |
 | **Metronome (Click)** | Toggle audible click during playback (independent of record count-in) |
+| **Cap MIDI** | Retrospective capture of buffered notes into a new clip |
 | **MIDI export** | Export all instrument-track MIDI from the arrangement to a Standard MIDI File |
+| **Render progress** | Progress bar while an offline export/bounce is running (start exports from **Export ▾**) |
 
 > During **record**, a one-bar metronome count-in still runs before capture begins. The **Click** toggle is for everyday playback practice.
 > **Audio/MIDI device pickers** live in **Settings → Audio / MIDI**, not on the transport.
@@ -155,56 +158,42 @@ Clip interactions (mouse):
 
 Audio clips show a waveform with fade handles; MIDI clips show a mini note preview.
 
-When **project video** is enabled and a reference file is loaded, a **Video:** banner appears above the
-ruler showing the reference filename (read-only; edit sync in the **Video** centre tab).
-
 ---
 
-## 5. Video tab (centre)
+## 5. Video editing mode
 
-A dedicated **Video** centre tab (between **Notation** and **Scripting**) for reference sync, overlays,
-triggers, and preview
-([`Views/Panels/VideoTrackView.axaml`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/VideoTrackView.axaml),
-[`ViewModels/Panels/VideoTrackViewModel.cs`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/ViewModels/Panels/VideoTrackViewModel.cs)).
-The tab is visible only when **Settings → General → Enable video features** is on.
+Selecting the centre **Video** tab switches the workspace into video editing mode (when **Settings →
+General → Enable video features** is on and the project has video enabled). Three regions work together:
+
+| Region | View | Role |
+| --- | --- | --- |
+| **Left** | [`VideoResourcesView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/VideoResourcesView.axaml) | Project bin: reference tracks, overlays, triggers, linked clips |
+| **Centre** | [`VideoTrackView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/VideoTrackView.axaml) | **Program monitor** — large preview, browse, mute, live preview, pop-out |
+| **Bottom** | [`VideoTimelineView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/VideoTimelineView.axaml) | Beat-synced lanes, reference blocks, trigger markers, inspector |
+
+Leaving the **Video** tab restores the usual left sidebar (Track Controls / Project Clips / Channel Rack)
+and your previous bottom tab.
 
 ### Enable prompt
 
-Projects start with video off. The tab shows **Enable video for this project** until you click **Enable
-video** — this sets the per-project flag without affecting other projects.
+Projects start with video off. The centre tab shows **Enable video for this project** until you click
+**Enable video**.
 
-### Reference tracks
+### Program monitor (centre)
 
-Toolbar: **Add Track**, **Delete Track**, **Pop out**, **Live preview** (requires **ffmpeg**).
+Track picker, **Browse…**, **Muted**, **Live preview**, **Pop out**, and status. Overlay drag/resize
+works directly on the preview canvas; selection syncs with Resources and the bottom timeline.
 
-Per-track controls:
+### Resources (left)
 
-| Control | Purpose |
-| --- | --- |
-| Track picker | Switch between multiple reference videos |
-| File path / **Browse…** | Load the reference MP4/MOV |
-| **Offset (s)** | Nudge sync relative to the playhead |
-| **FPS** | Preview frame rate |
-| **In (s)** / **Out (s)** | Trim within the source file |
-| **Muted** | Track sync time without showing frames |
-| **Sync to clip…** + **Sync** | Lock offset and trim to an arrangement clip |
+Toolbar: **+ Track**, **+ Overlay**, **+ Trigger**, delete. Tree sections list all video objects.
+Double-click a **linked clip** to seek the arrangement to that clip's start.
 
-Sync honours the project tempo map (tempo automation included).
+### Video timeline (bottom · **Video** tab)
 
-### Overlays & triggers
-
-Two side-by-side panels:
-
-- **Overlays** — composited layers (image, animated GIF, video, waveform) with name, kind, and source
-  file. Used for **Export composited video** in the export dialog.
-- **Triggers** — map arrangement-clip start/end, session-clip launch, or MIDI note on/off to show, hide,
-  toggle, or fade overlay layers during playback.
-
-### Preview & pop-out
-
-The large preview pane shows the current sync frame when **ffmpeg** is installed. Without ffmpeg, a sync
-time readout still tracks playback. **Pop out** opens a separate **Video preview** window with the same
-frame. Toggle **Live preview** for streaming decode during playback vs single-frame scrub extraction.
+Reference lane (blue blocks), one overlay row per layer, diamond trigger markers on clip beats, shared
+ruler zoom/scroll with the arrangement timeline. Scrub the ruler to seek transport. Inspector below
+edits sync-to-clip, overlay kind, and trigger moment/action/target.
 
 See [video-and-composition guide](https://onge.net/articles/guides/video-and-composition.html) for export
 and ffmpeg setup.
@@ -276,9 +265,9 @@ clips — session/arrangement hybrid workflows without duplicating tracks.
 | **Expression Maps** | VST expression / keyswitch articulation maps |
 | **Audio Editor** | Edison-class multitrack sample editor — clip list + shared waveform tools ([audio-editor.md](audio-editor.md)) |
 | **Pitch Editor** | Polyphonic note-segment pitch correction on audio clips (timeline → **Open Pitch Editor**) |
-| **Scripting** | **Scripting** centre tab — in-app C# IDE with syntax highlighting and IntelliSense ([scripting.md](scripting.md)) |
+| **Scripts** | **Scripting** centre tab — in-app C# IDE with syntax highlighting and IntelliSense ([scripting.md](scripting.md)) |
 
-**Settings → General → Plugins → Isolate plugins in separate process** enables optional VST3 effect
+**Settings → General → Plugins → Run VST3 plugins in an isolated process** enables optional VST3 effect
 crash isolation via `Ongenet.PluginHost` ([plugin-isolation.md](plugin-isolation.md)).
 
 **Export → ADM BWF** (when surround is 5.1/7.1) exports ITU-R BS.2076 immersive handoff. **AAF/OMF
@@ -296,7 +285,7 @@ the tab strip. Tabs:
 | **Everything** | A combined view of all library content |
 | **Files** | An OS folder browser |
 | **Samples** | Your sample library |
-| **Soundfonts** | SF2 soundfonts |
+| **Soundfonts** | SFZ / SF2 instruments |
 | **Instruments** | Built-in (and plugin) instruments |
 | **Effects** | Built-in (and plugin) effects |
 | **Inst Presets** / **FX Presets** / **FX Chains** | Saved presets and effect-chain presets |
@@ -316,11 +305,15 @@ The bottom panel is a tabbed editor that changes with what you've selected
 | Tab | Shows | When |
 | --- | --- | --- |
 | **Instrument** / **Sample** | The instrument rack, or the selected audio clip's settings | Instrument tracks (header switches to "Sample" when an audio clip is selected) |
+| **Pattern** | Pattern / step editor | Pattern tracks and pattern clips |
 | **Piano Roll** | The MIDI note editor | Auto-selected when you pick a MIDI clip |
-| **Effects** | The track's effect chain | Always (the only tab for bus tracks) |
+| **Clip** | Clip inspector (audio/MIDI clip properties) | When a clip is selected |
+| **MIDI FX** | MIDI effect chain | Instrument / MIDI tracks |
+| **Effects** | The track's effect chain | Always (often the only tab for bus tracks) |
+| **Video** | Beat-synced video timeline | When video features are enabled |
 
 The panel switches tabs automatically: select a MIDI clip and it jumps to Piano Roll; an audio clip to
-Sample; a bus shows only Effects.
+Sample; a bus typically shows Effects.
 
 **Instrument inspector** ([`InstrumentInspectorView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/InstrumentInspectorView.axaml)):
 an **"+ Add instrument"** menu (grouped by category), a rack of instrument-slot cards, and a shared
@@ -399,11 +392,11 @@ Defined in [`MainWindow.axaml.cs`](https://github.com/1-chris/Ongenet/blob/main/
 | **Shift + [** | Set loop **start** to the start marker |
 | **Shift + ]** | Set loop **end** to the start marker |
 | **F8** | Toggle Avalonia renderer diagnostics (FPS / render & layout graphs) |
-| **View → Tempo Map** | Edit master tempo automation (menu; no default shortcut) |
-| **View → Section Playlist** | Ordered section playback from arrangement markers (menu) |
+| **View → Tempo Map** | Edit master tempo automation (also **Ctrl + Alt + T**) |
+| **View → Section Playlist** | Ordered section playback from arrangement markers (also **Ctrl + Alt + L**) |
 | **Edit → Ripple edit** | Toggle ripple mode for clip edits (when enabled in edit menu) |
-| **File → Collaboration → Pull latest** | Import the project copy from the sync folder |
-| **Transport → Capture MIDI** | Retrospective capture of buffered notes into a new clip |
+| **Export ▾ → Pull from collaboration folder** | Import the project copy from the sync folder |
+| **Transport → Cap MIDI** | Retrospective capture of buffered notes into a new clip |
 
 > Custom transport/key mappings can be configured in **Settings → MIDI** (`TransportMappings` in app settings).
 
@@ -466,8 +459,9 @@ Ctrl+D or Shift+[.
 
 ### On the web build
 
-The [WebAssembly demo](web-demo.md) supports **Space** (play/stop) and the typing keyboard, but not the
-file/undo/loop/delete shortcuts.
+The [WebAssembly demo](web-demo.md) supports **Space** (play/stop), the typing keyboard, and
+**Ctrl/Cmd+N/O/S** plus **Ctrl/Cmd+Z/Y** (new/open/save and undo/redo). Loop/delete and other
+desktop-only shortcuts are still not wired in the single-view shell.
 
 ---
 

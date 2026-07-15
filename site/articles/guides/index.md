@@ -12,9 +12,11 @@ Step-by-step guides for using Ongenet — from your first session to advanced wo
 | [Session & patterns](session-and-patterns.md) | Clip launcher, channel rack, step sequencer |
 | [Field modular](field-modular.md) | Node-graph instruments and effects |
 | [Mixer & export](mixer-and-export.md) | Strips, sends, offline export |
+| [Mastering](mastering.md) | Master chains, loudness, Compare, delivery targets |
 | [Video & composition](video-and-composition.md) | Reference sync, overlays, triggers, MP4 export |
 | [Audio Editor](audio-editor.md) | Standalone sample editor |
 | [Polyphonic pitch](polyphonic-pitch.md) | VariAudio-class pitch editing |
+| [SFZ / SF2 opcode support](sfz-sf2-opcode-support.md) | Sampler opcode matrix |
 | [Scripting](scripting.md) | C# automation scripts |
 | [Sidechain & dynamics](sidechain-and-dynamics.md) | Ducking, compressor sidechain |
 | [Keyboard shortcuts](keyboard-shortcuts.md) | Essential shortcuts |

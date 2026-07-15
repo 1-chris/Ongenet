@@ -36,12 +36,13 @@ public delegate void AudioRenderCallback(Span<float> buffer);
 
 The engine registers its `Render` method as that callback when it starts:
 
-```92:97:Ongenet.Core/Audio/AudioEngine.cs
+```196:202:Ongenet.Core/Audio/AudioEngine.cs
     public void Start()
     {
         if (_output.IsRunning) return;
-        _output.Start(Render);
         RebuildTracks();
+        if (!CanReuseMasterSpectrum()) PrepareMasterMeters();
+        _output.Start(Render);
     }
 ```
 
@@ -81,28 +82,30 @@ constant.
 
 Here's the top of `AudioEngine.Render` — the entry point for every block:
 
-```321:335:Ongenet.Core/Audio/AudioEngine.cs
+```557:573:Ongenet.Core/Audio/AudioEngine.cs
     private void Render(Span<float> buffer)
     {
+        FlushPendingRebuild();
+
+        var blockStart = Stopwatch.GetTimestamp();
+        var blockStartAllocated = GC.GetAllocatedBytesForCurrentThread();
         buffer.Clear();
-        if (_temp.Length < buffer.Length) _temp = new float[buffer.Length];
-        if (_slotTemp.Length < buffer.Length) _slotTemp = new float[buffer.Length];
 
         var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
         var frames = buffer.Length / channels;
+        AudioDiagnostics.SetBlockBudget(frames, _output.Format.SampleRate);
 
         // Count-in runs before content: emit metronome clicks, keep the playhead parked.
         if (_countingIn) ProcessCountIn(frames);
 
         var playing = _playing;
         var prevBeat = _currentBeat;
-        var curBeat = prevBeat + frames / _samplesPerBeat;
 ```
 
-Notice `buffer.Clear()` at the very top — the engine **zeroes the buffer first**, which is exactly why
+Notice `buffer.Clear()` near the top — the engine **zeroes the buffer first**, which is exactly why
 instruments *add* their output (`+=`) instead of overwriting: many sources sum into the same cleared
-buffer with no extra copies. The two scratch buffers (`_temp`, `_slotTemp`) are reused fields, grown
-only when a bigger block arrives — never freshly allocated per call.
+buffer with no extra copies. Scratch buffers (`_temp`, `_slotTemp`) are reused fields, grown only when
+a bigger block arrives — never freshly allocated per call.
 
 Conceptually, each block does this:
 
@@ -127,7 +130,8 @@ Render(buffer):
       run the bus's effects
       apply PDC delay if needed
       apply bus volume/pan, sum into its parent (the master sums into the output buffer)
-  master limiter + peak metering
+  hard-clamp ±1.0 + master peak / loudness metering
+  (Master insert FX — Peak Limiter, etc. — already ran on the Master bus)
 ```
 
 That's the whole engine in one breath. The rest of this document expands the two interesting parts: the
@@ -162,24 +166,28 @@ Every track has a **parent**: its output sums into a *group bus*, and group buse
 
 Track kinds are:
 
-```6:25:Ongenet.Core/Models/Audio/TrackKind.cs
+```6:31:Ongenet.Core/Models/Audio/TrackKind.cs
 public enum TrackKind
 {
     Audio,
     Instrument,
     Midi,
+    Hybrid,  // audio + MIDI clips on one lane
+    Pattern, // FL-style pattern playlist lane
     Group,   // sums children
     Return,  // aux bus fed by sends
     Master   // root bus
 }
 ```
 
-```26:34:Ongenet.Core/Models/Audio/Track.cs
+```27:34:Ongenet.Core/Models/Audio/Track.cs
+    /// <summary>
     /// The <see cref="Id"/> of the group/master bus this track's output routes into, or null to route
-    /// straight to the master.
+    /// straight to the master. Drives both audio routing and the timeline's nesting/indentation.
+    /// </summary>
     public Guid? ParentId { get; set; }
 
-    /// <summary>True for a bus (group, return or master) that sums child output rather than carrying clips.</summary>
+    /// <summary>True for a bus (group, return, or master) that sums child output rather than carrying clips.</summary>
     public bool IsBus => Kind is TrackKind.Group or TrackKind.Return or TrackKind.Master;
 ```
 
@@ -187,7 +195,7 @@ When the track layout changes, the engine builds a **routing snapshot** — a `B
 each linked to its parent, ordered *deepest-first*. Ordering deepest-first means one linear pass can mix
 children into groups, then groups into the master, with no recursion:
 
-```119:124:Ongenet.Core/Audio/AudioEngine.cs
+```260:263:Ongenet.Core/Audio/AudioEngine.cs
     // Builds the bus graph from the current tracks: a Bus per group/master, linked to its parent bus,
     // ordered deepest-first so a block can be mixed children → groups → master in a single pass.
     private void BuildRouting(Track[] tracks)
@@ -211,19 +219,21 @@ public sealed class TrackSend
 }
 ```
 
-Each block the engine processes **pre-fader sends** right after a track renders (before PDC and the main
-fader), then **post-fader sends** after the track's volume/pan is applied to its parent bus. Return tracks
-run their own insert chains and sum into their parent like any other bus. Sends are independent of the
-sidechain tap (below) — sidechain is a cross-track *read*, sends are a parallel *write*.
+Each block the engine runs track **POST inserts** first, then processes **pre-fader sends** (pre-fader,
+post-insert — before PDC and the main fader), then **post-fader sends** after the track's volume/pan is
+applied to its parent bus. Return tracks run their own insert chains and sum into their parent like any
+other bus. Sends are independent of the sidechain tap (below) — sidechain is a cross-track *read*, sends
+are a parallel *write*.
 
 ```mermaid
 flowchart TB
     V[Instrument voices] --> S[Slot PRE effects]
     S --> T[Sum slots → track buffer]
     A[Audio clips] --> T
-    T --> PF[Pre-fader sends → return buses]
     T --> P[Track POST effects]
-    P --> G[Track volume + pan]
+    P --> PF[Pre-fader sends → return buses]
+    P --> PDC[PDC delay]
+    PDC --> G[Track volume + pan]
     G --> B[Parent group bus]
     G --> PO[Post-fader sends → return buses]
     R[Return bus FX] --> B
@@ -246,20 +256,128 @@ All paths that reach the master therefore align at the mix point. PDC is honoure
 [`OfflineRenderer`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.Core/Audio/OfflineRenderer.cs) (export, clip render). Latency is summed
 from reported plugin values only — the engine does not guess.
 
-```211:231:Ongenet.Core/Audio/AudioEngine.cs
+```309:330:Ongenet.Core/Audio/AudioEngine.cs
             Pdc = LatencyCompensator.Compute(tracks)
-            ...
+        };
+        // …
                 st.PdcDelay = comp.DelaySamples;
-            ...
+                st.EnsurePdc(channels, maxFrames);
+        // …
                 bus.PdcDelay = comp.DelaySamples;
+                bus.EnsurePdc(channels, maxFrames);
 ```
 
 ### How summing and panning work
 
 Mixing one buffer into another applies a per-channel gain and accumulates. Volume and pan are turned
 into left/right gains by [`Mixing`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.Core/Audio/Mixing.cs) — tracks use an equal-power pan law
-(constant perceived loudness as you pan), buses use a simpler balance law. The master applies a final
-limiter to catch overs, then measures peak levels for the meters you see in the transport bar.
+(constant perceived loudness as you pan), buses use a simpler balance law. After summing, the engine
+hard-clamps the output to ±1.0 as a last-resort safety net and measures peak levels for the meters you
+see in the transport bar. Proper loudness limiting (and ISP headroom) comes from user-inserted
+effects on the **Master** track — typically a clipper followed by a limiter — not from a built-in
+engine limiter.
+
+### Mastering insert chains
+
+Mastering is DAW-style: insert FX on the pinned Master track. The canonical factory recipe lives in
+[`MasteringChains`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.Core/Audio/Effects/MasteringChains.cs)
+(`CreateFullMaster` / `AddFullMaster`) and is shared by the **Full Master** FX Chains library preset and
+demo songs:
+
+1. Corrective EQ (HPF / LPF / air shelf)
+2. Mid/Side EQ (side low-cut + side air)
+3. Glue compressor
+4. Stereo width
+5. Soft clipper (optional 2×/4× oversampling)
+6. Peak Limiter (Streaming preset, optional oversampling)
+7. Spectrum analyser (pass-through; skipped during offline export)
+
+**Multiband OTT is intentionally omitted** from Full Master (use on buses, or drag **Full Master+** /
+**Techno Master**). Named limiter and multiband macros live in
+[`MasteringPresetBank`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.Core/Audio/Effects/MasteringPresetBank.cs)
+with descriptions shown as UI tooltips.
+
+`MasteringChains.Create(name)` builds **eight** core recipes plus **Audiophile Master** and **Reference Master** (**ten** named recipes total):
+
+| Chain | Role |
+| --- | --- |
+| **Full Master** | Corrective EQ → mid/side → glue → width → clipper → Peak Limiter (Streaming) → Spectrum |
+| **Full Master+** | Full Master with Multiband OTT before width |
+| **Streaming Master** | EQ → glue → Peak Limiter (Streaming) — no clipper |
+| **Pre-Master** | DC blocker → EQ → mid/side → glue only (no limiter) |
+| **Club Loud** | Multiband → width → soft Over → clipper → Peak Limiter (Master) |
+| **Podcast / Speech** | HPF → de-esser → glue → Peak Limiter (Safety) |
+| **Master Glue** | Glue compressor → width → Peak Limiter (Loud) |
+| **Techno Master** | HPF → multiband → width → Exciter → Peak Limiter (Master) |
+| **Audiophile Master** | Full Master with **Linear-Phase EQ** replacing the minimum-phase corrective EQ (`Create("audiophile")` / `Create("linear")`; higher latency, experimental) |
+| **Reference Master** | Corrective EQ → Match EQ → glue → Peak Limiter (Streaming) → Spectrum (`Create("reference")` / `Create("match")`; capture reference spectrum in UI first) |
+
+**Built-in project genre chains** (same recipes as the FX Chains library):
+
+| Project | Master chain | Notes |
+| --- | --- | --- |
+| **Ascension** | Full Master | Multiband OTT on **Leads** bus, not on Master |
+| **First Light**, **House Starter** | Full Master | |
+| **Undertow**, **Trap Beat** | Club Loud | |
+| **Dust & Vinyl**, **Field Modular**, **Static Bloom**, **Web Demo** | Streaming Master | Field Modular / Static Bloom add reverb before the limiter |
+| **Techno Starter** | Techno Master | |
+
+Desktop startup opens **Ascension**; WASM/Android open **Web Demo**. **First Light** is a library demo only.
+
+**Peak Limiter presets** (`MasteringPresetBank.LimiterPresets`):
+
+| Preset | Ceiling | Spectral | Typical use |
+| --- | --- | --- | --- |
+| Transparent | −0.3 dBFS | off | Archival / CD |
+| Streaming | −1.0 dBFS | off | Lossy streaming headroom |
+| Loud | −0.5 dBFS | on | Competitive loudness |
+| Master | −0.3 dBFS | on | Club / techno masters |
+| Safety | −1.5 dBFS | off | Broadcast / podcast |
+
+**Multiband OTT presets** (`MasteringPresetBank.MultibandPresets`): Transparent, Glue, OTT, Aggressive, Max — depth and high-band boost increase with index.
+
+**Delivery platform targets** (`DeliveryPlatformPresets` in export):
+
+| Platform | Integrated LUFS | True peak |
+| --- | --- | --- |
+| Spotify | −14 | −1.0 dBTP |
+| YouTube | −14 | −1.0 dBTP |
+| Apple Music | −16 | −1.0 dBTP |
+| Club | −9 | −0.3 dBTP |
+| Podcast | −16 | −1.5 dBTP |
+
+**Mastering UI workflow:** On the Master Effects tab, use **Bypass chain**, loudness-measured **Compare**, ordered-chain **A/B** snapshots, and WAV **reference** slots A/B (LUFS-matched audition). The chain picker applies any of the recipes above (eight core chains plus Audiophile and Reference). Title-bar meters can tap **Pre Limiter**, **Post Chain**, or **Post Fader**. The **Spectrum** analyser panel shows peak bars, LUFS, correlation, and a **Scope** goniometer (L vs R Lissajous with mid / anti-phase diagonals); **Tool** supplies peak/LUFS/correlation meters without a goniometer. Delivery targets are shared app-wide via `IMasteringDeliveryTarget` (Master Effects tab, title-bar meter, Export dialog).
+
+**Match EQ** (`MatchEqEffect`) captures a target magnitude spectrum (48 analysis bins) and applies approximate **12-band** peaking EQ toward it via **Blend** and **Smoothness**.
+
+**Two limiters:** `PeakLimiterEffect` (Mastering category — presets, GR meter, spectral mode, oversampling)
+is the delivery brickwall. `LimiterEffect` (Dynamics) is a simpler bus limiter kept for drum / bus chains
+that do not need mastering macros.
+
+The title-bar master meter can tap **Pre Limiter**, **Post Chain**, or **Post Fader**. Its dBTP reading
+uses a 4× polyphase FIR reconstruction meter (BS.1770-style true-peak measurement), not a
+sample-peak-only or Hermite/ZOH estimate. Short-term and integrated LUFS use ITU-R BS.1770
+K-weighting; loudness reports also include **LRA** (loudness range). The title-bar bars are stereo L/R
+(the first two channels); surround export analysis uses all channels with full BS.1770 channel weights.
+Clipper and Peak Limiter oversampling is a real FIR **upsample → process nonlinear DSP
+at the higher rate → downsample** path; the 1× choice alone is sample-peak based.
+
+The Peak Limiter's optional **Spectral** mode adds a slower spectral-envelope follower to the fast
+peak detector. It deliberately holds more reduction after dense/transient energy, reducing bright
+bursts at the cost of less transparent release behaviour; preset descriptions call out where it is
+enabled. The limiter card plots recent gain reduction and its delivery ceiling.
+
+Stem export can bake Master inserts via
+`ExportOptions.IncludeMasterFx`. Master/region export supports pre-master bounce (`BypassMasterFx`),
+16-bit TPDF or noise-shaped dither, loudness analysis (integrated LUFS, LRA, momentary/short-term peaks), and optional
+platform LUFS normalisation. When normalise boosts gain, `ApplyDeliveryLimiter` re-limits at the delivery
+ceiling instead of only attenuating. Rate conversion uses a 48-tap windowed-sinc low-pass. WAV exports
+embed LUFS/true-peak in RIFF INFO/ICMT; encoded audio receives ReplayGain and R128 tags. Loudness JSON sidecars include `ReplayGainTrackGainDb` when a target
+LUFS is set. Album scripts should call `MatchAlbumLoudness` (via `IScriptingApi`) to align
+multiple tracks to a shared target while preserving relative loudness.
+
+Offline render skips `IAnalyserOnlyEffect` processors (Spectrum, Loudness Meter, 3D Scope, Oscilloscope)
+and metering-only `ToolEffect` paths for speed.
 
 ### Sidechain: reading another track
 
@@ -299,23 +417,22 @@ is merged on top. Pattern clips on the timeline reference shared [`Pattern`](htt
 objects; the scheduler expands step-sequencer data into scheduled MIDI notes on the pattern's target
 instrument tracks (respecting mutes and repeat length).
 
-```371:386:Ongenet.Core/Audio/AudioEngine.cs
+```490:500:Ongenet.Core/Audio/AudioEngine.cs
     private PlaybackSchedule BuildSchedule(PlaybackScheduleContext context)
     {
-        ...
-        PlaybackSchedule schedule = _playback.Mode switch
+        var sessionClips = context.Project.SessionClips;
+        var launches = _playback.ActiveLaunches;
+
+        return _playback.Mode switch
         {
             PlaybackMode.Session => new SessionScheduler(sessionClips, launches).Build(context),
-            PlaybackMode.Hybrid => new HybridScheduler(sessionClips, launches).Build(context),
-            _ => _arrangementScheduler.Build(context)
+            PlaybackMode.Hybrid => BuildHybridSchedule(context, sessionClips, launches),
+            _ => MergeWithPatterns(_arrangementScheduler.Build(context), context)
         };
-
-        if (_playback.Mode != PlaybackMode.Session)
-            schedule = HybridScheduler.MergeSchedules(schedule, _patternScheduler.Build(context));
-
-        return schedule;
     }
 ```
+
+`MergeWithPatterns` / `BuildHybridSchedule` blend arrangement, session, and pattern scheduler output (pattern expansion is skipped in Session-only mode).
 
 Session clips carry launch modes (Trigger, Gate, Toggle, Repeat) and can reference a source arrangement
 clip by id. Launches are quantised to the beat grid via `IPlaybackModeService.LaunchQuantizeBeats`.
@@ -361,7 +478,7 @@ So how does the UI safely change things the audio thread is using (add a track, 
 move a note)? With **immutable snapshots published atomically.** The UI builds a new array off-thread,
 then swaps a single `volatile` reference. The audio thread always reads one consistent snapshot:
 
-```44:46:Ongenet.Core/Audio/AudioEngine.cs
+```73:75:Ongenet.Core/Audio/AudioEngine.cs
     // --- Bus routing (groups + master). Rebuilt whenever the track topology changes; published as a
     //     single immutable snapshot so the audio thread always reads a consistent graph. ---
     private volatile Routing _routing = new();
@@ -554,9 +671,9 @@ instrument already implements.
 
 ## 13. Immersive export (ADM BWF)
 
-For **5.1 / 7.1** surround exports, the **Export** dialog can write **ADM BWF** (ITU-R BS.2076): the
-master mix is offline-rendered through the same `OfflineRenderer` path as WAV export, then wrapped with
-open ADM metadata and an XML sidecar for broadcast handoff.
+For **5.1 / 7.1** surround exports, the **Export** dialog can write the multichannel BWF audio and an
+ADM XML sidecar for ITU-R BS.2076 handoff. ADM XML is currently sidecar-only rather than embedded in
+the BWF. The master mix uses the same `OfflineRenderer` path as WAV export.
 
 **AAF/OMF handoff** exports structured timeline XML for Nuendo/Pro Tools pipelines.
 

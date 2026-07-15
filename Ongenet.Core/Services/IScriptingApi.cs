@@ -94,6 +94,16 @@ public interface IScriptingApi
     void SetEffectBoolParameter(Guid trackId, int effectIndex, string paramName, bool value, int instrumentSlotIndex = -1);
     void SetEffectChoiceParameter(Guid trackId, int effectIndex, string paramName, int choiceIndex, int instrumentSlotIndex = -1);
     void LoadEffectPreset(Guid trackId, int effectIndex, string presetName, int instrumentSlotIndex = -1);
+    /// <summary>
+    /// Replaces the Master track insert chain with a named mastering recipe
+    /// (full, full+, glue, techno, streaming, premaster, club, podcast, audiophile, reference).
+    /// </summary>
+    void ApplyMasteringChain(Guid masterTrackId, string chainName = "full");
+
+    /// <summary>Reads the stage feeding the title-bar master meters.</summary>
+    ScriptMasterMeterTap GetMasterMeterTap();
+    /// <summary>Sets the stage feeding the title-bar master meters.</summary>
+    void SetMasterMeterTap(ScriptMasterMeterTap tap);
 
     // Clips — read
     IReadOnlyList<ScriptClipInfo> GetClips(Guid? trackId = null);
@@ -183,6 +193,31 @@ public interface IScriptingApi
     string ExportInstrumentSlotAsScript(Guid trackId, int slotIndex, ExportScriptOptions? options = null);
     string ExportEffectChainAsScript(Guid trackId, int instrumentSlotIndex = -1, ExportScriptOptions? options = null);
     string ExportPresetAsScript(Guid trackId, int? slotIndex, int? effectIndex, ExportScriptOptions? options = null);
+    /// <summary>
+    /// Offline master bounce to a filesystem path (WAV / FLAC / MP3 / OGG by extension).
+    /// Loudness options mirror the Export dialog (previously UI-only).
+    /// </summary>
+    /// <param name="path">Filesystem path for the master deliverable (extension selects format).</param>
+    /// <param name="deliveryPlatform">Optional platform name (Spotify, YouTube, Apple Music, Club, Podcast). When null, uses the shared <see cref="IMasteringDeliveryTarget"/> platform.</param>
+    /// <param name="normalizeLoudness">When true, two-pass normalize to the platform / default LUFS target.</param>
+    /// <param name="applyDither">When true, apply dither on 16-bit WAV writes.</param>
+    /// <param name="bypassMasterFx">When true, bounce pre-master (Master inserts bypassed).</param>
+    /// <param name="analyzeLoudness">When true, write loudness sidecars beside the deliverable.</param>
+    /// <param name="bitDepth">PCM bit depth (0 = 24, or 16 when <paramref name="applyDither"/> is true).</param>
+    /// <param name="ditherMode">TPDF or noise-shaped dither when <paramref name="applyDither"/> is true.</param>
+    /// <param name="targetSampleRate">Optional destination sample rate in Hz (0 = project rate).</param>
+    /// <param name="exportComparisonPair">When true, also write unmastered vs mastered comparison WAV excerpts.</param>
+    void ExportAudio(string path, string? deliveryPlatform = null, bool normalizeLoudness = false,
+        bool applyDither = false, bool bypassMasterFx = false, bool analyzeLoudness = true,
+        int bitDepth = 0, ScriptDitherMode ditherMode = ScriptDitherMode.Tpdf, int targetSampleRate = 0,
+        bool exportComparisonPair = false);
+    /// <summary>Matches a set of PCM WAV files as one album and rewrites them as 24-bit WAV.</summary>
+    void MatchAlbumLoudness(string[] wavPaths, double targetLufs = -14, double targetTp = -1);
+
+    /// <summary>Reads the shared delivery platform / LUFS / true-peak targets used by meters and Export.</summary>
+    (string PlatformName, double TargetLufs, double TargetTruePeakDbTp) GetDeliveryTarget();
+    /// <summary>Sets the shared delivery target. Pass a known platform name, or null/"Custom" with explicit LUFS/dBTP.</summary>
+    void SetDeliveryTarget(string? platformName, double? targetLufs = null, double? targetTruePeakDbTp = null);
 
     // Live scripting
     IDisposable OnTransportStateChanged(Action<ScriptTransportState> handler);

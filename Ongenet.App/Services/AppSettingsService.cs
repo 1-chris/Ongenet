@@ -75,6 +75,7 @@ public sealed class AppSettingsService : IAppSettingsService
             // Empty = unset → leave the manager's OS-aware default (Native on Linux/macOS) in place.
             if (!string.IsNullOrEmpty(Current.AudioBackend)) _audioBackend.Switch(Current.AudioBackend);
             ApplyAudio();
+            ApplyCoreAudioLead();
             ApplyMidi();
             ApplyMidiInstrumentInput();
             _recording.InputQuantizeBeats = Current.InputQuantizeBeats;
@@ -186,6 +187,15 @@ public sealed class AppSettingsService : IAppSettingsService
             _audio.InputChannelMode = mode;
 
         _audio.LowLatencyExclusive = Current.WasapiExclusiveMode;
+    }
+
+    private void ApplyCoreAudioLead()
+    {
+        var frames = Current.CoreAudioLeadFrames is 2048 or 4096
+            ? Current.CoreAudioLeadFrames
+            : 2048;
+        Current.CoreAudioLeadFrames = frames;
+        AudioRuntimeOptions.CoreAudioLeadFrames = frames;
     }
 
     private void ApplyMidiInstrumentInput()

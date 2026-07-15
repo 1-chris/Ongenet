@@ -22,12 +22,12 @@ Ongenet embeds a Roslyn C# scripting host with a curated `IScriptingApi`:
 - **Tracks** — all track kinds, mute/solo/arm, routing, sends
 - **Devices** — instruments, effects, presets, parameters
 - **Clips** — MIDI notes/CC, audio metadata, automation, patterns, session clips
-- **Timeline meta** — markers, chord track, drum maps, video paths, overlays, triggers
-- **Video** — `GetVideoEnabled` / `SetVideoEnabled`, `GetVideoElements` / `AddVideoElement`, `GetVideoTriggers` / `AddVideoTrigger`
+- **Timeline meta** — markers, chord track, drum maps, video layers/items, overlays, triggers
+- **Video** — `GetVideoEnabled` / `SetVideoEnabled`, `GetVideoLayers` / `AddVideoLayer`, `GetVideoLayerItems` / `AddVideoLayerItem`, `GetVideoTriggers` / `AddVideoTrigger`
 - **MIDI bulk** — quantize, transpose, velocity scale, humanize, chance
 - **Live handlers** — transport state, beat grid, clip changes (Start live)
 
-Scripts cannot access arbitrary filesystem paths or spawn processes — see [Dev: Scripting](/dev/scripting.html) for the full API and security limits.
+Scripts have no general filesystem or process API. Desktop scripts may write only the explicit paths passed to `ExportAudio` / `MatchAlbumLoudness` — see [Dev: Scripting](/dev/scripting.html) for the full API and security limits.
 
 ### Batch example
 
@@ -48,13 +48,39 @@ api.OnTransportStateChanged(state =>
 
 ```csharp
 api.SetVideoEnabled(true);
-foreach (var el in api.GetVideoElements())
-    api.Log($"Overlay: {el.Name} ({el.Kind})");
+foreach (var layer in api.GetVideoLayers())
+    api.Log($"Layer: {layer.Name} (z={layer.ZOrder})");
 ```
+
+### Mastering and export
+
+Desktop scripts can drive delivery targets, meter taps, factory master chains, and offline bounces:
+
+```csharp
+using System.Linq;
+
+var master = api.GetTracks().First(t => t.Kind == ScriptTrackKind.Master);
+api.ApplyMasteringChain(master.Id, "reference");
+api.SetDeliveryTarget("Spotify");
+api.SetMasterMeterTap(ScriptMasterMeterTap.PreLimiter);
+
+api.ExportAudio("/tmp/master.wav",
+    normalizeLoudness: true,
+    bitDepth: 16,
+    applyDither: true,
+    ditherMode: ScriptDitherMode.NoiseShaped,
+    targetSampleRate: 44100,
+    exportComparisonPair: true);
+
+api.MatchAlbumLoudness(new[] { "/tmp/01.wav", "/tmp/02.wav" }, -14, -1);
+```
+
+Use `ApplyMasteringChain` for whole-recipe replacement; use `AddEffect` when building a custom chain insert-by-insert. Web Demo and Android do not expose these APIs — see [Mastering](mastering.md#scripting-limitations).
 
 ## Related
 
 - [Getting started](getting-started.md)
 - [Video & composition](video-and-composition.md)
+- [Mastering](mastering.md)
 - [Dev: Scripting API](/dev/scripting.html)
 - [Keyboard shortcuts](keyboard-shortcuts.md)

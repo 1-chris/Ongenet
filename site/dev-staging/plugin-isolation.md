@@ -5,7 +5,7 @@ Optional **out-of-process plugin hosting** protects the main DAW from VST3 effec
 ## Enabling isolation
 
 1. Open **Settings → General → Plugins**
-2. Enable **Isolate plugins in separate process**
+2. Enable **Run VST3 plugins in an isolated process**
 3. Restart Ongenet (new effect instances use the isolated host)
 
 When enabled and `Ongenet.PluginHost` is present beside the main executable, VST3 **effects** load

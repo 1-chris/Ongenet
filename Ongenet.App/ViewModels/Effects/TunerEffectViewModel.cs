@@ -18,7 +18,7 @@ public sealed class TunerEffectViewModel : EffectViewModel
 
     public string DetectedHzText => Tuner.DetectedHz > 0 ? $"{Tuner.DetectedHz:0.0} Hz" : "";
 
-    public new void Refresh()
+    public override void Refresh()
     {
         base.Refresh();
         OnPropertyChanged(nameof(DetectedNote));

@@ -20,6 +20,7 @@ namespace Ongenet.App.ViewModels
 
         public string Name { get; }
         public string Group { get; }
+        public bool HasGroup => !string.IsNullOrWhiteSpace(Group);
 
         /// <summary>
         /// Re-reads the underlying parameter and raises change notifications, so a value written
@@ -124,9 +125,12 @@ namespace Ongenet.App.ViewModels
     {
         private readonly ChoiceParameter _parameter;
 
-        public ChoiceParameterViewModel(ChoiceParameter parameter) : base(parameter.Name, parameter.Group) => _parameter = parameter;
+        public ChoiceParameterViewModel(ChoiceParameter parameter)
+            : base(parameter.Name, parameter.Group) => _parameter = parameter;
 
         public IReadOnlyList<string> Options => _parameter.Options;
+
+        public string? Tooltip => _parameter.SelectedDescription ?? _parameter.Description;
 
         public int SelectedIndex
         {
@@ -137,7 +141,14 @@ namespace Ongenet.App.ViewModels
                 History?.Capture("Change parameter");
                 _parameter.SelectedIndex = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(Tooltip));
             }
+        }
+
+        public override void Refresh()
+        {
+            OnPropertyChanged(nameof(SelectedIndex));
+            OnPropertyChanged(nameof(Tooltip));
         }
     }
 }

@@ -6,7 +6,7 @@ using Ongenet.Core.Audio.Parameters;
 namespace Ongenet.Core.Audio.Effects;
 
 /// <summary>2D oscilloscope pass-through visualizer.</summary>
-public sealed class OscilloscopeEffect : IAudioEffect, IWaveformSource
+public sealed class OscilloscopeEffect : IAudioEffect, IWaveformSource, IAnalyserOnlyEffect
 {
     public const string TypeId = "oscilloscope";
 

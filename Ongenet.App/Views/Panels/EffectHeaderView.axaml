@@ -23,60 +23,83 @@
             <Setter Property="Background" Value="{StaticResource CatppuccinSurface1}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+        <Style Selector="DockPanel.highlighted">
+            <Setter Property="Background" Value="{StaticResource CatppuccinSurface2}"/>
+        </Style>
     </UserControl.Styles>
 
-    <DockPanel>
-        <!-- Enable / bypass dot -->
-        <Button DockPanel.Dock="Left" Classes="fxdot" Margin="0,0,8,0" Name="BypassDot"
-                Command="{Binding ToggleEnabledCommand}"
-                ToolTip.Tip="{DynamicResource EffectHeader_Enable_bypass_effect_right_click_to_automate_Tip}">
-            <Panel>
-                <Ellipse Width="12" Height="12" IsVisible="{Binding IsEnabled}"
-                         Fill="{StaticResource CatppuccinGreen}"/>
-                <Ellipse Width="12" Height="12" IsVisible="{Binding !IsEnabled}"
-                         Fill="{StaticResource CatppuccinRed}"/>
-            </Panel>
-        </Button>
+    <StackPanel Spacing="4">
+        <DockPanel Classes.highlighted="{Binding IsHighlighted}">
+            <!-- Enable / bypass dot -->
+            <Button DockPanel.Dock="Left" Classes="fxdot" Margin="0,0,8,0" Name="BypassDot"
+                    Command="{Binding ToggleEnabledCommand}"
+                    ToolTip.Tip="{DynamicResource EffectHeader_Enable_bypass_effect_right_click_to_automate_Tip}">
+                <Panel>
+                    <Ellipse Width="12" Height="12" IsVisible="{Binding IsEnabled}"
+                             Fill="{StaticResource CatppuccinGreen}"/>
+                    <Ellipse Width="12" Height="12" IsVisible="{Binding !IsEnabled}"
+                             Fill="{StaticResource CatppuccinRed}"/>
+                </Panel>
+            </Button>
 
-        <!-- Chain position badge -->
-        <Border DockPanel.Dock="Left" Margin="0,0,8,0" Width="20" Height="20" CornerRadius="10"
-                Background="{StaticResource CatppuccinSurface2}" VerticalAlignment="Center"
-                ToolTip.Tip="{DynamicResource EffectHeader_Processing_order_1_first_Tip}">
-            <TextBlock Text="{Binding Position}" FontSize="11" FontWeight="SemiBold"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Foreground="{StaticResource CatppuccinText}"/>
-        </Border>
+            <!-- Chain position badge -->
+            <Border DockPanel.Dock="Left" Margin="0,0,8,0" Width="20" Height="20" CornerRadius="10"
+                    Background="{StaticResource CatppuccinSurface2}" VerticalAlignment="Center"
+                    ToolTip.Tip="{DynamicResource EffectHeader_Processing_order_1_first_Tip}">
+                <TextBlock Text="{Binding Position}" FontSize="11" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{StaticResource CatppuccinText}"/>
+            </Border>
 
-        <!-- Right-aligned controls: save-preset / field toggle / move up / down / remove -->
-        <Button DockPanel.Dock="Right" Content="{DynamicResource EffectHeader_Text}" Padding="6,2" Background="Transparent"
-                Foreground="{StaticResource CatppuccinRed}"
-                Command="{Binding RemoveCommand}" ToolTip.Tip="{DynamicResource EffectHeader_Remove_effect_Tip}" VerticalAlignment="Center"/>
-        <Button DockPanel.Dock="Right" Content="{Binding FieldEditorToggleText}" Classes="ord" Margin="0,0,4,0"
-                Command="{Binding ToggleFieldEditorCommand}"
-                IsVisible="{Binding HasCustomFieldSurface}"
-                ToolTip.Tip="Switch between the custom interface and the Field graph editor"/>
-        <Button DockPanel.Dock="Right" Name="SaveEffectPresetButton" Content="{DynamicResource EffectHeader_Text_2}" Classes="ord" Margin="0,0,4,0"
-                ToolTip.Tip="{DynamicResource EffectHeader_Save_this_effects_settings_as_a_preset_Tip}">
-            <Button.Flyout>
-                <Flyout>
-                    <StackPanel Width="200" Spacing="6">
-                        <TextBlock Text="{DynamicResource EffectHeader_Preset_name}" FontSize="11"
-                                   Foreground="{StaticResource CatppuccinSubtext0}"/>
-                        <TextBox Text="{Binding PresetName, Mode=TwoWay}" PlaceholderText="{Binding Name}"/>
-                        <Button Content="{DynamicResource EffectHeader_Save}" Click="OnSaveEffectPreset" HorizontalAlignment="Right"
-                                Background="{StaticResource CatppuccinSurface1}"/>
-                    </StackPanel>
-                </Flyout>
-            </Button.Flyout>
-        </Button>
-        <Button DockPanel.Dock="Right" Classes="ord" Content="▼" Margin="0,0,4,0"
-                Command="{Binding MoveDownCommand}" IsEnabled="{Binding !IsLast}"
-                ToolTip.Tip="{DynamicResource EffectHeader_Move_later_in_the_chain_Tip}"/>
-        <Button DockPanel.Dock="Right" Classes="ord" Content="▲" Margin="0,0,4,0"
-                Command="{Binding MoveUpCommand}" IsEnabled="{Binding !IsFirst}"
-                ToolTip.Tip="{DynamicResource EffectHeader_Move_earlier_in_the_chain_Tip}"/>
+            <!-- Right-aligned controls: save-preset / field toggle / move up / down / remove -->
+            <Button DockPanel.Dock="Right" Content="{DynamicResource EffectHeader_Text}" Padding="6,2" Background="Transparent"
+                    Foreground="{StaticResource CatppuccinRed}"
+                    Command="{Binding RemoveCommand}" ToolTip.Tip="{DynamicResource EffectHeader_Remove_effect_Tip}" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right" Content="{Binding FieldEditorToggleText}" Classes="ord" Margin="0,0,4,0"
+                    Command="{Binding ToggleFieldEditorCommand}"
+                    IsVisible="{Binding HasCustomFieldSurface}"
+                    ToolTip.Tip="Switch between the custom interface and the Field graph editor"/>
+            <Button DockPanel.Dock="Right" Name="SaveEffectPresetButton" Content="{DynamicResource EffectHeader_Text_2}" Classes="ord" Margin="0,0,4,0"
+                    ToolTip.Tip="{DynamicResource EffectHeader_Save_this_effects_settings_as_a_preset_Tip}">
+                <Button.Flyout>
+                    <Flyout>
+                        <StackPanel Width="200" Spacing="6">
+                            <TextBlock Text="{DynamicResource EffectHeader_Preset_name}" FontSize="11"
+                                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <TextBox Text="{Binding PresetName, Mode=TwoWay}" PlaceholderText="{Binding Name}"/>
+                            <Button Content="{DynamicResource EffectHeader_Save}" Click="OnSaveEffectPreset" HorizontalAlignment="Right"
+                                    Background="{StaticResource CatppuccinSurface1}"/>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+            <Button DockPanel.Dock="Right" Classes="ord" Content="▼" Margin="0,0,4,0"
+                    Command="{Binding MoveDownCommand}" IsEnabled="{Binding !IsLast}"
+                    ToolTip.Tip="{DynamicResource EffectHeader_Move_later_in_the_chain_Tip}"/>
+            <Button DockPanel.Dock="Right" Classes="ord" Content="▲" Margin="0,0,4,0"
+                    Command="{Binding MoveUpCommand}" IsEnabled="{Binding !IsFirst}"
+                    ToolTip.Tip="{DynamicResource EffectHeader_Move_earlier_in_the_chain_Tip}"/>
+            <Button DockPanel.Dock="Right" Classes="ord" Margin="0,0,4,0"
+                    Command="{Binding ToggleCollapsedCommand}"
+                    Content="{Binding CollapseGlyph}"
+                    ToolTip.Tip="{DynamicResource EffectHeader_Collapse_Tip}"/>
 
-        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
-                   Foreground="{StaticResource CatppuccinMauve}"/>
-    </DockPanel>
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
+                       Foreground="{StaticResource CatppuccinMauve}"/>
+        </DockPanel>
+
+        <!-- Gain-reduction meter for Peak Limiter / Compressor / Compressor+ (IGainReductionSource). -->
+        <Grid ColumnDefinitions="Auto,*,Auto" Height="12" IsVisible="{Binding HasGainReduction}"
+                              ToolTip.Tip="{DynamicResource EffectHeader_Gain_reduction_Tip}">
+            <TextBlock Text="GR" FontSize="9" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+            <ProgressBar Grid.Column="1" Minimum="0" Maximum="1" Height="6" VerticalAlignment="Center"
+                         Value="{Binding GainReductionNormalized}"
+                         Foreground="{StaticResource CatppuccinPeach}"
+                         Background="{StaticResource CatppuccinSurface1}"/>
+            <TextBlock Grid.Column="2" Text="{Binding GainReductionText}" FontSize="9"
+                       VerticalAlignment="Center" Margin="6,0,0,0" MinWidth="48"
+                       Foreground="{StaticResource CatppuccinSubtext0}"/>
+        </Grid>
+    </StackPanel>
 </UserControl>

@@ -2,11 +2,13 @@ using System;
 using System.Diagnostics;
 using Avalonia.Threading;
 using Ongenet.App.Services;
+using Ongenet.Core.Audio;
 
 namespace Ongenet.Desktop.Services;
 
 /// <summary>
-/// Samples the current process CPU % and working-set RAM once per second for the transport-bar indicators.
+/// Samples the current process CPU %, working-set RAM, managed heap, and audio render load
+/// once per second for the transport-bar indicators.
 /// </summary>
 public sealed class ProcessSystemMetricsSampler : ISystemMetricsSampler
 {
@@ -21,6 +23,12 @@ public sealed class ProcessSystemMetricsSampler : ISystemMetricsSampler
     public double? CpuPercent { get; private set; }
 
     public long MemoryBytes { get; private set; }
+
+    public long ManagedHeapBytes { get; private set; }
+
+    public double? AudioLoadPercent { get; private set; }
+
+    public long UnderrunCount { get; private set; }
 
     public event Action? Updated;
 
@@ -43,6 +51,7 @@ public sealed class ProcessSystemMetricsSampler : ISystemMetricsSampler
     {
         _process.Refresh();
         MemoryBytes = _process.WorkingSet64;
+        ManagedHeapBytes = GC.GetTotalMemory(forceFullCollection: false);
 
         var nowWallMs = Environment.TickCount64;
         var nowCpu = _process.TotalProcessorTime;
@@ -54,6 +63,13 @@ public sealed class ProcessSystemMetricsSampler : ISystemMetricsSampler
             var pct = cpuDeltaMs / wallDeltaMs / cores * 100.0;
             CpuPercent = Math.Clamp(pct, 0, 100);
         }
+
+        var snap = AudioDiagnostics.Snapshot();
+        UnderrunCount = snap.UnderrunCount;
+        if (snap.BlockBudgetMicroseconds > 0 && snap.LastBlockMicroseconds > 0)
+            AudioLoadPercent = Math.Clamp(snap.LastLoad * 100.0, 0, 999);
+        else
+            AudioLoadPercent = null;
 
         _lastCpuTime = nowCpu;
         _lastWallMs = nowWallMs;

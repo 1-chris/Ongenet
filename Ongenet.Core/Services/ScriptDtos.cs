@@ -23,6 +23,21 @@ public enum ScriptTransportState
     Playing
 }
 
+/// <summary>Title-bar master meter tap exposed to user scripts.</summary>
+public enum ScriptMasterMeterTap
+{
+    PostFader,
+    PreLimiter,
+    PostChain
+}
+
+/// <summary>Dither mode for 16-bit PCM export from scripts.</summary>
+public enum ScriptDitherMode
+{
+    Tpdf,
+    NoiseShaped
+}
+
 /// <summary>Project playback mode exposed to scripts.</summary>
 public enum ScriptPlaybackMode
 {

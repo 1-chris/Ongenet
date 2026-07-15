@@ -104,7 +104,7 @@ public class FieldPatchTests
         inst.Graph.Connect(reverb.Id, "r", outN.Id, "r");
 
         inst.Prepare(Fmt);
-        Assert.True(reverb.IsPreparedFor(Fmt, 2048, FieldGraphCompiler.DefaultMaxVoices));
+        Assert.True(reverb.IsPreparedFor(Fmt, 512, FieldGraphCompiler.DefaultMaxVoices));
 
         inst.NoteOn(60, 1.0f);
         var buffer = new float[512 * 2];

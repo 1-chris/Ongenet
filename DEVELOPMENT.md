@@ -44,12 +44,10 @@ Deep-dive guides for extending and understanding Ongenet live in [`docs/`](docs/
 
 ### Automation design (v1)
 
-Ongenet uses **automation lanes** under tracks (right-click a control → *Automate*), not separate
-**automation clips** as first-class timeline objects. Lanes record and playback curves during arrange
-and offline export. Linked clip groups (`LinkedClipGroupId`) cover pattern reuse; alias-style editing is
-via **Clip → Link clones** in the timeline context menu.
-
-via **Clip → Link clones** in the timeline context menu.
+Ongenet uses **automation lanes** under tracks (right-click a control → **Create automation track**), not
+separate **automation clips** as first-class timeline objects. Lanes record and playback curves during
+arrange and offline export. Linked clip groups (`LinkedClipGroupId`) cover pattern reuse; alias-style
+editing is via **Create linked copy** in the timeline context menu.
 
 Everything else — the audio backend, MIDI, and all plugin hosting (CLAP/LV2/VST2/VST3) — is reached by
 P/Invoke to libraries the OS already ships, so there is **nothing native to compile or install** for a
@@ -135,8 +133,9 @@ workspace bounds.
 
 ### Collaboration sync
 
-Use **File → Share to sync folder** to export a read-only project manifest and copy for folder-based
-collaboration (configure the sync folder in settings).
+Use **Export ▾ → Sync to collaboration folder** to export a read-only project manifest and copy for
+folder-based collaboration (configure the sync folder in settings). Pull with **Export ▾ → Pull from
+collaboration folder**.
 
 ### Accessibility
 
@@ -715,4 +714,4 @@ Ongenet targets a **feature-complete open-source DAW**.
 
 - **Immersive delivery** — **ADM BWF** export (ITU-R BS.2076) with XML sidecar for broadcast handoff
 - **Post interchange** — structured **AAF/OMF XML** and custom timeline XML for Nuendo/Pro Tools pipelines
-- **Collaboration** — self-hosted versioned folder sync (File → Collaboration)
+- **Collaboration** — self-hosted versioned folder sync (**Export ▾ → Sync / Pull**)

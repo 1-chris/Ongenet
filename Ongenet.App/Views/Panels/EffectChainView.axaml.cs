@@ -1,16 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.App.ViewModels.Effects;
 using Ongenet.App.Views.Windows;
+using Ongenet.App.ViewModels;
+using Ongenet.App.Localization;
 
 namespace Ongenet.App.Views.Panels
 {
@@ -24,15 +29,50 @@ namespace Ongenet.App.Views.Panels
     {
         private enum Zone { Above, Replace, Below }
 
+        private EffectChainViewModel? _subscribedChain;
+
         public EffectChainView()
         {
             InitializeComponent();
             PluginEditorHost.EditorStateChanged += OnEditorStateChanged;
+            DataContextChanged += OnDataContextChanged;
 
             DragDrop.SetAllowDrop(this, true);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
             AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        }
+
+        private void OnDataContextChanged(object? sender, EventArgs e)
+        {
+            if (_subscribedChain is not null)
+                _subscribedChain.PropertyChanged -= OnChainPropertyChanged;
+            _subscribedChain = DataContext as EffectChainViewModel;
+            if (_subscribedChain is not null)
+                _subscribedChain.PropertyChanged += OnChainPropertyChanged;
+        }
+
+        private void OnChainPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(EffectChainViewModel.HighlightedEffectIndex))
+                ScrollToHighlightedEffect();
+        }
+
+        private void ScrollToHighlightedEffect()
+        {
+            if (DataContext is not EffectChainViewModel vm) return;
+            var index = vm.HighlightedEffectIndex;
+            if (index < 0 || index >= vm.Effects.Count) return;
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                var containers = EffectList.GetVisualDescendants()
+                    .OfType<ContentPresenter>()
+                    .Where(c => c.DataContext is EffectViewModel)
+                    .ToList();
+                if (index < containers.Count)
+                    containers[index].BringIntoView();
+            }, DispatcherPriority.Loaded);
         }
 
         // Only effects / effect-presets are zoned onto a card; whole FX-chain presets always append.
@@ -180,6 +220,64 @@ namespace Ongenet.App.Views.Panels
 
             var path = files.FirstOrDefault()?.TryGetLocalPath();
             if (!string.IsNullOrEmpty(path)) vm.LoadImpulseFromPath(path);
+        }
+
+        private async void OnBrowseReference(object? sender, RoutedEventArgs e)
+            => await BrowseReferenceAsync(slot: 0);
+
+        private async void OnBrowseReferenceB(object? sender, RoutedEventArgs e)
+            => await BrowseReferenceAsync(slot: 1);
+
+        private async Task BrowseReferenceAsync(int slot)
+        {
+            if (DataContext is not EffectChainViewModel vm) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top is null) return;
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = slot == 1
+                    ? "Browse reference B"
+                    : Loc.Get("Mastering_Reference_Browse"),
+                AllowMultiple = false,
+                FileTypeFilter = new List<FilePickerFileType>
+                {
+                    new("Audio")
+                    {
+                        Patterns = new[] { "*.wav", "*.wave", "*.flac", "*.aiff", "*.aif" }
+                    },
+                    new("WAV") { Patterns = new[] { "*.wav", "*.wave" } },
+                    new("FLAC") { Patterns = new[] { "*.flac" } },
+                    new("AIFF") { Patterns = new[] { "*.aiff", "*.aif" } }
+                }
+            });
+            var path = files.FirstOrDefault()?.TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path)) await vm.LoadReferenceAsync(path, slot);
+        }
+
+        private void OnReferencePressed(object? sender, PointerPressedEventArgs e)
+        {
+            (DataContext as EffectChainViewModel)?.StartReferenceAudition();
+            e.Handled = true;
+        }
+
+        private void OnReferenceReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            (DataContext as EffectChainViewModel)?.StopReferenceAudition();
+            e.Handled = true;
+        }
+
+        private void OnOpenMasteringGuide(object? sender, RoutedEventArgs e)
+        {
+            var owner = TopLevel.GetTopLevel(this) as Window;
+            if (owner is null) return;
+            var guide = new GuideWindow();
+            if (guide.DataContext is GuideViewModel vm)
+                vm.Selected = vm.Sections.FirstOrDefault(s =>
+                                  s.Title == Loc.Get("Guide_Mastering_Title", "Mastering")
+                                  || s.Title.Contains("Mastering", StringComparison.OrdinalIgnoreCase))
+                              ?? vm.Sections.FirstOrDefault(s => s.Title == Loc.Get("Guide_Mixer_Title"))
+                              ?? vm.Selected;
+            guide.Show(owner);
         }
 
         // Refresh the matching effect card's open/close button when its editor's state changes.

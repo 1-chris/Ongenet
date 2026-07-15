@@ -29,16 +29,25 @@ public sealed class MultibandCompressorEffect : IAudioEffect
     /// <summary>Factory mastering macro preset index.</summary>
     public int MasteringPresetIndex { get; set; }
 
-    // Fixed crossover points (Hz): low/mid around the body split, mid/high around the presence split.
-    private const double LowCrossHz = 200.0;
-    private const double HighCrossHz = 2500.0;
+    public double LowCrossoverHz { get; set; } = 200.0;
+    public double HighCrossoverHz { get; set; } = 2500.0;
+    public double ThresholdDb { get; set; } = -30.0;
+    public double DownRatio { get; set; } = 4.0;
+    public double UpRatio { get; set; } = 3.0;
+    public double MaxUpwardDb { get; set; } = 12.0;
+    public bool SoloLow { get; set; }
+    public bool SoloMid { get; set; }
+    public bool SoloHigh { get; set; }
+    public bool MuteLow { get; set; }
+    public bool MuteMid { get; set; }
+    public bool MuteHigh { get; set; }
 
-    // OTT band behaviour: a single threshold per band — clamp downward above it, lift upward below
-    // it — so loud peaks are tamed while quiet detail and harmonics are pushed up ("inflated").
-    private const double ThresholdDb = -30.0;
-    private const double DownRatio = 4.0;
-    private const double UpRatio = 3.0;
-    private const double MaxUpwardDb = 12.0;
+    public double LowEnergy { get; private set; }
+    public double MidEnergy { get; private set; }
+    public double HighEnergy { get; private set; }
+    public double LowGainReductionDb { get; private set; }
+    public double MidGainReductionDb { get; private set; }
+    public double HighGainReductionDb { get; private set; }
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
@@ -46,11 +55,12 @@ public sealed class MultibandCompressorEffect : IAudioEffect
     private BiquadCoefficients _lp = BiquadCoefficients.Identity;
     private BiquadCoefficients _hp = BiquadCoefficients.Identity;
 
-    // Per-channel band-split filters and per-channel/per-band envelope followers.
     private Biquad[] _lpState = Array.Empty<Biquad>();
     private Biquad[] _hpState = Array.Empty<Biquad>();
     private EnvelopeFollower[,] _env = new EnvelopeFollower[0, 0];
-    private int _lastPresetIndex;
+    private int _lastPresetIndex = -1;
+    private double _lastLowCross = -1;
+    private double _lastHighCross = -1;
 
     public string Name => "Multiband (OTT)";
 
@@ -60,18 +70,35 @@ public sealed class MultibandCompressorEffect : IAudioEffect
     {
         new ChoiceParameter("Preset",
             Array.ConvertAll(MasteringPresetBank.MultibandPresets, p => p.Name),
-            () => MasteringPresetIndex, v => MasteringPresetIndex = v),
+            () => MasteringPresetIndex, v => MasteringPresetIndex = v,
+            Array.ConvertAll(MasteringPresetBank.MultibandPresets, p => p.Description)),
         new FloatParameter("Depth", 0.0, 1.0, () => Depth, v => Depth = v),
-        new FloatParameter("High Boost", 0.0, 9.0, () => HighBoostDb, v => HighBoostDb = v, "0.#", "dB")
+        new FloatParameter("High Boost", 0.0, 9.0, () => HighBoostDb, v => HighBoostDb = v, "0.#", "dB"),
+        new FloatParameter("Low Cross", 40.0, 800.0, () => LowCrossoverHz, v => LowCrossoverHz = v, "0", "Hz", 2.0)
+            { Group = "Crossovers" },
+        new FloatParameter("High Cross", 800.0, 8000.0, () => HighCrossoverHz, v => HighCrossoverHz = v, "0", "Hz", 2.0)
+            { Group = "Crossovers" },
+        new FloatParameter("Threshold", -60.0, 0.0, () => ThresholdDb, v => ThresholdDb = v, "0.#", "dB")
+            { Group = "Dynamics" },
+        new FloatParameter("Down Ratio", 1.0, 20.0, () => DownRatio, v => DownRatio = v, "0.#")
+            { Group = "Dynamics" },
+        new FloatParameter("Up Ratio", 1.0, 20.0, () => UpRatio, v => UpRatio = v, "0.#")
+            { Group = "Dynamics" },
+        new FloatParameter("Max Upward", 0.0, 24.0, () => MaxUpwardDb, v => MaxUpwardDb = v, "0.#", "dB")
+            { Group = "Dynamics" },
+        new BoolParameter("Solo Low", () => SoloLow, v => SoloLow = v) { Group = "Band Audition" },
+        new BoolParameter("Solo Mid", () => SoloMid, v => SoloMid = v) { Group = "Band Audition" },
+        new BoolParameter("Solo High", () => SoloHigh, v => SoloHigh = v) { Group = "Band Audition" },
+        new BoolParameter("Mute Low", () => MuteLow, v => MuteLow = v) { Group = "Band Audition" },
+        new BoolParameter("Mute Mid", () => MuteMid, v => MuteMid = v) { Group = "Band Audition" },
+        new BoolParameter("Mute High", () => MuteHigh, v => MuteHigh = v) { Group = "Band Audition" }
     };
 
     public void Prepare(AudioFormat format)
     {
         _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
         _channels = format.Channels < 1 ? 1 : format.Channels;
-
-        var lp = BiquadCoefficients.Compute(FilterMode.LowPass, LowCrossHz, 0.707, _sampleRate);
-        var hp = BiquadCoefficients.Compute(FilterMode.HighPass, HighCrossHz, 0.707, _sampleRate);
+        RebuildFilters(force: true);
 
         var lpState = new Biquad[_channels];
         var hpState = new Biquad[_channels];
@@ -87,20 +114,36 @@ public sealed class MultibandCompressorEffect : IAudioEffect
             }
         }
 
-        // Publish fully-built state with single assignments — RebuildTracks can call Prepare from the UI
-        // thread while Process runs on the audio thread (e.g. after "Render clip to new track").
-        _lp = lp;
-        _hp = hp;
         _lpState = lpState;
         _hpState = hpState;
         _env = env;
+    }
+
+    private void RebuildFilters(bool force = false)
+    {
+        var low = Math.Clamp(LowCrossoverHz, 40.0, 800.0);
+        var high = Math.Clamp(HighCrossoverHz, Math.Max(low + 50.0, 800.0), 8000.0);
+        LowCrossoverHz = low;
+        HighCrossoverHz = high;
+        if (!force && Math.Abs(low - _lastLowCross) < 0.01 && Math.Abs(high - _lastHighCross) < 0.01)
+            return;
+        _lastLowCross = low;
+        _lastHighCross = high;
+        _lp = BiquadCoefficients.Compute(FilterMode.LowPass, low, 0.707, _sampleRate);
+        _hp = BiquadCoefficients.Compute(FilterMode.HighPass, high, 0.707, _sampleRate);
     }
 
     public IAudioEffect Clone()
     {
         var c = new MultibandCompressorEffect
         {
-            Enabled = Enabled, Depth = Depth, HighBoostDb = HighBoostDb, MasteringPresetIndex = MasteringPresetIndex
+            Enabled = Enabled, Depth = Depth, HighBoostDb = HighBoostDb,
+            MasteringPresetIndex = MasteringPresetIndex,
+            LowCrossoverHz = LowCrossoverHz, HighCrossoverHz = HighCrossoverHz,
+            ThresholdDb = ThresholdDb, DownRatio = DownRatio, UpRatio = UpRatio,
+            MaxUpwardDb = MaxUpwardDb,
+            SoloLow = SoloLow, SoloMid = SoloMid, SoloHigh = SoloHigh,
+            MuteLow = MuteLow, MuteMid = MuteMid, MuteHigh = MuteHigh
         };
         c._lastPresetIndex = MasteringPresetIndex;
         return c;
@@ -109,6 +152,7 @@ public sealed class MultibandCompressorEffect : IAudioEffect
     public void Process(Span<float> buffer)
     {
         ApplyPresetIfChanged();
+        RebuildFilters();
         var lpState = _lpState;
         var hpState = _hpState;
         var env = _env;
@@ -120,8 +164,18 @@ public sealed class MultibandCompressorEffect : IAudioEffect
         var hp = _hp;
         var depth = (float)Math.Clamp(Depth, 0, 1);
         var highBoost = (float)AudioMath.Db2Lin(HighBoostDb);
+        var threshold = ThresholdDb;
+        var downRatio = Math.Max(1.0, DownRatio);
+        var upRatio = Math.Max(1.0, UpRatio);
+        var maxUp = MaxUpwardDb;
+        var anySolo = SoloLow || SoloMid || SoloHigh;
+        var hearLow = !MuteLow && (!anySolo || SoloLow);
+        var hearMid = !MuteMid && (!anySolo || SoloMid);
+        var hearHigh = !MuteHigh && (!anySolo || SoloHigh);
 
         var frames = buffer.Length / channels;
+        double lowEnergy = 0, midEnergy = 0, highEnergy = 0;
+        double lowGr = 0, midGr = 0, highGr = 0;
         for (var frame = 0; frame < frames; frame++)
         {
             var i = frame * channels;
@@ -129,7 +183,6 @@ public sealed class MultibandCompressorEffect : IAudioEffect
             {
                 var dry = buffer[i + c];
 
-                // Split into three bands (spectral subtraction keeps the sum coherent).
                 var low = (float)lpState[c].Process(lp, dry);
                 var high = (float)hpState[c].Process(hp, dry);
                 var mid = dry - low - high;
@@ -139,29 +192,40 @@ public sealed class MultibandCompressorEffect : IAudioEffect
                 var envHigh = env[c, 2];
                 if (envLow is null || envMid is null || envHigh is null) continue;
 
-                low = BandGain(low, envLow) * low;
-                mid = BandGain(mid, envMid) * mid;
-                high = BandGain(high, envHigh) * high * highBoost;
+                low = BandGain(low, envLow, threshold, downRatio, upRatio, maxUp, out var lowGainDb) * low;
+                mid = BandGain(mid, envMid, threshold, downRatio, upRatio, maxUp, out var midGainDb) * mid;
+                high = BandGain(high, envHigh, threshold, downRatio, upRatio, maxUp, out var highGainDb) * high * highBoost;
+                lowEnergy += low * low;
+                midEnergy += mid * mid;
+                highEnergy += high * high;
+                lowGr = Math.Min(lowGr, lowGainDb);
+                midGr = Math.Min(midGr, midGainDb);
+                highGr = Math.Min(highGr, highGainDb);
 
-                var wet = low + mid + high;
+                var wet = (hearLow ? low : 0f) + (hearMid ? mid : 0f) + (hearHigh ? high : 0f);
                 buffer[i + c] = dry * (1 - depth) + wet * depth;
             }
         }
+        var count = Math.Max(1, frames * channels);
+        LowEnergy = LowEnergy * 0.75 + Math.Sqrt(lowEnergy / count) * 0.25;
+        MidEnergy = MidEnergy * 0.75 + Math.Sqrt(midEnergy / count) * 0.25;
+        HighEnergy = HighEnergy * 0.75 + Math.Sqrt(highEnergy / count) * 0.25;
+        LowGainReductionDb = lowGr;
+        MidGainReductionDb = midGr;
+        HighGainReductionDb = highGr;
     }
 
-    // The OTT gain for one band: downward compression above the threshold, upward compression
-    // (a lift toward the threshold) below it — the two together "inflate" the band.
-    private static float BandGain(float sample, EnvelopeFollower follower)
+    private static float BandGain(float sample, EnvelopeFollower follower,
+        double thresholdDb, double downRatio, double upRatio, double maxUpwardDb, out double gainDb)
     {
         var rect = sample < 0 ? -sample : sample;
         var env = follower.Process(rect);
         var levelDb = AudioMath.Lin2Db(env);
 
-        double gainDb;
-        if (levelDb > ThresholdDb)
-            gainDb = -(levelDb - ThresholdDb) * (1.0 - 1.0 / DownRatio);
+        if (levelDb > thresholdDb)
+            gainDb = -(levelDb - thresholdDb) * (1.0 - 1.0 / downRatio);
         else
-            gainDb = Math.Min(MaxUpwardDb, (ThresholdDb - levelDb) * (1.0 - 1.0 / UpRatio));
+            gainDb = Math.Min(maxUpwardDb, (thresholdDb - levelDb) * (1.0 - 1.0 / upRatio));
 
         return (float)AudioMath.Db2Lin(gainDb);
     }

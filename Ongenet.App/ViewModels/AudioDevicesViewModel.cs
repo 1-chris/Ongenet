@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Threading;
@@ -110,6 +111,32 @@ namespace Ongenet.App.ViewModels
         }
 
         public bool ShowWasapiExclusive => SelectedBackend?.Id is "wasapi" or "win";
+
+        /// <summary>True on macOS where the CoreAudio producer lead is relevant.</summary>
+        public bool ShowCoreAudioLead =>
+            OperatingSystem.IsMacOS();
+
+        public int[] CoreAudioLeadOptions { get; } = { 2048, 4096 };
+
+        /// <summary>
+        /// CoreAudio producer lead frames. Applied on next audio engine restart.
+        /// </summary>
+        public int CoreAudioLeadFrames
+        {
+            get => _settings?.Current.CoreAudioLeadFrames is 4096 ? 4096 : 2048;
+            set
+            {
+                var frames = value is 4096 ? 4096 : 2048;
+                if (_settings is null) return;
+                if (_settings.Current.CoreAudioLeadFrames == frames
+                    && AudioRuntimeOptions.CoreAudioLeadFrames == frames)
+                    return;
+                _settings.Current.CoreAudioLeadFrames = frames;
+                AudioRuntimeOptions.CoreAudioLeadFrames = frames;
+                OnPropertyChanged();
+                _settings.CaptureAndSave();
+            }
+        }
 
         public bool MidiClockEnabled
         {

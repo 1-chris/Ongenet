@@ -61,7 +61,9 @@ public static class DarkDnbSongFactory
             ColorKey = "CatppuccinSubtext0",
             Volume = 1.0
         };
-        master.Effects.Add(new LimiterEffect { CeilingDb = -0.5, ReleaseMs = 90 });
+        // Club Loud suits DnB peak energy; keep Spectrum via Full Master polarity with club ceiling.
+        MasteringChains.Add(master.Effects, "club");
+        master.Effects.Add(new SpectrumEffect());
         master.Effects.Add(new WaveformVisualizerEffect());
         project.Tracks.Add(master);
 

@@ -11,7 +11,7 @@ namespace Ongenet.Core.Audio.Effects;
 /// in the UI (a reusable Engine3D control); this effect just exposes the captured waveform via
 /// <see cref="IWaveformSource"/>. A demo of the engine's GPU 3D controls.
 /// </summary>
-public sealed class WaveformVisualizerEffect : IAudioEffect, IWaveformSource
+public sealed class WaveformVisualizerEffect : IAudioEffect, IWaveformSource, IAnalyserOnlyEffect
 {
     public const string TypeId = "waveform-visualizer";
 

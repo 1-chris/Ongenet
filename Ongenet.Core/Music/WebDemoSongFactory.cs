@@ -10,6 +10,8 @@ namespace Ongenet.Core.Music;
 /// Builds "Web Demo" — a barebones house sketch for the browser/Android startup path
 /// (A minor, 124 BPM, 16 bars). Kick + hats + quarter-note bass only; no pads, reverb, or
 /// sidechain so the main-thread ScriptProcessor path has as little DSP as possible.
+/// Uses Streaming Master (EQ → glue → Peak Limiter → Spectrum) instead of Full Master to
+/// keep the WASM/Android CPU budget low while still providing a true-peak-safe ceiling.
 /// </summary>
 public static class WebDemoSongFactory
 {
@@ -37,8 +39,12 @@ public static class WebDemoSongFactory
             ColorKey = "CatppuccinSubtext0",
             Volume = 1.0
         };
-        // Soft ceiling only — cheaper than a dense FX graph on the web path.
-        master.Effects.Add(new LimiterEffect { CeilingDb = -0.5, ReleaseMs = 100 });
+        // Lightweight streaming ceiling — EQ → glue → Peak Limiter only (no Spectrum analyser on the web path).
+        foreach (var fx in MasteringChains.Create("streaming"))
+        {
+            if (fx is SpectrumEffect) continue;
+            master.Effects.Add(fx);
+        }
         project.Tracks.Add(master);
 
         project.Tracks.Add(BuildKick());

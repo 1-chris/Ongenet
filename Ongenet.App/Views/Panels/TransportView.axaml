@@ -4,172 +4,176 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Ongenet.App.ViewModels"
              xmlns:controls="using:Ongenet.App.Controls"
-             xmlns:audio="using:Ongenet.Core.Audio"
              xmlns:Automation="using:Avalonia.Automation"
-             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="48"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="72"
              x:Class="Ongenet.App.Views.Panels.TransportView"
              x:DataType="vm:TransportViewModel">
 
     <Border Classes="panel" Padding="12,7">
-        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+        <Grid RowDefinitions="Auto,Auto" ClipToBounds="True">
 
-            <!-- Col 0: transport cluster -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
-                        VerticalAlignment="Center" Margin="0,0,12,0">
-                <controls:IconButton Classes="large success"
-                                     Icon="{StaticResource IconPlay}"
-                                     Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"
-                                     ToolTip.Tip="{DynamicResource Transport_Play_Space_Tip}"
-                                     Automation:AutomationProperties.Name="{DynamicResource Transport_Play_A11yName}"
-                                     Automation:AutomationProperties.HelpText="{DynamicResource Transport_Start_playback_from_the_playhead}"/>
-                <controls:IconButton Classes="danger"
-                                     Icon="{StaticResource IconStop}"
-                                     Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
-                                     ToolTip.Tip="{DynamicResource Transport_Stop_Space_Tip}"
-                                     Automation:AutomationProperties.Name="{DynamicResource Transport_Stop_A11yName}"
-                                     Automation:AutomationProperties.HelpText="{DynamicResource Transport_Stop_playback_and_return_to_start}"/>
-                <controls:IconButton Classes="record"
-                                     Classes.active="{Binding IsRecording}"
-                                     Icon="{StaticResource IconRecord}"
-                                     Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}"
-                                     ToolTip.Tip="{DynamicResource Transport_Record_one_bar_count_in_into_armed_tracks_Tip}"
-                                     Automation:AutomationProperties.Name="{DynamicResource Transport_Record_A11yName}"
-                                     Automation:AutomationProperties.HelpText="{DynamicResource Transport_Record_into_armed_tracks_with_count_in}"/>
-            </StackPanel>
-
-            <Border Grid.Column="1" Classes="divider vertical" Margin="0,4,12,4"/>
-
-            <!-- Col 2: time readout + edit-mode/loop tools -->
-            <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center" Margin="0,0,12,0">
-                <StackPanel Orientation="Horizontal" Spacing="5">
+            <!-- Row 0: primary transport + time + tempo/project + metronome -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,4" ClipToBounds="True">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
+                            VerticalAlignment="Center" Margin="0,0,12,0">
+                    <controls:IconButton Classes="large success"
+                                         Icon="{StaticResource IconPlay}"
+                                         Command="{Binding PlayCommand}" IsEnabled="{Binding CanPlay}"
+                                         ToolTip.Tip="{DynamicResource Transport_Play_Space_Tip}"
+                                         Automation:AutomationProperties.Name="{DynamicResource Transport_Play_A11yName}"
+                                         Automation:AutomationProperties.HelpText="{DynamicResource Transport_Start_playback_from_the_playhead}"/>
+                    <controls:IconButton Classes="danger"
+                                         Icon="{StaticResource IconStop}"
+                                         Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
+                                         ToolTip.Tip="{DynamicResource Transport_Stop_Space_Tip}"
+                                         Automation:AutomationProperties.Name="{DynamicResource Transport_Stop_A11yName}"
+                                         Automation:AutomationProperties.HelpText="{DynamicResource Transport_Stop_playback_and_return_to_start}"/>
+                    <controls:IconButton Classes="record"
+                                         Classes.active="{Binding IsRecording}"
+                                         Icon="{StaticResource IconRecord}"
+                                         Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}"
+                                         ToolTip.Tip="{DynamicResource Transport_Record_one_bar_count_in_into_armed_tracks_Tip}"
+                                         Automation:AutomationProperties.Name="{DynamicResource Transport_Record_A11yName}"
+                                         Automation:AutomationProperties.HelpText="{DynamicResource Transport_Record_into_armed_tracks_with_count_in}"/>
+                    <Border Classes="divider vertical" Margin="8,4,8,4"/>
                     <!-- Render-only control (not a TextBlock): the playhead time changes ~30x/sec while
                          playing, and a bound TextBlock re-runs an expensive measure layout each frame. -->
                     <controls:TimeReadoutControl Text="{Binding PlayheadTime}" FontSize="14"
                                                  VerticalAlignment="Center"/>
                     <TextBlock Text="{DynamicResource Transport_Text}" VerticalAlignment="Center"
-                               Foreground="{StaticResource CatppuccinOverlay1}"/>
+                               Foreground="{StaticResource CatppuccinOverlay1}" Margin="5,0"/>
                     <TextBlock Classes="mono" Text="{Binding TotalTime}" FontSize="14"
                                VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <ToggleButton Classes="toggle" IsChecked="{Binding IsSliceMode}"
-                                  ToolTip.Tip="{DynamicResource Transport_Slice_mode_click_a_clip_to_cut_it_at_the_grid_or_Tip}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Path Classes="icon small" Data="{StaticResource IconScissors}"/>
-                            <TextBlock Text="{DynamicResource Transport_Slice}" VerticalAlignment="Center"/>
+
+                <Panel Grid.Column="1" ClipToBounds="True">
+                    <StackPanel Orientation="Horizontal" Spacing="8"
+                                VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Classes="caption" Text="{DynamicResource Transport_Tempo}" VerticalAlignment="Center"/>
+                        <NumericUpDown Classes="compact" x:Name="TempoEditor" Value="{Binding Bpm}"
+                                       Minimum="1" Maximum="999" Increment="1"
+                                       FormatString="0.#" Width="88"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="{DynamicResource Transport_Tempo_BPM_Right_click_to_automate_on_the_master__Tip}"
+                                       Automation:AutomationProperties.Name="{DynamicResource Transport_Tempo_A11yName}"
+                                       Automation:AutomationProperties.HelpText="{DynamicResource Transport_Project_tempo_in_beats_per_minute}"/>
+                        <Button Classes="flat compact" Content="{DynamicResource Transport_Tap}" Command="{Binding TapTempoCommand}"
+                                ToolTip.Tip="{DynamicResource Transport_Tap_two_to_four_times_to_set_tempo_Tip}"/>
+                        <TextBlock Classes="caption" Text="{DynamicResource Transport_BPM}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Classes="caption" Text="{DynamicResource Transport_Bars}" VerticalAlignment="Center"/>
+                        <NumericUpDown Classes="compact" Value="{Binding Bars}"
+                                       Minimum="1" Maximum="999" Increment="1"
+                                       FormatString="0" Width="88" MinWidth="88"
+                                       VerticalAlignment="Center"/>
+                        <TextBlock Classes="caption" Text="{DynamicResource Transport_Time}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <NumericUpDown Classes="compact" x:Name="TimeSigEditor" Value="{Binding TimeSigNumerator}" Minimum="1" Maximum="32" Increment="1"
+                                       FormatString="0" Width="88" MinWidth="88" VerticalAlignment="Center"
+                                       ToolTip.Tip="{DynamicResource Transport_Beats_per_bar_Right_click_to_automate_on_the_mas_Tip}"/>
+                        <TextBlock Text="{DynamicResource Transport_Text}" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                        <ComboBox Classes="compact" ItemsSource="{Binding Denominators}" SelectedItem="{Binding TimeSigDenominator}"
+                                  Width="70" VerticalAlignment="Center"/>
+                        <TextBlock Classes="caption" Text="{DynamicResource Transport_Key}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <ComboBox Classes="compact" ItemsSource="{Binding KeyRootNotes}" SelectedIndex="{Binding KeyRootIndex}"
+                                  Width="52" VerticalAlignment="Center"
+                                  ToolTip.Tip="{DynamicResource Transport_Global_key_root_for_scale_snapping_in_the_piano__Tip}"/>
+                        <ComboBox Classes="compact" ItemsSource="{Binding KeyScales}" SelectedItem="{Binding KeyScale}"
+                                  Width="120" VerticalAlignment="Center"
+                                  ToolTip.Tip="{DynamicResource Transport_Global_scale_mode_for_the_piano_roll_Tip}"/>
+                    </StackPanel>
+                </Panel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10"
+                            VerticalAlignment="Center" Margin="12,0,0,0">
+                    <ToggleButton Classes="toggle" IsChecked="{Binding MetronomeEnabled}"
+                                  ToolTip.Tip="{DynamicResource Transport_Metronome_click_during_playback_Tip}"
+                                  Automation:AutomationProperties.Name="{DynamicResource Transport_Metronome_A11yName}"
+                                  Automation:AutomationProperties.HelpText="{DynamicResource Transport_Toggle_metronome_click_during_playback}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Path Classes="icon small" Data="{StaticResource IconMetronome}"/>
+                            <TextBlock Text="{DynamicResource Transport_Click}" VerticalAlignment="Center" FontSize="11"/>
                         </StackPanel>
                     </ToggleButton>
-                    <controls:IconButton Classes="flat" Icon="{StaticResource IconChevronRight}"
-                                         Command="{Binding SetLoopStartCommand}"
-                                         ToolTip.Tip="{DynamicResource Transport_Set_loop_start_to_the_cursor_Shift_Tip}"/>
-                    <controls:IconButton Classes="flat" Icon="{StaticResource IconChevronLeft}"
-                                         Command="{Binding SetLoopEndCommand}"
-                                         ToolTip.Tip="{DynamicResource Transport_Set_loop_end_to_the_cursor_Shift_Tip}"/>
-                    <controls:IconButton Classes="flat active" Icon="{StaticResource IconLoop}"
-                                         IsVisible="{Binding IsLooping}" IsHitTestVisible="False"
-                                         ToolTip.Tip="{DynamicResource Transport_Loop_region_active_Tip}"/>
-                    <ToggleButton Classes="toggle" IsChecked="{Binding LoopRecording}"
-                                  ToolTip.Tip="{DynamicResource Transport_Loop_recording_restart_at_loop_end_Tip}">
-                        <TextBlock Text="{DynamicResource Transport_Loop_rec}" VerticalAlignment="Center"/>
-                    </ToggleButton>
-                    <ComboBox Classes="compact" ItemsSource="{Binding PlaybackModes}" SelectedItem="{Binding PlaybackMode}"
-                              Width="110" VerticalAlignment="Center"
-                              ToolTip.Tip="{DynamicResource Transport_Arrangement_Session_or_Hybrid_playback_Tip}"/>
-                    <Button Classes="flat compact" Content="{DynamicResource Transport_P}" Command="{Binding SetPunchInCommand}"
-                            ToolTip.Tip="{DynamicResource Transport_Set_punch_in_to_cursor_Tip}"/>
-                    <Button Classes="flat compact" Content="{DynamicResource Transport_P_2}" Command="{Binding SetPunchOutCommand}"
-                            ToolTip.Tip="{DynamicResource Transport_Set_punch_out_to_cursor_Tip}"/>
-                    <Button Classes="flat compact" Content="{DynamicResource Transport_Clear_punch}" Command="{Binding ClearPunchCommand}"
-                            IsVisible="{Binding HasPunchRegion}"
-                            ToolTip.Tip="{DynamicResource Transport_Clear_punch_Tip}"/>
-                    <Button Classes="flat compact" Content="{DynamicResource Transport_M}" Command="{Binding AddMarkerAtPlayheadCommand}"
-                            ToolTip.Tip="{DynamicResource Transport_Add_arrangement_marker_at_playhead_Tip}"/>
-                    <Button Classes="flat compact" Content="{DynamicResource Transport_M_2}" Command="{Binding GoToNextMarkerCommand}"
-                            ToolTip.Tip="{DynamicResource Transport_Go_to_next_marker_Tip}"/>
-                    <Button Classes="flat compact" Content="{DynamicResource Transport_M_3}" Command="{Binding GoToPreviousMarkerCommand}"
-                            ToolTip.Tip="{DynamicResource Transport_Go_to_previous_marker_Tip}"/>
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding RenderProgress}"
+                                 Width="90" Height="8" VerticalAlignment="Center"
+                                 IsVisible="{Binding IsRendering}"
+                                 Foreground="{StaticResource CatppuccinMauve}"
+                                 ToolTip.Tip="{DynamicResource Transport_Rendering_Tip}"/>
+                    <Button Classes="compact" Click="OnExportMidi"
+                            ToolTip.Tip="{DynamicResource Transport_Export_all_instrument_track_MIDI_to_a_mid_file_Tip}">
+                        <TextBlock Text="{DynamicResource Transport_MIDI}" VerticalAlignment="Center" FontSize="11"/>
+                    </Button>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
 
-            <!-- Centre: tempo + bars + time signature -->
-            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8"
-                        VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Classes="caption" Text="{DynamicResource Transport_Tempo}" VerticalAlignment="Center"/>
-                <NumericUpDown Classes="compact" x:Name="TempoEditor" Value="{Binding Bpm}"
-                               Minimum="1" Maximum="999" Increment="1"
-                               FormatString="0.#" Width="110"
-                               VerticalAlignment="Center"
-                               ToolTip.Tip="{DynamicResource Transport_Tempo_BPM_Right_click_to_automate_on_the_master__Tip}"
-                               Automation:AutomationProperties.Name="{DynamicResource Transport_Tempo_A11yName}"
-                               Automation:AutomationProperties.HelpText="{DynamicResource Transport_Project_tempo_in_beats_per_minute}"/>
-                <Button Classes="flat compact" Content="{DynamicResource Transport_Tap}" Command="{Binding TapTempoCommand}"
-                        ToolTip.Tip="{DynamicResource Transport_Tap_two_to_four_times_to_set_tempo_Tip}"/>
-                <TextBlock Classes="caption" Text="{DynamicResource Transport_BPM}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowLink}"
-                            VerticalAlignment="Center" Margin="0,0,8,0">
-                    <ToggleButton Classes="toggle" IsChecked="{Binding IsLinkEnabled}"
-                                  ToolTip.Tip="{DynamicResource Transport_Enable_Ableton_Link_tempo_phase_sync_Tip}">
-                        <TextBlock Text="{Binding LinkPeerText}" VerticalAlignment="Center" FontSize="11"/>
-                    </ToggleButton>
-                    <TextBlock Text="{Binding LinkPhaseText}" FontSize="10" VerticalAlignment="Center"
-                               Foreground="{StaticResource CatppuccinOverlay1}"/>
-                    <TextBlock Text="{Binding LinkSessionBeatText}" FontSize="10" VerticalAlignment="Center"
-                               Foreground="{StaticResource CatppuccinOverlay1}"/>
-                </StackPanel>
-                <TextBlock Classes="caption" Text="{DynamicResource Transport_Bars}" VerticalAlignment="Center"/>
-                <NumericUpDown Classes="compact" Value="{Binding Bars}"
-                               Minimum="1" Maximum="999" Increment="1"
-                               FormatString="0" Width="120" MinWidth="120"
-                               VerticalAlignment="Center"/>
-
-                <TextBlock Classes="caption" Text="{DynamicResource Transport_Time}" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                <NumericUpDown Classes="compact" x:Name="TimeSigEditor" Value="{Binding TimeSigNumerator}" Minimum="1" Maximum="32" Increment="1"
-                               FormatString="0" Width="100" MinWidth="100" VerticalAlignment="Center"
-                               ToolTip.Tip="{DynamicResource Transport_Beats_per_bar_Right_click_to_automate_on_the_mas_Tip}"/>
-                <TextBlock Text="{DynamicResource Transport_Text}" VerticalAlignment="Center" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <ComboBox Classes="compact" ItemsSource="{Binding Denominators}" SelectedItem="{Binding TimeSigDenominator}"
-                          Width="70" VerticalAlignment="Center"/>
-                <TextBlock Classes="caption" Text="{DynamicResource Transport_Key}" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                <ComboBox Classes="compact" ItemsSource="{Binding KeyRootNotes}" SelectedIndex="{Binding KeyRootIndex}"
-                          Width="52" VerticalAlignment="Center"
-                          ToolTip.Tip="{DynamicResource Transport_Global_key_root_for_scale_snapping_in_the_piano__Tip}"/>
-                <ComboBox Classes="compact" ItemsSource="{Binding KeyScales}" SelectedItem="{Binding KeyScale}"
-                          Width="120" VerticalAlignment="Center"
-                          ToolTip.Tip="{DynamicResource Transport_Global_scale_mode_for_the_piano_roll_Tip}"/>
-                <Button Classes="flat compact" Content="{DynamicResource Transport_Cap_MIDI}" Command="{Binding CaptureRetrospectiveMidiCommand}"
-                        ToolTip.Tip="{DynamicResource Transport_Capture_recently_played_MIDI_into_a_clip_at_the__Tip}"/>
-                <ToggleButton Classes="toggle" IsChecked="{Binding SessionRecordArmed}"
-                              ToolTip.Tip="Arm session capture — logs clip launches during playback for materializing to the arrangement">
-                    <TextBlock Text="Session Rec" VerticalAlignment="Center" FontSize="11"/>
-                </ToggleButton>
-                <ToggleButton Classes="toggle" IsChecked="{Binding MidiInstrumentInputEnabled}"
-                              ToolTip.Tip="Route MIDI notes and controllers to the selected instrument (disable for session/controller use)">
-                    <TextBlock Text="MIDI Keys" VerticalAlignment="Center" FontSize="11"/>
-                </ToggleButton>
-            </StackPanel>
-
-            <!-- Col 4: metronome + render progress + MIDI export -->
-            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="10"
-                        VerticalAlignment="Center" HorizontalAlignment="Right">
-                <ToggleButton Classes="toggle" IsChecked="{Binding MetronomeEnabled}"
-                              ToolTip.Tip="{DynamicResource Transport_Metronome_click_during_playback_Tip}"
-                              Automation:AutomationProperties.Name="{DynamicResource Transport_Metronome_A11yName}"
-                              Automation:AutomationProperties.HelpText="{DynamicResource Transport_Toggle_metronome_click_during_playback}">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Path Classes="icon small" Data="{StaticResource IconMetronome}"/>
-                        <TextBlock Text="{DynamicResource Transport_Click}" VerticalAlignment="Center" FontSize="11"/>
+            <!-- Row 1: edit / loop / punch / markers + secondary toggles -->
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ClipToBounds="True">
+                <Panel Grid.Column="0" ClipToBounds="True">
+                    <StackPanel Orientation="Horizontal" Spacing="4"
+                                VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <ToggleButton Classes="toggle" IsChecked="{Binding IsSliceMode}"
+                                      ToolTip.Tip="{DynamicResource Transport_Slice_mode_click_a_clip_to_cut_it_at_the_grid_or_Tip}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="icon small" Data="{StaticResource IconScissors}"/>
+                                <TextBlock Text="{DynamicResource Transport_Slice}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ToggleButton>
+                        <controls:IconButton Classes="flat" Icon="{StaticResource IconChevronRight}"
+                                             Command="{Binding SetLoopStartCommand}"
+                                             ToolTip.Tip="{DynamicResource Transport_Set_loop_start_to_the_cursor_Shift_Tip}"/>
+                        <controls:IconButton Classes="flat" Icon="{StaticResource IconChevronLeft}"
+                                             Command="{Binding SetLoopEndCommand}"
+                                             ToolTip.Tip="{DynamicResource Transport_Set_loop_end_to_the_cursor_Shift_Tip}"/>
+                        <controls:IconButton Classes="flat active" Icon="{StaticResource IconLoop}"
+                                             IsVisible="{Binding IsLooping}" IsHitTestVisible="False"
+                                             ToolTip.Tip="{DynamicResource Transport_Loop_region_active_Tip}"/>
+                        <ToggleButton Classes="toggle" IsChecked="{Binding LoopRecording}"
+                                      ToolTip.Tip="{DynamicResource Transport_Loop_recording_restart_at_loop_end_Tip}">
+                            <TextBlock Text="{DynamicResource Transport_Loop_rec}" VerticalAlignment="Center"/>
+                        </ToggleButton>
+                        <ComboBox Classes="compact" ItemsSource="{Binding PlaybackModes}" SelectedItem="{Binding PlaybackMode}"
+                                  Width="110" VerticalAlignment="Center"
+                                  ToolTip.Tip="{DynamicResource Transport_Arrangement_Session_or_Hybrid_playback_Tip}"/>
+                        <Button Classes="flat compact" Content="{DynamicResource Transport_P}" Command="{Binding SetPunchInCommand}"
+                                ToolTip.Tip="{DynamicResource Transport_Set_punch_in_to_cursor_Tip}"/>
+                        <Button Classes="flat compact" Content="{DynamicResource Transport_P_2}" Command="{Binding SetPunchOutCommand}"
+                                ToolTip.Tip="{DynamicResource Transport_Set_punch_out_to_cursor_Tip}"/>
+                        <Button Classes="flat compact" Content="{DynamicResource Transport_Clear_punch}" Command="{Binding ClearPunchCommand}"
+                                IsVisible="{Binding HasPunchRegion}"
+                                ToolTip.Tip="{DynamicResource Transport_Clear_punch_Tip}"/>
+                        <Button Classes="flat compact" Content="{DynamicResource Transport_M}" Command="{Binding AddMarkerAtPlayheadCommand}"
+                                ToolTip.Tip="{DynamicResource Transport_Add_arrangement_marker_at_playhead_Tip}"/>
+                        <Button Classes="flat compact" Content="{DynamicResource Transport_M_2}" Command="{Binding GoToNextMarkerCommand}"
+                                ToolTip.Tip="{DynamicResource Transport_Go_to_next_marker_Tip}"/>
+                        <Button Classes="flat compact" Content="{DynamicResource Transport_M_3}" Command="{Binding GoToPreviousMarkerCommand}"
+                                ToolTip.Tip="{DynamicResource Transport_Go_to_previous_marker_Tip}"/>
                     </StackPanel>
-                </ToggleButton>
-                <ProgressBar Minimum="0" Maximum="1" Value="{Binding RenderProgress}"
-                             Width="90" Height="8" VerticalAlignment="Center"
-                             IsVisible="{Binding IsRendering}"
-                             Foreground="{StaticResource CatppuccinMauve}"
-                             ToolTip.Tip="{DynamicResource Transport_Rendering_Tip}"/>
-                <Button Classes="compact" Click="OnExportMidi"
-                        ToolTip.Tip="{DynamicResource Transport_Export_all_instrument_track_MIDI_to_a_mid_file_Tip}">
-                    <TextBlock Text="{DynamicResource Transport_MIDI}" VerticalAlignment="Center" FontSize="11"/>
-                </Button>
-            </StackPanel>
+                </Panel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                            VerticalAlignment="Center" Margin="12,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowLink}"
+                                VerticalAlignment="Center">
+                        <ToggleButton Classes="toggle" IsChecked="{Binding IsLinkEnabled}"
+                                      ToolTip.Tip="{DynamicResource Transport_Enable_Ableton_Link_tempo_phase_sync_Tip}">
+                            <TextBlock Text="{Binding LinkPeerText}" VerticalAlignment="Center" FontSize="11"/>
+                        </ToggleButton>
+                        <TextBlock Text="{Binding LinkPhaseText}" FontSize="10" VerticalAlignment="Center"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                        <TextBlock Text="{Binding LinkSessionBeatText}" FontSize="10" VerticalAlignment="Center"
+                                   Foreground="{StaticResource CatppuccinOverlay1}"/>
+                    </StackPanel>
+                    <Button Classes="flat compact" Content="{DynamicResource Transport_Cap_MIDI}" Command="{Binding CaptureRetrospectiveMidiCommand}"
+                            ToolTip.Tip="{DynamicResource Transport_Capture_recently_played_MIDI_into_a_clip_at_the__Tip}"/>
+                    <ToggleButton Classes="toggle" IsChecked="{Binding SessionRecordArmed}"
+                                  ToolTip.Tip="Arm session capture — logs clip launches during playback for materializing to the arrangement">
+                        <TextBlock Text="Session Rec" VerticalAlignment="Center" FontSize="11"/>
+                    </ToggleButton>
+                    <ToggleButton Classes="toggle" IsChecked="{Binding MidiInstrumentInputEnabled}"
+                                  ToolTip.Tip="Route MIDI notes and controllers to the selected instrument (disable for session/controller use)">
+                        <TextBlock Text="MIDI Keys" VerticalAlignment="Center" FontSize="11"/>
+                    </ToggleButton>
+                </StackPanel>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

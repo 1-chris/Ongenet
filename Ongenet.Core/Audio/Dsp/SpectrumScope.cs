@@ -40,3 +40,42 @@ public sealed class SpectrumScope
         return n;
     }
 }
+
+/// <summary>Lock-free L/R ring for vectorscope displays (256 frames).</summary>
+public sealed class StereoScope
+{
+    private const int Size = 256;
+    private readonly float[] _left = new float[Size];
+    private readonly float[] _right = new float[Size];
+    private int _write;
+
+    public void Tap(ReadOnlySpan<float> buffer, int channels)
+    {
+        if (channels < 1) channels = 1;
+        var frames = buffer.Length / channels;
+        var w = _write;
+        for (var n = 0; n < frames; n++)
+        {
+            var i = n * channels;
+            var l = buffer[i];
+            var r = channels > 1 ? buffer[i + 1] : l;
+            _left[w] = l;
+            _right[w] = r;
+            w = (w + 1) & (Size - 1);
+        }
+        _write = w;
+    }
+
+    public int CaptureLatest(float[] left, float[] right)
+    {
+        var n = Math.Min(Math.Min(left.Length, right.Length), Size);
+        var start = (_write - n) & (Size - 1);
+        for (var i = 0; i < n; i++)
+        {
+            var idx = (start + i) & (Size - 1);
+            left[i] = _left[idx];
+            right[i] = _right[idx];
+        }
+        return n;
+    }
+}

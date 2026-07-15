@@ -47,7 +47,8 @@ public static class LoFiBeatSongFactory
             ColorKey = "CatppuccinSubtext0",
             Volume = 1.0
         };
-        master.Effects.Add(new LimiterEffect { CeilingDb = -1.0, ReleaseMs = 150 });
+        // Gentle Streaming Master — less width/clipper than Full Master for dusty material.
+        MasteringChains.Add(master.Effects, "streaming");
         project.Tracks.Add(master);
 
         project.Tracks.Add(BuildKick());

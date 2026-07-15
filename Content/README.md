@@ -21,7 +21,7 @@ Software (Ongenet) stays **MIT**. Audio here is licensed **separately** (CC0 / P
 | `Soundfonts/Sf2/GM/*` | [bratpeki/soundfonts](https://github.com/bratpeki/soundfonts): ChaosBank, Jnsgm2, Masterpiece, Unison, eawpats, GeneralUser | CC0 / PD / GeneralUser |
 | `Soundfonts/Sf2/Drums/909_drum_sf` | 909 drum SF2 (bratpeki / Musical Artifacts) | **CC BY 3.0** |
 
-Credits for CC-BY material (and GeneralUser) are required in product credits (`Settings → Legal → Factory content attribution`).
+Credits for CC-BY material (and GeneralUser) are required in product credits (`Settings → General → Factory content attribution`).
 
 **Size:** Core is ~1.4 GB uncompressed (packaging asserts ≤ 1600 MB). VCSL has no traditional strings/brass/guitar — orchestra pieces come from sibling **VSCO 2 CE**; fretted tone is **Strumstick**; piano is VCSL **Grand Piano, Kawai**. GPLv2 banks (e.g. TimGM) and personal-use-only banks (WeedsGM3) are **not** shipped.
 

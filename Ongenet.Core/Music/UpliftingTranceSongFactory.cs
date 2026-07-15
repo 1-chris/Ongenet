@@ -107,7 +107,8 @@ public static class UpliftingTranceSongFactory
             Volume = 1.0
         };
         // The mastering chain, in the canonical trance order (mixdown → corrective EQ → mid/side →
-        // glue comp → soft clip → brickwall limiter → meter):
+        // glue comp → soft clip → brickwall limiter → meter). Multiband OTT stays on the Leads bus
+        // (not Full Master+) so the master remains a clean delivery path and lead inflation is local.
         //  1. A corrective EQ: a steep 26 Hz high-pass strips inaudible sub-rumble that would trick
         //     the limiter into clamping early, and a 19.5 kHz low-pass shaves digital hiss.
         //  2. Mid/side EQ: mono the sub-bass below 120 Hz into the dead centre for club punch, and a
@@ -115,19 +116,9 @@ public static class UpliftingTranceSongFactory
         //  3. VCA-style glue compression (2:1, slow 30 ms attack so kick/pluck transients pass, fast
         //     release so it pumps in sync with the 138 BPM) — just ~1–2 dB of gain reduction.
         //  4. A soft clipper shaves the microscopic transient peaks so the limiter works less.
-        //  5. A -1.0 dBFS brickwall limiter leaves inter-sample-peak headroom for lossy encoding.
-        var masterEq = new EqEffect();
-        masterEq.Bands[0].Type = EqBandType.HighPass; masterEq.Bands[0].Frequency = 26; masterEq.Bands[0].Q = 0.7;
-        masterEq.Bands[1].Type = EqBandType.LowPass; masterEq.Bands[1].Frequency = 19500; masterEq.Bands[1].Q = 0.7;
-        masterEq.Bands[2].Type = EqBandType.HighShelf; masterEq.Bands[2].Frequency = 12000; masterEq.Bands[2].GainDb = 0.5;
-        masterEq.CommitBands();
-        master.Effects.Add(masterEq);
-        master.Effects.Add(new MidSideEqEffect { SideLowCutHz = 120, SideAirHz = 9000, SideAirDb = 1.2 });
-        master.Effects.Add(new CompressorEffect { ThresholdDb = -14, Ratio = 2.0, AttackMs = 30, ReleaseMs = 110, MakeupDb = 1.5 });
-        master.Effects.Add(new StereoWidthEffect { Width = 1.1 });
-        master.Effects.Add(new ClipperEffect { DriveDb = 1.5, CeilingDb = -0.5 });
-        master.Effects.Add(new LimiterEffect { CeilingDb = -1.0, ReleaseMs = 110 });
-        master.Effects.Add(new WaveformVisualizerEffect());
+        //  5. A -1.0 dBFS Peak Limiter (Streaming preset) leaves inter-sample-peak headroom for lossy
+        //     encoding; Spectrum is a pass-through analyser at the chain tail.
+        MasteringChains.AddFullMaster(master.Effects);
         project.Tracks.Add(master);
 
         // Group buses: effects and automation applied once per family instead of per track.
@@ -135,7 +126,8 @@ public static class UpliftingTranceSongFactory
 
         // Drums: a mastering-style bus chain — a punch EQ (boom up, mud out, snap and air up), a
         // glue compressor whose 15 ms attack lets the kick transient through before the squeeze
-        // grabs the body, and a bus limiter for density.
+        // grabs the body, and a bus limiter for density (ceiling above the master Streaming −1.0 so
+        // the Peak Limiter owns final ISP control and drops keep punch).
         var drums = new Track { Name = "Drums", Kind = TrackKind.Group, ColorKey = "CatppuccinRed", Volume = 1.0 };
         var drumEq = new EqEffect();
         drumEq.AddBand(new EqBand(EqBandType.LowShelf, 90, 2.5, 0.7));   // boom
@@ -149,7 +141,7 @@ public static class UpliftingTranceSongFactory
         // Mono the low end (kick dead-centre for club punch) while spreading the hat/clap "air" wide —
         // the modern trance drum image: driving centre, exploding sides.
         drums.Effects.Add(new MidSideEqEffect { SideLowCutHz = 250, SideAirHz = 9000, SideAirDb = 2.5 });
-        drums.Effects.Add(new LimiterEffect { CeilingDb = -1.0, ReleaseMs = 80 });
+        drums.Effects.Add(new LimiterEffect { CeilingDb = -0.5, ReleaseMs = 80 });
         AddGroup(project, drums, kick, BuildClap(), BuildSnare(), BuildClosedHat(), BuildOpenHat(), BuildCrash());
 
         var bassGroup = new Track { Name = "Bass Bus", Kind = TrackKind.Group, ColorKey = "CatppuccinMauve", Volume = 1.0 };

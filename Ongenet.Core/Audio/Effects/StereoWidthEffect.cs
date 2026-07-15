@@ -21,6 +21,7 @@ public sealed class StereoWidthEffect : IAudioEffect
     public double SideGain { get; set; } = 1.0;
     public double LeftGain { get; set; } = 1.0;
     public double RightGain { get; set; } = 1.0;
+    public float Correlation { get; private set; } = 1f;
 
     private int _channels = 2;
 
@@ -61,6 +62,7 @@ public sealed class StereoWidthEffect : IAudioEffect
         gl *= center; gr *= center;
 
         var frames = buffer.Length / channels;
+        double ll = 0, rr = 0, lr = 0;
         for (var frame = 0; frame < frames; frame++)
         {
             var i = frame * channels;
@@ -70,6 +72,11 @@ public sealed class StereoWidthEffect : IAudioEffect
             var side = (l - r) * 0.5f * sideGain * width;
             buffer[i] = (mid + side) * leftGain * gl;
             buffer[i + 1] = (mid - side) * rightGain * gr;
+            ll += buffer[i] * buffer[i];
+            rr += buffer[i + 1] * buffer[i + 1];
+            lr += buffer[i] * buffer[i + 1];
         }
+        var denom = Math.Sqrt(ll * rr);
+        Correlation = denom > 1e-12 ? (float)Math.Clamp(lr / denom, -1, 1) : 1f;
     }
 }

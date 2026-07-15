@@ -102,7 +102,7 @@
         <!-- Custom Title Bar Styles -->
         <Style Selector="Grid.TitleBar">
             <Setter Property="Background" Value="{StaticResource CatppuccinMantle}"/>
-            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
         </Style>
         <Style Selector="Button.TitleBarButton">
             <Setter Property="Background" Value="Transparent"/>

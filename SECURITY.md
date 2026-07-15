@@ -71,7 +71,7 @@ Ongenet is a powerful local application. To reduce risk:
 
 - Install from [official GitHub Releases](https://github.com/1-chris/Ongenet/releases) or [onge.net](https://onge.net/)
 - Only load plugins and scripts from sources you trust
-- Consider enabling **Settings → General → Plugins → Isolate plugins in separate process** for untrusted VST3 effects (see [plugin isolation](docs/plugin-isolation.md)); this limits crash impact but is not a full security sandbox
+- Consider enabling **Settings → General → Plugins → Run VST3 plugins in an isolated process** for untrusted VST3 effects (see [plugin isolation](docs/plugin-isolation.md)); this limits crash impact but is not a full security sandbox
 - Keep Ongenet updated to the latest release
 
 ## Privacy

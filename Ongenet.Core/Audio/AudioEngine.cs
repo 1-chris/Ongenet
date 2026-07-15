@@ -93,12 +93,28 @@ public sealed class AudioEngine : IAudioEngine
 
     private float _masterL;
     private float _masterR;
+    private readonly TruePeakMeter _truePeak = new();
+    private readonly LoudnessMeter _loudness = new();
+    private readonly AudioAnalyzer _masterAnalyzer = new();
+    private float _masterTpLDb = -120f;
+    private float _masterTpRDb = -120f;
+    private float _masterTpMaxDb = -120f;
+    private float _masterMomLufs = float.NegativeInfinity;
+    private float _masterStLufs = float.NegativeInfinity;
+    private float _masterIntLufs = float.NegativeInfinity;
+    private float _masterLra = float.NaN;
+    private float _masterCorrelation = 1f;
+    private volatile MasterMeterTap _masterMeterTap = MasterMeterTap.PostFader;
+    private bool _masterMetersPrepared;
 
     // The render fan-out pool plus the cached per-block parameters its job delegate reads (kept in
     // fields so dispatching a block never allocates a closure on the audio thread).
     private readonly AudioWorkerPool _workers = new();
     private readonly Action<int> _renderJob;
+    private readonly Action<int> _busFxJob;
     private TrackState[] _blkStates = Array.Empty<TrackState>();
+    private Bus[] _blkBuses = Array.Empty<Bus>();
+    private int _blkBusStart;
     private Routing _blkRouting = new();
     private int _blkBufferLength;
     private int _blkChannels;
@@ -132,6 +148,7 @@ public sealed class AudioEngine : IAudioEngine
         _inputMonitor = inputMonitor ?? new NullInputMonitorService();
         _videoScope = videoScope;
         _renderJob = RenderTrackJob;
+        _busFxJob = BusFxJob;
         _project.ProjectChanged += OnProjectChanged;
         _transport.StateChanged += OnTransportStateChanged;
         _playback.ActiveClipsChanged += OnSessionClipsChanged;
@@ -145,19 +162,61 @@ public sealed class AudioEngine : IAudioEngine
     public AudioFormat Format => _output.Format;
     public float MasterLevelLeft => _masterL;
     public float MasterLevelRight => _masterR;
+    public float MasterTruePeakLeftDbTp => _masterTpLDb;
+    public float MasterTruePeakRightDbTp => _masterTpRDb;
+    public float MasterTruePeakMaxDbTp => _masterTpMaxDb;
+    public float MasterMomentaryLufs => _masterMomLufs;
+    public float MasterShortTermLufs => _masterStLufs;
+    public float MasterIntegratedLufs => _masterIntLufs;
+    public float MasterLoudnessRangeLu => _masterLra;
+    public float MasterCorrelation => _masterCorrelation;
+    public MasterMeterTap MasterMeterTap
+    {
+        get => _masterMeterTap;
+        set
+        {
+            // Non-tail taps cannot share the canonical Spectrum analyser. Prepare on the caller/UI
+            // thread before exposing the new tap to the realtime thread.
+            if (value != MasterMeterTap.PostFader && !_masterMetersPrepared)
+                PrepareMasterMeters();
+            _masterMeterTap = value;
+        }
+    }
+
+    public void ResetMasterLoudness()
+    {
+        _loudness.Reset();
+        _truePeak.ResetHeld();
+        if (MasterTailSpectrum() is { } spectrum) spectrum.ResetAnalysis();
+        _masterMomLufs = _masterStLufs = _masterIntLufs = float.NegativeInfinity;
+        _masterLra = float.NaN;
+        _masterTpMaxDb = -120f;
+    }
 
     public void Start()
     {
         if (_output.IsRunning) return;
-        _output.Start(Render);
         RebuildTracks();
+        if (!CanReuseMasterSpectrum()) PrepareMasterMeters();
+        _output.Start(Render);
     }
 
     public void Stop() => _output.Stop();
 
+    private void PrepareMasterMeters()
+    {
+        _truePeak.Prepare(_output.Format);
+        _loudness.Prepare(_output.Format);
+        _masterMetersPrepared = true;
+    }
+
     private void OnProjectChanged() => RequestRebuild();
 
-    private void OnFormatChanged() => RequestRebuild();
+    private void OnFormatChanged()
+    {
+        _masterMetersPrepared = false;
+        RequestRebuild();
+    }
 
     /// <summary>
     /// Schedules a track-graph rebuild. While the audio device is running, preparation runs at the start
@@ -402,8 +461,8 @@ public sealed class AudioEngine : IAudioEngine
 
         _events = notes.ToArray();
         _ccEvents = ccEvents.OrderBy(c => c.Beat).ToArray();
-        _trackActivity = TrackActivityMap.Build(_events);
         _audioClips = clips.ToArray();
+        _trackActivity = TrackActivityMap.Build(_events, _audioClips);
 
         foreach (var st in _routing.ContentStates) st.SilentSamples = 0;
 
@@ -500,10 +559,12 @@ public sealed class AudioEngine : IAudioEngine
         FlushPendingRebuild();
 
         var blockStart = Stopwatch.GetTimestamp();
+        var blockStartAllocated = GC.GetAllocatedBytesForCurrentThread();
         buffer.Clear();
 
         var channels = _output.Format.Channels < 1 ? 1 : _output.Format.Channels;
         var frames = buffer.Length / channels;
+        AudioDiagnostics.SetBlockBudget(frames, _output.Format.SampleRate);
 
         // Count-in runs before content: emit metronome clicks, keep the playhead parked.
         if (_countingIn) ProcessCountIn(frames);
@@ -561,6 +622,7 @@ public sealed class AudioEngine : IAudioEngine
         foreach (var st in states) st.EnsureCapacity(buffer.Length);
 
         // Prepare each bus's accumulation buffer for this block.
+        var masterMeterCaptured = false;
         foreach (var bus in buses)
         {
             if (bus.Buffer.Length < buffer.Length) bus.Buffer = new float[buffer.Length];
@@ -608,6 +670,8 @@ public sealed class AudioEngine : IAudioEngine
         _blkPlaying = playing;
         _blkSoloActive = soloActive;
         if (states.Length > 0) _workers.Run(states.Length, _renderJob);
+        var afterRender = Stopwatch.GetTimestamp();
+        var afterRenderAllocated = GC.GetAllocatedBytesForCurrentThread();
 
         FlushMultiOutputRoutes(states);
 
@@ -668,39 +732,13 @@ public sealed class AudioEngine : IAudioEngine
             ProcessSends(st, track, routing, channels, frames, soloActive, preFader: false);
         }
 
-        // 2) Buses deepest-first: insert effects on the summed input → strip → into the parent bus
-        //    (the master, having no parent, strips straight into the device output below).
-        foreach (var bus in buses)
-        {
-            var bt = bus.Track;
-            if (bt.IsMuted)
-            {
-                bt.MeterLevel *= MeterRelease;
-                continue;
-            }
+        // 2) Buses deepest-first by depth level: insert FX for same-depth buses run in parallel,
+        //    then serial mix into parent (deterministic sum order within each depth).
+        ProcessBusesStaged(buses, buffer, channels, frames, ref masterMeterCaptured);
 
-            var busSpan = bus.Buffer.AsSpan(0, buffer.Length);
-            var effects = bt.ActiveEffects;
-            if (effects.Length > 0)
-            {
-                foreach (var fx in effects)
-                {
-                    if (!fx.Enabled) continue;
-                    if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
-                    fx.Process(busSpan);
-                }
-            }
-
-            // A group/master bus can be a sidechain source too (e.g. a "Drums" group triggering a duck).
-            if (NeedsTrackTap(bt.Id)) PublishTrackOutput(bt.Id, busSpan, channels);
-
-            if (bus.PdcDelay > 0)
-                bus.PdcLine.Process(busSpan, frames);
-
-            var target = bus.Parent is not null ? bus.Parent.Buffer.AsSpan(0, buffer.Length) : buffer;
-            var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
-            bt.MeterLevel = MixInto(target, busSpan, lg, rg, channels, frames, bt.MeterLevel);
-        }
+        // Project-master delivery meters (before metronome / audition / input monitor).
+        if (!masterMeterCaptured)
+            ProcessMasterMeters(buffer, channels);
 
         if (playing)
         {
@@ -723,7 +761,6 @@ public sealed class AudioEngine : IAudioEngine
         _inputMonitor.Mix(buffer, channels, frames);
 
         // Limit and measure the master output.
-        float masterPeakL = 0, masterPeakR = 0;
         for (var i = 0; i < buffer.Length; i++)
         {
             var s = buffer[i];
@@ -731,24 +768,180 @@ public sealed class AudioEngine : IAudioEngine
             else if (s < -1f) s = -1f;
             buffer[i] = s;
 
-            var a = s < 0 ? -s : s;
-            if (channels >= 2 && (i & 1) == 1)
-            {
-                if (a > masterPeakR) masterPeakR = a;
-            }
-            else
-            {
-                if (a > masterPeakL) masterPeakL = a;
-            }
         }
-
-        _masterL = MaxWithRelease(masterPeakL, _masterL);
-        _masterR = MaxWithRelease(masterPeakR, _masterR);
 
         var elapsedTicks = Stopwatch.GetTimestamp() - blockStart;
         var micros = elapsedTicks * 1_000_000 / Stopwatch.Frequency;
         AudioDiagnostics.RecordBlock(micros);
+        var renderMicros = (afterRender - blockStart) * 1_000_000 / Stopwatch.Frequency;
+        var mixMicros = Math.Max(0, micros - renderMicros);
+        AudioDiagnostics.RecordPhases(renderMicros, mixMicros);
+        var blockEndAllocated = GC.GetAllocatedBytesForCurrentThread();
+        AudioDiagnostics.RecordAllocations(
+            afterRenderAllocated - blockStartAllocated,
+            blockEndAllocated - afterRenderAllocated);
     }
+
+    private void ProcessBusesStaged(Bus[] buses, Span<float> buffer, int channels, int frames,
+        ref bool masterMeterCaptured)
+    {
+        if (buses.Length == 0) return;
+
+        // Group contiguous deepest-first buses by Depth for parallel FX within a level.
+        var i = 0;
+        while (i < buses.Length)
+        {
+            var depth = buses[i].Depth;
+            var start = i;
+            while (i < buses.Length && buses[i].Depth == depth) i++;
+            var count = i - start;
+
+            if (count > 1 && _workers.WorkerCount > 0)
+            {
+                _blkBusStart = start;
+                _blkBuses = buses;
+                _blkBufferLength = buffer.Length;
+                _blkChannels = channels;
+                _workers.Run(count, _busFxJob);
+            }
+            else
+            {
+                for (var b = start; b < i; b++)
+                    ProcessBusEffects(buses[b], buffer.Length, ref masterMeterCaptured);
+            }
+
+            // Serial deterministic mix into parent after this depth's FX finish.
+            for (var b = start; b < i; b++)
+                MixBusToParent(buses[b], buffer, channels, frames, ref masterMeterCaptured);
+        }
+    }
+
+    private void BusFxJob(int index)
+    {
+        var bus = _blkBuses[_blkBusStart + index];
+        // Parallel phase only runs effects; meter capture stays on the serial mix pass for master.
+        var ignore = false;
+        ProcessBusEffects(bus, _blkBufferLength, ref ignore);
+    }
+
+    private void ProcessBusEffects(Bus bus, int bufferLength, ref bool masterMeterCaptured)
+    {
+        var bt = bus.Track;
+        if (bt.IsMuted) return;
+
+        var busSpan = bus.Buffer.AsSpan(0, bufferLength);
+        var effects = bt.ActiveEffects;
+        if (effects.Length == 0) return;
+
+        foreach (var fx in effects)
+        {
+            if (!fx.Enabled) continue;
+            if (!masterMeterCaptured && bt.Kind == TrackKind.Master &&
+                _masterMeterTap == MasterMeterTap.PreLimiter && fx is PeakLimiterEffect)
+            {
+                ProcessMasterMeters(busSpan, _blkChannels > 0 ? _blkChannels : 2);
+                masterMeterCaptured = true;
+            }
+            if (fx is Effects.IContextualEffect cae) cae.SetContext(_effectCtx);
+            fx.Process(busSpan);
+        }
+    }
+
+    private void MixBusToParent(Bus bus, Span<float> buffer, int channels, int frames,
+        ref bool masterMeterCaptured)
+    {
+        var bt = bus.Track;
+        if (bt.IsMuted)
+        {
+            bt.MeterLevel *= MeterRelease;
+            return;
+        }
+
+        var busSpan = bus.Buffer.AsSpan(0, buffer.Length);
+
+        if (!masterMeterCaptured && bt.Kind == TrackKind.Master &&
+            _masterMeterTap is MasterMeterTap.PostChain or MasterMeterTap.PreLimiter)
+        {
+            ProcessMasterMeters(busSpan, channels);
+            masterMeterCaptured = true;
+        }
+
+        if (NeedsTrackTap(bt.Id)) PublishTrackOutput(bt.Id, busSpan, channels);
+
+        if (bus.PdcDelay > 0)
+            bus.PdcLine.Process(busSpan, frames);
+
+        var target = bus.Parent is not null ? bus.Parent.Buffer.AsSpan(0, buffer.Length) : buffer;
+        var (lg, rg) = Mixing.BusGains(bt.Volume, bt.Pan);
+        bt.MeterLevel = MixInto(target, busSpan, lg, rg, channels, frames, bt.MeterLevel);
+    }
+
+    private void ProcessMasterMeters(ReadOnlySpan<float> buffer, int channels)
+    {
+        // Canonical mastering chains end in Spectrum, which has already measured this exact signal.
+        // Reuse that tap at unity post-fader instead of running a second 4× true-peak pass, a second
+        // BS.1770 meter, and a second stereo analyser on the serial audio thread.
+        if (CanReuseMasterSpectrum() && MasterTailSpectrum() is { } spectrum)
+        {
+            _masterL = MaxWithRelease(spectrum.PeakLeft, _masterL);
+            _masterR = MaxWithRelease(spectrum.PeakRight, _masterR);
+            _masterTpLDb = spectrum.TruePeakLeftDbTp;
+            _masterTpRDb = spectrum.TruePeakRightDbTp;
+            _masterTpMaxDb = spectrum.MaxTruePeakDbTp;
+            _masterMomLufs = spectrum.MomentaryLufs;
+            _masterStLufs = spectrum.ShortTermLufs;
+            _masterIntLufs = spectrum.IntegratedLufs;
+            _masterLra = spectrum.LoudnessRangeLu;
+            _masterCorrelation = spectrum.Correlation;
+            return;
+        }
+
+        if (!_masterMetersPrepared)
+            PrepareMasterMeters();
+
+        _truePeak.Process(buffer);
+        _loudness.Process(buffer);
+        float peakL = 0, peakR = 0;
+        var ch = Math.Max(1, channels);
+        var frames = buffer.Length / ch;
+        for (var f = 0; f < frames; f++)
+        {
+            var l = buffer[f * ch];
+            var r = ch > 1 ? buffer[f * ch + 1] : l;
+            peakL = Math.Max(peakL, Math.Abs(l));
+            peakR = Math.Max(peakR, Math.Abs(r));
+            _masterAnalyzer.ProcessFrame(l, r);
+        }
+        _masterAnalyzer.CommitBlock();
+
+        _masterL = MaxWithRelease(peakL, _masterL);
+        _masterR = MaxWithRelease(peakR, _masterR);
+        _masterTpLDb = _truePeak.PeakLeftDbTp;
+        _masterTpRDb = _truePeak.PeakRightDbTp;
+        _masterTpMaxDb = _truePeak.MaxDbTp;
+        _masterMomLufs = _loudness.MomentaryLufs;
+        _masterStLufs = _loudness.ShortTermLufs;
+        _masterIntLufs = _loudness.IntegratedLufs;
+        _masterLra = _loudness.LoudnessRangeLu;
+        _masterCorrelation = _masterAnalyzer.Correlation;
+    }
+
+    private SpectrumEffect? MasterTailSpectrum()
+    {
+        var effects = _routing.MasterTrack?.ActiveEffects;
+        if (effects is null) return null;
+        for (var i = effects.Length - 1; i >= 0; i--)
+        {
+            if (!effects[i].Enabled) continue;
+            return effects[i] as SpectrumEffect;
+        }
+        return null;
+    }
+
+    private bool CanReuseMasterSpectrum() =>
+        _masterMeterTap == MasterMeterTap.PostFader
+        && _routing.MasterTrack is { Volume: 1.0, Pan: 0.0 }
+        && MasterTailSpectrum() is not null;
 
     private void ProcessSends(TrackState st, Track track, Routing routing, int channels, int frames,
         bool soloActive, bool preFader)
@@ -790,6 +983,8 @@ public sealed class AudioEngine : IAudioEngine
     // Worker-pool job: render one content track into its own <see cref="TrackState"/> buffer.
     private void RenderTrackJob(int index)
     {
+        var started = Stopwatch.GetTimestamp();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var st = _blkStates[index];
         var track = st.Track;
         var silenced = IsSilenced(track, _blkSoloActive, _blkRouting);
@@ -798,13 +993,29 @@ public sealed class AudioEngine : IAudioEngine
         st.Rendered = false;
         st.HasContent = false;
 
-        if (silenced && !sidechainSource) return;
+        if (silenced && !sidechainSource)
+        {
+            RecordTrackDiagnostics(track.Name, started, allocatedBefore);
+            return;
+        }
 
-        if (_blkPlaying && !sidechainSource && !TrackNeedsRender(st, track)) return;
+        if (_blkPlaying && !sidechainSource && !TrackNeedsRender(st, track))
+        {
+            RecordTrackDiagnostics(track.Name, started, allocatedBefore);
+            return;
+        }
 
         st.HasContent = RenderTrackContent(st, _blkBufferLength, _blkChannels, _blkPrevBeat,
             _blkSampleRate, _blkBpm, _blkPlaying, _blkDormantSamples);
         st.Rendered = true;
+        RecordTrackDiagnostics(track.Name, started, allocatedBefore);
+    }
+
+    private static void RecordTrackDiagnostics(string name, long started, long allocatedBefore)
+    {
+        var micros = (Stopwatch.GetTimestamp() - started) * 1_000_000 / Stopwatch.Frequency;
+        AudioDiagnostics.RecordTrack(name, micros,
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
     }
 
     // Renders a content track's signal into <paramref name="state"/>.Buffer: its instrument rack (each
@@ -913,28 +1124,30 @@ public sealed class AudioEngine : IAudioEngine
             destId = routed;
         if (!destId.HasValue) return;
 
-        var copy = new float[busAudio.Length];
+        var copy = sourceState.RentRouteBuffer(busAudio.Length);
         busAudio.CopyTo(copy);
         sourceState.PendingRoutes.Add((destId.Value, copy));
     }
 
-    private static void FlushMultiOutputRoutes(TrackState[] states)
+    private void FlushMultiOutputRoutes(TrackState[] states)
     {
-        var byId = new Dictionary<Guid, TrackState>(states.Length);
-        foreach (var st in states) byId[st.Track.Id] = st;
-
         foreach (var st in states)
         {
             foreach (var (destId, samples) in st.PendingRoutes)
             {
-                if (!byId.TryGetValue(destId, out var dest)) continue;
+                TrackState? dest = null;
+                for (var i = 0; i < states.Length; i++)
+                {
+                    if (states[i].Track.Id == destId) { dest = states[i]; break; }
+                }
+                if (dest is null) continue;
                 var destSpan = dest.Buffer.AsSpan(0, samples.Length);
                 for (var i = 0; i < samples.Length; i++) destSpan[i] += samples[i];
                 dest.HasContent = true;
                 dest.SilentSamples = 0;
             }
 
-            st.PendingRoutes.Clear();
+            st.ClearPendingRoutes();
         }
     }
 
@@ -977,15 +1190,7 @@ public sealed class AudioEngine : IAudioEngine
     }
 
     private bool HasActiveAudioClip(Track track, double prevBeat, double curBeat)
-    {
-        foreach (var acp in _audioClips)
-        {
-            if (!ReferenceEquals(acp.Track, track)) continue;
-            if (acp.StartBeat + acp.LengthBeats > prevBeat && acp.StartBeat < curBeat) return true;
-        }
-
-        return false;
-    }
+        => _trackActivity.HasAudioClip(track.Id, prevBeat, curBeat);
 
     // Mixes <paramref name="source"/> through per-channel gains additively into <paramref name="target"/>,
     // returning the strip's peak (with meter release) for the level meter.
@@ -1321,11 +1526,31 @@ public sealed class AudioEngine : IAudioEngine
         public int PdcDelay;
         public PdcDelayLine PdcLine = new();
         public readonly List<(Guid DestId, float[] Samples)> PendingRoutes = new();
+        private readonly List<float[]> _routePool = new();
 
         public void EnsureCapacity(int length)
         {
             if (Buffer.Length < length) Buffer = new float[length];
             if (SlotScratch.Length < length) SlotScratch = new float[length];
+        }
+
+        public float[] RentRouteBuffer(int length)
+        {
+            for (var i = _routePool.Count - 1; i >= 0; i--)
+            {
+                var buf = _routePool[i];
+                if (buf.Length < length) continue;
+                _routePool.RemoveAt(i);
+                return buf;
+            }
+            return new float[length];
+        }
+
+        public void ClearPendingRoutes()
+        {
+            foreach (var (_, samples) in PendingRoutes)
+                _routePool.Add(samples);
+            PendingRoutes.Clear();
         }
 
         public void EnsurePdc(int channels, int maxFrames)
@@ -1628,16 +1853,25 @@ public sealed class AudioEngine : IAudioEngine
         public Dictionary<Guid, LatencyCompensator.Compensation> Pdc = new();
     }
 
-    // Per-track MIDI note intervals built at playback start for skipping idle instrument tracks.
+    // Per-track MIDI note + audio-clip intervals built at playback start for skipping idle tracks.
     private sealed class TrackActivityMap
     {
-        public static readonly TrackActivityMap Empty = new(new Dictionary<Guid, (double On, double Off)[]>());
+        public static readonly TrackActivityMap Empty = new(
+            new Dictionary<Guid, (double On, double Off)[]>(),
+            new Dictionary<Guid, (double On, double Off)[]>());
 
-        private readonly Dictionary<Guid, (double On, double Off)[]> _intervals;
+        private readonly Dictionary<Guid, (double On, double Off)[]> _noteIntervals;
+        private readonly Dictionary<Guid, (double On, double Off)[]> _audioIntervals;
 
-        private TrackActivityMap(Dictionary<Guid, (double On, double Off)[]> intervals) => _intervals = intervals;
+        private TrackActivityMap(
+            Dictionary<Guid, (double On, double Off)[]> noteIntervals,
+            Dictionary<Guid, (double On, double Off)[]> audioIntervals)
+        {
+            _noteIntervals = noteIntervals;
+            _audioIntervals = audioIntervals;
+        }
 
-        public static TrackActivityMap Build(ScheduledNote[] notes)
+        public static TrackActivityMap Build(ScheduledNote[] notes, AudioClipPlayback[] audioClips)
         {
             var building = new Dictionary<Guid, List<(double On, double Off)>>();
             foreach (var note in notes)
@@ -1652,16 +1886,64 @@ public sealed class AudioEngine : IAudioEngine
                 list.Add((note.OnBeat, note.OffBeat));
             }
 
-            var intervals = new Dictionary<Guid, (double On, double Off)[]>(building.Count);
-            foreach (var kv in building) intervals[kv.Key] = kv.Value.ToArray();
-            return new TrackActivityMap(intervals);
+            var noteIntervals = new Dictionary<Guid, (double On, double Off)[]>(building.Count);
+            foreach (var kv in building)
+            {
+                var arr = kv.Value.ToArray();
+                Array.Sort(arr, (a, b) => a.On.CompareTo(b.On));
+                noteIntervals[kv.Key] = arr;
+            }
+
+            var audioBuilding = new Dictionary<Guid, List<(double On, double Off)>>();
+            foreach (var clip in audioClips)
+            {
+                var id = clip.Track.Id;
+                if (!audioBuilding.TryGetValue(id, out var list))
+                {
+                    list = new List<(double On, double Off)>();
+                    audioBuilding[id] = list;
+                }
+                list.Add((clip.StartBeat, clip.StartBeat + clip.LengthBeats));
+            }
+
+            var audioIntervals = new Dictionary<Guid, (double On, double Off)[]>(audioBuilding.Count);
+            foreach (var kv in audioBuilding)
+            {
+                var arr = kv.Value.ToArray();
+                Array.Sort(arr, (a, b) => a.On.CompareTo(b.On));
+                audioIntervals[kv.Key] = arr;
+            }
+
+            return new TrackActivityMap(noteIntervals, audioIntervals);
         }
 
         public bool HasActivity(Guid trackId, double windowStart, double windowEnd)
+            => HasInterval(_noteIntervals, trackId, windowStart, windowEnd);
+
+        public bool HasAudioClip(Guid trackId, double windowStart, double windowEnd)
+            => HasInterval(_audioIntervals, trackId, windowStart, windowEnd);
+
+        private static bool HasInterval(
+            Dictionary<Guid, (double On, double Off)[]> map, Guid trackId,
+            double windowStart, double windowEnd)
         {
-            if (!_intervals.TryGetValue(trackId, out var intervals)) return false;
-            foreach (var (on, off) in intervals)
+            if (!map.TryGetValue(trackId, out var intervals) || intervals.Length == 0)
+                return false;
+
+            // First interval whose Off is past windowStart (sorted by On; Off >= On).
+            var lo = 0;
+            var hi = intervals.Length;
+            while (lo < hi)
             {
+                var mid = (lo + hi) >> 1;
+                if (intervals[mid].Off <= windowStart) lo = mid + 1;
+                else hi = mid;
+            }
+
+            for (var i = lo; i < intervals.Length; i++)
+            {
+                var (on, off) = intervals[i];
+                if (on >= windowEnd) break;
                 if (off > windowStart && on < windowEnd) return true;
             }
 

@@ -65,6 +65,11 @@ public sealed class AppSettings
     /// <summary>When true, Windows WASAPI uses exclusive mode for lower latency.</summary>
     public bool WasapiExclusiveMode { get; set; }
 
+    /// <summary>
+    /// macOS CoreAudio producer lead frames (2048 default / 4096 safer). Restart audio to apply.
+    /// </summary>
+    public int CoreAudioLeadFrames { get; set; } = 2048;
+
     /// <summary>Saved window layout profiles (multi-monitor workspace).</summary>
     public List<WindowLayoutProfileDto> WindowLayouts { get; set; } = new();
 

@@ -16,12 +16,16 @@
   href: field-modular.md
 - name: Mixer & export
   href: mixer-and-export.md
+- name: Mastering
+  href: mastering.md
 - name: Video & composition
   href: video-and-composition.md
 - name: Audio Editor
   href: audio-editor.md
 - name: Polyphonic pitch
   href: polyphonic-pitch.md
+- name: SFZ / SF2 opcode support
+  href: sfz-sf2-opcode-support.md
 - name: Scripting
   href: scripting.md
 - name: Sidechain & dynamics

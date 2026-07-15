@@ -75,7 +75,18 @@ public sealed class DesktopPlatform : IPlatformServices
         // Roslyn user scripting (replaces NullScriptingHost from the shared App composition root).
         services.AddSingleton<IProjectScriptExporter, ProjectScriptExporter>();
         services.AddSingleton<IPresetScriptExporter, PresetScriptExporter>();
-        services.AddSingleton<ScriptingApi>();
+        services.AddSingleton<ScriptingApi>(sp => new ScriptingApi(
+            sp.GetRequiredService<IProjectService>(),
+            sp.GetRequiredService<ITransportService>(),
+            sp.GetRequiredService<IHistoryCapture>(),
+            sp.GetRequiredService<IEventAggregator>(),
+            sp.GetRequiredService<IInstrumentRegistry>(),
+            sp.GetRequiredService<IEffectRegistry>(),
+            sp.GetRequiredService<IProjectScriptExporter>(),
+            sp.GetRequiredService<IPresetScriptExporter>(),
+            sp.GetService<ExportService>(),
+            sp.GetService<IAudioEngine>(),
+            sp.GetService<IMasteringDeliveryTarget>()));
         services.AddSingleton<Core.Services.IScriptingApi>(sp => sp.GetRequiredService<ScriptingApi>());
         services.AddSingleton<Core.Services.IScriptingHost, RoslynScriptingHost>();
         services.AddSingleton<IScriptEditorFactory, ScriptEditorFactory>();

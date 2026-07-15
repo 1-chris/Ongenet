@@ -44,7 +44,7 @@ public static class HouseStarterSongFactory
             ColorKey = "CatppuccinSubtext0",
             Volume = 1.0
         };
-        master.Effects.Add(new LimiterEffect { CeilingDb = -0.5, ReleaseMs = 100 });
+        MasteringChains.AddFullMaster(master.Effects);
         project.Tracks.Add(master);
 
         var kick = BuildKick();

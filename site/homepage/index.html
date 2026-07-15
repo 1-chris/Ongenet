@@ -317,11 +317,12 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
         <p>Signal flows top → bottom through reorderable effects. Save a chain as a preset, bypass any
            module with one click, and drag new processors in from the library sidebar.</p>
         <ul>
-          <li>Visual parametric EQ — double-click to add bands, drag to move, scroll for Q, right-click for filter type; Mid/Side EQ for stereo polish.</li>
-          <li>Dynamics — Compressor, Multiband (OTT), Limiter, Gate and a dedicated Sidechain effect with tempo-synced and track-keyed ducking.</li>
+          <li>Visual parametric EQ — double-click to add bands, drag to move, scroll for Q, right-click for filter type; Mid/Side and Match EQ for stereo polish and reference matching.</li>
+          <li>Dynamics — Compressor, Limiter (bus), Gate, De-Esser and a dedicated Sidechain effect with tempo-synced and track-keyed ducking.</li>
+          <li>Mastering — Peak Limiter, Clipper, Multiband (OTT), Spectrum, Loudness Meter and delivery-oriented factory chains.</li>
           <li>Modulation — Chorus, Phaser, Flanger, Tremolo and <strong>Stuttero</strong>, our Stutter Edit-style performance processor.</li>
-          <li>Utility &amp; visual — Stereo Width, Clipper, Utility, Live Difference and the GPU-powered <strong>3D Scope</strong> pass-through visualizer.</li>
-          <li>Effects browser grouped by category; CLAP, LV2, VST2 and VST3 audio effects slot in under <em>Plugins</em> alongside built-ins.</li>
+          <li>Utility &amp; visual — Utility, Live Difference, Tuner and the GPU-powered <strong>3D Scope</strong> pass-through visualizer.</li>
+          <li>Effects browser grouped by category; CLAP, LV2, VST2, VST3 and AU audio effects slot in under <em>Plugins</em> alongside built-ins.</li>
           <li>Per-track strips feed group buses and the master; mute, solo, pan and metering stay audible in live play and offline export.</li>
         </ul>
       </div>
@@ -338,8 +339,8 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
     <div class="section-head">
       <div class="kicker">Sound sources</div>
       <h2>Instruments</h2>
-      <p>Eleven built-in instruments ship in the core. Any CLAP, LV2, VST2 or VST3 instrument you have
-         installed is discovered at runtime and appears right alongside them.</p>
+      <p>Twenty-four built-in instruments ship in the core, plus Field. Any CLAP, LV2, VST2, VST3 or AU
+         instrument you have installed is discovered at runtime and appears right alongside them.</p>
     </div>
     <div class="grid grid-3">
       <div class="card">
@@ -399,8 +400,8 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
            module-wrapped plugins. See <a href="#field">Field</a> above.</p>
       </div>
       <div class="card">
-        <h3><span class="bullet" style="background:var(--sky)"></span>CLAP, LV2, VST2 &amp; VST3 Plugins</h3>
-        <p>Third-party <code>.clap</code>, <code>.lv2</code>, VST2 and <code>.vst3</code> instruments are
+        <h3><span class="bullet" style="background:var(--sky)"></span>CLAP, LV2, VST2, VST3 &amp; AU Plugins</h3>
+        <p>Third-party <code>.clap</code>, <code>.lv2</code>, VST2, <code>.vst3</code> and macOS AU instruments are
            scanned at startup and hosted directly — including their native plugin GUIs — with no extra setup.</p>
       </div>
     </div>
@@ -411,26 +412,38 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
     <div class="section-head">
       <div class="kicker">Processing</div>
       <h2>Built-in effects</h2>
-      <p>Twenty-five built-in effects, organised by category and chainable per track in any order.
-         CLAP, LV2, VST2 and VST3 audio effects slot into the same chain.</p>
+      <p>Ninety built-in effects, organised by category and chainable per track in any order.
+         CLAP, LV2, VST2, VST3 and AU audio effects slot into the same chain.</p>
     </div>
     <div class="grid grid-2">
       <div class="fxgroup">
         <h3><span class="bullet" style="background:var(--blue)"></span>EQ &amp; Filter</h3>
         <div class="tags">
           <span class="tag-chip">EQ</span>
-          <span class="tag-chip">Mid/Side EQ</span>
+          <span class="tag-chip">EQ+</span>
           <span class="tag-chip">Filter</span>
+          <span class="tag-chip">Ladder</span>
+        </div>
+      </div>
+      <div class="fxgroup">
+        <h3><span class="bullet" style="background:var(--peach)"></span>Mastering</h3>
+        <div class="tags">
+          <span class="tag-chip">Peak Limiter</span>
+          <span class="tag-chip">Clipper</span>
+          <span class="tag-chip">Match EQ</span>
+          <span class="tag-chip">Mid/Side EQ</span>
+          <span class="tag-chip">Spectrum</span>
+          <span class="tag-chip">Loudness Meter</span>
         </div>
       </div>
       <div class="fxgroup">
         <h3><span class="bullet" style="background:var(--red)"></span>Dynamics</h3>
         <div class="tags">
           <span class="tag-chip">Compressor</span>
-          <span class="tag-chip">Multiband (OTT)</span>
-          <span class="tag-chip">Limiter</span>
+          <span class="tag-chip">Limiter (bus)</span>
           <span class="tag-chip">Gate</span>
           <span class="tag-chip">Sidechain</span>
+          <span class="tag-chip">De-Esser</span>
         </div>
       </div>
       <div class="fxgroup">
@@ -451,10 +464,11 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
         </div>
       </div>
       <div class="fxgroup">
-        <h3><span class="bullet" style="background:var(--peach)"></span>Distortion</h3>
+        <h3><span class="bullet" style="background:var(--maroon)"></span>Distortion</h3>
         <div class="tags">
           <span class="tag-chip">Distortion</span>
-          <span class="tag-chip">Clipper</span>
+          <span class="tag-chip">Saturator</span>
+          <span class="tag-chip">Exciter</span>
           <span class="tag-chip">Bitcrusher</span>
         </div>
       </div>
@@ -468,15 +482,16 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
       <div class="fxgroup">
         <h3><span class="bullet" style="background:var(--yellow)"></span>Utility</h3>
         <div class="tags">
-          <span class="tag-chip">Stereo Width</span>
           <span class="tag-chip">Utility</span>
           <span class="tag-chip">Live Difference</span>
+          <span class="tag-chip">Tuner</span>
         </div>
       </div>
       <div class="fxgroup">
         <h3><span class="bullet" style="background:var(--green)"></span>Visualizer</h3>
         <div class="tags">
           <span class="tag-chip">3D Scope</span>
+          <span class="tag-chip">Oscilloscope</span>
         </div>
       </div>
       <div class="fxgroup">
@@ -488,10 +503,10 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
       <div class="fxgroup">
         <h3><span class="bullet" style="background:var(--sky)"></span>Plugins</h3>
         <div class="tags">
-          <span class="tag-chip">CLAP audio effects</span>
-          <span class="tag-chip">LV2 audio effects</span>
-          <span class="tag-chip">VST2 audio effects</span>
-          <span class="tag-chip">VST3 audio effects</span>
+          <span class="tag-chip">CLAP</span>
+          <span class="tag-chip">LV2</span>
+          <span class="tag-chip">VST2 / VST3</span>
+          <span class="tag-chip">AU</span>
         </div>
       </div>
     </div>
@@ -552,7 +567,7 @@ document.documentElement.setAttribute('data-theme',s&&v[s]?s:d);})();
       <h3>Scripting &amp; plugin isolation</h3>
       <p>Extend the DAW with C# automation scripts and optionally sandbox VST3 effects in a child process.</p>
       <ul>
-        <li><strong>Tools → Scripts</strong> — Roslyn host with curated project/transport API; factory scripts for tempo, rename, and quantize.</li>
+        <li><strong>Scripting tab</strong> — Roslyn host with curated project/transport API; factory scripts for tempo, rename, and quantize.</li>
         <li><strong>Plugin isolation</strong> — Settings → General → Plugins; <code>Ongenet.PluginHost</code> child process for crash-safe VST3 effects.</li>
       </ul>
     </div>

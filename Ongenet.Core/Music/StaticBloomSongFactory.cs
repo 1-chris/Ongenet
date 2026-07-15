@@ -35,8 +35,13 @@ public static class StaticBloomSongFactory
             ColorKey = "CatppuccinSubtext0",
             Volume = 1.0
         };
-        master.Effects.Add(new LimiterEffect { CeilingDb = -1.5, ReleaseMs = 200 });
-        master.Effects.Add(new ReverbEffect { Mix = 0.12, RoomSize = 0.5, Damping = 0.6 });
+        // Streaming Master with a light room wash before the Peak Limiter (never after).
+        foreach (var fx in MasteringChains.Create("streaming"))
+        {
+            if (fx is PeakLimiterEffect)
+                master.Effects.Add(new ReverbEffect { Mix = 0.12, RoomSize = 0.5, Damping = 0.6 });
+            master.Effects.Add(fx);
+        }
         project.Tracks.Add(master);
 
         project.Tracks.Add(BuildKick());

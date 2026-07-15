@@ -38,8 +38,9 @@ Ongenet uses **custom window chrome** (its own title bar, themed with Catppuccin
 │  (left)      │                                            │  h  (right) │
 │              │                                            │  t          │
 ├──────────────┴──────────────────────────────────────────┤  tabs       │
-│  Bottom panel:  [ Instrument | Piano Roll | Effects | Video ]     │             │
+│  Bottom: [ Instrument/Sample | Pattern | Piano Roll | Clip | MIDI FX | Effects | Video ]
 └───────────────────────────────────────────────────────────────────────┘
+Centre tabs also include Arrangement, Mixer, Session, Notation, Video, and Scripting.
 ```
 
 Each side region can be collapsed:
@@ -83,7 +84,6 @@ The playback control strip ([`Views/Panels/TransportView.axaml`](https://github.
 
 | Control | What it does |
 | --- | --- |
-| **Render** | Export the arrangement to a WAV file (offline render) |
 | **Play** ▶ | Start playback from the start marker |
 | **Stop** ■ | Stop playback; if recording, stop and commit the take |
 | **Record** ● | One-bar metronome count-in, then record into armed tracks |
@@ -92,12 +92,15 @@ The playback control strip ([`Views/Panels/TransportView.axaml`](https://github.
 | **Slice toggle** | Switch the timeline/piano-roll into "slice" (cut) edit mode |
 | **[** / **]** | Set the loop start / loop end to the current start marker |
 | **Loop indicator** | A green dot lights when looping is active |
-| **Tempo** | Project BPM (20–300) |
+| **Tempo** | Project BPM (editor allows 1–999; **Tap** tempo clamps to 20–300) |
+| **Tap** | Set project BPM from your tap rhythm |
 | **Bars** | Arrangement length in bars |
 | **Time signature** | Numerator + denominator (denominators 1/2/4/8/16) |
 | **Master meter + fader** | Live stereo output level meter and master volume slider |
 | **Metronome (Click)** | Toggle audible click during playback (independent of record count-in) |
+| **Cap MIDI** | Retrospective capture of buffered notes into a new clip |
 | **MIDI export** | Export all instrument-track MIDI from the arrangement to a Standard MIDI File |
+| **Render progress** | Progress bar while an offline export/bounce is running (start exports from **Export ▾**) |
 
 > During **record**, a one-bar metronome count-in still runs before capture begins. The **Click** toggle is for everyday playback practice.
 > **Audio/MIDI device pickers** live in **Settings → Audio / MIDI**, not on the transport.
@@ -264,7 +267,7 @@ clips — session/arrangement hybrid workflows without duplicating tracks.
 | **Pitch Editor** | Polyphonic note-segment pitch correction on audio clips (timeline → **Open Pitch Editor**) |
 | **Scripts** | **Scripting** centre tab — in-app C# IDE with syntax highlighting and IntelliSense ([scripting.md](scripting.md)) |
 
-**Settings → General → Plugins → Isolate plugins in separate process** enables optional VST3 effect
+**Settings → General → Plugins → Run VST3 plugins in an isolated process** enables optional VST3 effect
 crash isolation via `Ongenet.PluginHost` ([plugin-isolation.md](plugin-isolation.md)).
 
 **Export → ADM BWF** (when surround is 5.1/7.1) exports ITU-R BS.2076 immersive handoff. **AAF/OMF
@@ -282,7 +285,7 @@ the tab strip. Tabs:
 | **Everything** | A combined view of all library content |
 | **Files** | An OS folder browser |
 | **Samples** | Your sample library |
-| **Soundfonts** | SF2 soundfonts |
+| **Soundfonts** | SFZ / SF2 instruments |
 | **Instruments** | Built-in (and plugin) instruments |
 | **Effects** | Built-in (and plugin) effects |
 | **Inst Presets** / **FX Presets** / **FX Chains** | Saved presets and effect-chain presets |
@@ -302,11 +305,15 @@ The bottom panel is a tabbed editor that changes with what you've selected
 | Tab | Shows | When |
 | --- | --- | --- |
 | **Instrument** / **Sample** | The instrument rack, or the selected audio clip's settings | Instrument tracks (header switches to "Sample" when an audio clip is selected) |
+| **Pattern** | Pattern / step editor | Pattern tracks and pattern clips |
 | **Piano Roll** | The MIDI note editor | Auto-selected when you pick a MIDI clip |
-| **Effects** | The track's effect chain | Always (the only tab for bus tracks) |
+| **Clip** | Clip inspector (audio/MIDI clip properties) | When a clip is selected |
+| **MIDI FX** | MIDI effect chain | Instrument / MIDI tracks |
+| **Effects** | The track's effect chain | Always (often the only tab for bus tracks) |
+| **Video** | Beat-synced video timeline | When video features are enabled |
 
 The panel switches tabs automatically: select a MIDI clip and it jumps to Piano Roll; an audio clip to
-Sample; a bus shows only Effects.
+Sample; a bus typically shows Effects.
 
 **Instrument inspector** ([`InstrumentInspectorView`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.App/Views/Panels/InstrumentInspectorView.axaml)):
 an **"+ Add instrument"** menu (grouped by category), a rack of instrument-slot cards, and a shared
@@ -385,11 +392,11 @@ Defined in [`MainWindow.axaml.cs`](https://github.com/1-chris/Ongenet/blob/main/
 | **Shift + [** | Set loop **start** to the start marker |
 | **Shift + ]** | Set loop **end** to the start marker |
 | **F8** | Toggle Avalonia renderer diagnostics (FPS / render & layout graphs) |
-| **View → Tempo Map** | Edit master tempo automation (menu; no default shortcut) |
-| **View → Section Playlist** | Ordered section playback from arrangement markers (menu) |
+| **View → Tempo Map** | Edit master tempo automation (also **Ctrl + Alt + T**) |
+| **View → Section Playlist** | Ordered section playback from arrangement markers (also **Ctrl + Alt + L**) |
 | **Edit → Ripple edit** | Toggle ripple mode for clip edits (when enabled in edit menu) |
-| **File → Collaboration → Pull latest** | Import the project copy from the sync folder |
-| **Transport → Capture MIDI** | Retrospective capture of buffered notes into a new clip |
+| **Export ▾ → Pull from collaboration folder** | Import the project copy from the sync folder |
+| **Transport → Cap MIDI** | Retrospective capture of buffered notes into a new clip |
 
 > Custom transport/key mappings can be configured in **Settings → MIDI** (`TransportMappings` in app settings).
 

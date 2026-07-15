@@ -45,125 +45,170 @@
     <Border Name="RootBorder" Background="{StaticResource CatppuccinBase}" BorderBrush="{StaticResource CatppuccinBase}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
     <Panel>
         <Grid RowDefinitions="Auto, *">
-            <!-- Custom Title Bar (exact port of the original MainWindow chrome) -->
-            <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" ColumnDefinitions="Auto, *, Auto" PointerPressed="TitleBar_PointerPressed">
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- macOS "traffic light" buttons live on the left; hidden on other platforms (toggled in code-behind).
-                     macOS left-to-right order: close (red) / minimise (yellow) / maximise (green). -->
-                <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
-                            VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
-                    <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
-                            Click="CloseButton_Click" ToolTip.Tip="{DynamicResource Main_Close_Tip}">
-                        <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
-                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Button>
-                    <Button Classes="MacButton" Background="{StaticResource CatppuccinYellow}"
-                            Click="MinimizeButton_Click" ToolTip.Tip="{DynamicResource Main_Minimize_Tip}">
-                        <Path Data="M0,3 L7,3" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
-                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Button>
-                    <Button Classes="MacButton" Background="{StaticResource CatppuccinGreen}"
-                            Click="MaximizeButton_Click" ToolTip.Tip="{DynamicResource Main_Maximize_Tip}">
-                        <Path Data="M0,3 L7,3 M3.5,0 L3.5,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
-                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Button>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" Spacing="12">
-                    <TextBlock Text="{DynamicResource Main_Ongenet}" FontSize="12" Foreground="{StaticResource CatppuccinMauve}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
-                               VerticalAlignment="Center" Margin="-6,1,0,0"/>
-                    <Button Name="NewButton" Content="New ▾" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_New_project_CtrlN_Tip}">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuItem Header="{DynamicResource Main_Blank_project}" Click="OnNew_Click"/>
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                    <Button Content="{DynamicResource Main_Open}" Click="OnOpen_Click" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Open_project_CtrlO_Tip}"/>
-                    <Button Content="{DynamicResource Main_Save}" Click="OnSave_Click" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Save_project_CtrlS_Tip}"/>
-                    <Button Content="{DynamicResource Main_Save_As}" Click="OnSaveAs_Click" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Save_project_as_CtrlShiftS_Tip}"/>
-                    <Button Name="ExportShareButton" Content="Export ▾" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Export_and_collaboration_Tip}">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuItem Header="{DynamicResource Main_Export_audio}" Click="OnExportAudio_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Export_video}"
-                                          IsVisible="{Binding ShowExportVideo}"
-                                          Click="OnExportVideo_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Sync_to_collaboration_folder}" Click="OnSyncCollaboration_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Pull_from_collaboration_folder}" Click="OnPullCollaboration_Click"/>
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                    <Button Name="LayoutButton" Content="Layout ▾" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Save_or_restore_window_layout_Tip}">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuItem Header="{DynamicResource Main_Save_layout}" Click="OnSaveLayout_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Load_layout}" Click="OnLoadLayout_Click"/>
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                    <Button Content="View ▾" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuItem Header="{DynamicResource Main_Tempo_Map}" Click="OpenTempoMap_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Section_Playlist}" Click="OpenSectionPlaylist_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Chord_Track}" Click="OpenChordTrack_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Expression_Maps}" Click="OpenExpressionMaps_Click"/>
-                                <MenuItem Header="{DynamicResource Main_Audio_Editor}" Click="OpenAudioEditor_Click"/>
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                    <Button Content="↶" Click="OnUndo_Click" FontSize="13" Padding="8,2"
-                            IsEnabled="{Binding CanUndo}"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Undo_CtrlZ_Tip}"/>
-                    <Button Content="↷" Click="OnRedo_Click" FontSize="13" Padding="8,2"
-                            IsEnabled="{Binding CanRedo}"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Redo_CtrlY_Tip}"/>
-                    <Button Content="{DynamicResource Main_Guide}" Click="OpenGuide_Click" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_In_app_guide_Tip}"/>
-                    <Button Content="{DynamicResource Main_History}" Click="OpenHistory_Click" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_History_Tip}"/>
-                    <Button Content="{DynamicResource Main_Logs}" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <Button Content="{DynamicResource Main_Settings}" Click="OpenSettings_Click" FontSize="11" Padding="8,2"
-                            Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
-                            ToolTip.Tip="{DynamicResource Main_Settings_audio_MIDI_theme_Tip}"/>
+            <!-- Custom Title Bar: row 0 = menus + window chrome; row 1 = master monitoring -->
+            <Grid Grid.Row="0" Name="TitleBar" Classes="TitleBar" RowDefinitions="Auto,Auto"
+                  PointerPressed="TitleBar_PointerPressed">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" MinHeight="32" ClipToBounds="True">
+                    <Panel Grid.Column="0" ClipToBounds="True">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- macOS "traffic light" buttons live on the left; hidden on other platforms (toggled in code-behind).
+                             macOS left-to-right order: close (red) / minimise (yellow) / maximise (green). -->
+                        <StackPanel Name="MacWindowButtons" Orientation="Horizontal" Spacing="8"
+                                    VerticalAlignment="Center" Margin="14,0,8,0" IsVisible="False">
+                            <Button Classes="MacButton" Background="{StaticResource CatppuccinRed}"
+                                    Click="CloseButton_Click" ToolTip.Tip="{DynamicResource Main_Close_Tip}">
+                                <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Button>
+                            <Button Classes="MacButton" Background="{StaticResource CatppuccinYellow}"
+                                    Click="MinimizeButton_Click" ToolTip.Tip="{DynamicResource Main_Minimize_Tip}">
+                                <Path Data="M0,3 L7,3" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Button>
+                            <Button Classes="MacButton" Background="{StaticResource CatppuccinGreen}"
+                                    Click="MaximizeButton_Click" ToolTip.Tip="{DynamicResource Main_Maximize_Tip}">
+                                <Path Data="M0,3 L7,3 M3.5,0 L3.5,7" Stroke="#80000000" StrokeThickness="1.2" Opacity="0"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Button>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0" Spacing="12">
+                            <TextBlock Text="{DynamicResource Main_Ongenet}" FontSize="12" Foreground="{StaticResource CatppuccinMauve}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource CatppuccinOverlay1}"
+                                       VerticalAlignment="Center" Margin="-6,1,0,0"/>
+                            <Button Name="NewButton" Content="New ▾" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_New_project_CtrlN_Tip}">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="{DynamicResource Main_Blank_project}" Click="OnNew_Click"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Content="{DynamicResource Main_Open}" Click="OnOpen_Click" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Open_project_CtrlO_Tip}"/>
+                            <Button Content="{DynamicResource Main_Save}" Click="OnSave_Click" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Save_project_CtrlS_Tip}"/>
+                            <Button Content="{DynamicResource Main_Save_As}" Click="OnSaveAs_Click" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Save_project_as_CtrlShiftS_Tip}"/>
+                            <Button Name="ExportShareButton" Content="Export ▾" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Export_and_collaboration_Tip}">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="{DynamicResource Main_Export_audio}" Click="OnExportAudio_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Export_video}"
+                                                  IsVisible="{Binding ShowExportVideo}"
+                                                  Click="OnExportVideo_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Sync_to_collaboration_folder}" Click="OnSyncCollaboration_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Pull_from_collaboration_folder}" Click="OnPullCollaboration_Click"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Name="LayoutButton" Content="Layout ▾" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Save_or_restore_window_layout_Tip}">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="{DynamicResource Main_Save_layout}" Click="OnSaveLayout_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Load_layout}" Click="OnLoadLayout_Click"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Content="View ▾" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="{DynamicResource Main_Tempo_Map}" Click="OpenTempoMap_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Section_Playlist}" Click="OpenSectionPlaylist_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Chord_Track}" Click="OpenChordTrack_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Expression_Maps}" Click="OpenExpressionMaps_Click"/>
+                                        <MenuItem Header="{DynamicResource Main_Audio_Editor}" Click="OpenAudioEditor_Click"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Content="↶" Click="OnUndo_Click" FontSize="13" Padding="8,2"
+                                    IsEnabled="{Binding CanUndo}"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Undo_CtrlZ_Tip}"/>
+                            <Button Content="↷" Click="OnRedo_Click" FontSize="13" Padding="8,2"
+                                    IsEnabled="{Binding CanRedo}"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Redo_CtrlY_Tip}"/>
+                            <Button Content="{DynamicResource Main_Guide}" Click="OpenGuide_Click" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_In_app_guide_Tip}"/>
+                            <Button Content="{DynamicResource Main_History}" Click="OpenHistory_Click" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_History_Tip}"/>
+                            <Button Content="{DynamicResource Main_Logs}" Click="OpenLogs_Click" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                            <Button Content="{DynamicResource Main_Settings}" Click="OpenSettings_Click" FontSize="11" Padding="8,2"
+                                    Background="Transparent" Foreground="{StaticResource CatppuccinSubtext0}"
+                                    ToolTip.Tip="{DynamicResource Main_Settings_audio_MIDI_theme_Tip}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    </Panel>
+                    <StackPanel Name="StandardWindowButtons" Grid.Column="1" Orientation="Horizontal"
+                                VerticalAlignment="Top">
+                        <Button Name="MinimizeButton" Classes="TitleBarButton" Click="MinimizeButton_Click">
+                            <Path Margin="0,5,0,0" VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,0" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                        </Button>
+                        <Button Name="MaximizeButton" Classes="TitleBarButton" Click="MaximizeButton_Click">
+                            <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,0 L10,10 L0,10 Z" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1" Fill="Transparent"/>
+                        </Button>
+                        <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
+                            <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Row 1: master volume, meter, loudness / K-System, system metrics -->
+                <Panel Grid.Row="1" ClipToBounds="True" Margin="10,0,10,4">
+                <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center"
+                            HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
                                 ToolTip.Tip="{DynamicResource Transport_Master_output_volume_Tip}"
                                 Automation:AutomationProperties.Name="{DynamicResource Transport_Master_volume_A11yName}"
                                 Automation:AutomationProperties.HelpText="{DynamicResource Transport_Adjust_master_output_level}">
                         <Path Classes="icon small" Data="{StaticResource IconVolumeHigh}"/>
-                        <Slider Minimum="0" Maximum="1" Width="72" Value="{Binding Transport.MasterVolume}"
+                        <!-- Match play (44) + gap (4) + stop (36) + gap (4) + record (36) = 124. -->
+                        <Slider Minimum="0" Maximum="1" Width="124" Value="{Binding Transport.MasterVolume}"
                                 VerticalAlignment="Center"/>
                     </StackPanel>
-                    <controls:MasterMeterControl Height="20" MinWidth="160" VerticalAlignment="Center"
+                    <controls:MasterMeterControl Width="320" Height="28" VerticalAlignment="Center"
+                                                 Margin="0,0,6,0"
+                                                 ClipToBounds="True"
                                                  LevelLeft="{Binding Transport.MasterLevelLeft}"
-                                                 LevelRight="{Binding Transport.MasterLevelRight}"/>
+                                                 LevelRight="{Binding Transport.MasterLevelRight}"
+                                                 TruePeakLeftDbTp="{Binding Transport.MasterTruePeakLeftDbTp}"
+                                                 TruePeakRightDbTp="{Binding Transport.MasterTruePeakRightDbTp}"
+                                                 LoudnessText="{Binding Transport.MasterLoudnessText}"
+                                                 MeterTapLabel="{Binding Transport.MeterTapLabel}"
+                                                 TargetTruePeakDbTp="{Binding Transport.TargetTruePeakDbTp}"
+                                                 KSystemOffsetDb="{Binding Transport.KSystemOffsetDb}"
+                                                 TruePeakWarning="{Binding Transport.MasterTruePeakWarning}"
+                                                 ToolTip.Tip="{Binding Transport.DeliveryTargetText}"/>
+                    <Button Content="↺" Command="{Binding Transport.ResetMasterLoudnessCommand}"
+                            Padding="5,2" Background="Transparent"
+                            ToolTip.Tip="{DynamicResource Mastering_ResetLoudness}"/>
+                    <Button Content="{Binding Transport.KSystemLabel}" Command="{Binding Transport.CycleKSystemCommand}"
+                            Padding="5,2" Background="Transparent" FontSize="11"
+                            ToolTip.Tip="{DynamicResource Mastering_KSystem_Tip}"/>
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                Margin="4,0,0,0"
                                 IsVisible="{Binding Transport.ShowSystemMetrics}">
+                        <TextBlock Classes="mono caption" Text="{Binding Transport.AudioLoadText}"
+                                   ToolTip.Tip="Audio render load vs block deadline (DSP). Underruns shown after !"/>
                         <TextBlock Classes="mono caption" Text="{Binding Transport.CpuText}"
                                    ToolTip.Tip="{DynamicResource Transport_Ongenet_process_CPU_usage_Tip}"/>
                         <TextBlock Classes="mono caption" Text="{Binding Transport.RamText}"
                                    ToolTip.Tip="{DynamicResource Transport_Ongenet_process_memory_working_set_Tip}"/>
+                        <TextBlock Classes="mono caption" Text="{Binding Transport.HeapText}"
+                                   ToolTip.Tip="Managed GC heap (distinct from process working set)"/>
                     </StackPanel>
-                    <!-- Save/Load progress indicator -->
                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                                 IsVisible="{Binding IsBusy}">
                         <ProgressBar IsIndeterminate="True" Width="70" Height="4" VerticalAlignment="Center"/>
@@ -171,18 +216,7 @@
                                    Foreground="{StaticResource CatppuccinGreen}"/>
                     </StackPanel>
                 </StackPanel>
-                </StackPanel>
-                <StackPanel Name="StandardWindowButtons" Grid.Column="2" Orientation="Horizontal">
-                    <Button Name="MinimizeButton" Classes="TitleBarButton" Click="MinimizeButton_Click">
-                        <Path Margin="0,5,0,0" VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,0" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
-                    </Button>
-                    <Button Name="MaximizeButton" Classes="TitleBarButton" Click="MaximizeButton_Click">
-                        <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,0 L10,10 L0,10 Z" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1" Fill="Transparent"/>
-                    </Button>
-                    <Button Name="CloseButton" Classes="TitleBarButton Close" Click="CloseButton_Click">
-                        <Path VerticalAlignment="Center" HorizontalAlignment="Center" Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1"/>
-                    </Button>
-                </StackPanel>
+                </Panel>
             </Grid>
 
             <!-- DAW workspace: transport bar over [track inspector | timeline+clip inspector | file browser] -->

@@ -1,12 +1,13 @@
 using System;
 using System.IO;
+using Ongenet.Core.Audio.Dsp;
 
 namespace Ongenet.Core.Audio.Files;
 
 /// <summary>
 /// Streams interleaved float samples to a PCM WAV file (16-, 24-, or 32-bit). The RIFF/data sizes are
 /// written as placeholders up front and patched on <see cref="Dispose"/>, so arbitrarily long renders
-/// need no in-memory buffer.
+/// need no in-memory buffer. Optional TPDF or noise-shaped dither for 16/24-bit quantisation.
 /// </summary>
 public sealed class WavWriter : IDisposable
 {
@@ -16,10 +17,13 @@ public sealed class WavWriter : IDisposable
     private readonly int _sampleRate;
     private readonly int _bitsPerSample;
     private readonly int _bytesPerSample;
+    private readonly bool _dither;
+    private readonly PcmDither _pcmDither = new();
     private long _dataBytes;
     private bool _disposed;
 
-    public WavWriter(string path, int channels, int sampleRate, int bitsPerSample = 16)
+    public WavWriter(string path, int channels, int sampleRate, int bitsPerSample = 16, bool applyDither = false,
+        DitherMode ditherMode = DitherMode.Tpdf)
     {
         _channels = channels < 1 ? 1 : channels;
         _sampleRate = sampleRate <= 0 ? 44100 : sampleRate;
@@ -30,6 +34,8 @@ public sealed class WavWriter : IDisposable
             _ => 16
         };
         _bytesPerSample = _bitsPerSample / 8;
+        _dither = applyDither && _bitsPerSample < 32;
+        _pcmDither.Mode = ditherMode;
         _stream = new FileStream(path, FileMode.Create, FileAccess.Write);
         _writer = new BinaryWriter(_stream);
         WriteHeader(0);
@@ -54,12 +60,15 @@ public sealed class WavWriter : IDisposable
         _writer.Write(dataBytes);
     }
 
-    /// <summary>Writes a block of interleaved float samples (clamped, converted to PCM).</summary>
+    /// <summary>Writes a block of interleaved float samples (dithered then clamped, converted to PCM).</summary>
     public void Write(ReadOnlySpan<float> samples)
     {
         foreach (var sample in samples)
         {
-            var s = sample > 1f ? 1f : sample < -1f ? -1f : sample;
+            // Dither before hard clamp so overs still receive dither energy near ±1;
+            // clamp only immediately before integer quantisation.
+            var s = _dither ? _pcmDither.Process(sample, _bitsPerSample) : sample;
+            s = s > 1f ? 1f : s < -1f ? -1f : s;
             switch (_bitsPerSample)
             {
                 case 24:

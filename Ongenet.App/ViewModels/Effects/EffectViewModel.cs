@@ -13,6 +13,8 @@ namespace Ongenet.App.ViewModels.Effects
         private int _position;
         private bool _isFirst;
         private bool _isLast;
+        private bool _isHighlighted;
+        private bool _isCollapsed;
 
         public EffectViewModel(IAudioEffect effect, Action<EffectViewModel> remove,
             Action<EffectViewModel> moveUp, Action<EffectViewModel> moveDown)
@@ -25,6 +27,7 @@ namespace Ongenet.App.ViewModels.Effects
             ToggleEnabledCommand = new RelayCommand(() => IsEnabled = !IsEnabled);
             MoveUpCommand = new RelayCommand(() => moveUp(this));
             MoveDownCommand = new RelayCommand(() => moveDown(this));
+            ToggleCollapsedCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
         }
 
         public IAudioEffect Effect { get; }
@@ -50,11 +53,38 @@ namespace Ongenet.App.ViewModels.Effects
         }
 
         /// <summary>Re-reads the enabled state and parameters (so automation shows live during playback).</summary>
-        public void Refresh()
+        public virtual void Refresh()
         {
             OnPropertyChanged(nameof(IsEnabled));
             foreach (var p in Parameters) p.Refresh();
+            if (HasGainReduction)
+            {
+                OnPropertyChanged(nameof(GainReductionDb));
+                OnPropertyChanged(nameof(GainReductionNormalized));
+                OnPropertyChanged(nameof(GainReductionText));
+            }
         }
+
+        /// <summary>True when this effect exposes live gain-reduction metering.</summary>
+        public bool HasGainReduction => Effect is IGainReductionSource;
+
+        /// <summary>Current gain reduction in dB (0 = none; negative = attenuation).</summary>
+        public double GainReductionDb =>
+            Effect is IGainReductionSource gr ? gr.GainReductionDb : 0;
+
+        /// <summary>0..1 fill for the GR bar (maps 0..−24 dB reduction).</summary>
+        public double GainReductionNormalized
+        {
+            get
+            {
+                var amount = -GainReductionDb;
+                if (amount <= 0) return 0;
+                return amount >= 24 ? 1 : amount / 24.0;
+            }
+        }
+
+        /// <summary>Compact GR readout for the meter label.</summary>
+        public string GainReductionText => $"{GainReductionDb:0.0} dB";
 
         /// <summary>Toggles whether the effect processes audio (the green/red dot).</summary>
         public RelayCommand ToggleEnabledCommand { get; }
@@ -82,6 +112,26 @@ namespace Ongenet.App.ViewModels.Effects
             get => _isLast;
             set => SetField(ref _isLast, value);
         }
+
+        public bool IsHighlighted
+        {
+            get => _isHighlighted;
+            set => SetField(ref _isHighlighted, value);
+        }
+
+        /// <summary>When true, specialized card body UI can hide for compact mastering racks.</summary>
+        public bool IsCollapsed
+        {
+            get => _isCollapsed;
+            set
+            {
+                if (!SetField(ref _isCollapsed, value)) return;
+                OnPropertyChanged(nameof(CollapseGlyph));
+            }
+        }
+
+        public RelayCommand ToggleCollapsedCommand { get; }
+        public string CollapseGlyph => IsCollapsed ? "▸" : "▾";
 
         /// <summary>Whether the effect is active; when false the engine bypasses it.</summary>
         public bool IsEnabled

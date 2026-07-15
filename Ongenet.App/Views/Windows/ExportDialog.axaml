@@ -3,178 +3,304 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Ongenet.App.ViewModels"
-        xmlns:services="using:Ongenet.Core.Services"
         xmlns:audio="using:Ongenet.Core.Models.Audio"
         xmlns:media="using:Ongenet.Core.Models.Media"
-        xmlns:display="using:Ongenet.App.Display"
-        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="520"
+        mc:Ignorable="d" d:DesignWidth="520" d:DesignHeight="720"
         x:Class="Ongenet.App.Views.Windows.ExportDialog"
         x:DataType="vm:ExportViewModel"
         Title="{DynamicResource Export_Export_Title}"
-        Width="420" MinWidth="360"
-        SizeToContent="Height"
-        CanResize="False"
+        Width="520" Height="720" MinWidth="360" MinHeight="480"
+        CanResize="True"
         WindowStartupLocation="CenterOwner">
 
     <Border Background="{StaticResource CatppuccinBase}" Padding="16">
-        <StackPanel Spacing="12">
-            <TextBlock Text="{DynamicResource Export_Export}" FontWeight="SemiBold" FontSize="16"
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
+            <TextBlock Grid.Row="0" Text="{DynamicResource Export_Export}" FontWeight="SemiBold" FontSize="18"
                        IsVisible="{Binding ShowAudioExportOptions}"/>
-            <TextBlock Text="{DynamicResource Export_Video_heading}" FontWeight="SemiBold" FontSize="16"
+            <TextBlock Grid.Row="0" Text="{DynamicResource Export_Video_heading}" FontWeight="SemiBold" FontSize="18"
                        IsVisible="{Binding IsVideoExportMode}"/>
-            <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsVideoExportMode}">
-                <TextBlock Text="{DynamicResource Export_Video_canvas}" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <TextBlock Text="{Binding VideoCanvasSizeLabel}" Foreground="{StaticResource CatppuccinText}"/>
-                <TextBlock Text="{DynamicResource Export_Video_fps}" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <TextBlock Text="{Binding VideoExportFpsLabel}" Foreground="{StaticResource CatppuccinText}"/>
-            </StackPanel>
-            <TextBlock Text="{Binding RenderQueueStatus}" FontSize="11"
-                       Foreground="{StaticResource CatppuccinOverlay1}"
-                       IsVisible="{Binding IsVideoExportMode}"/>
-            <CheckBox Content="{DynamicResource Export_Background_video}"
-                      IsChecked="{Binding ExportInBackground, Mode=TwoWay}"
-                      IsVisible="{Binding ShowBackgroundExportOption}"/>
 
-            <StackPanel Spacing="4">
-                <TextBlock Text="{DynamicResource Export_Kind}" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <ComboBox ItemsSource="{Binding ExportKinds}" SelectedItem="{Binding Kind, Mode=TwoWay}"
-                          HorizontalAlignment="Stretch"/>
-            </StackPanel>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="12" Margin="0,0,8,0">
+                    <!-- Audio -->
+                    <Border Padding="12" BorderThickness="1" BorderBrush="{StaticResource CatppuccinSurface1}"
+                            CornerRadius="6" IsVisible="{Binding ShowAudioExportOptions}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Audio" FontWeight="SemiBold" FontSize="14"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock Text="{DynamicResource Export_Kind}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox ItemsSource="{Binding ExportKinds}" SelectedItem="{Binding Kind, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="{DynamicResource Export_Audio_format}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox ItemsSource="{Binding AudioFormats}" SelectedItem="{Binding AudioFormat, Mode=TwoWay}"/>
+                                </StackPanel>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock Text="{DynamicResource Export_Bit_depth}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox ItemsSource="{Binding BitDepths}" SelectedItem="{Binding BitDepth, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="{DynamicResource Export_Target_sample_rate}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                    <ComboBox ItemsSource="{Binding TargetSampleRates}" SelectedItem="{Binding TargetSampleRate, Mode=TwoWay}"/>
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{DynamicResource Export_Surround}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <ComboBox ItemsSource="{Binding SurroundFormats}" SelectedItem="{Binding Surround, Mode=TwoWay}"/>
+                            </StackPanel>
+                            <StackPanel Spacing="4" IsVisible="{Binding HasMarkers}">
+                                <TextBlock Text="{DynamicResource Export_Region_from_marker}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <ComboBox ItemsSource="{Binding Markers}" SelectedItem="{Binding SelectedMarker, Mode=TwoWay}"
+                                          PlaceholderText="{DynamicResource Export_optional}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="audio:ArrangementMarker">
+                                            <TextBlock>
+                                                <Run Text="{Binding Name}"/>
+                                                <Run Text="{DynamicResource Export_Text}"/>
+                                                <Run Text="{Binding Beat, StringFormat='{}{0:0.##}'}"/>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Spacing="6" IsVisible="{Binding IsRegionVisible}">
+                                <TextBlock Text="{DynamicResource Export_Region_beats}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+                                    <NumericUpDown Grid.Column="0" Value="{Binding RegionStartBeat, Mode=TwoWay}"
+                                                   Minimum="0" Increment="0.25" FormatString="0.##"/>
+                                    <TextBlock Grid.Column="1" Text="{DynamicResource Export_to}" VerticalAlignment="Center"/>
+                                    <NumericUpDown Grid.Column="2" Value="{Binding RegionEndBeat, Mode=TwoWay}"
+                                                   Minimum="0" Increment="0.25" FormatString="0.##"/>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Spacing="4" IsVisible="{Binding ShowBypassMasterFx}">
+                                <CheckBox Content="{DynamicResource Export_Pre_master_bounce}"
+                                          IsChecked="{Binding BypassMasterFx, Mode=TwoWay}"
+                                          ToolTip.Tip="{DynamicResource Export_Pre_master_bounce_Tip}"/>
+                                <CheckBox Content="{DynamicResource Export_Comparison_pair}"
+                                          IsChecked="{Binding ExportComparisonPair, Mode=TwoWay}"
+                                          IsVisible="{Binding ShowComparisonPair}"/>
+                            </StackPanel>
+                            <StackPanel Spacing="4" IsVisible="{Binding ShowDitherOption}">
+                                <CheckBox Content="{DynamicResource Export_Apply_dither}"
+                                          IsChecked="{Binding ApplyDither, Mode=TwoWay}"/>
+                                <ComboBox ItemsSource="{Binding DitherModes}"
+                                          SelectedItem="{Binding SelectedDitherMode, Mode=TwoWay}"
+                                          IsEnabled="{Binding ApplyDither}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DitherModeOption">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock Text="{Binding DitherAuditionPreviewText}" FontSize="10" TextWrapping="Wrap"
+                                           Foreground="{StaticResource CatppuccinOverlay1}"/>
+                                <TextBlock Text="{DynamicResource Export_Dither_warning}" FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{StaticResource CatppuccinPeach}"
+                                           IsVisible="{Binding ShowDitherWarning}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-            <StackPanel Spacing="4" IsVisible="{Binding ShowAudioExportOptions}">
-                <TextBlock Text="{DynamicResource Export_Surround}" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <ComboBox ItemsSource="{Binding SurroundFormats}" SelectedItem="{Binding Surround, Mode=TwoWay}"
-                          HorizontalAlignment="Stretch"/>
-            </StackPanel>
+                    <!-- Loudness and delivery -->
+                    <Border Padding="12" BorderThickness="1" BorderBrush="{StaticResource CatppuccinSurface1}"
+                            CornerRadius="6" IsVisible="{Binding ShowLoudnessOptions}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Loudness / Delivery" FontWeight="SemiBold" FontSize="14"/>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{DynamicResource Export_Delivery_platform}" Foreground="{StaticResource CatppuccinSubtext0}"/>
+                                <ComboBox ItemsSource="{Binding DeliveryPlatforms}"
+                                          SelectedItem="{Binding SelectedDeliveryPlatform, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DeliveryPlatformOption">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsCustomDeliveryPlatform}">
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="{DynamicResource Export_Target_LUFS}" FontSize="10"/>
+                                    <NumericUpDown Value="{Binding TargetIntegratedLufs, Mode=TwoWay}"
+                                                   Minimum="-30" Maximum="-5" Increment="0.5" FormatString="0.0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{DynamicResource Export_Target_dBTP}" FontSize="10"/>
+                                    <NumericUpDown Value="{Binding TargetTruePeakDbTp, Mode=TwoWay}"
+                                                   Minimum="-6" Maximum="0" Increment="0.1" FormatString="0.0"/>
+                                </StackPanel>
+                            </Grid>
+                            <CheckBox Content="{DynamicResource Export_Analyze_loudness}"
+                                      IsChecked="{Binding AnalyzeLoudness, Mode=TwoWay}"/>
+                            <CheckBox Content="{DynamicResource Export_Normalize_loudness}"
+                                      IsChecked="{Binding NormalizeLoudness, Mode=TwoWay}"
+                                      ToolTip.Tip="{DynamicResource Export_Normalize_loudness_Tip}"/>
+                            <CheckBox Content="{DynamicResource Export_Match_album_loudness}"
+                                      IsChecked="{Binding MatchAlbumLoudness, Mode=TwoWay}"
+                                      IsVisible="{Binding ShowMatchAlbumLoudness}"/>
+                            <TextBlock Text="{Binding NormalizePreviewText}" FontSize="10" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <TextBlock Text="{Binding RelimitWarningText}" FontSize="10" TextWrapping="Wrap"
+                                       IsVisible="{Binding ShowRelimitWarning}"
+                                       Foreground="{StaticResource CatppuccinPeach}"/>
+                            <TextBlock Text="{Binding MetadataPreviewText}" FontSize="10" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"/>
+                            <TextBlock Text="{DynamicResource Export_Delivery_hint}" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"
+                                       IsVisible="{Binding ShowDeliveryHint}"/>
 
-            <StackPanel Spacing="4" IsVisible="{Binding ShowAudioExportOptions}">
-                <TextBlock Text="{DynamicResource Export_Audio_format}" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <ComboBox ItemsSource="{Binding AudioFormats}" SelectedItem="{Binding AudioFormat, Mode=TwoWay}"
-                          HorizontalAlignment="Stretch"/>
-            </StackPanel>
+                            <Border Padding="10" Background="{StaticResource CatppuccinSurface0}" CornerRadius="4"
+                                    IsVisible="{Binding ShowStructuredLoudnessReport}">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Export loudness report" FontWeight="SemiBold"/>
+                                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="4">
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding ReportIntegratedLufs}"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ReportLra}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding ReportTruePeak}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ReportTargetStatus}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
 
-            <StackPanel Spacing="4" IsVisible="{Binding HasMarkers}">
-                <TextBlock Text="{DynamicResource Export_Region_from_marker}" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <ComboBox ItemsSource="{Binding Markers}" SelectedItem="{Binding SelectedMarker, Mode=TwoWay}"
-                          PlaceholderText="{DynamicResource Export_optional}" HorizontalAlignment="Stretch">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="audio:ArrangementMarker">
-                            <TextBlock>
-                                <Run Text="{Binding Name}"/>
-                                <Run Text="{DynamicResource Export_Text}"/>
-                                <Run Text="{Binding Beat, StringFormat='{}{0:0.##}'}"/>
-                            </TextBlock>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-            </StackPanel>
+                    <!-- Stems and album -->
+                    <Border Padding="12" BorderThickness="1" BorderBrush="{StaticResource CatppuccinSurface1}"
+                            CornerRadius="6" IsVisible="{Binding ShowStemsAlbumSection}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Stems / Album" FontWeight="SemiBold" FontSize="14"/>
+                            <CheckBox Content="{DynamicResource Export_Include_master_FX}"
+                                      IsChecked="{Binding IncludeMasterFx, Mode=TwoWay}"
+                                      IsVisible="{Binding ShowIncludeMasterFx}"/>
+                            <TextBlock Text="{Binding MasterFxChainPreview}" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{StaticResource CatppuccinOverlay1}"
+                                       IsVisible="{Binding ShowMasterFxPreview}"/>
+                            <ScrollViewer MaxHeight="150" HorizontalScrollBarVisibility="Disabled"
+                                          IsVisible="{Binding IsStemsVisible}">
+                                <ItemsControl ItemsSource="{Binding StemTracks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ExportStemTrackViewModel">
+                                            <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      Margin="0,2"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <Button Content="Analyze selected stems" Command="{Binding AnalyzeAlbumLoudnessCommand}"
+                                    HorizontalAlignment="Left"/>
+                            <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" Height="5"
+                                         IsVisible="{Binding IsAnalyzingAlbumLoudness}"/>
+                            <StackPanel Spacing="4" IsVisible="{Binding ShowAlbumLoudnessPreview}">
+                                <Grid ColumnDefinitions="2*,*,*,*,*" ColumnSpacing="6">
+                                    <TextBlock Grid.Column="0" Text="Track" FontWeight="SemiBold" FontSize="10"/>
+                                    <TextBlock Grid.Column="1" Text="LUFS" FontWeight="SemiBold" FontSize="10"/>
+                                    <TextBlock Grid.Column="2" Text="LRA" FontWeight="SemiBold" FontSize="10"/>
+                                    <TextBlock Grid.Column="3" Text="dBTP" FontWeight="SemiBold" FontSize="10"/>
+                                    <TextBlock Grid.Column="4" Text="Offset" FontWeight="SemiBold" FontSize="10"/>
+                                </Grid>
+                                <ItemsControl ItemsSource="{Binding AlbumLoudnessRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AlbumLoudnessRow">
+                                            <Grid ColumnDefinitions="2*,*,*,*,*" ColumnSpacing="6" Margin="0,2">
+                                                <TextBlock Grid.Column="0" Text="{Binding TrackName}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding IntegratedLufs}"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding Lra}"/>
+                                                <TextBlock Grid.Column="3" Text="{Binding TruePeak}"/>
+                                                <TextBlock Grid.Column="4" Text="{Binding OffsetDb}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-            <CheckBox Content="{DynamicResource Export_Export_timeline_XML_post_handoff}"
-                      IsChecked="{Binding ExportTimelineXml, Mode=TwoWay}"
-                      IsVisible="{Binding ShowAudioExportOptions}"
-                      ToolTip.Tip="{DynamicResource Export_Custom_Ongenet_timeline_XML_for_video_post_refer_Tip}"/>
+                    <!-- Stem separation -->
+                    <Border Padding="12" BorderThickness="1" BorderBrush="{StaticResource CatppuccinSurface1}"
+                            CornerRadius="6" IsVisible="{Binding ShowAudioExportOptions}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{DynamicResource Export_Stem_separation}" FontWeight="SemiBold" FontSize="14"/>
+                            <TextBlock Text="{Binding StemSeparationBackend}" FontSize="11" TextWrapping="Wrap"/>
+                            <ComboBox ItemsSource="{Binding StemQualities}" SelectedItem="{Binding StemQuality, Mode=TwoWay}"/>
+                            <TextBlock Text="{Binding DemucsInstallHint}" FontSize="10" TextWrapping="Wrap"
+                                       IsVisible="{Binding ShowDemucsHint}"/>
+                            <ProgressBar Minimum="0" Maximum="1" Value="{Binding StemSeparationProgress}" Height="6"
+                                         IsVisible="{Binding IsSeparatingStems}"/>
+                            <Button Content="{DynamicResource Export_Separate_selected_audio_clip_4_stems}"
+                                    Command="{Binding SeparateSelectedClipCommand}"/>
+                        </StackPanel>
+                    </Border>
 
-            <StackPanel Spacing="4" IsVisible="{Binding ShowVideoCompositorPanel}">
-                <CheckBox Content="{DynamicResource Export_Mux_with_video}"
-                          IsChecked="{Binding MuxWithVideo, Mode=TwoWay}"
-                          IsVisible="{Binding ShowAudioExportOptions}"
-                          IsEnabled="{Binding HasMuxVideoLayers}"/>
-                <CheckBox Content="{DynamicResource Export_Composited_video}"
-                          IsChecked="{Binding ComposeVideo, Mode=TwoWay}"
-                          IsEnabled="{Binding CanComposeVideo}"
-                          IsVisible="{Binding IsVideoExportMode}"/>
-                <CheckBox Content="{DynamicResource Export_Composited_video}"
-                          IsChecked="{Binding ComposeVideo, Mode=TwoWay}"
-                          IsEnabled="{Binding CanComposeVideo}"
-                          IsVisible="{Binding ShowAudioExportOptions}"
-                          Margin="16,0,0,0"/>
-                <ComboBox ItemsSource="{Binding VideoLayers}" SelectedItem="{Binding SelectedVideoLayer, Mode=TwoWay}"
-                          IsVisible="{Binding ShowAudioExportOptions}"
-                          IsEnabled="{Binding MuxWithVideo}" PlaceholderText="{DynamicResource Export_Video_layer}">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="media:VideoLayer">
-                            <TextBlock Text="{Binding Name}"/>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-            </StackPanel>
-
-            <CheckBox Content="{DynamicResource Export_Export_AAF_OMF_handoff_XML}"
-                      IsChecked="{Binding ExportAafOmf, Mode=TwoWay}"
-                      IsVisible="{Binding ShowAudioExportOptions}"
-                      ToolTip.Tip="{DynamicResource Export_Structured_XML_interchange_for_post_houses_binar_Tip}"/>
-
-            <CheckBox Content="{DynamicResource Export_Export_ADM_BWF_immersive}"
-                      IsChecked="{Binding ExportAdmBwf, Mode=TwoWay}"
-                      IsVisible="{Binding ShowAdmExportOption}"
-                      ToolTip.Tip="{DynamicResource Export_ITU_R_BS2076_metadata_sidecar_for_broadcast_imme_Tip}"/>
-
-            <StackPanel Spacing="6" IsVisible="{Binding ShowAudioExportOptions}">
-                <TextBlock Text="{DynamicResource Export_Stem_separation}" FontWeight="SemiBold" FontSize="11"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <TextBlock Text="{Binding StemSeparationBackend}" FontSize="11"
-                           Foreground="{StaticResource CatppuccinSubtext0}" TextWrapping="Wrap"/>
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{DynamicResource Export_Quality}" FontSize="11" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <ComboBox ItemsSource="{Binding StemQualities}" SelectedItem="{Binding StemQuality, Mode=TwoWay}"
-                              HorizontalAlignment="Stretch"/>
+                    <!-- Video and post handoff -->
+                    <Border Padding="12" BorderThickness="1" BorderBrush="{StaticResource CatppuccinSurface1}"
+                            CornerRadius="6">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Video / Handoff" FontWeight="SemiBold" FontSize="14"/>
+                            <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsVideoExportMode}">
+                                <TextBlock Text="{DynamicResource Export_Video_canvas}"/>
+                                <TextBlock Text="{Binding VideoCanvasSizeLabel}"/>
+                                <TextBlock Text="{DynamicResource Export_Video_fps}"/>
+                                <TextBlock Text="{Binding VideoExportFpsLabel}"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding RenderQueueStatus}" FontSize="11"
+                                       IsVisible="{Binding IsVideoExportMode}"/>
+                            <CheckBox Content="{DynamicResource Export_Background_video}"
+                                      IsChecked="{Binding ExportInBackground, Mode=TwoWay}"
+                                      IsVisible="{Binding ShowBackgroundExportOption}"/>
+                            <StackPanel Spacing="4" IsVisible="{Binding ShowVideoCompositorPanel}">
+                                <CheckBox Content="{DynamicResource Export_Mux_with_video}"
+                                          IsChecked="{Binding MuxWithVideo, Mode=TwoWay}"
+                                          IsVisible="{Binding ShowAudioExportOptions}"
+                                          IsEnabled="{Binding HasMuxVideoLayers}"/>
+                                <CheckBox Content="{DynamicResource Export_Composited_video}"
+                                          IsChecked="{Binding ComposeVideo, Mode=TwoWay}"
+                                          IsEnabled="{Binding CanComposeVideo}"/>
+                                <ComboBox ItemsSource="{Binding VideoLayers}"
+                                          SelectedItem="{Binding SelectedVideoLayer, Mode=TwoWay}"
+                                          IsVisible="{Binding ShowAudioExportOptions}"
+                                          IsEnabled="{Binding MuxWithVideo}"
+                                          PlaceholderText="{DynamicResource Export_Video_layer}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="media:VideoLayer">
+                                            <TextBlock Text="{Binding Name}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                            <CheckBox Content="{DynamicResource Export_Export_timeline_XML_post_handoff}"
+                                      IsChecked="{Binding ExportTimelineXml, Mode=TwoWay}"
+                                      IsVisible="{Binding ShowAudioExportOptions}"/>
+                            <CheckBox Content="{DynamicResource Export_Export_AAF_OMF_handoff_XML}"
+                                      IsChecked="{Binding ExportAafOmf, Mode=TwoWay}"
+                                      IsVisible="{Binding ShowAudioExportOptions}"/>
+                            <CheckBox Content="{DynamicResource Export_Export_ADM_BWF_immersive}"
+                                      IsChecked="{Binding ExportAdmBwf, Mode=TwoWay}"
+                                      IsVisible="{Binding ShowAdmExportOption}"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-                <TextBlock Text="{Binding DemucsInstallHint}" FontSize="10"
-                           Foreground="{StaticResource CatppuccinOverlay0}" TextWrapping="Wrap"
-                           IsVisible="{Binding ShowDemucsHint}"/>
-                <ProgressBar Minimum="0" Maximum="1" Value="{Binding StemSeparationProgress}" Height="6"
-                             IsVisible="{Binding IsSeparatingStems}"/>
-                <Button Content="{DynamicResource Export_Separate_selected_audio_clip_4_stems}"
-                        Command="{Binding SeparateSelectedClipCommand}"
-                        HorizontalAlignment="Stretch"/>
-            </StackPanel>
+            </ScrollViewer>
 
-            <StackPanel Spacing="4" IsVisible="{Binding ShowAudioExportOptions}">
-                <TextBlock Text="{DynamicResource Export_Bit_depth}" Foreground="{StaticResource CatppuccinSubtext0}"/>
-                <ComboBox ItemsSource="{Binding BitDepths}" SelectedItem="{Binding BitDepth, Mode=TwoWay}"
-                          HorizontalAlignment="Stretch"/>
+            <StackPanel Grid.Row="2" Spacing="8">
+                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" Height="8"
+                             IsVisible="{Binding IsExporting}"/>
+                <TextBlock Text="{Binding Status}" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{StaticResource CatppuccinSubtext0}"/>
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                    <Button Content="{DynamicResource Export_Cancel}" Click="OnCancel"
+                            IsEnabled="{Binding !IsExporting}"/>
+                    <Button Content="{DynamicResource Export_Export_video_action}" Classes="accent"
+                            Click="OnExport" IsEnabled="{Binding CanExport}"
+                            IsVisible="{Binding IsVideoExportMode}"/>
+                    <Button Content="{DynamicResource Export_Export_2}" Classes="accent"
+                            Click="OnExport" IsEnabled="{Binding CanExport}"
+                            IsVisible="{Binding ShowAudioExportOptions}"/>
+                </StackPanel>
             </StackPanel>
-
-            <StackPanel Spacing="6" IsVisible="{Binding IsRegionVisible}">
-                <TextBlock Text="{DynamicResource Export_Region_beats}" FontWeight="SemiBold" FontSize="11"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
-                    <NumericUpDown Grid.Column="0" Value="{Binding RegionStartBeat, Mode=TwoWay}"
-                                   Minimum="0" Increment="0.25" FormatString="0.##"/>
-                    <TextBlock Grid.Column="1" Text="{DynamicResource Export_to}" VerticalAlignment="Center"
-                               Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <NumericUpDown Grid.Column="2" Value="{Binding RegionEndBeat, Mode=TwoWay}"
-                                   Minimum="0" Increment="0.25" FormatString="0.##"/>
-                </Grid>
-            </StackPanel>
-
-            <StackPanel Spacing="6" IsVisible="{Binding IsStemsVisible}">
-                <TextBlock Text="{DynamicResource Export_Stem_tracks}" FontWeight="SemiBold" FontSize="11"
-                           Foreground="{StaticResource CatppuccinOverlay1}"/>
-                <ScrollViewer MaxHeight="160" HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding StemTracks}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ExportStemTrackViewModel">
-                                <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                          Margin="0,2"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
-
-            <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" Height="8"
-                         IsVisible="{Binding IsExporting}"/>
-            <TextBlock Text="{Binding Status}" FontSize="11"
-                       Foreground="{StaticResource CatppuccinSubtext0}"/>
-
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                <Button Content="{DynamicResource Export_Cancel}" Click="OnCancel" IsEnabled="{Binding !IsExporting}"/>
-                <Button Content="{DynamicResource Export_Export_video_action}" Classes="accent" Click="OnExport" IsEnabled="{Binding CanExport}"
-                        IsVisible="{Binding IsVideoExportMode}"/>
-                <Button Content="{DynamicResource Export_Export_2}" Classes="accent" Click="OnExport" IsEnabled="{Binding CanExport}"
-                        IsVisible="{Binding ShowAudioExportOptions}"/>
-            </StackPanel>
-        </StackPanel>
+        </Grid>
     </Border>
 </Window>

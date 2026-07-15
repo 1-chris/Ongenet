@@ -16,27 +16,38 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.DataTemplates>
             <DataTemplate DataType="vm:FloatParameterViewModel">
-                <StackPanel Width="58" Margin="2,4" HorizontalAlignment="Center">
+                <StackPanel Width="58" Margin="2,4" HorizontalAlignment="Center"
+                            ToolTip.Tip="{Binding ValueText}">
+                    <TextBlock Text="{Binding Group}" IsVisible="{Binding HasGroup}" FontSize="8"
+                               FontWeight="SemiBold" Foreground="{StaticResource CatppuccinOverlay0}"
+                               HorizontalAlignment="Center"/>
                     <controls:Knob Width="40" Height="40" HorizontalAlignment="Center"
                                    Minimum="{Binding Min}" Maximum="{Binding Max}" Skew="{Binding Skew}"
                                    Value="{Binding Value, Mode=TwoWay}"/>
                     <TextBlock Text="{Binding Name}" FontSize="10" HorizontalAlignment="Center"
                                TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
-                    <TextBlock Text="{Binding ValueText}" FontSize="9" HorizontalAlignment="Center"
-                               Foreground="{StaticResource CatppuccinSubtext1}"/>
+                    <NumericUpDown Value="{Binding Value, Mode=TwoWay}"
+                                   Minimum="{Binding Min}" Maximum="{Binding Max}"
+                                   FormatString="0.##" FontSize="9" Height="22" Padding="2,0"
+                                   HorizontalContentAlignment="Center"
+                                   ToolTip.Tip="Type an exact value; Shift-drag the knob for fine adjust"/>
                 </StackPanel>
             </DataTemplate>
             <DataTemplate DataType="vm:ChoiceParameterViewModel">
-                <StackPanel Width="120" Margin="2,4">
+                <StackPanel Width="120" Margin="2,4" ToolTip.Tip="{Binding Tooltip}">
+                    <TextBlock Text="{Binding Group}" IsVisible="{Binding HasGroup}" FontSize="8"
+                               FontWeight="SemiBold" Foreground="{StaticResource CatppuccinOverlay0}"/>
                     <TextBlock Text="{Binding Name}" FontSize="10"
                                Foreground="{StaticResource CatppuccinSubtext0}"/>
                     <ComboBox Classes="stretch" ItemsSource="{Binding Options}" SelectedIndex="{Binding SelectedIndex}"
-                              HorizontalAlignment="Stretch"/>
+                              HorizontalAlignment="Stretch" ToolTip.Tip="{Binding Tooltip}"/>
                 </StackPanel>
             </DataTemplate>
             <DataTemplate DataType="vm:BoolParameterViewModel">
                 <StackPanel Width="90" Margin="2,4" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Group}" IsVisible="{Binding HasGroup}" FontSize="8"
+                               FontWeight="SemiBold" Foreground="{StaticResource CatppuccinOverlay0}"/>
                     <CheckBox IsChecked="{Binding Value, Mode=TwoWay}" Content="{Binding Name}" FontSize="11"/>
                 </StackPanel>
             </DataTemplate>

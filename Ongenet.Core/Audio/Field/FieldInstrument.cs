@@ -19,7 +19,8 @@ namespace Ongenet.Core.Audio.Field;
 public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProjectStatefulComponent, IPresetProvider
 {
     public const string Id = "field";
-    private const int InitialMaxBlock = 2048;
+    // Match the macOS producer chunk (and typical device blocks) so compiled graphs stay lean.
+    private const int InitialMaxBlock = 512;
 
     private enum EvType { On, Off, AllOff, Bend, Cc }
     private readonly struct NoteEvent
@@ -128,6 +129,17 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
 
     public void Prepare(AudioFormat format)
     {
+        // Idempotent: undo/history clones and engine rebuilds must not reallocate an identical graph.
+        if (_compiled is not null
+            && format.SampleRate == _format.SampleRate
+            && format.Channels == _format.Channels
+            && _compiledRevision == _graph.Revision
+            && _compiled.MaxBlock >= _maxBlock)
+        {
+            _format = format;
+            return;
+        }
+
         _format = format;
         Recompile(_maxBlock);
     }
@@ -140,6 +152,13 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
         lock (_compileLock)
         {
             if (minBlock > _maxBlock) _maxBlock = minBlock;
+            if (_compiled is not null
+                && _compiledRevision == _graph.Revision
+                && _compiled.MaxBlock >= _maxBlock
+                && _compiled.Format.SampleRate == _format.SampleRate
+                && _compiled.Format.Channels == _format.Channels)
+                return;
+
             var compiled = FieldGraphCompiler.Compile(_graph, _format, _maxBlock, isInstrument: true);
             _compiledRevision = _graph.Revision;
             _compiled = compiled;
@@ -239,7 +258,10 @@ public sealed class FieldInstrument : IInstrument, IInstrumentVoiceState, IProje
         _definitionId = definitionId;
         _surface = surface;
         RebuildExposedParameters();
-        Recompile(_maxBlock);
+        // Defer compilation until Prepare/Recompile — history clones must stay unprepared
+        // so undo snapshots do not retain per-voice float buffers for every Field instrument.
+        _compiled = null;
+        _compiledRevision = -1;
     }
 
     private void CopyGraph(FieldGraph source, FieldGraph dest)

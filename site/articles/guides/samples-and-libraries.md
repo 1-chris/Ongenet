@@ -11,7 +11,7 @@
 
 Desktop installers ship a **Content/Core** pack (~1.4 GB): drums (Stargate, Oramics, VCSL kit, 909 SF2), acoustic instruments (VCSL piano/Strumstick, VSCO 2 CE orchestra), GM SF2 banks (Jnsgm2, GeneralUser, ChaosBank, …), and tonejs **CC BY 3.0** bass / organ / xylophone.
 
-Full catalogue, licences, and attribution: **[Factory content](factory-content.md)**. In-app: **Settings → Legal → Factory content attribution** (`Content/Core/ATTRIBUTION.md`).
+Full catalogue, licences, and attribution: **[Factory content](factory-content.md)**. In-app: **Settings → General → Factory content attribution** (`Content/Core/ATTRIBUTION.md`).
 
 Maintainers expanding the pack: see [`Content/README.md`](../../../Content/README.md).
 

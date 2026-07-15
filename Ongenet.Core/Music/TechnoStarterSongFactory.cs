@@ -44,7 +44,9 @@ public static class TechnoStarterSongFactory
             ColorKey = "CatppuccinSubtext0",
             Volume = 1.0
         };
-        master.Effects.Add(new LimiterEffect { CeilingDb = -0.5, ReleaseMs = 80 });
+        master.Effects.Clear();
+        foreach (var fx in MasteringChains.Create("techno"))
+            master.Effects.Add(fx);
         project.Tracks.Add(master);
 
         var kick = BuildKick();

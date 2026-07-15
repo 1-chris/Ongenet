@@ -139,8 +139,8 @@ public static class FieldGraphCompiler
             }
         }
 
-        var outBuf = new float[totalSlots][];
-        for (var i = 0; i < totalSlots; i++) outBuf[i] = new float[maxBlock];
+        var outBuf = AllocateOutputBuffers(
+            nodes, order, inEdgesRaw, perVoice, outSlotBase, totalSlots, voiceCount, maxBlock);
 
         // Build compiled nodes in topological order.
         var compiled = new CompiledGraph.CompiledNode[order.Count];
@@ -179,6 +179,76 @@ public static class FieldGraphCompiler
 
         var voices = new FieldVoiceManager(voiceCount);
         return new CompiledGraph(format, maxBlock, isInstrument, voices, compiled, outBuf, scratchPorts);
+    }
+
+    private static float[][] AllocateOutputBuffers(
+        List<FieldNode> nodes,
+        List<int> order,
+        List<(int srcNode, int srcPort, bool audio)>[][] inEdgesRaw,
+        bool[] perVoice,
+        int[][] outSlotBase,
+        int totalSlots,
+        int voiceCount,
+        int maxBlock)
+    {
+        var position = new int[nodes.Count];
+        for (var oi = 0; oi < order.Count; oi++) position[order[oi]] = oi;
+
+        var lastUse = new int[nodes.Count][];
+        var feedback = new bool[nodes.Count][];
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            lastUse[i] = new int[nodes[i].Outputs.Count];
+            feedback[i] = new bool[nodes[i].Outputs.Count];
+            Array.Fill(lastUse[i], position[i]);
+        }
+
+        for (var dst = 0; dst < nodes.Count; dst++)
+        {
+            foreach (var input in inEdgesRaw[dst])
+            foreach (var edge in input)
+            {
+                var srcPosition = position[edge.srcNode];
+                var dstPosition = position[dst];
+                if (dstPosition <= srcPosition)
+                    feedback[edge.srcNode][edge.srcPort] = true;
+                else if (dstPosition > lastUse[edge.srcNode][edge.srcPort])
+                    lastUse[edge.srcNode][edge.srcPort] = dstPosition;
+            }
+        }
+
+        // Logical slots remain stable for the compiled edge table, but non-overlapping lifetimes point
+        // at the same physical arrays. Feedback outputs stay dedicated because their previous-block
+        // contents are read before the source runs in the next block.
+        var result = new float[totalSlots][];
+        var available = new Stack<float[]>();
+        var active = new List<(int End, float[] Buffer)>();
+        for (var oi = 0; oi < order.Count; oi++)
+        {
+            for (var a = active.Count - 1; a >= 0; a--)
+            {
+                if (active[a].End >= oi) continue;
+                available.Push(active[a].Buffer);
+                active.RemoveAt(a);
+            }
+
+            var nodeIndex = order[oi];
+            var slotsPerPort = perVoice[nodeIndex] ? voiceCount : 1;
+            for (var port = 0; port < nodes[nodeIndex].Outputs.Count; port++)
+            {
+                for (var voice = 0; voice < slotsPerPort; voice++)
+                {
+                    var buffer = feedback[nodeIndex][port] || available.Count == 0
+                        ? new float[maxBlock]
+                        : available.Pop();
+                    result[outSlotBase[nodeIndex][port] + voice] = buffer;
+                    if (!feedback[nodeIndex][port])
+                        active.Add((lastUse[nodeIndex][port], buffer));
+                }
+            }
+        }
+
+        return result;
     }
 
     private static void TopoVisit(int u, HashSet<int>[] deps, byte[] state, List<int> order)

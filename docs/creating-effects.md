@@ -417,19 +417,15 @@ The app finds effects through the
 [`EffectRegistry`](https://github.com/1-chris/Ongenet/blob/main/Ongenet.Core/Audio/Effects/EffectRegistry.cs). Add one line to the `_builtIn`
 list and you're done — the library, the "add effect" menu, and project loading all read from it:
 
-```19:40:Ongenet.Core/Audio/Effects/EffectRegistry.cs
-    private readonly List<EffectInfo> _builtIn = new()
-    {
-        new EffectInfo(EqEffect.TypeId, "EQ", () => new EqEffect(), CatEqFilter),
-        new EffectInfo(FilterEffect.TypeId, "Filter", () => new FilterEffect(), CatEqFilter),
-        new EffectInfo(CompressorEffect.TypeId, "Compressor", () => new CompressorEffect(), CatDynamics),
-        new EffectInfo(LimiterEffect.TypeId, "Limiter", () => new LimiterEffect(), CatDynamics),
-        new EffectInfo(GateEffect.TypeId, "Gate", () => new GateEffect(), CatDynamics),
-        new EffectInfo(SidechainEffect.TypeId, "Sidechain", () => new SidechainEffect(), CatDynamics),
-        new EffectInfo(ChorusEffect.TypeId, "Chorus", () => new ChorusEffect(), CatModulation),
-        // ...
-        new EffectInfo(UtilityEffect.TypeId, "Utility", () => new UtilityEffect(), CatUtility)
-    };
+```csharp
+// EffectRegistry._builtIn (abbreviated — see the file for the full ~90 entries)
+private readonly List<EffectInfo> _builtIn = new()
+{
+    new EffectInfo(EqEffect.TypeId, "EQ", () => new EqEffect(), CatEqFilter),
+    new EffectInfo(CompressorEffect.TypeId, "Compressor", () => new CompressorEffect(), CatDynamics),
+    new EffectInfo(PeakLimiterEffect.TypeId, "Peak Limiter", () => new PeakLimiterEffect(), CatMastering),
+    // … Mastering, Modulation, Delay & Reverb, Distortion, Pitch, Utility, Visualizer, Spectral, …
+};
 ```
 
 Your line, e.g.:

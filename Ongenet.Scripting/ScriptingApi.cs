@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Models.Audio;
@@ -22,6 +23,9 @@ public sealed partial class ScriptingApi : IScriptingApi, IDisposable
     private readonly IEffectRegistry _effects;
     private readonly IProjectScriptExporter? _projectExporter;
     private readonly IPresetScriptExporter? _presetExporter;
+    private readonly ExportService? _export;
+    private readonly IAudioEngine? _engine;
+    private readonly IMasteringDeliveryTarget? _deliveryTarget;
     private readonly ScriptingRuntime _runtime;
     private readonly List<string> _output = new();
     private readonly List<IDisposable> _liveSubscriptions = new();
@@ -35,7 +39,10 @@ public sealed partial class ScriptingApi : IScriptingApi, IDisposable
         IInstrumentRegistry instruments,
         IEffectRegistry effects,
         IProjectScriptExporter? projectExporter = null,
-        IPresetScriptExporter? presetExporter = null)
+        IPresetScriptExporter? presetExporter = null,
+        ExportService? export = null,
+        IAudioEngine? engine = null,
+        IMasteringDeliveryTarget? deliveryTarget = null)
     {
         _project = project;
         _transport = transport;
@@ -45,6 +52,9 @@ public sealed partial class ScriptingApi : IScriptingApi, IDisposable
         _effects = effects;
         _projectExporter = projectExporter;
         _presetExporter = presetExporter;
+        _export = export;
+        _engine = engine;
+        _deliveryTarget = deliveryTarget;
         _runtime = new ScriptingRuntime(transport);
         _runtime.Configure(msg => Log(msg), uiContext: null);
     }
