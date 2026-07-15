@@ -26,7 +26,7 @@ public sealed class RotaryEffect : IAudioEffect
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
-    private readonly RotarySpeaker _rotary = new();
+    private RotarySpeaker _rotary = new();
 
     public string Name => "Rotary";
 
@@ -42,11 +42,18 @@ public sealed class RotaryEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _rotary.Configure((int)_sampleRate);
-        _rotary.Reset();
-        ApplySpeed();
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var rotary = new RotarySpeaker();
+        rotary.Configure((int)sampleRate);
+        rotary.Reset();
+        ApplySpeed(rotary);
+
+        // Publish a fully-configured instance — RebuildTracks can call Prepare from the UI thread
+        // while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _rotary = rotary;
     }
 
     public IAudioEffect Clone() => new RotaryEffect
@@ -56,9 +63,10 @@ public sealed class RotaryEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        _rotary.SetDrive(DriveDb);
-        _rotary.Mix = (float)Math.Clamp(Mix, 0, 1);
-        ApplySpeed();
+        var rotary = _rotary;
+        rotary.SetDrive(DriveDb);
+        rotary.Mix = (float)Math.Clamp(Mix, 0, 1);
+        ApplySpeed(rotary);
 
         var channels = _channels < 1 ? 1 : _channels;
         var frames = buffer.Length / channels;
@@ -67,23 +75,23 @@ public sealed class RotaryEffect : IAudioEffect
             var i = frame * channels;
             if (channels >= 2)
             {
-                _rotary.Process(buffer[i], buffer[i + 1], out var outL, out var outR);
+                rotary.Process(buffer[i], buffer[i + 1], out var outL, out var outR);
                 buffer[i] = outL;
                 buffer[i + 1] = outR;
             }
             else
             {
-                _rotary.Process(buffer[i], buffer[i], out var outL, out _);
+                rotary.Process(buffer[i], buffer[i], out var outL, out _);
                 buffer[i] = outL;
             }
         }
     }
 
-    private void ApplySpeed()
+    private void ApplySpeed(RotarySpeaker rotary)
     {
         if (SpeedHz > 0.01)
-            _rotary.SetSpeedHz(SpeedHz, SpeedHz * 0.85);
+            rotary.SetSpeedHz(SpeedHz, SpeedHz * 0.85);
         else
-            _rotary.SetSpeed(SpeedIndex >= 1 ? 1.0 : 0.0);
+            rotary.SetSpeed(SpeedIndex >= 1 ? 1.0 : 0.0);
     }
 }

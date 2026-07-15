@@ -17,21 +17,26 @@ public sealed class DelayLine
 
     public void Resize(int size)
     {
-        _size = Math.Max(1, size);
-        _buf = new float[_size];
+        var next = Math.Max(1, size);
+        var buf = new float[next];
+        // Publish the buffer first so torn reads of Size/_buf never outrun the live array length.
+        _buf = buf;
+        _size = next;
         _write = 0;
     }
 
     public void Clear()
     {
-        Array.Clear(_buf, 0, _buf.Length);
+        var buf = _buf;
+        Array.Clear(buf, 0, buf.Length);
         _write = 0;
     }
 
     /// <summary>Reads <paramref name="delaySamples"/> samples back (integer).</summary>
     public float ReadInt(int delaySamples)
     {
-        var size = _buf.Length;
+        var buf = _buf;
+        var size = buf.Length;
         if (size <= 0) return 0f;
         // Index using the live buffer length — Prepare/Resize may run on another thread and briefly
         // leave _size and _buf out of sync; a torn read must never crash the audio thread.
@@ -39,33 +44,36 @@ public sealed class DelayLine
         var i = _write - delaySamples;
         i %= size;
         if (i < 0) i += size;
-        return _buf[i];
+        return buf[i];
     }
 
     /// <summary>Reads a fractional delay back with linear interpolation.</summary>
     public float ReadFrac(double delaySamples)
     {
-        if (_size <= 0) return 0f;
-        // Wrap the read position into [0, _size) robustly — handles large or even negative delays without
+        var buf = _buf;
+        var size = buf.Length;
+        if (size <= 0) return 0f;
+        // Wrap the read position into [0, size) robustly — handles large or even negative delays without
         // spinning or indexing out of bounds (a torn delay/size must never crash the audio thread).
         var rp = _write - delaySamples;
-        rp -= Math.Floor(rp / _size) * _size;
+        rp -= Math.Floor(rp / size) * size;
         var i0 = (int)rp;
-        if (i0 < 0) i0 = 0; else if (i0 >= _size) i0 = _size - 1;
+        if (i0 < 0) i0 = 0; else if (i0 >= size) i0 = size - 1;
         var frac = (float)(rp - i0);
         var i1 = i0 + 1;
-        if (i1 >= _size) i1 -= _size;
-        return _buf[i0] * (1 - frac) + _buf[i1] * frac;
+        if (i1 >= size) i1 -= size;
+        return buf[i0] * (1 - frac) + buf[i1] * frac;
     }
 
     /// <summary>Writes the next sample and advances the write position.</summary>
     public void Write(float x)
     {
-        var size = _buf.Length;
+        var buf = _buf;
+        var size = buf.Length;
         if (size <= 0) return;
         var w = _write;
         if (w >= size) w = 0;
-        _buf[w] = x;
+        buf[w] = x;
         _write = w + 1 >= size ? 0 : w + 1;
     }
 }

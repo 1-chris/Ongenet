@@ -36,10 +36,10 @@ public sealed class AutoTuneEffect : IAudioEffect
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
-    private readonly PitchDetector _detector = new();
+    private PitchDetector _detector = new();
     private PitchShifter[] _shifters = Array.Empty<PitchShifter>();
     private PitchShifter[][] _harmony = Array.Empty<PitchShifter[]>();
-    private readonly OnePole _ratioSmooth = new();
+    private OnePole _ratioSmooth = new();
     private double _lastPeriod;
     private double _lastF0;
     private double _lastRatio = 1.0;
@@ -67,28 +67,37 @@ public sealed class AutoTuneEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
 
-        _detector.Configure(_sampleRate, 70.0, 1000.0);
-        var shifters = new PitchShifter[_channels];
-        var harmony = new PitchShifter[_channels][];
-        for (var ch = 0; ch < _channels; ch++)
+        var detector = new PitchDetector();
+        detector.Configure(sampleRate, 70.0, 1000.0);
+        var shifters = new PitchShifter[channels];
+        var harmony = new PitchShifter[channels][];
+        for (var ch = 0; ch < channels; ch++)
         {
             shifters[ch] = new PitchShifter();
-            shifters[ch].Configure(_sampleRate);
+            shifters[ch].Configure(sampleRate);
             harmony[ch] = new PitchShifter[MaxHarmonyVoices];
             for (var h = 0; h < MaxHarmonyVoices; h++)
             {
                 harmony[ch][h] = new PitchShifter();
-                harmony[ch][h].Configure(_sampleRate);
+                harmony[ch][h].Configure(sampleRate);
             }
         }
+
+        var ratioSmooth = new OnePole();
+        ratioSmooth.SetSmoothTime(RetuneMs, sampleRate);
+        ratioSmooth.Reset(1.0);
+
+        // Publish fully-built state with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _detector = detector;
         _shifters = shifters;
         _harmony = harmony;
-
-        _ratioSmooth.SetSmoothTime(RetuneMs, _sampleRate);
-        _ratioSmooth.Reset(1.0);
+        _ratioSmooth = ratioSmooth;
         _lastPeriod = 0;
         _lastF0 = 0;
         _lastRatio = 1.0;
@@ -100,25 +109,33 @@ public sealed class AutoTuneEffect : IAudioEffect
     {
         var shifters = _shifters;
         var harmony = _harmony;
+        var detector = _detector;
+        var ratioSmooth = _ratioSmooth;
         var channels = Math.Min(_channels < 1 ? 1 : _channels, shifters.Length);
-        if (channels <= 0) return;
+        if (channels <= 0 || harmony.Length < channels) return;
         var frames = buffer.Length / channels;
 
         _sinceDetect += frames;
         if (_sinceDetect >= DetectHop)
         {
             _sinceDetect = 0;
-            UpdateCorrection();
+            UpdateCorrection(detector);
         }
 
         for (var ch = 0; ch < channels; ch++)
         {
-            shifters[ch].SetPeriod(_lastPeriod);
+            var shifter = shifters[ch];
+            var harm = harmony[ch];
+            if (shifter is null || harm is null) return;
+            shifter.SetPeriod(_lastPeriod);
             for (var h = 0; h < MaxHarmonyVoices; h++)
-                harmony[ch][h].SetPeriod(_lastPeriod);
+            {
+                if (harm[h] is null) return;
+                harm[h].SetPeriod(_lastPeriod);
+            }
         }
 
-        _ratioSmooth.SetSmoothTime(RetuneMs, _sampleRate);
+        ratioSmooth.SetSmoothTime(RetuneMs, _sampleRate);
         var mix = AudioMath.Clamp(Mix, 0.0, 1.0);
         var harmonyMix = (float)Math.Clamp(HarmonyMix, 0, 1);
         var voiceCount = Math.Clamp(HarmonyVoices, 0, MaxHarmonyVoices);
@@ -126,11 +143,11 @@ public sealed class AutoTuneEffect : IAudioEffect
 
         for (var f = 0; f < frames; f++)
         {
-            var ratio = _ratioSmooth.ProcessLP(_lastRatio);
+            var ratio = ratioSmooth.ProcessLP(_lastRatio);
 
             var mono = 0f;
             for (var ch = 0; ch < channels; ch++) mono += buffer[f * channels + ch];
-            _detector.Push(mono / channels);
+            detector.Push(mono / channels);
 
             for (var ch = 0; ch < channels; ch++)
             {
@@ -158,9 +175,9 @@ public sealed class AutoTuneEffect : IAudioEffect
         }
     }
 
-    private void UpdateCorrection()
+    private void UpdateCorrection(PitchDetector detector)
     {
-        var f0 = _detector.Detect();
+        var f0 = detector.Detect();
         if (f0 <= 0) return;
 
         if (_lastF0 > 0)

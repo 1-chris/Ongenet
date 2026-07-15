@@ -30,7 +30,7 @@ public sealed class TunerEffect : IAudioEffect
 
     private int _channels = 2;
     private double _sampleRate = 44100.0;
-    private readonly PitchDetector _detector = new();
+    private PitchDetector _detector = new();
     private int _sinceDetect;
 
     public string Name => "Tuner";
@@ -39,9 +39,16 @@ public sealed class TunerEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _detector.Configure(_sampleRate, 70.0, 1000.0);
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var detector = new PitchDetector();
+        detector.Configure(sampleRate, 70.0, 1000.0);
+
+        // Publish a fully-configured instance — RebuildTracks can call Prepare from the UI thread
+        // while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _detector = detector;
         _sinceDetect = 0;
         DetectedNote = "";
         DetectedHz = 0;
@@ -54,6 +61,7 @@ public sealed class TunerEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
+        var detector = _detector;
         var channels = _channels < 1 ? 1 : _channels;
         var frames = buffer.Length / channels;
 
@@ -63,14 +71,14 @@ public sealed class TunerEffect : IAudioEffect
             float mono = 0;
             for (var c = 0; c < channels; c++) mono += buffer[i + c];
             mono /= channels;
-            _detector.Push(mono);
+            detector.Push(mono);
         }
 
         _sinceDetect += frames;
         if (_sinceDetect < DetectHop) return;
         _sinceDetect = 0;
 
-        var hz = _detector.Detect();
+        var hz = detector.Detect();
         DetectedHz = hz;
         if (hz <= 0)
         {

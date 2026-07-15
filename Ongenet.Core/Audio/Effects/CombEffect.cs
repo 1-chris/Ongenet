@@ -23,7 +23,7 @@ public sealed class CombEffect : IAudioEffect
 
     private int _channels = 2;
     private int _sampleRate = 44100;
-    private readonly CombFilter _comb = new();
+    private CombFilter _comb = new();
 
     public string Name => "Comb";
 
@@ -39,10 +39,17 @@ public sealed class CombEffect : IAudioEffect
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _comb.Reset();
-        _comb.Configure(DelayMs, Stereo, Feedback, Mix, _sampleRate);
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var comb = new CombFilter();
+        comb.Configure(DelayMs, Stereo, Feedback, Mix, sampleRate);
+        comb.Reset();
+
+        // Publish a fully-configured instance — RebuildTracks can call Prepare from the UI thread
+        // while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _comb = comb;
     }
 
     public IAudioEffect Clone() => new CombEffect
@@ -52,7 +59,9 @@ public sealed class CombEffect : IAudioEffect
 
     public void Process(Span<float> buffer)
     {
-        _comb.Configure(DelayMs, Stereo, Feedback, Mix, _sampleRate);
+        var comb = _comb;
+        var sampleRate = _sampleRate;
+        comb.Configure(DelayMs, Stereo, Feedback, Mix, sampleRate);
         var channels = _channels < 1 ? 1 : _channels;
         var frames = buffer.Length / channels;
 
@@ -61,7 +70,7 @@ public sealed class CombEffect : IAudioEffect
             for (var frame = 0; frame < frames; frame++)
             {
                 var i = frame * channels;
-                _comb.Process(buffer[i], buffer[i + 1], out var l, out var r);
+                comb.Process(buffer[i], buffer[i + 1], out var l, out var r);
                 buffer[i] = l;
                 buffer[i + 1] = r;
             }
@@ -73,7 +82,7 @@ public sealed class CombEffect : IAudioEffect
         for (var frame = 0; frame < frames; frame++)
         {
             var dry = buffer[frame];
-            _comb.Process(dry, dry, out var l, out var r);
+            comb.Process(dry, dry, out var l, out var r);
             buffer[frame] = (l + r) * 0.5f;
         }
     }

@@ -57,16 +57,23 @@ public sealed class FilterEffect : IAudioEffect, ISpectrumSource
 
     public void Prepare(AudioFormat format)
     {
-        _sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
-        _channels = format.Channels < 1 ? 1 : format.Channels;
-        _bq = new Biquad[_channels];
-        _multibank = new MultibankGateFilterDsp[_channels];
-        for (var c = 0; c < _channels; c++)
+        var sampleRate = format.SampleRate > 0 ? format.SampleRate : 44100.0;
+        var channels = format.Channels < 1 ? 1 : format.Channels;
+        var bq = new Biquad[channels];
+        var multibank = new MultibankGateFilterDsp[channels];
+        for (var c = 0; c < channels; c++)
         {
-            _multibank[c] = new MultibankGateFilterDsp();
-            _multibank[c].Prepare(_sampleRate);
-            _multibank[c].HoldOpen();
+            multibank[c] = new MultibankGateFilterDsp();
+            multibank[c].Prepare(sampleRate);
+            multibank[c].HoldOpen();
         }
+
+        // Publish fully-built arrays with single assignments — RebuildTracks can call Prepare from the UI
+        // thread while Process runs on the audio worker pool (e.g. after "Render clip to new track").
+        _sampleRate = sampleRate;
+        _channels = channels;
+        _bq = bq;
+        _multibank = multibank;
         _lastMode = (FilterMode)(-1);
     }
 
@@ -95,13 +102,18 @@ public sealed class FilterEffect : IAudioEffect, ISpectrumSource
 
         if (MultibankMode)
         {
-            ConfigureMultibank();
             var mb = _multibank;
+            if (mb.Length < channels) return;
+            ConfigureMultibank(mb, channels);
             for (var frame = 0; frame < frames; frame++)
             {
                 var i = frame * channels;
                 for (var c = 0; c < channels; c++)
-                    buffer[i + c] = mb[c].Process((float)(buffer[i + c] * pre)) * (float)post;
+                {
+                    var bank = mb[c];
+                    if (bank is null) return;
+                    buffer[i + c] = bank.Process((float)(buffer[i + c] * pre)) * (float)post;
+                }
             }
         }
         else
@@ -129,13 +141,14 @@ public sealed class FilterEffect : IAudioEffect, ISpectrumSource
 
     public int CaptureLatest(float[] dest) => _scope.CaptureLatest(dest);
 
-    private void ConfigureMultibank()
+    private void ConfigureMultibank(MultibankGateFilterDsp[] banks, int channels)
     {
         var freq = Math.Clamp(Frequency, 20, _sampleRate * 0.45);
         var q = Math.Clamp(Resonance, 0.5, 16);
-        for (var c = 0; c < _channels; c++)
+        for (var c = 0; c < channels; c++)
         {
-            var mb = _multibank[c];
+            var mb = banks[c];
+            if (mb is null) return;
             for (var i = 0; i < MultibankGateFilterDsp.BankCount; i++)
             {
                 mb.Levels[i] = 0;
