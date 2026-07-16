@@ -773,8 +773,22 @@ namespace Ongenet.App.Views.Windows
 
         private IProjectFileService? ProjectFile => App.ServiceProvider?.GetService<IProjectFileService>();
 
+        // Patterns only — do not set MimeTypes/AppleUniformTypeIdentifiers.
+        // On macOS those override extension filters and can leave files visible but unselectable.
         private static readonly FilePickerFileType OngenFileType =
             new("Ongenet project") { Patterns = new[] { "*.ongen" } };
+
+        private static readonly FilePickerFileType ForeignProjectFileType =
+            new("DAW project (import)")
+            {
+                Patterns = new[] { "*.flp", "*.als", "*.dawproject", "*.bwproject" }
+            };
+
+        private static readonly FilePickerFileType AllSupportedProjectsFileType =
+            new("All supported projects")
+            {
+                Patterns = new[] { "*.ongen", "*.flp", "*.als", "*.dawproject", "*.bwproject" }
+            };
 
         private void OnNew_Click(object? sender, RoutedEventArgs e) => _ = NewAsync();
         private void OnOpen_Click(object? sender, RoutedEventArgs e) => _ = OpenAsync();
@@ -802,7 +816,13 @@ namespace Ongenet.App.Views.Windows
             {
                 Title = "Open project",
                 AllowMultiple = false,
-                FileTypeFilter = new[] { OngenFileType }
+                FileTypeFilter = new[]
+                {
+                    AllSupportedProjectsFileType,
+                    OngenFileType,
+                    ForeignProjectFileType,
+                    FilePickerFileTypes.All
+                }
             });
 
             var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
@@ -810,11 +830,30 @@ namespace Ongenet.App.Views.Windows
 
             try
             {
-                var result = await pf.LoadAsync(path);
-                History?.Clear(); // start fresh history for the opened project
-                if (result.Warnings.Count > 0)
-                    await MessageDialog.Notify(this, "Project opened with warnings",
-                        string.Join("\n", result.Warnings));
+                if (pf.CanImport(path))
+                {
+                    var imported = await pf.ImportAsync(path);
+                    History?.Clear();
+                    var messages = imported.Warnings
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList();
+                    if (imported.UnresolvedSamplePaths.Count > 0)
+                    {
+                        var unique = imported.UnresolvedSamplePaths.Distinct(StringComparer.OrdinalIgnoreCase).Count();
+                        messages.Add($"{unique} sample path(s) could not be resolved (audio not decoded during import).");
+                    }
+                    messages.Insert(0, "Imported as an Ongenet project (conversion-only). Save As .ongen to keep your work.");
+                    await MessageDialog.Notify(this, "Project imported with notes",
+                        string.Join("\n", messages.Take(25)));
+                }
+                else
+                {
+                    var result = await pf.LoadAsync(path);
+                    History?.Clear();
+                    if (result.Warnings.Count > 0)
+                        await MessageDialog.Notify(this, "Project opened with warnings",
+                            string.Join("\n", result.Warnings));
+                }
             }
             catch (Exception ex)
             {

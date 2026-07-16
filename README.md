@@ -99,7 +99,10 @@ workflows, and hybrid live/arrange work.
 **ADM BWF export** delivers immersive multichannel masters with an ITU-R BS.2076 XML sidecar for
 broadcast handoff. ADM XML is currently sidecar-only rather than embedded in the BWF.
 Timeline **AAF/OMF XML** and custom timeline XML support post-house interchange. Collaboration uses
-self-hosted versioned folder sync.
+self-hosted versioned folder sync. **DAW project import** (read-only conversion): open FL Studio
+(`.flp`), Ableton Live (`.als`), Bitwig DAWproject (`.dawproject`), and experimental native Bitwig
+(`.bwproject`) files that use samples and stock effects — see
+[docs/daw-project-import-roadmap.md](docs/daw-project-import-roadmap.md).
 
 
 | Area                                        | Status                                                                                                               |

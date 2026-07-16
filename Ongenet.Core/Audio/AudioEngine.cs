@@ -351,8 +351,9 @@ public sealed class AudioEngine : IAudioEngine
     private static Bus? ParentBusOf(Track track, Routing routing) => MainOutputBusOf(track, routing);
 
     // Pattern and MIDI lanes schedule notes elsewhere; they never render audio in the engine.
+    // Hybrid tracks host both instruments and audio clips and must participate in the render fan-out.
     private static bool IsDirectAudioTrack(Track track) =>
-        !track.IsBus && track.Kind is TrackKind.Audio or TrackKind.Instrument;
+        !track.IsBus && track.Kind is TrackKind.Audio or TrackKind.Instrument or TrackKind.Hybrid;
 
     // The parent track in the routing tree (the master is the implicit parent of top-level tracks).
     private static Track? ParentTrackOf(Track track, Routing routing)
@@ -985,7 +986,15 @@ public sealed class AudioEngine : IAudioEngine
     {
         var started = Stopwatch.GetTimestamp();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        var st = _blkStates[index];
+        // Snapshot: routing rebuild / next block must not let a stale worker index past the array.
+        var states = _blkStates;
+        if ((uint)index >= (uint)states.Length)
+        {
+            RecordTrackDiagnostics("(stale)", started, allocatedBefore);
+            return;
+        }
+
+        var st = states[index];
         var track = st.Track;
         var silenced = IsSilenced(track, _blkSoloActive, _blkRouting);
         var sidechainSource = _blkRouting.SidechainSources.Contains(track.Id);
@@ -999,7 +1008,10 @@ public sealed class AudioEngine : IAudioEngine
             return;
         }
 
-        if (_blkPlaying && !sidechainSource && !TrackNeedsRender(st, track))
+        // Idle skip applies while stopped too. Large imported projects otherwise render every
+        // instrument + insert FX on every block with the transport stopped, which pegs the CPU
+        // (underrun buzz) and starves UI rebuild after Open/Import.
+        if (!sidechainSource && !TrackNeedsRender(st, track))
         {
             RecordTrackDiagnostics(track.Name, started, allocatedBefore);
             return;
@@ -1043,7 +1055,7 @@ public sealed class AudioEngine : IAudioEngine
             foreach (var slot in slots)
             {
                 if (!slot.Enabled) { slotIndex++; continue; }
-                if (playing && !InstrumentNeedsRender(slot.Instrument, track.Id)) { slotIndex++; continue; }
+                if (!InstrumentNeedsRender(slot.Instrument, track.Id)) { slotIndex++; continue; }
 
                 slotTemp.Clear();
                 if (slot.Instrument is IMultiOutputInstrument multi)
@@ -1073,7 +1085,9 @@ public sealed class AudioEngine : IAudioEngine
                 slotIndex++;
             }
         }
-        else if (playing && track.Kind == TrackKind.Audio)
+
+        // Audio clips on Audio and Hybrid tracks (Hybrid also runs the instrument rack above).
+        if (playing && track.Kind is TrackKind.Audio or TrackKind.Hybrid)
         {
             foreach (var acp in _audioClips)
             {
@@ -1166,6 +1180,9 @@ public sealed class AudioEngine : IAudioEngine
     private bool TrackNeedsRender(TrackState st, Track track)
     {
         if (AnySlotHasActiveVoices(track)) return true;
+        // Arrangement activity only matters while the transport is rolling. When stopped, keep
+        // rendering only tracks with ringing voices (live MIDI / release tails).
+        if (!_blkPlaying) return false;
         var endBeat = _blkCurBeat + _blkLookaheadBeats;
         if (_trackActivity.HasActivity(track.Id, _blkPrevBeat, endBeat)) return true;
         if (track.Kind == TrackKind.Audio && HasActiveAudioClip(track, _blkPrevBeat, _blkCurBeat)) return true;
@@ -1175,6 +1192,7 @@ public sealed class AudioEngine : IAudioEngine
     private bool InstrumentNeedsRender(IInstrument instrument, Guid trackId)
     {
         if (ContainerRenderer.HasActiveVoices(instrument)) return true;
+        if (!_blkPlaying) return false;
         return _trackActivity.HasActivity(trackId, _blkCurBeat, _blkCurBeat + _blkLookaheadBeats);
     }
 

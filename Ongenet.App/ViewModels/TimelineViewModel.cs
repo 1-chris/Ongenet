@@ -60,6 +60,7 @@ namespace Ongenet.App.ViewModels
         private readonly List<TrackLaneViewModel> _trackLanes = new();
         private LaneViewModel? _selectedLane;
         private bool _syncingSelection;
+        private int _clipPopulateGeneration;
 
         public TimelineViewModel(IProjectService project, ISelectionService selection,
             IEventAggregator events, IAudioFileService audioFiles, ITransportService transport,
@@ -1815,22 +1816,55 @@ namespace Ongenet.App.ViewModels
 
         private void Rebuild()
         {
+            _clipPopulateGeneration++;
+            var populateGen = _clipPopulateGeneration;
+
+            // Large imports create thousands of clip VMs; defer so the lane headers paint first.
+            var clipCount = 0;
+            foreach (var t in _project.Current.Tracks)
+                clipCount += t.Clips.Count;
+            var deferClips = clipCount > 200;
+
             _trackLanes.Clear();
             foreach (var track in _project.Current.Tracks)
             {
-                var lane = new TrackLaneViewModel(track, Metrics, this, this);
+                var lane = new TrackLaneViewModel(track, Metrics, this, this, deferClips);
                 lane.RefreshTakeLanes(RebuildRows);
                 _trackLanes.Add(lane);
             }
 
             RecomputeIndents();
             RebuildRows();
-            RefreshPatternClipsOnLanes();
+            if (!deferClips)
+                RefreshPatternClipsOnLanes();
             RefreshMarkers();
             OnPropertyChanged(nameof(ShowVideoReferenceLane));
             OnPropertyChanged(nameof(VideoReferenceLabel));
             ResizeArrangement();
-            foreach (var lane in _trackLanes) UpdateCrossfades(lane);
+            if (!deferClips)
+            {
+                foreach (var lane in _trackLanes) UpdateCrossfades(lane);
+            }
+            else
+            {
+                _ = PopulateDeferredClipsAsync(populateGen);
+            }
+        }
+
+        private async Task PopulateDeferredClipsAsync(int populateGen)
+        {
+            var n = 0;
+            foreach (var lane in _trackLanes.ToList())
+            {
+                if (populateGen != _clipPopulateGeneration) return;
+                if (lane.EnsureClipsLoaded())
+                    UpdateCrossfades(lane);
+                if ((++n & 7) == 0)
+                    await Task.Delay(1);
+            }
+
+            if (populateGen != _clipPopulateGeneration) return;
+            RefreshPatternClipsOnLanes();
         }
 
         private void RefreshMarkers()

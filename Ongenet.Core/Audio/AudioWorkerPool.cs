@@ -117,10 +117,12 @@ public sealed class AudioWorkerPool : IDisposable
     {
         var job = _job;
         if (job is null) return;
+        // Snapshot count so a concurrent Run() cannot stretch indices past the caller's array.
+        var jobCount = Volatile.Read(ref _jobCount);
         while (true)
         {
             var index = Interlocked.Increment(ref _nextJob) - 1;
-            if (index >= _jobCount) return;
+            if (index >= jobCount) return;
             try
             {
                 job(index);

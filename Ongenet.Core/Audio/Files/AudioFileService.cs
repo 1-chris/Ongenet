@@ -31,7 +31,7 @@ public sealed class AudioFileService : IAudioFileService
 
     public bool CanDecode(string path) => _decoders.Any(d => d.CanDecode(path));
 
-    public LoadedAudio? Load(string path)
+    public LoadedAudio? Load(string path, bool analyzeTempo = true)
     {
         var decoder = _decoders.FirstOrDefault(d => d.CanDecode(path));
         if (decoder is null) return null;
@@ -41,7 +41,7 @@ public sealed class AudioFileService : IAudioFileService
 
         // Natural tempo: prefer an explicit "<n>bpm" tag in the file/folder name, else estimate it.
         var named = TempoDetector.FromPath(path);
-        var tempo = named ?? TempoDetector.Estimate(samples);
+        var tempo = named ?? (analyzeTempo ? TempoDetector.Estimate(samples) : null);
         return new LoadedAudio(samples, waveform, tempo, named.HasValue);
     }
 }

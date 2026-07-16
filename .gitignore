@@ -127,3 +127,6 @@ packaging/windows/Output/
 /site/_site/
 /site/api/**
 !/site/api/index.md
+
+# Local scratch / DAW fixtures (not for commit)
+.scratch/

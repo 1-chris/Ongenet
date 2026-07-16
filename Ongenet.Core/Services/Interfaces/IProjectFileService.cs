@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Ongenet.Core.Persistence;
+using Ongenet.Core.Persistence.Import;
 
 namespace Ongenet.Core.Services.Interfaces;
 
@@ -37,6 +38,17 @@ public interface IProjectFileService
 
     /// <summary>Loads a project from <paramref name="path"/>, swaps it in, and returns the load result (warnings).</summary>
     Task<ProjectFile.LoadResult> LoadAsync(string path);
+
+    /// <summary>
+    /// True when <paramref name="path"/> is a foreign DAW project this build can convert (not <c>.ongen</c>).
+    /// </summary>
+    bool CanImport(string path);
+
+    /// <summary>
+    /// Conversion-only import of a foreign DAW project. Clears <see cref="CurrentPath"/>, marks dirty,
+    /// and sets <see cref="DisplayName"/> from the source file. Save writes <c>.ongen</c> only.
+    /// </summary>
+    Task<ImportResult> ImportAsync(string path);
 
     /// <summary>
     /// Saves the current project to <paramref name="stream"/> (browser download / no local path).

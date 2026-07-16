@@ -2,43 +2,41 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace Ongenet.Core.Audio.Files;
 
 /// <summary>
 /// Decodes the audio formats the built-in WAV decoder can't, by transcoding them to a temporary
-/// 32-bit-float WAV with <c>ffmpeg</c> and parsing that via <see cref="WavParser"/>. The decoded PCM
-/// is held in memory; the temp file is deleted immediately. Assumes <c>ffmpeg</c> is on the PATH.
+/// 32-bit-float WAV with <c>ffmpeg</c> and parsing that via <see cref="WavParser"/>. Decoded PCM
+/// is held in memory. Assumes <c>ffmpeg</c> is on the PATH.
 /// </summary>
 public sealed class FfmpegAudioDecoder : IAudioFileDecoder
 {
-    // Formats we hand to ffmpeg. WAV is intentionally excluded — the native decoder handles it.
+    // Formats we hand to ffmpeg. Native PCM/float WAV is handled by WavFileDecoder; compressed
+    // WAV containers (FL Edison Ogg-in-WAV, etc.) are accepted here via CanDecode.
     private static readonly HashSet<string> Convertible = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".mp4", ".aac",
         ".aif", ".aiff", ".aifc", ".wma", ".alac", ".caf", ".ape", ".wv"
     };
 
-    public bool CanDecode(string path) => Convertible.Contains(Path.GetExtension(path));
-
-    public AudioSampleBuffer Decode(string path)
+    public bool CanDecode(string path)
     {
-        // Avalonia/HW-agnostic: write to a unique temp WAV, parse it, then clean up.
-        var temp = Path.Combine(Path.GetTempPath(), $"ongenet-{Guid.NewGuid():N}.wav");
-        try
+        var ext = Path.GetExtension(path);
+        if (Convertible.Contains(ext)) return true;
+
+        if (ext.Equals(".wav", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".wave", StringComparison.OrdinalIgnoreCase))
         {
-            Transcode(path, temp);
-            using var stream = new FileStream(temp, FileMode.Open, FileAccess.Read, FileShare.Read);
-            return WavParser.Parse(stream);
+            return WavFormatProbe.TryGetFormatTag(path, out var tag) &&
+                   !WavFormatProbe.IsNativePcmOrFloat(tag);
         }
-        finally
-        {
-            try { if (File.Exists(temp)) File.Delete(temp); }
-            catch { /* best-effort cleanup */ }
-        }
+
+        return false;
     }
 
-    private static void Transcode(string input, string output)
+    public AudioSampleBuffer Decode(string path)
     {
         var psi = new ProcessStartInfo
         {
@@ -48,13 +46,22 @@ public sealed class FfmpegAudioDecoder : IAudioFileDecoder
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        // -y overwrite, quiet logs, decode to float WAV (full precision, lossless for our purposes).
+        // Quiet logs, float WAV on stdout (avoids per-file temp disk I/O on bulk import).
         psi.ArgumentList.Add("-v"); psi.ArgumentList.Add("error");
         psi.ArgumentList.Add("-y");
-        psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(input);
+
+        // FL Edison stores Ogg Vorbis inside a RIFF/WAVE shell (format 0x674F). ffmpeg's wav
+        // demuxer does not attach a decoder; forcing the ogg demuxer on the same file works.
+        if (WavFormatProbe.TryGetFormatTag(path, out var tag) && tag == WavFormatProbe.FormatOggVorbis)
+        {
+            psi.ArgumentList.Add("-f");
+            psi.ArgumentList.Add("ogg");
+        }
+
+        psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(path);
         psi.ArgumentList.Add("-f"); psi.ArgumentList.Add("wav");
         psi.ArgumentList.Add("-c:a"); psi.ArgumentList.Add("pcm_f32le");
-        psi.ArgumentList.Add(output);
+        psi.ArgumentList.Add("pipe:1");
 
         Process process;
         try
@@ -69,13 +76,19 @@ public sealed class FfmpegAudioDecoder : IAudioFileDecoder
 
         using (process)
         {
-            var error = process.StandardError.ReadToEnd();
+            using var ms = new MemoryStream();
+            var errTask = process.StandardError.ReadToEndAsync();
+            process.StandardOutput.BaseStream.CopyTo(ms);
             process.WaitForExit();
+            var error = errTask.GetAwaiter().GetResult();
             if (process.ExitCode != 0)
             {
                 throw new InvalidOperationException(
-                    $"ffmpeg failed to decode '{Path.GetFileName(input)}' (exit {process.ExitCode}): {error.Trim()}");
+                    $"ffmpeg failed to decode '{Path.GetFileName(path)}' (exit {process.ExitCode}): {error.Trim()}");
             }
+
+            ms.Position = 0;
+            return WavParser.Parse(ms);
         }
     }
 }

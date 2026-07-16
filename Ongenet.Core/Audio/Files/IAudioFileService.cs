@@ -16,5 +16,9 @@ public interface IAudioFileService
     /// Decodes the file to PCM samples (for playback) plus a peak summary (for display), or
     /// returns null if no decoder supports it.
     /// </summary>
-    LoadedAudio? Load(string path);
+    /// <param name="analyzeTempo">
+    /// When false, skips expensive onset-based tempo estimation (use for bulk DAW import).
+    /// Tagged tempos from the file/folder name are still applied.
+    /// </param>
+    LoadedAudio? Load(string path, bool analyzeTempo = true);
 }

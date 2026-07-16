@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -32,8 +33,15 @@ public partial class MainView : UserControl
     private GridLength _rightSaved = new(300);
     private bool _leftCollapsed, _rightCollapsed;
 
+    // Patterns only — MimeTypes/UTIs break selection of unknown extensions on macOS.
     private static readonly FilePickerFileType OngenFileType =
         new("Ongenet project") { Patterns = ["*.ongen"] };
+
+    private static readonly FilePickerFileType AllSupportedProjectsFileType =
+        new("All supported projects")
+        {
+            Patterns = ["*.ongen", "*.flp", "*.als", "*.dawproject", "*.bwproject"]
+        };
 
     public MainView()
     {
@@ -137,12 +145,24 @@ public partial class MainView : UserControl
         {
             Title = "Open project",
             AllowMultiple = false,
-            FileTypeFilter = [OngenFileType]
+            FileTypeFilter = [AllSupportedProjectsFileType, OngenFileType, FilePickerFileTypes.All]
         });
         if (files.Count == 0) return;
 
         try
         {
+            var path = files[0].TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path) && pf.CanImport(path))
+            {
+                var imported = await pf.ImportAsync(path);
+                History?.Clear();
+                var messages = imported.Warnings.Take(40).ToList();
+                messages.Insert(0, "Imported as an Ongenet project (conversion-only). Save As .ongen to keep your work.");
+                await MessageDialog.Notify(this, "Project imported with notes",
+                    string.Join("\n", messages));
+                return;
+            }
+
             await using var stream = await files[0].OpenReadAsync();
             var result = await pf.LoadAsync(stream, files[0].Name);
             History?.Clear();

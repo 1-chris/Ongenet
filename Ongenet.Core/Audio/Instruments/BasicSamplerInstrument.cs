@@ -26,8 +26,13 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
     public double Damping { get; set; } = 0.5;
     public double PickPosition { get; set; } = 0.5;
     public double Brightness { get; set; } = 0.5;
+    /// <summary>Fine pitch offset in cents (FL channel pitch shift), applied on top of MIDI note.</summary>
+    public double FinePitchCents { get; set; }
 
     private static readonly string[] VoiceModeNames = { "Sample", "Karplus" };
+
+    /// <summary>Absolute path of a sample pending decode (import deferral), or null.</summary>
+    public string? SampleFilePath { get; set; }
 
     public string? SampleName { get; private set; }
 
@@ -52,6 +57,7 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
         new FloatParameter("Bright", 0, 1, () => Brightness, v => Brightness = v, "0.00") { Group = "Voice" },
         new FloatParameter("Attack", 0.0, 1.0, () => AttackSeconds, v => AttackSeconds = v, "0.000", "s") { Group = "Amp Envelope" },
         new FloatParameter("Release", 0.001, 2.0, () => ReleaseSeconds, v => ReleaseSeconds = v, "0.000", "s") { Group = "Amp Envelope" },
+        new FloatParameter("Fine Pitch", -2400, 2400, () => FinePitchCents, v => FinePitchCents = v, "0", "ct") { Group = "Pitch" },
         new FloatParameter("Gain", 0.0, 1.0, () => Gain, v => Gain = v) { Group = "Output" }
     };
 
@@ -65,7 +71,9 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
             Gain = Gain,
             Damping = Damping,
             PickPosition = PickPosition,
-            Brightness = Brightness
+            Brightness = Brightness,
+            FinePitchCents = FinePitchCents,
+            SampleFilePath = SampleFilePath
         };
         if (_sample is { } s && SampleName is { } n) copy.LoadSample(s, n);
         return copy;
@@ -105,7 +113,7 @@ public sealed class BasicSamplerInstrument : PolyphonicInstrument, ISampleHost
             }
             else if (_sample is not null)
             {
-                var pitch = Math.Pow(2.0, (midiNote - RootNote) / 12.0);
+                var pitch = Math.Pow(2.0, (midiNote - RootNote) / 12.0 + _instrument.FinePitchCents / 1200.0);
                 _rate = (double)_sample.SampleRate / format.SampleRate * pitch;
             }
 

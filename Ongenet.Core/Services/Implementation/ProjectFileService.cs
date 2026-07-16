@@ -2,12 +2,15 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using Ongenet.Core.Audio;
 using Ongenet.Core.Audio.Effects;
+using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.MidiFx;
 using Ongenet.Core.Models.Audio;
 using Ongenet.Core.Models.Events;
 using Ongenet.Core.Persistence;
+using Ongenet.Core.Persistence.Import;
 using Ongenet.Core.Services.Interfaces;
 
 namespace Ongenet.Core.Services.Implementation;
@@ -25,6 +28,11 @@ public sealed class ProjectFileService : IProjectFileService
     private readonly IEffectRegistry _effects;
     private readonly IMidiEffectRegistry _midiEffects;
     private readonly ISelectionService _selection;
+    private readonly IProjectImportService _imports;
+    private readonly IAudioEngine _engine;
+    private readonly IAudioFileService _audioFiles;
+    private readonly IEventAggregator _events;
+    private int _hydrateGeneration;
 
     private bool _suppressDirty;
     private string? _displayNameOverride;
@@ -32,7 +40,10 @@ public sealed class ProjectFileService : IProjectFileService
     public ProjectFileService(IProjectService project, ITransportService transport,
         IInstrumentRegistry instruments, IEffectRegistry effects, IMidiEffectRegistry midiEffects,
         ISelectionService selection,
-        IEventAggregator events)
+        IProjectImportService imports,
+        IEventAggregator events,
+        IAudioEngine engine,
+        IAudioFileService audioFiles)
     {
         _project = project;
         _transport = transport;
@@ -40,6 +51,10 @@ public sealed class ProjectFileService : IProjectFileService
         _effects = effects;
         _midiEffects = midiEffects;
         _selection = selection;
+        _imports = imports;
+        _engine = engine;
+        _audioFiles = audioFiles;
+        _events = events;
 
         // Anything that mutates the project marks it dirty.
         events.Subscribe<TracksChangedEvent>(_ => MarkDirty());
@@ -127,12 +142,93 @@ public sealed class ProjectFileService : IProjectFileService
             ClearBusy();
         }
 
-        ApplyLoadedProject(result);
-        CurrentPath = path;
-        _displayNameOverride = null;
-        OpenedFromNewerVersion = result.FromNewerVersion;
-        SetDirty(false);
-        Changed?.Invoke();
+        WithEnginePaused(() =>
+        {
+            System.Threading.Interlocked.Increment(ref _hydrateGeneration);
+            ApplyLoadedProjectCore(result);
+            CurrentPath = path;
+            _displayNameOverride = null;
+            OpenedFromNewerVersion = result.FromNewerVersion;
+            SetDirty(false);
+            Changed?.Invoke();
+        });
+        return result;
+    }
+
+    public bool CanImport(string path) => _imports.CanImport(path);
+
+    public async Task<ImportResult> ImportAsync(string path)
+    {
+        // Keep the device quiet for the whole import: sample decode (even deferred hydrate) and
+        // graph rebuild must not contend with the realtime callback on huge FL demos.
+        var resume = _engine.IsRunning;
+        if (resume) _engine.Stop();
+
+        ImportResult result;
+        try
+        {
+            SetBusy("Importing…");
+            try
+            {
+                result = await Task.Run(() => _imports.Import(path));
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Import failed: {ex.Message}", ex);
+            }
+            finally
+            {
+                ClearBusy();
+            }
+
+            // Let the UI paint ClearBusy before the expensive project-swap rebuilds timeline/mixer.
+            await Task.Yield();
+            SetBusy("Building arrangement…");
+            try
+            {
+                _suppressDirty = true;
+                try
+                {
+                    _transport.Stop();
+                    _transport.LoopStart = 0;
+                    _transport.LoopEnd = 0;
+                    _transport.StartBeat = 0;
+                    _selection.SelectTrack(null);
+                    _project.SetCurrentProject(result.Project);
+                    _transport.Tempo = result.Project.Tempo;
+                }
+                finally
+                {
+                    _suppressDirty = false;
+                }
+
+                CurrentPath = null;
+                _displayNameOverride = SanitizeDisplayName(Path.GetFileNameWithoutExtension(path) + " (imported)");
+                OpenedFromNewerVersion = false;
+                SetDirty(true);
+                Changed?.Invoke();
+            }
+            finally
+            {
+                ClearBusy();
+            }
+
+            // Decode samples while the device is still stopped so ffmpeg doesn't underrun audio.
+            SetBusy("Loading samples…");
+            try
+            {
+                await Task.Run(() => ImportAudioHydrator.Hydrate(result.Project, _audioFiles));
+            }
+            finally
+            {
+                ClearBusy();
+            }
+        }
+        finally
+        {
+            if (resume) _engine.Start();
+        }
+
         return result;
     }
 
@@ -198,64 +294,76 @@ public sealed class ProjectFileService : IProjectFileService
             ClearBusy();
         }
 
-        ApplyLoadedProject(result);
-        CurrentPath = null;
-        _displayNameOverride = SanitizeDisplayName(displayName);
-        OpenedFromNewerVersion = result.FromNewerVersion;
-        SetDirty(false);
-        Changed?.Invoke();
+        WithEnginePaused(() =>
+        {
+            System.Threading.Interlocked.Increment(ref _hydrateGeneration);
+            ApplyLoadedProjectCore(result);
+            CurrentPath = null;
+            _displayNameOverride = SanitizeDisplayName(displayName);
+            OpenedFromNewerVersion = result.FromNewerVersion;
+            SetDirty(false);
+            Changed?.Invoke();
+        });
         return result;
     }
 
     public void NewProject()
     {
-        _suppressDirty = true;
-        try
+        System.Threading.Interlocked.Increment(ref _hydrateGeneration);
+        WithEnginePaused(() =>
         {
-            _transport.Stop();
-            _transport.LoopStart = 0;
-            _transport.LoopEnd = 0;
-            _selection.SelectTrack(null);
-            _project.NewProject();
-        }
-        finally
-        {
-            _suppressDirty = false;
-        }
+            _suppressDirty = true;
+            try
+            {
+                _transport.Stop();
+                _transport.LoopStart = 0;
+                _transport.LoopEnd = 0;
+                _selection.SelectTrack(null);
+                _project.NewProject();
+            }
+            finally
+            {
+                _suppressDirty = false;
+            }
 
-        CurrentPath = null;
-        _displayNameOverride = null;
-        OpenedFromNewerVersion = false;
-        SetDirty(false);
-        Changed?.Invoke();
+            CurrentPath = null;
+            _displayNameOverride = null;
+            OpenedFromNewerVersion = false;
+            SetDirty(false);
+            Changed?.Invoke();
+        });
     }
 
     public void LoadProject(Models.Audio.Project project)
     {
-        _suppressDirty = true;
-        try
+        System.Threading.Interlocked.Increment(ref _hydrateGeneration);
+        WithEnginePaused(() =>
         {
-            _transport.Stop();
-            _transport.LoopStart = 0;
-            _transport.LoopEnd = 0;
-            _transport.StartBeat = 0;
-            _selection.SelectTrack(null);
-            _project.SetCurrentProject(project);
-            _transport.Tempo = project.Tempo;
-        }
-        finally
-        {
-            _suppressDirty = false;
-        }
+            _suppressDirty = true;
+            try
+            {
+                _transport.Stop();
+                _transport.LoopStart = 0;
+                _transport.LoopEnd = 0;
+                _transport.StartBeat = 0;
+                _selection.SelectTrack(null);
+                _project.SetCurrentProject(project);
+                _transport.Tempo = project.Tempo;
+            }
+            finally
+            {
+                _suppressDirty = false;
+            }
 
-        CurrentPath = null;
-        _displayNameOverride = null;
-        OpenedFromNewerVersion = false;
-        SetDirty(false);
-        Changed?.Invoke();
+            CurrentPath = null;
+            _displayNameOverride = null;
+            OpenedFromNewerVersion = false;
+            SetDirty(false);
+            Changed?.Invoke();
+        });
     }
 
-    private void ApplyLoadedProject(ProjectFile.LoadResult result)
+    private void ApplyLoadedProjectCore(ProjectFile.LoadResult result)
     {
         _suppressDirty = true;
         try
@@ -271,6 +379,25 @@ public sealed class ProjectFileService : IProjectFileService
         finally
         {
             _suppressDirty = false;
+        }
+    }
+
+    /// <summary>
+    /// Stops the audio device around a project graph swap so instrument/FX Prepare and routing
+    /// rebuild run off the realtime thread. Large imports otherwise Prepare hundreds of devices
+    /// inside the audio callback (underrun buzz) while the UI tries to rebuild.
+    /// </summary>
+    private void WithEnginePaused(Action action)
+    {
+        var resume = _engine.IsRunning;
+        if (resume) _engine.Stop();
+        try
+        {
+            action();
+        }
+        finally
+        {
+            if (resume) _engine.Start();
         }
     }
 

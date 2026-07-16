@@ -29,8 +29,10 @@ namespace Ongenet.App.ViewModels.Timeline
         private readonly ITakeLaneActions? _takeLaneActions;
         private bool _isSelected;
         private bool _isDropTarget;
+        private bool _clipsLoaded;
 
-        public TrackLaneViewModel(Track model, TimelineMetrics metrics, ITrackActions actions, IClipActions clipActions)
+        public TrackLaneViewModel(Track model, TimelineMetrics metrics, ITrackActions actions, IClipActions clipActions,
+            bool deferClips = false)
         {
             Model = model;
             _metrics = metrics;
@@ -56,12 +58,22 @@ namespace Ongenet.App.ViewModels.Timeline
             DeleteGroupAndChildrenCommand = new RelayCommand(() => _actions.DeleteGroupAndChildren(this));
             DetachFromGroupCommand = new RelayCommand(() => _actions.DetachFromGroup(this));
 
-            foreach (var clip in model.Clips)
-            {
-                Clips.Add(new ClipViewModel(clip, model, metrics, clipActions));
-            }
+            if (!deferClips)
+                EnsureClipsLoaded();
 
             RefreshTakeLanes();
+        }
+
+        /// <summary>
+        /// Builds clip VMs if they were deferred (large project open). Safe to call repeatedly.
+        /// </summary>
+        public bool EnsureClipsLoaded()
+        {
+            if (_clipsLoaded) return false;
+            _clipsLoaded = true;
+            foreach (var clip in Model.Clips)
+                Clips.Add(new ClipViewModel(clip, Model, _metrics, _clipActions));
+            return true;
         }
 
         /// <summary>Rebuilds take-lane view models from the track model.</summary>

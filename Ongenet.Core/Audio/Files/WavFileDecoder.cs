@@ -4,15 +4,23 @@ using System.IO;
 namespace Ongenet.Core.Audio.Files;
 
 /// <summary>
-/// Decodes WAV/WAVE files directly (no external tools) via <see cref="WavParser"/>.
+/// Decodes PCM / IEEE-float WAV/WAVE files directly (no external tools) via <see cref="WavParser"/>.
+/// Compressed WAV containers (e.g. FL Studio Edison Ogg-in-WAV) are left for <see cref="FfmpegAudioDecoder"/>.
 /// </summary>
 public sealed class WavFileDecoder : IAudioFileDecoder
 {
     public bool CanDecode(string path)
     {
         var ext = Path.GetExtension(path);
-        return ext.Equals(".wav", StringComparison.OrdinalIgnoreCase)
-               || ext.Equals(".wave", StringComparison.OrdinalIgnoreCase);
+        if (!ext.Equals(".wav", StringComparison.OrdinalIgnoreCase) &&
+            !ext.Equals(".wave", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Unknown / unreadable fmt — assume classic PCM so existing content still loads.
+        if (!WavFormatProbe.TryGetFormatTag(path, out var tag))
+            return true;
+
+        return WavFormatProbe.IsNativePcmOrFloat(tag);
     }
 
     public AudioSampleBuffer Decode(string path)

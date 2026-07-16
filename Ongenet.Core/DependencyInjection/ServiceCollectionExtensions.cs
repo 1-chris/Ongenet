@@ -6,6 +6,11 @@ using Ongenet.Core.Audio.Files;
 using Ongenet.Core.Audio.Instruments;
 using Ongenet.Core.Audio.MidiFx;
 using Ongenet.Core.Audio.Modulation;
+using Ongenet.Core.Persistence.Import;
+using Ongenet.Core.Persistence.Import.Ableton;
+using Ongenet.Core.Persistence.Import.Bitwig;
+using Ongenet.Core.Persistence.Import.DawProject;
+using Ongenet.Core.Persistence.Import.FlStudio;
 using Ongenet.Core.Services;
 using Ongenet.Core.Services.Implementation;
 using Ongenet.Core.Services.Interfaces;
@@ -68,6 +73,13 @@ public static class ServiceCollectionExtensions
         // SFZ instrument loading (parse + decode referenced samples). Used by the inspector and to
         // rebuild "Sampler" instruments on project load.
         services.AddSingleton<Audio.Instruments.Sampler.ISamplerLoadService, Audio.Instruments.Sampler.SamplerLoadService>();
+
+        // Foreign DAW project import (conversion-only → in-memory Project / .ongen on save).
+        services.AddSingleton<IProjectImporter, FlpImporter>();
+        services.AddSingleton<IProjectImporter, AlsImporter>();
+        services.AddSingleton<IProjectImporter, DawprojectImporter>();
+        services.AddSingleton<IProjectImporter, BwprojectImporter>();
+        services.AddSingleton<IProjectImportService, ProjectImportService>();
 
         // Offline render (export to WAV).
         services.AddSingleton<OfflineRenderer>();
